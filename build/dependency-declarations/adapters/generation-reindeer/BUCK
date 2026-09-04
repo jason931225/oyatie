@@ -79,6 +79,37 @@ rust_test(
     within_view = _PACKAGE_VIEW,
 )
 
+rust_binary(
+    name = "dependency-declarations-generation-reindeer-qualification-fixture-provider",
+    srcs = ["tests/fixtures/reindeer_fixture.rs"],
+    crate = "dependency_declarations_generation_reindeer_qualification_fixture_provider",
+    crate_root = "tests/fixtures/reindeer_fixture.rs",
+    visibility = [],
+    within_view = _PACKAGE_VIEW,
+)
+
+rust_test(
+    name = "dependency-declarations-generation-reindeer-candidate-head-qualification-test",
+    srcs = [
+        "tests/candidate_head_qualification.rs",
+        "tests/fixtures/reindeer_fixture.rs",
+    ],
+    crate = "dependency_declarations_generation_reindeer_candidate_head_qualification_test",
+    crate_root = "tests/candidate_head_qualification.rs",
+    env = {
+        "REINDEER_QUALIFICATION_FIXTURE_PROVIDER": "$(location :dependency-declarations-generation-reindeer-qualification-fixture-provider)",
+    },
+    resources = [":dependency-declarations-generation-reindeer-qualification-fixture-provider"],
+    visibility = [],
+    within_view = _PACKAGE_VIEW + [
+        "//build/dependency-declarations/ports/generation/...",
+    ],
+    deps = [
+        ":dependency-declarations-generation-reindeer",
+        "//build/dependency-declarations/ports/generation:dependency-declarations-generation",
+    ],
+)
+
 rust_test(
     name = "dependency-declarations-generation-reindeer-module-membership-test",
     srcs = ["build.rs", "tests/module_membership.rs"],
