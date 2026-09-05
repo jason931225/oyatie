@@ -6,7 +6,7 @@ import "tenancy/binding/v1/attempt.proto";
 import "tenancy/binding/v1/operation.proto";
 import "tenancy/binding/v1/proof.proto";
 import "tenancy/binding/v1/serving_authority_handoff.proto";
-import "tenancy/binding/v1/binding_control_partition.proto";
+import "tenancy/binding/v1/binding_control_contribution_handoff.proto";
 import "tenancy/binding/v1/transfer_execution.proto";
 import "tenancy/binding/v1/source_release_issuance.proto";
 import "tenancy/binding/v1/work_snapshot.proto";
@@ -73,10 +73,12 @@ message BindingReconciliationSubjectV1 {
     TransferExecutionLedgerReconciliationSubjectV1 transfer_execution_ledger = 4;
     SourceReleaseIssuanceReconciliationSubjectV1 source_release_issuance = 5;
     WorkSnapshotReconciliationSubjectV1 work_snapshot = 6;
-    BindingControlContributionProjectionV1 control_contribution_projection = 8;
+    BindingControlContributionOutboxV1 control_contribution_outbox = 9;
   }
   reserved 3;
   reserved "write_authority_lease_issuance";
+  reserved 8;
+  reserved "control_contribution_projection";
 }
 
 message BindingReconciliationCandidateV1 {

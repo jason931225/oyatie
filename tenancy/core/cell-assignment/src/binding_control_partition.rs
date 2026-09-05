@@ -12,7 +12,8 @@ pub struct BindingControlPartitionMutationPartsV1 {
     pub drain_contributor_partition: TenantControlPartitionRefV1,
     pub cell_index_mutations: crate::CellBindingIndexMutationSetV1,
     pub drain_mutations: cell_placement::DrainContributorMutationSetV1,
-    pub contribution_projection_outbox: BindingControlContributionProjectionV1,
+    pub contribution_outbox: crate::BindingControlContributionOutboxV1,
+    pub contribution_limits: crate::BindingControlContributionLimitsV1,
 }
 
 impl BindingControlPartitionMutationV1 {
@@ -29,6 +30,7 @@ impl BindingControlPartitionMutationV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BindingControlContributionProjectionV1 {
+    pub payload: crate::BindingControlContributionPayloadV1,
     pub source_partition: TenantControlPartitionRefV1,
     pub binding_generation: crate::BindingGeneration,
     pub binding_revision: crate::BindingRevision,

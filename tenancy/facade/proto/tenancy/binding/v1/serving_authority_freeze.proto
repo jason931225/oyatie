@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/migration_claim_identity.proto";
+
 import "tenancy/binding/v1/proof.proto";
 import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/binding/v1/serving_authority_installation.proto";
@@ -12,9 +14,11 @@ message ServingAuthorityFreezeIntentV1 {
   ServingAuthorityInstanceV1 instance = 2;
   Digest32 installation_issuance_digest = 3;
   ServingAuthorityBusinessIdV1 business = 4;
-  Digest32 migration_claim_digest = 5;
   uint64 successor_generation = 6;
   Digest32 record_digest = 7;
+  reserved 5;
+  reserved "migration_claim_digest";
+  MigrationClaimIdentityV1 claim_identity = 8;
 }
 
 message CommittedServingAuthorityFreezeClaimV1 {

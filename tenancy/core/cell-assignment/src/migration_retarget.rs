@@ -39,12 +39,13 @@ pub struct MigrationFenceClaimTransitionV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct RetargetMigrationRequestV1 {
+    pub superseded_claim_identity: crate::MigrationClaimIdentityV1,
     pub superseded_operation: crate::BindingOperationKey,
     pub replacement_operation: crate::BindingOperationKey,
     pub expected_superseded_operation_revision: crate::BindingOperationRevision,
     pub expected_replacement_operation_revision: crate::BindingOperationRevision,
     pub active_claim_precondition: MigrationFenceClaimPreconditionV1,
-    pub replacement_claim: MigrationFenceClaimV1,
+    pub replacement_request: Box<crate::ClaimMigrationFenceRequestV1>,
     pub idempotency_key: crate::BindingIdempotencyKey,
     pub canonical_request_digest: crate::BindingDigest32,
 }
@@ -56,6 +57,8 @@ pub struct MigrationRetargetWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct MigrationRetargetWriteSetPartsV1 {
+    pub superseded_claim_identity: crate::MigrationClaimIdentityV1,
+    pub replacement_claim_identity: crate::MigrationClaimIdentityV1,
     pub authority: BindingPersistenceAuthorityV1,
     pub binding_precondition: BindingWritePrecondition,
     pub active_claim_precondition: MigrationFenceClaimPreconditionV1,

@@ -115,6 +115,11 @@ pub struct BindingProofEnvelopeV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BindingProofReuseScopeV1 {
+    ControlContribution {
+        source_partition: crate::TenantControlPartitionRefV1,
+        target: crate::BindingControlContributionTargetV1,
+        projection_digest: BindingDigest32,
+    },
     ServingAuthorityHandoff {
         instance: crate::ServingAuthorityInstanceV1,
         handoff_digest: BindingDigest32,
@@ -180,6 +185,10 @@ impl BindingProofConsumptionV1 {
 
 #[derive(Clone, Copy, Debug)]
 pub enum VerifiedBindingProofRefV1<'a> {
+    ControlContributionCommit(&'a crate::VerifiedCommittedBindingControlContribution),
+    ControlContributionHandoff(&'a crate::VerifiedBindingControlContributionHandoff),
+    ControlContributionAcknowledgment(&'a crate::VerifiedBindingControlContributionAcknowledgment),
+    ServingAuthorityIndependentRetirement(&'a crate::VerifiedServingAuthorityIndependentRetirement),
     ServingAuthorityInstallGrant(&'a crate::VerifiedServingAuthorityInstallGrant),
     ServingAuthorityInstallationResult(&'a crate::VerifiedServingAuthorityInstallationResult),
     ServingAuthorityFreezeResult(&'a crate::VerifiedServingAuthorityFreezeResult),
@@ -212,6 +221,10 @@ impl<'a> VerifiedBindingProofRefV1<'a> {
     #[must_use]
     pub fn proof_envelope(self) -> &'a BindingProofEnvelopeV1 {
         match self {
+            Self::ControlContributionCommit(proof) => &proof.claim().attestation.envelope,
+            Self::ControlContributionHandoff(proof) => &proof.signed().envelope,
+            Self::ControlContributionAcknowledgment(proof) => &proof.signed().envelope,
+            Self::ServingAuthorityIndependentRetirement(proof) => &proof.signed().envelope,
             Self::ServingAuthorityInstallGrant(proof) => &proof.signed().envelope,
             Self::ServingAuthorityInstallationResult(proof) => &proof.signed().envelope,
             Self::ServingAuthorityFreezeResult(proof) => &proof.signed().envelope,

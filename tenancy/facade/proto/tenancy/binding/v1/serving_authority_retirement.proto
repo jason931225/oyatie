@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/migration_claim_identity.proto";
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+import "cell/placement/v1/evidence.proto";
+
+message ServingAuthorityIndependentRetirementPayloadV1 {
+  uint32 schema_version = 1;
+  MigrationClaimIdentityV1 claim_identity = 2;
+  ServingAuthorityInstanceV1 prior_instance = 3;
+  Digest32 installation_issuance_digest = 4;
+  Digest32 issuer_path_manifest_digest = 5;
+  uint64 issuer_path_count = 6;
+  cell.placement.v1.ImmutableEvidenceRefV1 permanent_issuer_fence = 7;
+  cell.placement.v1.ImmutableEvidenceRefV1 permanent_delayed_install_fence = 8;
+  Digest32 retirement_policy_digest = 9;
+  uint64 retired_at_unix_seconds = 10;
+  Digest32 retirement_digest = 11;
+}
+
+message SignedServingAuthorityIndependentRetirementV1 {
+  ServingAuthorityIndependentRetirementPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message ServingAuthorityRetirementExpectationV1 {
+  MigrationClaimIdentityV1 claim_identity = 1;
+  ServingAuthorityInstanceV1 prior_instance = 2;
+  Digest32 installation_issuance_digest = 3;
+  Digest32 issuer_path_manifest_digest = 4;
+  uint64 issuer_path_count = 5;
+  Digest32 retirement_policy_digest = 6;
+  BindingProducerIdV1 expected_producer = 7;
+  BindingProducerIdV1 expected_audience = 8;
+  uint64 now_unix_seconds = 9;
+}
+
+message ServingAuthorityRetirementEvidenceV1 {
+  oneof evidence {
+    ServingAuthorityFreezeResultV1 local_freeze = 1;
+    SignedServingAuthorityIndependentRetirementV1 independent = 2;
+  }
+}
+
+message ServingAuthorityLeaseExpiryRecoveryBasisV1 {
+  ServingAuthorityFreezeResultV1 freeze_result = 1;
+  cell.placement.v1.ImmutableEvidenceRefV1 qualified_time_evidence = 2;
+  cell.placement.v1.ImmutableEvidenceRefV1 source_isolation_proof = 3;
+  Digest32 clock_authority_digest = 4;
+  uint64 clock_uncertainty_bound_millis = 5;
+}
+
+message ServingAuthorityIndependentRecoveryBasisV1 {
+  SignedServingAuthorityIndependentRetirementV1 retirement = 1;
+  cell.placement.v1.ImmutableEvidenceRefV1 effect_isolation_proof = 2;
+}
+
+message ServingAuthorityRecoveryBasisV1 {
+  oneof basis {
+    ServingAuthorityLeaseExpiryRecoveryBasisV1 lease_expiry = 1;
+    ServingAuthorityIndependentRecoveryBasisV1 independent_permanent_fence = 2;
+  }
+}
+
+message ServingAuthorityTerminalClosurePayloadV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 installation_issuance_digest = 2;
+  reserved 3;
+  reserved "freeze_result_digest";
+  Digest32 complete_effect_path_fencing_digest = 4;
+  Digest32 closure_digest = 5;
+  ServingAuthorityRetirementEvidenceV1 retirement = 6;
+}

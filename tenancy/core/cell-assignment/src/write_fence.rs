@@ -122,11 +122,7 @@ pub struct RecoverySourceFenceCompletionPayloadV1 {
     pub evidence_count: u64,
     pub evidence_record: cell_placement::ImmutableEvidenceRefV1,
     pub source_authority: crate::ServingAuthorityInstanceV1,
-    pub source_authority_freeze_result_digest: BindingDigest32,
-    pub committed_source_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
-    pub source_isolation_proof: cell_placement::ImmutableEvidenceRefV1,
-    pub clock_authority_digest: BindingDigest32,
-    pub clock_uncertainty_bound_millis: u64,
+    pub recovery_basis: crate::ServingAuthorityRecoveryBasisV1,
     pub completed_at_unix_seconds: u64,
     pub record_digest: BindingDigest32,
 }
@@ -154,10 +150,7 @@ pub struct RecoverySourceFenceCompletionExpectationV1 {
     pub participant_count: u64,
     pub mode: WriteFenceModeV1,
     pub source_authority: crate::ServingAuthorityInstanceV1,
-    pub source_authority_freeze_result_digest: BindingDigest32,
-    pub committed_source_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
-    pub expected_clock_authority_digest: BindingDigest32,
-    pub maximum_clock_uncertainty_bound_millis: u64,
+    pub recovery_basis: crate::ServingAuthorityRecoveryBasisV1,
     pub expected_producer: BindingProducerId,
     pub expected_audience: BindingProducerId,
     pub now_unix_seconds: u64,
@@ -176,7 +169,7 @@ impl VerifiedRecoverySourceFenceCompletion {
 pub fn verify_recovery_source_fence_completion(
     _verifier: &dyn BindingProofVerifier,
     _signed: SignedRecoverySourceFenceCompletionV1,
-    _freeze: &crate::VerifiedServingAuthorityFreezeResult,
+    _retirement: &crate::VerifiedServingAuthorityRetirementV1,
     _expectation: &RecoverySourceFenceCompletionExpectationV1,
 ) -> Result<VerifiedRecoverySourceFenceCompletion, BindingProofVerificationError> {
     Err(BindingProofVerificationError::NotImplemented)
@@ -224,8 +217,7 @@ pub struct WriteFencePayloadV1 {
     pub participant_manifest_digest: BindingDigest32,
     pub source_fencing_completion_digest: BindingDigest32,
     pub source_authority: crate::ServingAuthorityInstanceV1,
-    pub source_authority_freeze_result_digest: BindingDigest32,
-    pub committed_source_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
+    pub source_retirement: crate::ServingAuthorityRetirementEvidenceV1,
     pub source_fence_directive_ledger_digest: Option<BindingDigest32>,
     pub final_delta_digest: BindingDigest32,
     pub clock_uncertainty_bound_millis: u64,
@@ -262,8 +254,7 @@ pub struct WriteFenceExpectationV1 {
     pub participant_manifest_digest: BindingDigest32,
     pub source_fencing_completion_digest: BindingDigest32,
     pub source_authority: crate::ServingAuthorityInstanceV1,
-    pub source_authority_freeze_result_digest: BindingDigest32,
-    pub committed_source_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
+    pub source_retirement: crate::ServingAuthorityRetirementEvidenceV1,
     pub source_fence_directive_ledger_digest: Option<BindingDigest32>,
     pub final_delta_digest: BindingDigest32,
     pub expected_producer: BindingProducerId,
@@ -284,7 +275,7 @@ impl VerifiedWriteFence {
 pub fn verify_write_fence(
     _verifier: &dyn BindingProofVerifier,
     _signed: SignedWriteFenceV1,
-    _freeze: &crate::VerifiedServingAuthorityFreezeResult,
+    _retirement: &crate::VerifiedServingAuthorityRetirementV1,
     _expectation: &WriteFenceExpectationV1,
 ) -> Result<VerifiedWriteFence, BindingProofVerificationError> {
     Err(BindingProofVerificationError::NotImplemented)

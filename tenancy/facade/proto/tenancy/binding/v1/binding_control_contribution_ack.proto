@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/binding_control_contribution.proto";
+import "tenancy/binding/v1/cell_index.proto";
+
+message BindingControlContributionCheckpointV1 {
+  TenantControlPartitionRefV1 source_partition = 1;
+  BindingControlContributionTargetV1 target = 2;
+  uint64 source_sequence = 3;
+  Digest32 projection_digest = 4;
+  uint64 revision = 5;
+  Digest32 record_digest = 6;
+}
+
+message BindingControlContributionApplicationIntentV1 {
+  uint32 schema_version = 1;
+  TenantControlPartitionRefV1 source_partition = 2;
+  BindingControlContributionTargetV1 target = 3;
+  Digest32 projection_digest = 4;
+  Digest32 complete_payload_digest = 5;
+  uint64 committed_source_revision = 6;
+  BindingControlContributionCheckpointV1 previous_checkpoint = 7;
+  BindingControlContributionCheckpointV1 applied_checkpoint = 8;
+  uint64 target_projection_revision = 9;
+  Digest32 target_projection_digest = 10;
+  Digest32 intent_digest = 11;
+}
+
+message BindingControlContributionAcknowledgmentPayloadV1 {
+  uint32 schema_version = 1;
+  BindingControlContributionApplicationIntentV1 intent = 2;
+  Digest32 target_committed_transaction_digest = 3;
+  Digest32 acknowledgment_digest = 4;
+}
+
+message SignedBindingControlContributionAcknowledgmentV1 {
+  BindingControlContributionAcknowledgmentPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message BindingCellIndexProjectionResultV1 {
+  CellBindingIndexSnapshotV1 snapshot = 1;
+  repeated SignedBindingControlContributionAcknowledgmentV1 acknowledgments = 2;
+}
+
+message BindingControlContributionAcknowledgmentQueryV1 {
+  TenantControlPartitionRefV1 source_partition = 1;
+  BindingControlContributionTargetV1 target = 2;
+  Digest32 projection_digest = 3;
+}

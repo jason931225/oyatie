@@ -2,7 +2,10 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
-import "tenancy/binding/v1/serving_authority_freeze.proto";
+import "tenancy/binding/v1/migration_claim_identity.proto";
+
+import "tenancy/binding/v1/serving_authority_retirement.proto";
+
 
 import "tenancy/binding/v1/serving_authority.proto";
 
@@ -136,8 +139,10 @@ message CommitMigrationWriteFenceRequestV1 {
   string idempotency_key = 4;
   Digest32 canonical_request_digest = 5;
   SourceFencingCompletionV1 source_fencing_completion = 6;
-  ServingAuthorityFreezeResultV1 source_authority_freeze = 7;
   ServingAuthorityTerminalClosurePayloadV1 terminal_authority_closure = 8;
+  reserved 7;
+  reserved "source_authority_freeze";
+  ServingAuthorityRetirementEvidenceV1 source_authority_retirement = 9;
 }
 
 message RetargetMigrationRequestV1 {
@@ -146,9 +151,12 @@ message RetargetMigrationRequestV1 {
   uint64 expected_superseded_operation_revision = 3;
   uint64 expected_replacement_operation_revision = 4;
   MigrationFenceClaimPreconditionV1 active_claim_precondition = 5;
-  MigrationFenceClaimV1 replacement_claim = 6;
+  reserved 6;
+  reserved "replacement_claim";
+  ClaimMigrationFenceRequestV1 replacement_request = 10;
   string idempotency_key = 7;
   Digest32 canonical_request_digest = 8;
+  MigrationClaimIdentityV1 superseded_claim_identity = 9;
 }
 
 message MigrationRetargetMutationResultV1 {

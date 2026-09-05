@@ -32,4 +32,8 @@ pub enum BindingProofDomainV1 {
     ServingAuthorityFreezeGrant,
     ServingAuthorityInstallationResult,
     ServingAuthorityFreezeResult,
+    ServingAuthorityIndependentRetirement,
+    ControlContributionCommit,
+    ControlContributionHandoff,
+    ControlContributionAcknowledgment,
 }

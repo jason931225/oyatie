@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority_retirement.proto";
+
+import "tenancy/binding/v1/migration_claim_identity.proto";
+
 import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/binding/v1/serving_authority_freeze.proto";
 
@@ -86,16 +90,18 @@ message RecoverySourceFenceCompletionPayloadV1 {
   Digest32 evidence_set_root_digest = 15;
   uint64 evidence_count = 16;
   cell.placement.v1.ImmutableEvidenceRefV1 evidence_record = 17;
-  cell.placement.v1.ImmutableEvidenceRefV1 source_isolation_proof = 19;
-  uint64 clock_uncertainty_bound_millis = 20;
   uint64 completed_at_unix_seconds = 21;
   Digest32 record_digest = 22;
-  Digest32 clock_authority_digest = 24;
   ServingAuthorityInstanceV1 source_authority = 25;
-  Digest32 source_authority_freeze_result_digest = 26;
   reserved 23, 18;
   reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds";
-  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 27;
+  reserved 26, 27;
+  reserved "source_authority_freeze_result_digest", "committed_source_horizon";
+  reserved 28;
+  reserved "source_retirement";
+  reserved 19, 24, 20;
+  reserved "source_isolation_proof", "clock_authority_digest", "clock_uncertainty_bound_millis";
+  ServingAuthorityRecoveryBasisV1 recovery_basis = 29;
 }
 
 message SignedRecoverySourceFenceCompletionV1 {
@@ -160,10 +166,11 @@ message WriteFencePayloadV1 {
   reserved 27 to 30;
   Digest32 source_fence_directive_ledger_digest = 31;
   ServingAuthorityInstanceV1 source_authority = 32;
-  Digest32 source_authority_freeze_result_digest = 33;
   reserved 25, 26;
   reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds";
-  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 34;
+  reserved 33, 34;
+  reserved "source_authority_freeze_result_digest", "committed_source_horizon";
+  ServingAuthorityRetirementEvidenceV1 source_retirement = 35;
 }
 
 message SignedWriteFenceV1 {
@@ -205,6 +212,7 @@ message MigrationFenceClaimV1 {
   ServingAuthorityInstanceV1 source_authority = 31;
   Digest32 source_installation_issuance_digest = 32;
   Digest32 source_freeze_intent_digest = 33;
+  MigrationClaimIdentityV1 identity = 34;
 }
 
 message MigrationFenceClaimMutationResultV1 {
@@ -257,11 +265,12 @@ message MigrationCommitSealPayloadV1 {
   Digest32 forward_completion_coverage_digest = 40;
   RollbackWindowPolicyV1 rollback_window_policy = 41;
   ServingAuthorityInstanceV1 source_authority = 42;
-  Digest32 source_authority_freeze_result_digest = 43;
   Digest32 source_authority_terminal_closure_digest = 44;
   reserved 37, 39, 38;
   reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds", "frozen_source_write_authority_lease_state_digest";
-  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 45;
+  reserved 43, 45;
+  reserved "source_authority_freeze_result_digest", "committed_source_horizon";
+  ServingAuthorityRetirementEvidenceV1 source_retirement = 46;
 }
 
 message SignedMigrationCommitSealV1 {

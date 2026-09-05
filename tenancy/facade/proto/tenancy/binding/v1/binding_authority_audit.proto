@@ -4,6 +4,7 @@ package tenancy.binding.v1;
 import "cell/placement/v1/proof.proto";
 import "tenancy/binding/v1/proof.proto";
 import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/binding_control_contribution.proto";
 import "tenancy/binding/v1/serving_authority_freeze.proto";
 
 message BindingMovedAuditEffectV1 {
@@ -35,6 +36,7 @@ message BindingMovedAuditEffectV1 {
   Digest32 installation_issuance_digest = 26;
   Digest32 primary_location_digest = 27;
   Digest32 recovery_location_digest = 28;
+  Digest32 control_contribution_digest = 29;
 }
 
 message MigrationWithAuthorityAllocationAuditEffectV1 {
@@ -42,6 +44,7 @@ message MigrationWithAuthorityAllocationAuditEffectV1 {
   Digest32 authority_high_water_record_digest = 2;
   ServingAuthorityInstanceV1 source_authority = 3;
   Digest32 source_freeze_intent_digest = 4;
+  Digest32 claim_identity_digest = 5;
 }
 
 message InitialBindingCommittedAuditEffectV1 {
@@ -66,6 +69,7 @@ message InitialBindingCommittedAuditEffectV1 {
   Digest32 installation_issuance_digest = 19;
   Digest32 primary_location_digest = 20;
   Digest32 recovery_location_digest = 21;
+  Digest32 control_contribution_digest = 22;
 }
 
 message MigrationFenceClaimedAuditEffectV1 {
@@ -86,6 +90,7 @@ message MigrationFenceClaimedAuditEffectV1 {
   Digest32 transfer_effect_manifest_digest = 15;
   Digest32 participant_manifest_digest = 16;
   Digest32 prepared_participant_closure_digest = 17;
+  Digest32 claim_identity_digest = 18;
 }
 
 message ServingAuthorityInstalledAuditEffectV1 {
@@ -129,4 +134,28 @@ message WriteAuthorityLeasePublishedAuditEffectV1 {
   uint64 write_authority_epoch = 5;
   Digest32 lease_digest = 6;
   Digest32 issuance_record_digest = 7;
+}
+
+message ServingAuthorityIndependentlyRetiredAuditEffectV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 retirement_digest = 2;
+  Digest32 installation_issuance_digest = 3;
+}
+
+message ControlContributionPublishedAuditEffectV1 {
+  Digest32 projection_digest = 1;
+  BindingControlContributionTargetV1 target = 2;
+  Digest32 handoff_digest = 3;
+}
+
+message ControlContributionAcknowledgedAuditEffectV1 {
+  Digest32 projection_digest = 1;
+  BindingControlContributionTargetV1 target = 2;
+  Digest32 acknowledgment_digest = 3;
+}
+
+message CellIndexContributionsAppliedAuditEffectV1 {
+  Digest32 applied_contribution_root_digest = 1;
+  Digest32 applied_checkpoint_root_digest = 2;
+  Digest32 target_projection_digest = 3;
 }

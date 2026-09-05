@@ -11,6 +11,7 @@ use crate::{
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct MigrationFenceClaimV1 {
+    identity: crate::MigrationClaimIdentityV1,
     operation: BindingOperationKey,
     tenant_id: TenantId,
     source_cell_id: CellId,
@@ -43,6 +44,7 @@ pub struct MigrationFenceClaimV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct MigrationFenceClaimPartsV1 {
+    pub identity: crate::MigrationClaimIdentityV1,
     pub operation: BindingOperationKey,
     pub tenant_id: TenantId,
     pub source_cell_id: CellId,
@@ -74,6 +76,19 @@ pub struct MigrationFenceClaimPartsV1 {
 }
 
 impl MigrationFenceClaimV1 {
+    pub fn assemble(
+        _identity: &crate::MigrationClaimIdentityV1,
+        _intent: &crate::ServingAuthorityFreezeIntentV1,
+        _parts: MigrationFenceClaimPartsV1,
+    ) -> Result<Self, MigrationFenceClaimError> {
+        Err(MigrationFenceClaimError::NotImplemented)
+    }
+
+    #[must_use]
+    pub fn identity(&self) -> &crate::MigrationClaimIdentityV1 {
+        &self.identity
+    }
+
     pub fn rehydrate(_parts: MigrationFenceClaimPartsV1) -> Result<Self, MigrationFenceClaimError> {
         Err(MigrationFenceClaimError::NotImplemented)
     }

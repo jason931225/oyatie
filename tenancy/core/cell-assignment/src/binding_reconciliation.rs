@@ -60,7 +60,7 @@ pub struct BindingReconciliationQueryV1 {
 #[derive(Debug, Eq, PartialEq)]
 pub enum BindingReconciliationSubjectV1 {
     ControlContributionProjection {
-        projection: Box<crate::BindingControlContributionProjectionV1>,
+        outbox: Box<crate::BindingControlContributionOutboxV1>,
     },
     WorkSnapshot {
         expected_revision: crate::BindingWorkSnapshotRevision,

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority_retirement.proto";
+
 import "tenancy/binding/v1/proof.proto";
 import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/binding/v1/serving_authority_installation.proto";
@@ -18,9 +20,11 @@ message ServingAuthorityHandoffProgressV1 {
     ServingAuthorityPotentiallyInstallableV1 committed_potentially_installable = 1;
     ServingAuthorityInstallationResultV1 installed = 2;
     ServingAuthorityFreezeIntentV1 freeze_requested = 3;
-    ServingAuthorityFreezeResultV1 frozen_awaiting_effect_fencing = 4;
+    ServingAuthorityRetirementEvidenceV1 retired_awaiting_effect_fencing = 6;
     ServingAuthorityTerminalFencedV1 terminal_fenced = 5;
   }
+  reserved 4;
+  reserved "frozen_awaiting_effect_fencing";
 }
 
 message ServingAuthorityHandoffRecordV1 {

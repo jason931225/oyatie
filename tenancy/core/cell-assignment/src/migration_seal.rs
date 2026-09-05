@@ -41,8 +41,7 @@ pub struct MigrationCommitSealPayloadV1 {
     pub write_fence_digest: BindingDigest32,
     pub source_fencing_completion_digest: BindingDigest32,
     pub source_authority: crate::ServingAuthorityInstanceV1,
-    pub source_authority_freeze_result_digest: BindingDigest32,
-    pub committed_source_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
+    pub source_retirement: crate::ServingAuthorityRetirementEvidenceV1,
     pub source_authority_terminal_closure_digest: BindingDigest32,
     pub write_authority_epoch: WriteAuthorityEpoch,
     pub write_fence_mode: WriteFenceModeV1,
@@ -93,8 +92,7 @@ pub struct MigrationCommitSealExpectationV1 {
     pub write_fence_digest: BindingDigest32,
     pub source_fencing_completion_digest: BindingDigest32,
     pub source_authority: crate::ServingAuthorityInstanceV1,
-    pub source_authority_freeze_result_digest: BindingDigest32,
-    pub committed_source_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
+    pub source_retirement: crate::ServingAuthorityRetirementEvidenceV1,
     pub source_authority_terminal_closure_digest: BindingDigest32,
     pub write_authority_epoch: WriteAuthorityEpoch,
     pub write_fence_mode: WriteFenceModeV1,
@@ -120,6 +118,7 @@ impl VerifiedMigrationCommitSeal {
 pub fn verify_migration_commit_seal(
     _verifier: &dyn BindingProofVerifier,
     _signed: SignedMigrationCommitSealV1,
+    _terminal_closure: &crate::VerifiedServingAuthorityTerminalClosure,
     _expectation: &MigrationCommitSealExpectationV1,
 ) -> Result<VerifiedMigrationCommitSeal, BindingProofVerificationError> {
     Err(BindingProofVerificationError::NotImplemented)

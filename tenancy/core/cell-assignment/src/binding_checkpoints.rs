@@ -68,6 +68,7 @@ pub struct BindingMigrationFenceClaimWriteSetV1 {
     authority: BindingPersistenceAuthorityV1,
     binding_precondition: BindingWritePrecondition,
     expected_operation_revision: BindingOperationRevision,
+    claim_identity: crate::MigrationClaimIdentityV1,
     claim: MigrationFenceClaimV1,
     operation: BindingOperationV1,
     idempotency: BindingIdempotencyRecordV1,
@@ -85,6 +86,7 @@ pub struct BindingMigrationFenceClaimWriteSetPartsV1 {
     pub authority: BindingPersistenceAuthorityV1,
     pub binding_precondition: BindingWritePrecondition,
     pub expected_operation_revision: BindingOperationRevision,
+    pub claim_identity: crate::MigrationClaimIdentityV1,
     pub claim: MigrationFenceClaimV1,
     pub operation: BindingOperationV1,
     pub idempotency: BindingIdempotencyRecordV1,
@@ -117,6 +119,11 @@ impl BindingMigrationFenceClaimWriteSetV1 {
     #[must_use]
     pub fn expected_operation_revision(&self) -> BindingOperationRevision {
         self.expected_operation_revision
+    }
+
+    #[must_use]
+    pub fn claim_identity(&self) -> &crate::MigrationClaimIdentityV1 {
+        &self.claim_identity
     }
 
     #[must_use]

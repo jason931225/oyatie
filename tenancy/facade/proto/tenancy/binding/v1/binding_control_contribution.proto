@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "cell/placement/v1/proof.proto";
+import "cell/placement/v1/drain_seal.proto";
+import "tenancy/binding/v1/cell_index.proto";
+
+message BindingControlContributionLimitsV1 {
+  uint32 maximum_index_mutations = 1;
+  uint32 maximum_drain_mutations = 2;
+  uint32 maximum_destinations = 3;
+  uint32 maximum_batch_contributions = 4;
+  uint64 maximum_encoded_bytes = 5;
+  uint32 maximum_proof_depth = 6;
+}
+
+message BindingControlContributionTargetV1 {
+  string partition = 1;
+  cell.placement.v1.CellId cell_id = 2;
+}
+
+message BindingControlContributionDestinationV1 {
+  BindingControlContributionTargetV1 target = 1;
+  uint64 previous_source_sequence = 2;
+  Digest32 previous_projection_digest = 3;
+  uint64 source_sequence = 4;
+}
+
+message BindingControlContributionPayloadV1 {
+  CellBindingIndexMutationSetV1 cell_index_mutations = 1;
+  cell.placement.v1.DrainContributorMutationSetV1 drain_mutations = 2;
+  repeated BindingControlContributionDestinationV1 destinations = 3;
+  uint64 encoded_bytes = 4;
+  Digest32 payload_digest = 5;
+}
+
+message BindingControlContributionProjectionV1 {
+  TenantControlPartitionRefV1 source_partition = 1;
+  uint64 binding_generation = 2;
+  uint64 binding_revision = 3;
+  Digest32 binding_record_digest = 4;
+  Digest32 cell_index_mutation_set_digest = 5;
+  Digest32 drain_mutation_set_digest = 6;
+  Digest32 projection_digest = 7;
+  BindingControlContributionPayloadV1 payload = 8;
+}
+
+message BindingControlContributionCommitPayloadV1 {
+  uint32 schema_version = 1;
+  TenantControlPartitionRefV1 source_partition = 2;
+  uint64 binding_revision = 3;
+  Digest32 projection_digest = 4;
+  Digest32 complete_payload_digest = 5;
+  uint64 committed_source_revision = 6;
+  Digest32 committed_transaction_digest = 7;
+  uint64 committed_at_unix_seconds = 8;
+}
+
+message SignedBindingControlContributionCommitV1 {
+  BindingControlContributionCommitPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message CommittedBindingControlContributionClaimV1 {
+  BindingControlContributionProjectionV1 projection = 1;
+  SignedBindingControlContributionCommitV1 attestation = 2;
+}
+
+message BindingControlContributionExpectationV1 {
+  TenantControlPartitionRefV1 source_partition = 1;
+  BindingControlContributionTargetV1 target = 2;
+  Digest32 projection_digest = 3;
+  Digest32 complete_payload_digest = 4;
+  uint64 committed_source_revision = 5;
+  BindingProducerIdV1 expected_source_producer = 6;
+  BindingProducerIdV1 expected_handoff_producer = 7;
+  BindingProducerIdV1 expected_audience = 8;
+  uint64 now_unix_seconds = 9;
+}

@@ -5,7 +5,7 @@ pub enum ServingAuthorityHandoffProgressV1 {
     CommittedPotentiallyInstallable,
     Installed(Box<crate::ServingAuthorityInstallationResultV1>),
     FreezeRequested(Box<crate::ServingAuthorityFreezeIntentV1>),
-    FrozenAwaitingEffectFencing(Box<crate::ServingAuthorityFreezeResultV1>),
+    RetiredAwaitingEffectFencing(Box<crate::ServingAuthorityRetirementEvidenceV1>),
     TerminalFenced { closure_digest: BindingDigest32 },
 }
 
@@ -40,7 +40,7 @@ impl ServingAuthorityHandoffRecordV1 {
 pub struct ServingAuthorityTerminalClosurePayloadV1 {
     pub instance: crate::ServingAuthorityInstanceV1,
     pub installation_issuance_digest: BindingDigest32,
-    pub freeze_result_digest: BindingDigest32,
+    pub retirement: crate::ServingAuthorityRetirementEvidenceV1,
     pub complete_effect_path_fencing_digest: BindingDigest32,
     pub closure_digest: BindingDigest32,
 }
@@ -56,8 +56,8 @@ impl VerifiedServingAuthorityTerminalClosure {
 }
 
 pub fn verify_serving_authority_terminal_closure(
-    _freeze: &crate::VerifiedServingAuthorityFreezeResult,
-    _effect_fencing: &crate::VerifiedSourceFencingCompletionV1,
+    _retirement: &crate::VerifiedServingAuthorityRetirementV1,
+    _effect_fencing: &crate::VerifiedRetiredSourceEffectClosureV1,
     _expected: &crate::ServingAuthorityHandoffExpectationV1,
     _payload: ServingAuthorityTerminalClosurePayloadV1,
 ) -> Result<VerifiedServingAuthorityTerminalClosure, crate::BindingProofVerificationError> {
@@ -68,7 +68,7 @@ pub fn verify_serving_authority_terminal_closure(
 pub enum ServingAuthorityControlHandoffEvidenceV1 {
     PublishedInstallGrant(Box<crate::VerifiedServingAuthorityInstallGrant>),
     Installed(Box<crate::VerifiedServingAuthorityInstallationResult>),
-    Frozen(Box<crate::VerifiedServingAuthorityFreezeResult>),
+    Retired(Box<crate::VerifiedServingAuthorityRetirementV1>),
     TerminalFenced(Box<VerifiedServingAuthorityTerminalClosure>),
 }
 

@@ -14,7 +14,7 @@ use crate::{
     MigrationWriteFenceMutationResultV1, MoveBindingRequestV1, RetargetMigrationRequestV1,
     SignedWriteFenceV1, TenantCellBinding, TenantId, VerifiedBindingInvocation,
     VerifiedBindingRepairAuthority, VerifiedParticipantManifest, VerifiedParticipantPhaseClosure,
-    VerifiedResidencyTransferAuthorizationSet, VerifiedSourceFencingCompletionV1,
+    VerifiedResidencyTransferAuthorizationSet, VerifiedRetiredSourceEffectClosureV1,
     VerifiedTransferEffectManifest, VerifiedWriteFence,
 };
 
@@ -106,8 +106,8 @@ pub struct CommitMigrationWriteFenceRequestV1 {
     pub operation: BindingOperationKey,
     pub expected_operation_revision: BindingOperationRevision,
     pub write_fence: VerifiedWriteFence,
-    pub source_fencing_completion: VerifiedSourceFencingCompletionV1,
-    pub source_authority_freeze: crate::VerifiedServingAuthorityFreezeResult,
+    pub source_fencing_completion: VerifiedRetiredSourceEffectClosureV1,
+    pub source_authority_retirement: crate::VerifiedServingAuthorityRetirementV1,
     pub terminal_authority_closure: crate::VerifiedServingAuthorityTerminalClosure,
     pub idempotency_key: BindingIdempotencyKey,
     pub canonical_request_digest: BindingDigest32,

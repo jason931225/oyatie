@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "cell/placement/v1/proof.proto";
+
+message MigrationClaimInitialAllocationV1 {}
+
+message MigrationClaimRetargetAllocationV1 {
+  Digest32 superseded_identity_digest = 1;
+}
+
+message MigrationClaimAllocationBasisV1 {
+  oneof basis {
+    MigrationClaimInitialAllocationV1 initial_allocation = 1;
+    MigrationClaimRetargetAllocationV1 retarget = 2;
+  }
+}
+
+message MigrationClaimIdentityPreimageV1 {
+  uint32 schema_version = 1;
+  TenantControlPartitionRefV1 control_partition = 2;
+  BindingOperationKeyV1 operation = 3;
+  string idempotency_key = 4;
+  Digest32 canonical_request_digest = 5;
+  ServingAuthorityInstanceV1 source_authority = 6;
+  Digest32 source_installation_issuance_digest = 7;
+  cell.placement.v1.CellId target_cell_id = 8;
+  uint64 successor_generation = 9;
+  uint64 successor_write_authority_epoch = 10;
+  Digest32 binding_attempt_digest = 11;
+  MigrationClaimAllocationBasisV1 allocation_basis = 12;
+}
+
+message MigrationClaimIdentityV1 {
+  MigrationClaimIdentityPreimageV1 preimage = 1;
+  Digest32 identity_digest = 2;
+}

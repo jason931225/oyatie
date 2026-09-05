@@ -86,6 +86,14 @@ pub struct ServingAuthorityBusinessIdV1 {
     pub handoff_digest: BindingDigest32,
 }
 
+impl ServingAuthorityBusinessIdV1 {
+    pub fn for_migration_claim(
+        _identity: &crate::MigrationClaimIdentityV1,
+    ) -> Result<Self, crate::BindingProofConstructionError> {
+        Err(crate::BindingProofConstructionError::NotImplemented)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServingAuthorityHandoffExpectationV1 {
     pub control_partition: TenantControlPartitionRefV1,

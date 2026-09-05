@@ -9,7 +9,7 @@ pub struct ServingAuthorityFreezeIntentV1 {
     pub instance: ServingAuthorityInstanceV1,
     pub installation_issuance_digest: BindingDigest32,
     pub business: ServingAuthorityBusinessIdV1,
-    pub migration_claim_digest: BindingDigest32,
+    pub claim_identity: crate::MigrationClaimIdentityV1,
     pub successor_generation: crate::BindingGeneration,
     pub record_digest: BindingDigest32,
 }
@@ -34,6 +34,7 @@ pub fn verify_committed_serving_authority_freeze(
     _verifier: &dyn crate::BindingProofVerifier,
     _claim: CommittedServingAuthorityFreezeClaimV1,
     _expectation: &crate::ServingAuthorityHandoffExpectationV1,
+    _claim_identity: &crate::MigrationClaimIdentityV1,
 ) -> Result<VerifiedCommittedServingAuthorityFreeze, crate::BindingProofVerificationError> {
     Err(crate::BindingProofVerificationError::NotImplemented)
 }
@@ -59,6 +60,7 @@ pub fn verify_serving_authority_freeze_grant(
     _verifier: &dyn crate::BindingProofVerifier,
     _signed: SignedServingAuthorityFreezeGrantV1,
     _expectation: &crate::ServingAuthorityHandoffExpectationV1,
+    _claim_identity: &crate::MigrationClaimIdentityV1,
 ) -> Result<VerifiedServingAuthorityFreezeGrant, crate::BindingProofVerificationError> {
     Err(crate::BindingProofVerificationError::NotImplemented)
 }
@@ -130,6 +132,7 @@ pub fn verify_serving_authority_freeze_result(
     _verifier: &dyn crate::BindingProofVerifier,
     _signed: ServingAuthorityFreezeResultV1,
     _expectation: &crate::ServingAuthorityHandoffExpectationV1,
+    _claim_identity: &crate::MigrationClaimIdentityV1,
 ) -> Result<VerifiedServingAuthorityFreezeResult, crate::BindingProofVerificationError> {
     Err(crate::BindingProofVerificationError::NotImplemented)
 }

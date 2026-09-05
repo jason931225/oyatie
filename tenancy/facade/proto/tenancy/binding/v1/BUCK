@@ -157,3 +157,28 @@ export_file(
     name = "binding_authority_audit.proto",
     visibility = ["PUBLIC"],
 )
+
+export_file(
+    name = "migration_claim_identity.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_retirement.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "binding_control_contribution.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "binding_control_contribution_ack.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "binding_control_contribution_handoff.proto",
+    visibility = ["PUBLIC"],
+)

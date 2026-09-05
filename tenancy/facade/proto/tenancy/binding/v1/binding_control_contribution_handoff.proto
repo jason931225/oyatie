@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/binding_control_contribution.proto";
+import "tenancy/binding/v1/binding_control_contribution_ack.proto";
+
+message SignedBindingControlContributionHandoffV1 {
+  CommittedBindingControlContributionClaimV1 committed = 1;
+  BindingControlContributionTargetV1 target = 2;
+  BindingProofEnvelopeV1 envelope = 3;
+  bytes signature = 4;
+}
+
+message BindingControlContributionPendingPublicationV1 {
+  BindingControlContributionTargetV1 target = 1;
+}
+
+message BindingControlContributionDeliveryV1 {
+  oneof delivery {
+    BindingControlContributionPendingPublicationV1 pending_publication = 1;
+    SignedBindingControlContributionHandoffV1 published_awaiting_acknowledgment = 2;
+    SignedBindingControlContributionAcknowledgmentV1 acknowledged = 3;
+  }
+}
+
+message BindingControlContributionOutboxV1 {
+  BindingControlContributionProjectionV1 projection = 1;
+  repeated BindingControlContributionDeliveryV1 deliveries = 2;
+  uint64 minimum_retention_after_acknowledgment_seconds = 3;
+  uint64 revision = 4;
+  Digest32 record_digest = 5;
+}
+
+message BindingControlContributionQueryV1 {
+  TenantControlPartitionRefV1 source_partition = 1;
+  Digest32 projection_digest = 2;
+}

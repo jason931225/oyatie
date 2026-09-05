@@ -14,6 +14,7 @@ pub enum BindingAbortContextV1 {
         authority_high_water_record_digest: BindingDigest32,
         source_authority: Box<crate::ServingAuthorityInstanceV1>,
         source_freeze_intent_digest: BindingDigest32,
+        claim_identity_digest: BindingDigest32,
     },
 }
 
@@ -42,6 +43,7 @@ pub struct BindingMovedAuditEffectV1 {
     pub source_authority_terminal_closure_digest: BindingDigest32,
     pub migration_commit_seal_digest: BindingDigest32,
     pub binding_outcome_digest: BindingDigest32,
+    pub control_contribution_digest: BindingDigest32,
     pub projection_digest: BindingDigest32,
     pub target_authority: crate::ServingAuthorityInstanceV1,
     pub installation_issuance_digest: BindingDigest32,
@@ -51,6 +53,26 @@ pub struct BindingMovedAuditEffectV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BindingAuditEffectV1 {
+    ControlContributionPublished {
+        projection_digest: BindingDigest32,
+        target: crate::BindingControlContributionTargetV1,
+        handoff_digest: BindingDigest32,
+    },
+    ControlContributionAcknowledged {
+        projection_digest: BindingDigest32,
+        target: crate::BindingControlContributionTargetV1,
+        acknowledgment_digest: BindingDigest32,
+    },
+    CellIndexContributionsApplied {
+        applied_contribution_root_digest: BindingDigest32,
+        applied_checkpoint_root_digest: BindingDigest32,
+        target_projection_digest: BindingDigest32,
+    },
+    ServingAuthorityIndependentlyRetired {
+        instance: crate::ServingAuthorityInstanceV1,
+        retirement_digest: BindingDigest32,
+        installation_issuance_digest: BindingDigest32,
+    },
     ServingAuthorityInstalled {
         instance: crate::ServingAuthorityInstanceV1,
         installation_issuance_digest: BindingDigest32,
@@ -105,6 +127,7 @@ pub enum BindingAuditEffectV1 {
         placement_decision_digest: BindingDigest32,
         reservation_commit_permit_digest: BindingDigest32,
         participant_preparation_closure_digest: BindingDigest32,
+        control_contribution_digest: BindingDigest32,
         projection_audience_policy_digest: BindingDigest32,
         binding_outcome_digest: BindingDigest32,
         projection_digest: BindingDigest32,
@@ -133,6 +156,7 @@ pub enum BindingAuditEffectV1 {
         authority_high_water_record_digest: BindingDigest32,
         source_authority: crate::ServingAuthorityInstanceV1,
         source_freeze_intent_digest: BindingDigest32,
+        claim_identity_digest: BindingDigest32,
         binding_attempt_digest: BindingDigest32,
         migration_fence_claim_digest: BindingDigest32,
         movement_permit_digest: BindingDigest32,

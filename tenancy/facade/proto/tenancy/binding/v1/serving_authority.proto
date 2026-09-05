@@ -61,11 +61,3 @@ message ServingAuthorityHandoffExpectationV1 {
   BindingProducerIdV1 expected_audience = 5;
   uint64 now_unix_seconds = 6;
 }
-
-message ServingAuthorityTerminalClosurePayloadV1 {
-  ServingAuthorityInstanceV1 instance = 1;
-  Digest32 installation_issuance_digest = 2;
-  Digest32 freeze_result_digest = 3;
-  Digest32 complete_effect_path_fencing_digest = 4;
-  Digest32 closure_digest = 5;
-}

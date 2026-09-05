@@ -14,9 +14,9 @@ pub struct ServingAuthorityReplacementEvidenceV1 {
     pub prior_instance: ServingAuthorityInstanceV1,
     pub replacement_instance: ServingAuthorityInstanceV1,
     pub prior_installation_issuance_digest: BindingDigest32,
-    pub independent_physical_fence: cell_placement::ImmutableEvidenceRefV1,
+    pub independent_retirement: crate::SignedServingAuthorityIndependentRetirementV1,
     pub prior_effect_path_fencing_digest: BindingDigest32,
-    pub prior_installation_rejection_digest: BindingDigest32,
+    pub terminal_closure_digest: BindingDigest32,
     pub recovery_authority_digest: BindingDigest32,
 }
 
@@ -52,7 +52,8 @@ pub fn verify_serving_authority_replacement(
     _verifier: &dyn crate::BindingProofVerifier,
     _evidence: ServingAuthorityReplacementEvidenceV1,
     _expected: &ServingAuthorityInstanceV1,
-    _effect_fencing: &crate::VerifiedSourceFencingCompletionV1,
+    _retirement: &crate::VerifiedServingAuthorityIndependentRetirement,
+    _terminal_closure: &crate::VerifiedServingAuthorityTerminalClosure,
 ) -> Result<VerifiedServingAuthorityReplacement, crate::BindingProofVerificationError> {
     Err(crate::BindingProofVerificationError::NotImplemented)
 }
