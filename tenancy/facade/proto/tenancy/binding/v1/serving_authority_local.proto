@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/write_authority.proto";
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+
+message ServingAuthorityUninstalledPreconditionV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  ServingAuthorityRejectionHighWaterV1 rejection_high_water = 2;
+}
+
+message ServingAuthorityInstalledPreconditionV1 {
+  InstalledServingAuthorityV1 authority = 1;
+  WriteAuthorityLeaseStatePreconditionV1 lease_state = 2;
+  ServingAuthorityRejectionHighWaterV1 rejection_high_water = 3;
+}
+
+message ServingAuthorityRejectedPreconditionV1 {
+  ServingAuthorityRejectionV1 rejection = 1;
+  ServingAuthorityRejectionHighWaterV1 rejection_high_water = 2;
+}
+
+message ServingAuthorityLocalPreconditionV1 {
+  oneof precondition {
+    ServingAuthorityUninstalledPreconditionV1 uninstalled = 1;
+    ServingAuthorityInstalledPreconditionV1 installed = 2;
+    ServingAuthorityRejectedPreconditionV1 rejected = 3;
+  }
+}
+
+message ServingAuthorityPublicationLeaseV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 issuance_digest = 2;
+  string worker_id = 3;
+  uint64 lease_epoch = 4;
+  uint64 expires_at_unix_seconds = 5;
+  Digest32 lease_digest = 6;
+}
+
+message ServingAuthorityPendingIssuanceQueryV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  uint64 changed_before_unix_seconds = 2;
+  uint32 maximum_page_size = 3;
+  bytes continuation = 4;
+}
+
+message ServingAuthorityPendingIssuancePageV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  repeated WriteAuthorityLeaseIssuanceRecordV1 issuances = 2;
+  bytes next_continuation = 3;
+  uint64 retained_from_revision = 4;
+  Digest32 page_digest = 5;
+}
+
+message ServingAuthorityResultQueryV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  ServingAuthorityBusinessIdV1 business = 2;
+}
+
+message CommittedWriteAuthorityLeaseIssuanceQueryV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 lease_digest = 2;
+}
+
+message WriteAuthorityLeaseIssuancePreconditionV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  uint64 revision = 2;
+  WriteAuthorityLeaseIssuanceStatusV1 status = 3;
+  Digest32 record_digest = 4;
+}
+
+message PublishWriteAuthorityLeaseRequestV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  BindingOperationKeyV1 operation = 2;
+  Digest32 lease_digest = 3;
+  WriteAuthorityLeaseIssuancePreconditionV1 expected_issuance = 4;
+  string idempotency_key = 5;
+  Digest32 canonical_request_digest = 6;
+}
+
+message WriteAuthorityLeasePublicationResultV1 {
+  PublishedWriteAuthorityLeaseV1 published = 1;
+  ServingAuthorityPublicationLeaseV1 completed_publication_lease = 2;
+}

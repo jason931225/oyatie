@@ -5,7 +5,8 @@ package tenancy.binding.v1;
 import "tenancy/binding/v1/attempt.proto";
 import "tenancy/binding/v1/operation.proto";
 import "tenancy/binding/v1/proof.proto";
-import "tenancy/binding/v1/write_authority.proto";
+import "tenancy/binding/v1/serving_authority_handoff.proto";
+import "tenancy/binding/v1/binding_control_partition.proto";
 import "tenancy/binding/v1/transfer_execution.proto";
 import "tenancy/binding/v1/source_release_issuance.proto";
 import "tenancy/binding/v1/work_snapshot.proto";
@@ -18,7 +19,10 @@ enum BindingReconciliationWorkClassV1 {
   BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_PROJECTION_CONVERGENCE = 3;
   BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_SOURCE_RELEASE = 4;
   BINDING_RECONCILIATION_WORK_CLASS_V1_NONTERMINAL_OPERATION = 5;
-  BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_WRITE_AUTHORITY_LEASE_PUBLICATION = 6;
+  reserved 6;
+  reserved "BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_WRITE_AUTHORITY_LEASE_PUBLICATION";
+  BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_SERVING_AUTHORITY_HANDOFF = 9;
+  BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_CONTROL_CONTRIBUTION_PROJECTION = 10;
   BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_TRANSFER_EXECUTION_SETTLEMENT = 7;
   BINDING_RECONCILIATION_WORK_CLASS_V1_PENDING_WORK_SNAPSHOT = 8;
 }
@@ -41,9 +45,9 @@ message BindingOperationReconciliationSubjectV1 {
   BindingOperationV1 operation = 2;
 }
 
-message WriteAuthorityLeaseIssuanceReconciliationSubjectV1 {
+message ServingAuthorityHandoffReconciliationSubjectV1 {
   uint64 expected_revision = 1;
-  WriteAuthorityLeaseIssuanceRecordV1 issuance = 2;
+  ServingAuthorityHandoffRecordV1 handoff = 2;
 }
 
 message TransferExecutionLedgerReconciliationSubjectV1 {
@@ -65,11 +69,14 @@ message BindingReconciliationSubjectV1 {
   oneof subject {
     ReservationAttemptReconciliationSubjectV1 reservation_attempt = 1;
     BindingOperationReconciliationSubjectV1 operation = 2;
-    WriteAuthorityLeaseIssuanceReconciliationSubjectV1 write_authority_lease_issuance = 3;
+    ServingAuthorityHandoffReconciliationSubjectV1 serving_authority_handoff = 7;
     TransferExecutionLedgerReconciliationSubjectV1 transfer_execution_ledger = 4;
     SourceReleaseIssuanceReconciliationSubjectV1 source_release_issuance = 5;
     WorkSnapshotReconciliationSubjectV1 work_snapshot = 6;
+    BindingControlContributionProjectionV1 control_contribution_projection = 8;
   }
+  reserved 3;
+  reserved "write_authority_lease_issuance";
 }
 
 message BindingReconciliationCandidateV1 {

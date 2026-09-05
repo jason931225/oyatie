@@ -17,6 +17,7 @@ pub enum WriteAuthorityLeaseDispositionV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeaseStateV1 {
+    instance: crate::ServingAuthorityInstanceV1,
     tenant_id: TenantId,
     cell_id: CellId,
     binding_generation: BindingGeneration,
@@ -34,6 +35,7 @@ pub struct WriteAuthorityLeaseStateV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeaseStatePartsV1 {
+    pub instance: crate::ServingAuthorityInstanceV1,
     pub tenant_id: TenantId,
     pub cell_id: CellId,
     pub binding_generation: BindingGeneration,
@@ -63,6 +65,11 @@ impl WriteAuthorityLeaseStateV1 {
         _parts: WriteAuthorityLeaseStatePartsV1,
     ) -> Result<Self, WriteAuthorityLeaseStateConstructionError> {
         Err(WriteAuthorityLeaseStateConstructionError::NotImplemented)
+    }
+
+    #[must_use]
+    pub fn instance(&self) -> &crate::ServingAuthorityInstanceV1 {
+        &self.instance
     }
 
     #[must_use]
@@ -133,6 +140,7 @@ impl WriteAuthorityLeaseStateV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeaseStatePreconditionV1 {
+    pub instance: crate::ServingAuthorityInstanceV1,
     pub revision: WriteAuthorityLeaseStateRevision,
     pub disposition: WriteAuthorityLeaseDispositionV1,
     pub current_lease_digest: BindingDigest32,

@@ -3,7 +3,7 @@ use crate::{
     BindingIdempotencyKey, BindingOperationKey, BindingOperationPreconditionV1, BindingOperationV1,
     BindingPersistenceAuthorityV1, BindingProofConsumptionV1, BindingReservationAttemptRevision,
     BindingReservationAttemptV1, BindingRevision, BindingStoreError,
-    BindingWriteAuthorityLeaseMutationV1, MigrationFenceClaimTransitionV1,
+    MigrationFenceClaimTransitionV1, ServingAuthorityInstallationIssuanceV1,
     SignedBindingProjectionV1, TenantCellBinding, TenantWriteAuthorityBindingMutationV1,
     VerifiedMigrationCommitSeal, VerifiedParticipantPhaseClosure, VerifiedStagedTenantBirthRecord,
 };
@@ -45,8 +45,9 @@ pub struct BindingWriteSetV1 {
     outcome_precondition: BindingOutcomePreconditionV1,
     expected_attempt_revision: BindingReservationAttemptRevision,
     reservation_attempt: BindingReservationAttemptV1,
-    cell_index_mutations: crate::CellBindingIndexMutationSetV1,
-    drain_mutations: cell_placement::DrainContributorMutationSetV1,
+    control_partition: crate::BindingControlPartitionMutationV1,
+    previous_authority_closure: Option<crate::VerifiedServingAuthorityTerminalClosure>,
+    installation_handoff: crate::ServingAuthorityHandoffRecordV1,
     tenant_birth: Option<VerifiedStagedTenantBirthRecord>,
     initial_participant_preparation: Option<VerifiedParticipantPhaseClosure>,
     binding: TenantCellBinding,
@@ -64,7 +65,7 @@ pub struct BindingWriteSetV1 {
     cell_proof_consumptions: Vec<CellProofConsumptionV1>,
     binding_proof_consumptions: Vec<BindingProofConsumptionV1>,
     authority_high_water: TenantWriteAuthorityBindingMutationV1,
-    write_authority_lease: BindingWriteAuthorityLeaseMutationV1,
+    installation_issuance: ServingAuthorityInstallationIssuanceV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -74,8 +75,9 @@ pub struct BindingWriteSetPartsV1 {
     pub outcome_precondition: BindingOutcomePreconditionV1,
     pub expected_attempt_revision: BindingReservationAttemptRevision,
     pub reservation_attempt: BindingReservationAttemptV1,
-    pub cell_index_mutations: crate::CellBindingIndexMutationSetV1,
-    pub drain_mutations: cell_placement::DrainContributorMutationSetV1,
+    pub control_partition: crate::BindingControlPartitionMutationV1,
+    pub previous_authority_closure: Option<crate::VerifiedServingAuthorityTerminalClosure>,
+    pub installation_handoff: crate::ServingAuthorityHandoffRecordV1,
     pub tenant_birth: Option<VerifiedStagedTenantBirthRecord>,
     pub initial_participant_preparation: Option<VerifiedParticipantPhaseClosure>,
     pub binding: TenantCellBinding,
@@ -93,7 +95,7 @@ pub struct BindingWriteSetPartsV1 {
     pub cell_proof_consumptions: Vec<CellProofConsumptionV1>,
     pub binding_proof_consumptions: Vec<BindingProofConsumptionV1>,
     pub authority_high_water: TenantWriteAuthorityBindingMutationV1,
-    pub write_authority_lease: BindingWriteAuthorityLeaseMutationV1,
+    pub installation_issuance: ServingAuthorityInstallationIssuanceV1,
 }
 
 impl BindingWriteSetV1 {
@@ -127,13 +129,20 @@ impl BindingWriteSetV1 {
     }
 
     #[must_use]
-    pub fn cell_index_mutations(&self) -> &crate::CellBindingIndexMutationSetV1 {
-        &self.cell_index_mutations
+    pub fn control_partition(&self) -> &crate::BindingControlPartitionMutationV1 {
+        &self.control_partition
     }
 
     #[must_use]
-    pub fn drain_mutations(&self) -> &cell_placement::DrainContributorMutationSetV1 {
-        &self.drain_mutations
+    pub fn previous_authority_closure(
+        &self,
+    ) -> Option<&crate::VerifiedServingAuthorityTerminalClosure> {
+        self.previous_authority_closure.as_ref()
+    }
+
+    #[must_use]
+    pub fn installation_handoff(&self) -> &crate::ServingAuthorityHandoffRecordV1 {
+        &self.installation_handoff
     }
 
     #[must_use]
@@ -170,8 +179,8 @@ impl BindingWriteSetV1 {
     }
 
     #[must_use]
-    pub fn write_authority_lease(&self) -> &BindingWriteAuthorityLeaseMutationV1 {
-        &self.write_authority_lease
+    pub fn installation_issuance(&self) -> &ServingAuthorityInstallationIssuanceV1 {
+        &self.installation_issuance
     }
 
     #[must_use]

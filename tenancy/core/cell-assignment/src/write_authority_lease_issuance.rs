@@ -14,12 +14,13 @@ pub enum WriteAuthorityLeaseIssuanceStatusV1 {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum WriteAuthorityLeaseIssuanceKindV1 {
-    BindingActivation,
+    LocalInstallation,
     Renewal,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeaseIssuanceRecordV1 {
+    installed: crate::InstalledServingAuthorityV1,
     intent: crate::WriteAuthorityLeaseIntentV1,
     kind: WriteAuthorityLeaseIssuanceKindV1,
     lease_state_revision_at_commit: WriteAuthorityLeaseStateRevision,
@@ -32,6 +33,7 @@ pub struct WriteAuthorityLeaseIssuanceRecordV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeaseIssuanceRecordPartsV1 {
+    pub installed: crate::InstalledServingAuthorityV1,
     pub intent: crate::WriteAuthorityLeaseIntentV1,
     pub kind: WriteAuthorityLeaseIssuanceKindV1,
     pub lease_state_revision_at_commit: WriteAuthorityLeaseStateRevision,
@@ -57,6 +59,11 @@ impl WriteAuthorityLeaseIssuanceRecordV1 {
         _parts: WriteAuthorityLeaseIssuanceRecordPartsV1,
     ) -> Result<Self, WriteAuthorityLeaseIssuanceConstructionErrorV1> {
         Err(WriteAuthorityLeaseIssuanceConstructionErrorV1::NotImplemented)
+    }
+
+    #[must_use]
+    pub fn installed(&self) -> &crate::InstalledServingAuthorityV1 {
+        &self.installed
     }
 
     #[must_use]
@@ -102,6 +109,7 @@ impl WriteAuthorityLeaseIssuanceRecordV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeaseIssuancePreconditionV1 {
+    pub instance: crate::ServingAuthorityInstanceV1,
     pub revision: WriteAuthorityLeaseIssuanceRevision,
     pub status: WriteAuthorityLeaseIssuanceStatusV1,
     pub record_digest: BindingDigest32,

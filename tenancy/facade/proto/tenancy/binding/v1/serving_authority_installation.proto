@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+
+message ServingAuthorityInstallationIssuanceV1 {
+  TenantControlPartitionRefV1 control_partition = 1;
+  ServingAuthorityInstanceV1 instance = 2;
+  ServingAuthorityBusinessIdV1 business = 3;
+  Digest32 participant_manifest_digest = 4;
+  Digest32 previous_authority_closure_digest = 5;
+  uint64 revision = 6;
+  Digest32 record_digest = 7;
+}
+
+message ServingAuthorityControlCommitAttestationPayloadV1 {
+  uint32 schema_version = 1;
+  TenantControlPartitionRefV1 control_partition = 2;
+  ServingAuthorityInstanceV1 instance = 3;
+  ServingAuthorityBusinessIdV1 business = 4;
+  Digest32 committed_binding_digest = 5;
+  uint64 committed_issuance_revision = 6;
+  Digest32 committed_issuance_digest = 7;
+  Digest32 committed_transaction_digest = 8;
+  uint64 committed_at_unix_seconds = 9;
+}
+
+message SignedServingAuthorityControlCommitAttestationV1 {
+  ServingAuthorityControlCommitAttestationPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message CommittedServingAuthorityInstallationClaimV1 {
+  ServingAuthorityInstallationIssuanceV1 issuance = 1;
+  SignedServingAuthorityControlCommitAttestationV1 attestation = 2;
+}
+
+message SignedServingAuthorityInstallGrantV1 {
+  CommittedServingAuthorityInstallationClaimV1 committed = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message ServingAuthorityInstallationResultPayloadV1 {
+  uint32 schema_version = 1;
+  ServingAuthorityInstanceV1 instance = 2;
+  ServingAuthorityBusinessIdV1 business = 3;
+  InstalledServingAuthorityV1 installed = 4;
+  Digest32 first_lease_issuance_digest = 5;
+  uint64 local_state_revision = 6;
+  Digest32 committed_transaction_digest = 7;
+  Digest32 result_digest = 8;
+}
+
+message ServingAuthorityInstallationResultV1 {
+  ServingAuthorityInstallationResultPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}

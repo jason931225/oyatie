@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/serving_authority_installation.proto";
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+
+message ServingAuthorityPotentiallyInstallableV1 {}
+
+message ServingAuthorityTerminalFencedV1 {
+  Digest32 closure_digest = 1;
+}
+
+message ServingAuthorityHandoffProgressV1 {
+  oneof progress {
+    ServingAuthorityPotentiallyInstallableV1 committed_potentially_installable = 1;
+    ServingAuthorityInstallationResultV1 installed = 2;
+    ServingAuthorityFreezeIntentV1 freeze_requested = 3;
+    ServingAuthorityFreezeResultV1 frozen_awaiting_effect_fencing = 4;
+    ServingAuthorityTerminalFencedV1 terminal_fenced = 5;
+  }
+}
+
+message ServingAuthorityHandoffRecordV1 {
+  TenantControlPartitionRefV1 control_partition = 1;
+  ServingAuthorityInstallationIssuanceV1 issuance = 2;
+  SignedServingAuthorityInstallGrantV1 signed_install_grant = 3;
+  ServingAuthorityHandoffProgressV1 progress = 4;
+  uint64 revision = 5;
+  Digest32 record_digest = 6;
+}
+
+message ServingAuthorityHandoffPreconditionV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 installation_issuance_digest = 2;
+  uint64 revision = 3;
+  Digest32 record_digest = 4;
+}

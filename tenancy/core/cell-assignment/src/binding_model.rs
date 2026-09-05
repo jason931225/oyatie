@@ -240,7 +240,7 @@ pub struct BindingCommitResult {
     pub history: BindingHistoryEntry,
     pub projection: SignedBindingProjectionV1,
     pub reservation_outcome: SignedBindingOutcomeV1,
-    pub write_authority_lease_issuance: crate::WriteAuthorityLeaseIssuanceRecordV1,
+    pub installation_issuance: crate::ServingAuthorityInstallationIssuanceV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]

@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+
+import "tenancy/binding/v1/serving_authority.proto";
+
 import "cell/placement/v1/placement.proto";
 import "cell/placement/v1/proof.proto";
 import "cell/placement/v1/reservation.proto";
@@ -15,7 +19,6 @@ import "tenancy/binding/v1/proof.proto";
 import "tenancy/binding/v1/repair.proto";
 import "tenancy/binding/v1/rollback_window.proto";
 import "tenancy/binding/v1/transfer_authority.proto";
-import "tenancy/binding/v1/write_authority.proto";
 import "tenancy/identity/v1/identity.proto";
 
 service TenancyBindingService {
@@ -119,9 +122,11 @@ message ClaimMigrationFenceRequestV1 {
   cell.placement.v1.SignedCellMovementPermitV1 movement_permit = 16;
   SignedTransferEffectManifestV1 transfer_effect_manifest = 17;
   SignedParticipantPhaseClosureV1 prepared_participant_closure = 18;
-  WriteAuthorityLeaseStatePreconditionV1 expected_source_write_authority_lease_state = 19;
   reserved 20;
   reserved "expected_source_write_authority_token_ledger_digest";
+  reserved 19;
+  reserved "expected_source_write_authority_lease_state";
+  ServingAuthorityInstanceV1 expected_source_authority = 21;
 }
 
 message CommitMigrationWriteFenceRequestV1 {
@@ -131,6 +136,8 @@ message CommitMigrationWriteFenceRequestV1 {
   string idempotency_key = 4;
   Digest32 canonical_request_digest = 5;
   SourceFencingCompletionV1 source_fencing_completion = 6;
+  ServingAuthorityFreezeResultV1 source_authority_freeze = 7;
+  ServingAuthorityTerminalClosurePayloadV1 terminal_authority_closure = 8;
 }
 
 message RetargetMigrationRequestV1 {

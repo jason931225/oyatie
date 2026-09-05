@@ -11,6 +11,7 @@ pub struct BindingMigrationWriteFenceWriteSetV1 {
     binding_precondition: BindingWritePrecondition,
     expected_operation_revision: BindingOperationRevision,
     migration_fence_claim: MigrationFenceClaimV1,
+    source_authority_freeze: crate::VerifiedServingAuthorityFreezeResult,
     source_fence_directive_ledger: Option<SourceFenceDirectiveLedgerV1>,
     source_fencing_completion: VerifiedSourceFencingCompletionV1,
     write_fence: VerifiedWriteFence,
@@ -26,6 +27,7 @@ pub struct BindingMigrationWriteFenceWriteSetPartsV1 {
     pub binding_precondition: BindingWritePrecondition,
     pub expected_operation_revision: BindingOperationRevision,
     pub migration_fence_claim: MigrationFenceClaimV1,
+    pub source_authority_freeze: crate::VerifiedServingAuthorityFreezeResult,
     pub source_fence_directive_ledger: Option<SourceFenceDirectiveLedgerV1>,
     pub source_fencing_completion: VerifiedSourceFencingCompletionV1,
     pub write_fence: VerifiedWriteFence,
@@ -55,6 +57,11 @@ impl BindingMigrationWriteFenceWriteSetV1 {
     #[must_use]
     pub fn expected_operation_revision(&self) -> BindingOperationRevision {
         self.expected_operation_revision
+    }
+
+    #[must_use]
+    pub fn source_authority_freeze(&self) -> &crate::VerifiedServingAuthorityFreezeResult {
+        &self.source_authority_freeze
     }
 
     #[must_use]

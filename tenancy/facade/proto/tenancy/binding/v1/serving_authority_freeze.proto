@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/serving_authority_installation.proto";
+import "tenancy/binding/v1/write_authority.proto";
+
+message ServingAuthorityFreezeIntentV1 {
+  TenantControlPartitionRefV1 control_partition = 1;
+  ServingAuthorityInstanceV1 instance = 2;
+  Digest32 installation_issuance_digest = 3;
+  ServingAuthorityBusinessIdV1 business = 4;
+  Digest32 migration_claim_digest = 5;
+  uint64 successor_generation = 6;
+  Digest32 record_digest = 7;
+}
+
+message CommittedServingAuthorityFreezeClaimV1 {
+  ServingAuthorityFreezeIntentV1 intent = 1;
+  SignedServingAuthorityControlCommitAttestationV1 attestation = 2;
+}
+
+message SignedServingAuthorityFreezeGrantV1 {
+  CommittedServingAuthorityFreezeClaimV1 committed = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message ServingAuthorityRejectionV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 installation_issuance_digest = 2;
+  Digest32 freeze_intent_digest = 3;
+  uint64 revision = 4;
+  Digest32 record_digest = 5;
+}
+
+message ServingAuthorityInstalledFrozenStateV1 {
+  InstalledServingAuthorityV1 authority = 1;
+  WriteAuthorityLeaseStateV1 frozen_lease_state = 2;
+  ServingAuthorityRejectionV1 rejection = 3;
+}
+
+message ServingAuthorityFrozenStateV1 {
+  oneof state {
+    ServingAuthorityInstalledFrozenStateV1 installed = 1;
+    ServingAuthorityRejectionV1 rejected_before_installation = 2;
+  }
+}
+
+message ServingAuthorityNeverInstalledHorizonV1 {
+  Digest32 rejection_digest = 1;
+}
+
+message ServingAuthorityIssuedHorizonV1 {
+  Digest32 issuance_root_digest = 1;
+  uint64 issuance_count = 2;
+  uint64 maximum_expires_at_unix_seconds = 3;
+  Digest32 frozen_lease_state_digest = 4;
+}
+
+message ServingAuthorityCommittedIssuanceHorizonV1 {
+  oneof horizon {
+    ServingAuthorityNeverInstalledHorizonV1 never_installed = 1;
+    ServingAuthorityIssuedHorizonV1 issued = 2;
+  }
+}
+
+message ServingAuthorityFreezeResultPayloadV1 {
+  uint32 schema_version = 1;
+  ServingAuthorityInstanceV1 instance = 2;
+  ServingAuthorityBusinessIdV1 business = 3;
+  Digest32 installation_issuance_digest = 4;
+  Digest32 freeze_intent_digest = 5;
+  ServingAuthorityFrozenStateV1 frozen_state = 6;
+  ServingAuthorityCommittedIssuanceHorizonV1 complete_committed_horizon = 7;
+  ServingAuthorityRejectionHighWaterV1 rejection_high_water = 8;
+  Digest32 committed_transaction_digest = 9;
+  Digest32 result_digest = 10;
+}
+
+message ServingAuthorityFreezeResultV1 {
+  ServingAuthorityFreezeResultPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}

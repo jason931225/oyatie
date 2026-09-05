@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+
 import "cell/placement/v1/capacity.proto";
 import "cell/placement/v1/evidence.proto";
 import "cell/placement/v1/movement.proto";
@@ -52,8 +55,11 @@ message SourceFenceDirectivePayloadV1 {
   Digest32 participant_manifest_digest = 14;
   uint64 not_before_unix_seconds = 15;
   uint64 expires_at_unix_seconds = 16;
-  uint64 maximum_source_write_authority_lease_expires_at_unix_seconds = 17;
-  Digest32 source_write_authority_lease_digest = 18;
+  ServingAuthorityInstanceV1 source_authority = 19;
+  Digest32 source_authority_freeze_result_digest = 20;
+  reserved 18, 17;
+  reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds";
+  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 21;
 }
 
 message SignedSourceFenceDirectiveV1 {
@@ -80,13 +86,16 @@ message RecoverySourceFenceCompletionPayloadV1 {
   Digest32 evidence_set_root_digest = 15;
   uint64 evidence_count = 16;
   cell.placement.v1.ImmutableEvidenceRefV1 evidence_record = 17;
-  uint64 maximum_source_write_authority_lease_expires_at_unix_seconds = 18;
   cell.placement.v1.ImmutableEvidenceRefV1 source_isolation_proof = 19;
   uint64 clock_uncertainty_bound_millis = 20;
   uint64 completed_at_unix_seconds = 21;
   Digest32 record_digest = 22;
-  Digest32 source_write_authority_lease_digest = 23;
   Digest32 clock_authority_digest = 24;
+  ServingAuthorityInstanceV1 source_authority = 25;
+  Digest32 source_authority_freeze_result_digest = 26;
+  reserved 23, 18;
+  reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds";
+  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 27;
 }
 
 message SignedRecoverySourceFenceCompletionV1 {
@@ -148,10 +157,13 @@ message WriteFencePayloadV1 {
   uint64 clock_uncertainty_bound_millis = 22;
   uint64 irreversible_at_unix_seconds = 23;
   Digest32 binding_attempt_digest = 24;
-  Digest32 source_write_authority_lease_digest = 25;
-  uint64 maximum_source_write_authority_lease_expires_at_unix_seconds = 26;
   reserved 27 to 30;
   Digest32 source_fence_directive_ledger_digest = 31;
+  ServingAuthorityInstanceV1 source_authority = 32;
+  Digest32 source_authority_freeze_result_digest = 33;
+  reserved 25, 26;
+  reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds";
+  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 34;
 }
 
 message SignedWriteFenceV1 {
@@ -184,14 +196,15 @@ message MigrationFenceClaimV1 {
   Digest32 authority_high_water_record_digest = 20;
   SignedTransferEffectManifestV1 transfer_effect_manifest = 21;
   SignedParticipantPhaseClosureV1 prepared_participant_closure = 22;
-  uint64 frozen_source_write_authority_lease_state_revision = 23;
-  Digest32 frozen_source_write_authority_lease_state_digest = 24;
-  Digest32 source_write_authority_lease_digest = 25;
-  uint64 maximum_source_write_authority_lease_expires_at_unix_seconds = 26;
   Digest32 forward_completion_coverage_digest = 27;
   uint64 revision = 28;
   MigrationFenceClaimDispositionV1 disposition = 29;
   BindingOperationKeyV1 superseded_by_operation = 30;
+  reserved 23, 24, 25, 26;
+  reserved "frozen_source_write_authority_lease_state_revision", "frozen_source_write_authority_lease_state_digest", "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds";
+  ServingAuthorityInstanceV1 source_authority = 31;
+  Digest32 source_installation_issuance_digest = 32;
+  Digest32 source_freeze_intent_digest = 33;
 }
 
 message MigrationFenceClaimMutationResultV1 {
@@ -241,11 +254,14 @@ message MigrationCommitSealPayloadV1 {
   cell.placement.v1.ReservationRefV1 source_warm_recovery_reservation = 34;
   Digest32 source_reservation_set_digest = 35;
   Digest32 source_fencing_completion_digest = 36;
-  Digest32 source_write_authority_lease_digest = 37;
-  Digest32 frozen_source_write_authority_lease_state_digest = 38;
-  uint64 maximum_source_write_authority_lease_expires_at_unix_seconds = 39;
   Digest32 forward_completion_coverage_digest = 40;
   RollbackWindowPolicyV1 rollback_window_policy = 41;
+  ServingAuthorityInstanceV1 source_authority = 42;
+  Digest32 source_authority_freeze_result_digest = 43;
+  Digest32 source_authority_terminal_closure_digest = 44;
+  reserved 37, 39, 38;
+  reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds", "frozen_source_write_authority_lease_state_digest";
+  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 45;
 }
 
 message SignedMigrationCommitSealV1 {

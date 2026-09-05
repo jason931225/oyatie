@@ -2,12 +2,13 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority_installation.proto";
+
 import "cell/placement/v1/capacity.proto";
 import "cell/placement/v1/evidence.proto";
 import "cell/placement/v1/proof.proto";
 import "cell/placement/v1/reservation.proto";
 import "tenancy/binding/v1/proof.proto";
-import "tenancy/binding/v1/write_authority.proto";
 import "tenancy/identity/v1/identity.proto";
 
 message TenantCellBindingV1 {
@@ -118,5 +119,7 @@ message BindingMutationResultV1 {
   BindingHistoryEntryV1 history = 2;
   SignedBindingProjectionV1 projection = 3;
   cell.placement.v1.SignedBindingOutcomeV1 reservation_outcome = 4;
-  WriteAuthorityLeaseIssuanceRecordV1 write_authority_lease_issuance = 5;
+  reserved 5;
+  reserved "write_authority_lease_issuance";
+  ServingAuthorityInstallationIssuanceV1 installation_issuance = 6;
 }

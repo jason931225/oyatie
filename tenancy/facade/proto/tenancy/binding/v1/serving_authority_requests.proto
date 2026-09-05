@@ -1,0 +1,57 @@
+syntax = "proto3";
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/serving_authority_installation.proto";
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+import "tenancy/binding/v1/serving_authority_local.proto";
+import "tenancy/binding/v1/serving_authority_restore.proto";
+import "tenancy/binding/v1/serving_authority_invocation.proto";
+import "tenancy/binding/v1/store_commit_attestation.proto";
+import "tenancy/binding/v1/write_authority.proto";
+
+message InstallServingAuthorityRequestV1 {
+  SignedServingAuthorityInstallGrantV1 grant = 1;
+  ServingAuthorityLocalPreconditionV1 precondition = 2;
+  ServingAuthorityRestoreBasisV1 restore_basis = 3;
+  ServingAuthorityBusinessIdV1 business = 4;
+}
+
+message FreezeServingAuthorityRequestV1 {
+  SignedServingAuthorityFreezeGrantV1 grant = 1;
+  ServingAuthorityLocalPreconditionV1 precondition = 2;
+  ServingAuthorityBusinessIdV1 business = 3;
+}
+
+message ServingAuthorityInstallCallV1 {
+  SignedServingAuthorityInvocationV1 invocation = 1;
+  InstallServingAuthorityRequestV1 request = 2;
+}
+
+message ServingAuthorityFreezeCallV1 {
+  SignedServingAuthorityInvocationV1 invocation = 1;
+  FreezeServingAuthorityRequestV1 request = 2;
+}
+
+message ServingAuthorityResultCallV1 {
+  SignedServingAuthorityInvocationV1 invocation = 1;
+  ServingAuthorityResultQueryV1 query = 2;
+}
+
+message CommittedWriteAuthorityLeaseIssuanceClaimV1 {
+  InstalledServingAuthorityV1 installed = 1;
+  WriteAuthorityLeaseStateV1 lease_state = 2;
+  WriteAuthorityLeaseIssuanceRecordV1 issuance = 3;
+  ServingAuthorityPublicationLeaseV1 publication_lease = 4;
+  SignedWriteAuthorityLeaseCommitAttestationV1 attestation = 5;
+}
+
+message ServingAuthorityPendingIssuanceCallV1 {
+  SignedServingAuthorityInvocationV1 invocation = 1;
+  ServingAuthorityPendingIssuanceQueryV1 query = 2;
+}
+
+service CellServingAuthorityService {
+  rpc Install(ServingAuthorityInstallCallV1) returns (ServingAuthorityInstallationResultV1);
+  rpc Freeze(ServingAuthorityFreezeCallV1) returns (ServingAuthorityFreezeResultV1);
+}

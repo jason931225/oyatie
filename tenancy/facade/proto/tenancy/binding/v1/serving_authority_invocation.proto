@@ -1,0 +1,50 @@
+syntax = "proto3";
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+
+enum ServingAuthorityActionV1 {
+  SERVING_AUTHORITY_ACTION_V1_UNSPECIFIED = 0;
+  SERVING_AUTHORITY_ACTION_V1_INSTALL = 1;
+  SERVING_AUTHORITY_ACTION_V1_FREEZE = 2;
+  SERVING_AUTHORITY_ACTION_V1_RENEW = 3;
+  SERVING_AUTHORITY_ACTION_V1_READ = 4;
+  SERVING_AUTHORITY_ACTION_V1_PUBLISH = 5;
+  SERVING_AUTHORITY_ACTION_V1_LIST_PENDING_ISSUANCES = 6;
+  SERVING_AUTHORITY_ACTION_V1_CLAIM_PENDING_ISSUANCE = 7;
+  SERVING_AUTHORITY_ACTION_V1_COMPLETE_PENDING_ISSUANCE = 8;
+}
+
+message BindingAuthorizationDecisionReceiptV1 {
+  string decision_id = 1;
+  string policy_version = 2;
+  Digest32 decision_digest = 3;
+  Digest32 determining_policy_set_digest = 4;
+  Digest32 obligations_digest = 5;
+}
+
+message ServingAuthorityInvocationPayloadV1 {
+  uint32 schema_version = 1;
+  ServingAuthorityInstanceV1 instance = 2;
+  ServingAuthorityActionV1 action = 3;
+  Digest32 actor_digest = 4;
+  BindingAuthorizationDecisionReceiptV1 authorization = 5;
+  Digest32 canonical_request_digest = 6;
+  uint64 deadline_unix_seconds = 7;
+}
+
+message SignedServingAuthorityInvocationV1 {
+  ServingAuthorityInvocationPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message ServingAuthorityInvocationExpectationV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  ServingAuthorityActionV1 action = 2;
+  Digest32 canonical_request_digest = 3;
+  BindingProducerIdV1 expected_producer = 4;
+  BindingProducerIdV1 expected_audience = 5;
+  uint64 now_unix_seconds = 6;
+}

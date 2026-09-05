@@ -4,8 +4,7 @@ use crate::{
     BindingAuditRecordV1, BindingIdempotencyRecordV1, BindingOperationPreconditionV1,
     BindingOperationV1, BindingPersistenceAuthorityV1, BindingProofConsumptionV1,
     BindingStoreError, BindingWritePrecondition, BoxTenancyFuture, MigrationFenceClaimV1,
-    TenantWriteAuthorityAdvanceV1, WriteAuthorityLeaseStatePreconditionV1,
-    WriteAuthorityLeaseStateV1,
+    TenantWriteAuthorityAdvanceV1,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -38,12 +37,6 @@ pub struct MigrationFenceClaimTransitionV1 {
     pub next: MigrationFenceClaimV1,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WriteAuthorityLeaseRetargetFreezeV1 {
-    pub source_precondition: WriteAuthorityLeaseStatePreconditionV1,
-    pub next_frozen_source_state: WriteAuthorityLeaseStateV1,
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct RetargetMigrationRequestV1 {
     pub superseded_operation: crate::BindingOperationKey,
@@ -73,7 +66,9 @@ pub struct MigrationRetargetWriteSetPartsV1 {
     pub superseded_operation: BindingOperationV1,
     pub replacement_operation: BindingOperationV1,
     pub authority_high_water_advance: TenantWriteAuthorityAdvanceV1,
-    pub source_write_authority_retarget: WriteAuthorityLeaseRetargetFreezeV1,
+    pub source_authority_freeze_intent: crate::ServingAuthorityFreezeIntentV1,
+    pub source_handoff_precondition: crate::ServingAuthorityHandoffPreconditionV1,
+    pub next_source_handoff: crate::ServingAuthorityHandoffRecordV1,
     pub idempotency: BindingIdempotencyRecordV1,
     pub audit_outbox: BindingAuditRecordV1,
     pub cell_proof_consumptions: Vec<CellProofConsumptionV1>,

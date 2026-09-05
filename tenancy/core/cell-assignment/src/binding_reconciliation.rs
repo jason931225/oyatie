@@ -5,7 +5,6 @@ use crate::{
     BindingReservationAttemptV1, BindingStoreError, BoxTenancyFuture,
     SourceReservationReleaseIssuanceRecordV1, SourceReservationReleaseIssuanceRevision, TenantId,
     TransferExecutionLedgerRevision, TransferExecutionLedgerV1,
-    WriteAuthorityLeaseIssuanceRecordV1, WriteAuthorityLeaseIssuanceRevision,
 };
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -43,7 +42,8 @@ pub enum BindingReconciliationWorkClassV1 {
     PendingProjectionConvergence,
     PendingSourceRelease,
     NonterminalOperation,
-    PendingWriteAuthorityLeasePublication,
+    PendingServingAuthorityHandoff,
+    PendingControlContributionProjection,
     PendingTransferExecutionSettlement,
     PendingWorkSnapshot,
 }
@@ -59,6 +59,9 @@ pub struct BindingReconciliationQueryV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum BindingReconciliationSubjectV1 {
+    ControlContributionProjection {
+        projection: Box<crate::BindingControlContributionProjectionV1>,
+    },
     WorkSnapshot {
         expected_revision: crate::BindingWorkSnapshotRevision,
         progress: Box<crate::BindingWorkSnapshotProgressV1>,
@@ -71,9 +74,9 @@ pub enum BindingReconciliationSubjectV1 {
         expected_revision: BindingOperationRevision,
         operation: Box<BindingOperationV1>,
     },
-    WriteAuthorityLeaseIssuance {
-        expected_revision: WriteAuthorityLeaseIssuanceRevision,
-        issuance: Box<WriteAuthorityLeaseIssuanceRecordV1>,
+    ServingAuthorityHandoff {
+        expected_revision: u64,
+        handoff: Box<crate::ServingAuthorityHandoffRecordV1>,
     },
     TransferExecutionLedger {
         expected_revision: TransferExecutionLedgerRevision,

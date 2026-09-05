@@ -93,6 +93,7 @@ pub struct RecordTransferExecutionOutcomeRequestV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct IssueSourceFenceDirectiveRequestV1 {
+    pub source_authority_freeze: crate::VerifiedServingAuthorityFreezeResult,
     pub operation: BindingOperationKey,
     pub expected_operation_revision: BindingOperationRevision,
     pub migration_fence_claim_digest: BindingDigest32,

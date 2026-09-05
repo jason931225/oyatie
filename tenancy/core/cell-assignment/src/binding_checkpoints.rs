@@ -4,7 +4,7 @@ use crate::{
     BindingAuditRecordV1, BindingIdempotencyRecordV1, BindingOperationPreconditionV1,
     BindingOperationRevision, BindingOperationV1, BindingPersistenceAuthorityV1,
     BindingProofConsumptionV1, BindingStoreError, BindingWritePrecondition, MigrationFenceClaimV1,
-    TenantWriteAuthorityAdvanceV1, VerifiedBindingRepairAuthority, WriteAuthorityLeaseFreezeV1,
+    TenantWriteAuthorityAdvanceV1, VerifiedBindingRepairAuthority,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -75,7 +75,9 @@ pub struct BindingMigrationFenceClaimWriteSetV1 {
     cell_proof_consumptions: Vec<CellProofConsumptionV1>,
     binding_proof_consumptions: Vec<BindingProofConsumptionV1>,
     authority_high_water_advance: TenantWriteAuthorityAdvanceV1,
-    source_write_authority_lease_freeze: WriteAuthorityLeaseFreezeV1,
+    source_authority_freeze_intent: crate::ServingAuthorityFreezeIntentV1,
+    source_handoff_precondition: crate::ServingAuthorityHandoffPreconditionV1,
+    next_source_handoff: crate::ServingAuthorityHandoffRecordV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -90,7 +92,9 @@ pub struct BindingMigrationFenceClaimWriteSetPartsV1 {
     pub cell_proof_consumptions: Vec<CellProofConsumptionV1>,
     pub binding_proof_consumptions: Vec<BindingProofConsumptionV1>,
     pub authority_high_water_advance: TenantWriteAuthorityAdvanceV1,
-    pub source_write_authority_lease_freeze: WriteAuthorityLeaseFreezeV1,
+    pub source_authority_freeze_intent: crate::ServingAuthorityFreezeIntentV1,
+    pub source_handoff_precondition: crate::ServingAuthorityHandoffPreconditionV1,
+    pub next_source_handoff: crate::ServingAuthorityHandoffRecordV1,
 }
 
 impl BindingMigrationFenceClaimWriteSetV1 {
@@ -149,8 +153,18 @@ impl BindingMigrationFenceClaimWriteSetV1 {
     }
 
     #[must_use]
-    pub fn source_write_authority_lease_freeze(&self) -> &WriteAuthorityLeaseFreezeV1 {
-        &self.source_write_authority_lease_freeze
+    pub fn source_handoff_precondition(&self) -> &crate::ServingAuthorityHandoffPreconditionV1 {
+        &self.source_handoff_precondition
+    }
+
+    #[must_use]
+    pub fn next_source_handoff(&self) -> &crate::ServingAuthorityHandoffRecordV1 {
+        &self.next_source_handoff
+    }
+
+    #[must_use]
+    pub fn source_authority_freeze_intent(&self) -> &crate::ServingAuthorityFreezeIntentV1 {
+        &self.source_authority_freeze_intent
     }
 }
 

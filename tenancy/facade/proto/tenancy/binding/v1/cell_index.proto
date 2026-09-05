@@ -5,6 +5,7 @@ package tenancy.binding.v1;
 import "cell/placement/v1/evidence.proto";
 import "cell/placement/v1/proof.proto";
 import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/identity/v1/identity.proto";
 
 message CellBindingIndexSnapshotRequestV1 {
@@ -19,6 +20,9 @@ message CellBindingIndexSnapshotV1 {
   Digest32 ordered_binding_root_digest = 4;
   uint64 binding_count = 5;
   Digest32 snapshot_digest = 6;
+  BindingControlContributionCoverageV1 control_contribution_coverage = 7;
+  uint64 projection_revision = 8;
+  Digest32 projection_record_digest = 9;
 }
 
 message CellBindingIndexPageRequestV1 {
@@ -70,6 +74,7 @@ message CellBindingIndexEntryMutationV1 {
   CellBindingIndexMutationKindV1 mutation_kind = 7;
   Digest32 mutation_digest = 8;
   CellBindingIndexEntryPreconditionV1 precondition = 9;
+  TenantControlPartitionRefV1 control_partition = 10;
 }
 
 message CellBindingIndexMutationSetV1 {
@@ -85,4 +90,11 @@ message CellBindingIndexPageV1 {
   uint64 next_ordinal = 3;
   bytes next_page_token = 4;
   Digest32 page_digest = 5;
+}
+
+message BindingControlContributionCoverageV1 {
+  Digest32 source_partition_root_digest = 1;
+  uint64 source_partition_count = 2;
+  Digest32 contribution_checkpoint_root_digest = 3;
+  cell.placement.v1.ImmutableEvidenceRefV1 source_manifest = 4;
 }

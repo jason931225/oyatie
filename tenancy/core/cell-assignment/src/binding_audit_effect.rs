@@ -12,9 +12,8 @@ pub enum BindingAbortContextV1 {
     MigrationWithAuthorityAllocation {
         migration_fence_claim_digest: BindingDigest32,
         authority_high_water_record_digest: BindingDigest32,
-        source_write_authority_lease_digest: BindingDigest32,
-        frozen_source_write_authority_lease_state_digest: BindingDigest32,
-        maximum_source_write_authority_lease_expires_at_unix_seconds: u64,
+        source_authority: Box<crate::ServingAuthorityInstanceV1>,
+        source_freeze_intent_digest: BindingDigest32,
     },
 }
 
@@ -39,22 +38,36 @@ pub struct BindingMovedAuditEffectV1 {
     pub transfer_authorization_set_digest: BindingDigest32,
     pub write_fence_digest: BindingDigest32,
     pub source_fencing_completion_digest: BindingDigest32,
-    pub source_write_authority_lease_digest: BindingDigest32,
-    pub frozen_source_write_authority_lease_state_digest: BindingDigest32,
-    pub maximum_source_write_authority_lease_expires_at_unix_seconds: u64,
+    pub source_authority: crate::ServingAuthorityInstanceV1,
+    pub source_authority_terminal_closure_digest: BindingDigest32,
     pub migration_commit_seal_digest: BindingDigest32,
     pub binding_outcome_digest: BindingDigest32,
     pub projection_digest: BindingDigest32,
-    pub target_write_authority_lease_digest: BindingDigest32,
-    pub target_write_authority_lease_issuance_digest: BindingDigest32,
-    pub maximum_target_write_authority_lease_expires_at_unix_seconds: u64,
-    pub target_write_authority_lease_state_digest: BindingDigest32,
+    pub target_authority: crate::ServingAuthorityInstanceV1,
+    pub installation_issuance_digest: BindingDigest32,
     pub primary_location_digest: BindingDigest32,
     pub recovery_location_digest: Option<BindingDigest32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BindingAuditEffectV1 {
+    ServingAuthorityInstalled {
+        instance: crate::ServingAuthorityInstanceV1,
+        installation_issuance_digest: BindingDigest32,
+        first_local_lease_issuance_digest: BindingDigest32,
+        result_digest: BindingDigest32,
+    },
+    ServingAuthorityFrozen {
+        instance: crate::ServingAuthorityInstanceV1,
+        freeze_intent_digest: BindingDigest32,
+        result_digest: BindingDigest32,
+        committed_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
+    },
+    ServingAuthorityHandoffRecorded {
+        instance: crate::ServingAuthorityInstanceV1,
+        handoff_record_digest: BindingDigest32,
+        authenticated_result_digest: BindingDigest32,
+    },
     WorkSnapshotPageCommitted {
         key: crate::BindingWorkSnapshotKeyV1,
         start_ordinal: u64,
@@ -95,10 +108,8 @@ pub enum BindingAuditEffectV1 {
         projection_audience_policy_digest: BindingDigest32,
         binding_outcome_digest: BindingDigest32,
         projection_digest: BindingDigest32,
-        write_authority_lease_digest: BindingDigest32,
-        write_authority_lease_issuance_digest: BindingDigest32,
-        maximum_write_authority_lease_expires_at_unix_seconds: u64,
-        write_authority_lease_state_digest: BindingDigest32,
+        target_authority: crate::ServingAuthorityInstanceV1,
+        installation_issuance_digest: BindingDigest32,
         primary_location_digest: BindingDigest32,
         recovery_location_digest: Option<BindingDigest32>,
     },
@@ -120,10 +131,8 @@ pub enum BindingAuditEffectV1 {
         write_authority_epoch: WriteAuthorityEpoch,
         authority_high_water_revision: crate::TenantWriteAuthorityHighWaterRevision,
         authority_high_water_record_digest: BindingDigest32,
-        source_write_authority_lease_digest: BindingDigest32,
-        frozen_source_write_authority_lease_state_revision: crate::WriteAuthorityLeaseStateRevision,
-        frozen_source_write_authority_lease_state_digest: BindingDigest32,
-        maximum_source_write_authority_lease_expires_at_unix_seconds: u64,
+        source_authority: crate::ServingAuthorityInstanceV1,
+        source_freeze_intent_digest: BindingDigest32,
         binding_attempt_digest: BindingDigest32,
         migration_fence_claim_digest: BindingDigest32,
         movement_permit_digest: BindingDigest32,
@@ -187,6 +196,7 @@ pub enum BindingAuditEffectV1 {
         ledger_record_digest: BindingDigest32,
     },
     WriteAuthorityLeaseRenewalCommitted {
+        instance: crate::ServingAuthorityInstanceV1,
         cell_id: CellId,
         binding_generation: BindingGeneration,
         binding_revision: BindingRevision,
@@ -198,6 +208,7 @@ pub enum BindingAuditEffectV1 {
         write_authority_lease_state_digest: BindingDigest32,
     },
     WriteAuthorityLeasePublished {
+        instance: crate::ServingAuthorityInstanceV1,
         cell_id: CellId,
         binding_generation: BindingGeneration,
         binding_revision: BindingRevision,

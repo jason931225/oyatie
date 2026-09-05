@@ -1,4 +1,4 @@
-use crate::BindingOperationKey;
+use crate::{BindingOperationKey, BindingProofDomainV1};
 
 pub const BINDING_INVOCATION_SCHEMA_VERSION: u32 = 1;
 pub const BINDING_PROOF_SIGNING_FORMAT_VERSION: u32 = 1;
@@ -85,36 +85,6 @@ pub enum BindingActionV1 {
     SealWorkSnapshot,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum BindingProofDomainV1 {
-    BindingInvocation,
-    ResidencyTransferAuthorization,
-    ResidencyTransferAuthorizationSet,
-    WriteFence,
-    WriteAuthorityToken,
-    WriteAuthorityLease,
-    MigrationCommitSeal,
-    RepairAuthority,
-    BindingProjection,
-    ParticipantManifest,
-    ParticipantPreparedReceipt,
-    ParticipantSourceFencedReceipt,
-    ParticipantTargetActivatedReceipt,
-    ParticipantSourceReleasedReceipt,
-    ParticipantPhaseClosure,
-    TransferEffectManifest,
-    TransferExecutionPermit,
-    TransferExecutionOutcome,
-    SourceFenceDirective,
-    RecoverySourceFenceCompletion,
-    ProjectionConvergence,
-    TenantBirthRecord,
-    WriteAuthorityLeaseCommitAttestation,
-    ReconciliationInvocation,
-    RollbackWindowElapsed,
-    SourceReleaseCommitAttestation,
-}
-
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct BindingPolicyVersionToken(String);
 
@@ -145,6 +115,10 @@ pub struct BindingProofEnvelopeV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BindingProofReuseScopeV1 {
+    ServingAuthorityHandoff {
+        instance: crate::ServingAuthorityInstanceV1,
+        handoff_digest: BindingDigest32,
+    },
     Operation(BindingOperationKey),
     Migration(BindingOperationKey),
     Projection {
@@ -206,6 +180,9 @@ impl BindingProofConsumptionV1 {
 
 #[derive(Clone, Copy, Debug)]
 pub enum VerifiedBindingProofRefV1<'a> {
+    ServingAuthorityInstallGrant(&'a crate::VerifiedServingAuthorityInstallGrant),
+    ServingAuthorityInstallationResult(&'a crate::VerifiedServingAuthorityInstallationResult),
+    ServingAuthorityFreezeResult(&'a crate::VerifiedServingAuthorityFreezeResult),
     Invocation(&'a crate::VerifiedBindingInvocation),
     ResidencyTransferAuthorization(&'a crate::VerifiedResidencyTransferAuthorization),
     ResidencyTransferAuthorizationSet(&'a crate::VerifiedResidencyTransferAuthorizationSet),
@@ -235,6 +212,9 @@ impl<'a> VerifiedBindingProofRefV1<'a> {
     #[must_use]
     pub fn proof_envelope(self) -> &'a BindingProofEnvelopeV1 {
         match self {
+            Self::ServingAuthorityInstallGrant(proof) => &proof.signed().envelope,
+            Self::ServingAuthorityInstallationResult(proof) => &proof.signed().envelope,
+            Self::ServingAuthorityFreezeResult(proof) => &proof.signed().envelope,
             Self::Invocation(proof) => &proof.signed().envelope,
             Self::ResidencyTransferAuthorization(proof) => &proof.signed().envelope,
             Self::ResidencyTransferAuthorizationSet(proof) => &proof.signed().envelope,

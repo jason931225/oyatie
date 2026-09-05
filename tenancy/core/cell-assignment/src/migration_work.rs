@@ -21,10 +21,9 @@ pub struct MigrationFenceClaimV1 {
     binding_attempt_digest: BindingDigest32,
     authority_high_water_revision: crate::TenantWriteAuthorityHighWaterRevision,
     authority_high_water_record_digest: BindingDigest32,
-    frozen_source_write_authority_lease_state_revision: crate::WriteAuthorityLeaseStateRevision,
-    frozen_source_write_authority_lease_state_digest: BindingDigest32,
-    source_write_authority_lease_digest: BindingDigest32,
-    maximum_source_write_authority_lease_expires_at_unix_seconds: u64,
+    source_authority: crate::ServingAuthorityInstanceV1,
+    source_installation_issuance_digest: BindingDigest32,
+    source_freeze_intent_digest: BindingDigest32,
     successor_generation: BindingGeneration,
     write_authority_epoch: WriteAuthorityEpoch,
     participant_manifest: VerifiedParticipantManifest,
@@ -54,10 +53,9 @@ pub struct MigrationFenceClaimPartsV1 {
     pub binding_attempt_digest: BindingDigest32,
     pub authority_high_water_revision: crate::TenantWriteAuthorityHighWaterRevision,
     pub authority_high_water_record_digest: BindingDigest32,
-    pub frozen_source_write_authority_lease_state_revision: crate::WriteAuthorityLeaseStateRevision,
-    pub frozen_source_write_authority_lease_state_digest: BindingDigest32,
-    pub source_write_authority_lease_digest: BindingDigest32,
-    pub maximum_source_write_authority_lease_expires_at_unix_seconds: u64,
+    pub source_authority: crate::ServingAuthorityInstanceV1,
+    pub source_installation_issuance_digest: BindingDigest32,
+    pub source_freeze_intent_digest: BindingDigest32,
     pub successor_generation: BindingGeneration,
     pub write_authority_epoch: WriteAuthorityEpoch,
     pub participant_manifest: VerifiedParticipantManifest,
@@ -156,25 +154,18 @@ impl MigrationFenceClaimV1 {
     }
 
     #[must_use]
-    pub fn frozen_source_write_authority_lease_state_revision(
-        &self,
-    ) -> crate::WriteAuthorityLeaseStateRevision {
-        self.frozen_source_write_authority_lease_state_revision
+    pub fn source_authority(&self) -> &crate::ServingAuthorityInstanceV1 {
+        &self.source_authority
     }
 
     #[must_use]
-    pub fn frozen_source_write_authority_lease_state_digest(&self) -> BindingDigest32 {
-        self.frozen_source_write_authority_lease_state_digest
+    pub fn source_installation_issuance_digest(&self) -> BindingDigest32 {
+        self.source_installation_issuance_digest
     }
 
     #[must_use]
-    pub fn source_write_authority_lease_digest(&self) -> BindingDigest32 {
-        self.source_write_authority_lease_digest
-    }
-
-    #[must_use]
-    pub fn maximum_source_write_authority_lease_expires_at_unix_seconds(&self) -> u64 {
-        self.maximum_source_write_authority_lease_expires_at_unix_seconds
+    pub fn source_freeze_intent_digest(&self) -> BindingDigest32 {
+        self.source_freeze_intent_digest
     }
 
     #[must_use]

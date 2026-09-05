@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+
+import "tenancy/binding/v1/serving_authority.proto";
+
 import "cell/placement/v1/movement.proto";
 import "cell/placement/v1/placement.proto";
 import "tenancy/binding/v1/migration.proto";
@@ -110,6 +114,7 @@ message IssueSourceFenceDirectiveRequestV1 {
   Digest32 canonical_request_digest = 8;
   reserved 9, 10;
   reserved "source_write_authority_lease", "expected_write_authority_token_ledger_digest";
+  ServingAuthorityFreezeResultV1 source_authority_freeze = 11;
 }
 
 message SourceFenceDirectiveLedgerV1 {
@@ -120,10 +125,13 @@ message SourceFenceDirectiveLedgerV1 {
   uint64 next_participant_ordinal = 5;
   Digest32 issued_directive_root_digest = 6;
   uint64 issued_directive_count = 7;
-  Digest32 source_write_authority_lease_digest = 8;
   uint64 revision = 9;
   Digest32 record_digest = 10;
-  uint64 maximum_source_write_authority_lease_expires_at_unix_seconds = 11;
+  ServingAuthorityInstanceV1 source_authority = 12;
+  Digest32 source_authority_freeze_result_digest = 13;
+  reserved 8, 11;
+  reserved "source_write_authority_lease_digest", "maximum_source_write_authority_lease_expires_at_unix_seconds";
+  ServingAuthorityCommittedIssuanceHorizonV1 committed_source_horizon = 14;
 }
 
 message IssueSourceFenceDirectiveResultV1 {

@@ -41,6 +41,9 @@ pub struct CellBindingIndexSnapshotRequestV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellBindingIndexSnapshotV1 {
+    pub control_contribution_coverage: crate::BindingControlContributionCoverageV1,
+    pub projection_revision: u64,
+    pub projection_record_digest: BindingDigest32,
     pub partition: CellBindingIndexPartitionKey,
     pub cell_id: CellId,
     pub snapshot: ImmutableEvidenceRefV1,
@@ -89,6 +92,7 @@ pub enum CellBindingIndexEntryPreconditionV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellBindingIndexEntryMutationV1 {
+    pub control_partition: crate::TenantControlPartitionRefV1,
     pub partition: CellBindingIndexPartitionKey,
     pub cell_id: CellId,
     pub tenant_id: TenantId,

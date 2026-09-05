@@ -33,6 +33,7 @@ pub enum WriteAuthorityBasisV1 {
 pub struct WriteAuthorityLeaseIntentV1 {
     pub schema_version: u32,
     pub operation: BindingOperationKey,
+    pub instance: crate::ServingAuthorityInstanceV1,
     pub tenant_id: TenantId,
     pub cell_id: CellId,
     pub binding_generation: BindingGeneration,
@@ -100,6 +101,7 @@ pub fn verify_write_authority_lease(
 pub struct WriteAuthorityTokenPayloadV1 {
     pub schema_version: u32,
     pub operation: BindingOperationKey,
+    pub instance: crate::ServingAuthorityInstanceV1,
     pub tenant_id: TenantId,
     pub cell_id: CellId,
     pub binding_generation: BindingGeneration,
@@ -127,6 +129,7 @@ pub struct SignedWriteAuthorityTokenV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriteAuthorityTokenExpectationV1 {
     pub operation: BindingOperationKey,
+    pub instance: crate::ServingAuthorityInstanceV1,
     pub tenant_id: TenantId,
     pub cell_id: CellId,
     pub binding_generation: BindingGeneration,

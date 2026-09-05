@@ -11,6 +11,9 @@ pub struct SourceFenceDirectiveLedgerRevision(pub u64);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceFenceDirectiveLedgerV1 {
+    pub source_authority: crate::ServingAuthorityInstanceV1,
+    pub source_authority_freeze_result_digest: BindingDigest32,
+    pub committed_source_horizon: crate::ServingAuthorityCommittedIssuanceHorizonV1,
     pub operation: BindingOperationKey,
     pub participant_manifest_digest: BindingDigest32,
     pub expected_participant_root_digest: BindingDigest32,
@@ -18,8 +21,6 @@ pub struct SourceFenceDirectiveLedgerV1 {
     pub next_participant_ordinal: u64,
     pub issued_directive_root_digest: BindingDigest32,
     pub issued_directive_count: u64,
-    pub source_write_authority_lease_digest: BindingDigest32,
-    pub maximum_source_write_authority_lease_expires_at_unix_seconds: u64,
     pub revision: SourceFenceDirectiveLedgerRevision,
     pub record_digest: BindingDigest32,
 }
@@ -35,6 +36,7 @@ pub struct SourceFenceDirectiveIssueWriteSetPartsV1 {
     pub expected_operation_revision: BindingOperationRevision,
     pub operation: BindingOperationV1,
     pub migration_fence_claim: MigrationFenceClaimV1,
+    pub source_authority_freeze: crate::VerifiedServingAuthorityFreezeResult,
     pub expected_ledger_revision: SourceFenceDirectiveLedgerRevision,
     pub participant: VerifiedParticipantManifestMember,
     pub directive: VerifiedSourceFenceDirective,

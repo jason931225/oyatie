@@ -107,3 +107,53 @@ export_file(
     name = "work_snapshot.proto",
     visibility = ["PUBLIC"],
 )
+
+export_file(
+    name = "serving_authority.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_installation.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_freeze.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_restore.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_handoff.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_local.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_invocation.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "serving_authority_requests.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "binding_control_partition.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "binding_authority_audit.proto",
+    visibility = ["PUBLIC"],
+)

@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "cell/placement/v1/proof.proto";
+import "tenancy/identity/v1/identity.proto";
+
+message TenantControlPartitionRefV1 {
+  tenancy.identity.v1.TenantId tenant_id = 1;
+  string shard_id = 2;
+  Digest32 topology_digest = 3;
+}
+
+message CellServingPartitionRefV1 {
+  cell.placement.v1.CellId cell_id = 1;
+  string shard_id = 2;
+  Digest32 topology_digest = 3;
+}
+
+message ServingAuthorityInstanceV1 {
+  tenancy.identity.v1.TenantId tenant_id = 1;
+  CellServingPartitionRefV1 partition = 2;
+  uint64 binding_generation = 3;
+  uint64 binding_revision = 4;
+  Digest32 binding_record_digest = 5;
+  uint64 write_authority_epoch = 6;
+  bytes incarnation = 7;
+}
+
+message InstalledServingAuthorityV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 installation_issuance_digest = 2;
+  Digest32 installed_grant_digest = 3;
+  uint64 revision = 4;
+  Digest32 record_digest = 5;
+}
+
+message ServingAuthorityRejectionHighWaterV1 {
+  tenancy.identity.v1.TenantId tenant_id = 1;
+  CellServingPartitionRefV1 partition = 2;
+  uint64 generation = 3;
+  Digest32 rejected_instance_root_digest = 4;
+  uint64 rejected_instance_count = 5;
+  uint64 revision = 6;
+  Digest32 record_digest = 7;
+}
+
+message ServingAuthorityBusinessIdV1 {
+  BindingOperationKeyV1 operation = 1;
+  string idempotency_key = 2;
+  Digest32 request_digest = 3;
+  Digest32 handoff_digest = 4;
+}
+
+message ServingAuthorityHandoffExpectationV1 {
+  TenantControlPartitionRefV1 control_partition = 1;
+  ServingAuthorityInstanceV1 instance = 2;
+  ServingAuthorityBusinessIdV1 business = 3;
+  BindingProducerIdV1 expected_producer = 4;
+  BindingProducerIdV1 expected_audience = 5;
+  uint64 now_unix_seconds = 6;
+}
+
+message ServingAuthorityTerminalClosurePayloadV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 installation_issuance_digest = 2;
+  Digest32 freeze_result_digest = 3;
+  Digest32 complete_effect_path_fencing_digest = 4;
+  Digest32 closure_digest = 5;
+}

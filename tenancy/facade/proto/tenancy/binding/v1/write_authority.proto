@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/serving_authority_invocation.proto";
+
 import "cell/placement/v1/proof.proto";
 import "cell/placement/v1/evidence.proto";
 import "tenancy/binding/v1/participant.proto";
@@ -50,6 +53,7 @@ message WriteAuthorityLeaseIntentV1 {
   Digest32 clock_authority_digest = 16;
   uint64 maximum_clock_uncertainty_millis = 17;
   cell.placement.v1.AssuranceAuditPolicyV1 assurance_audit_policy = 18;
+  ServingAuthorityInstanceV1 instance = 19;
 }
 
 message WriteAuthorityLeasePayloadV1 {
@@ -87,6 +91,7 @@ message WriteAuthorityTokenPayloadV1 {
   uint64 authority_expires_at_unix_seconds = 17;
   Digest32 write_authority_lease_digest = 18;
   cell.placement.v1.AssuranceAuditPolicyV1 assurance_audit_policy = 19;
+  ServingAuthorityInstanceV1 instance = 20;
 }
 
 message SignedWriteAuthorityTokenV1 {
@@ -116,6 +121,7 @@ message WriteAuthorityLeaseStateV1 {
   BindingOperationKeyV1 frozen_by_operation = 11;
   uint64 revision = 12;
   Digest32 record_digest = 13;
+  ServingAuthorityInstanceV1 instance = 14;
 }
 
 message WriteAuthorityLeaseStatePreconditionV1 {
@@ -124,6 +130,7 @@ message WriteAuthorityLeaseStatePreconditionV1 {
   Digest32 current_lease_digest = 3;
   uint64 maximum_issued_lease_expires_at_unix_seconds = 4;
   Digest32 record_digest = 5;
+  ServingAuthorityInstanceV1 instance = 6;
 }
 
 enum WriteAuthorityLeaseIssuanceStatusV1 {
@@ -134,7 +141,9 @@ enum WriteAuthorityLeaseIssuanceStatusV1 {
 
 enum WriteAuthorityLeaseIssuanceKindV1 {
   WRITE_AUTHORITY_LEASE_ISSUANCE_KIND_V1_UNSPECIFIED = 0;
-  WRITE_AUTHORITY_LEASE_ISSUANCE_KIND_V1_BINDING_ACTIVATION = 1;
+  reserved 1;
+  reserved "WRITE_AUTHORITY_LEASE_ISSUANCE_KIND_V1_BINDING_ACTIVATION";
+  WRITE_AUTHORITY_LEASE_ISSUANCE_KIND_V1_LOCAL_INSTALLATION = 3;
   WRITE_AUTHORITY_LEASE_ISSUANCE_KIND_V1_RENEWAL = 2;
 }
 
@@ -147,26 +156,27 @@ message WriteAuthorityLeaseIssuanceRecordV1 {
   uint64 revision = 6;
   Digest32 record_digest = 7;
   WriteAuthorityLeaseIssuanceKindV1 kind = 8;
+  InstalledServingAuthorityV1 installed = 9;
 }
 
 message GetWriteAuthorityLeaseRequestV1 {
-  tenancy.identity.v1.TenantId tenant_id = 1;
-  cell.placement.v1.CellId cell_id = 2;
-  uint64 binding_generation = 3;
-  uint64 write_authority_epoch = 4;
   uint64 minimum_valid_until_unix_seconds = 5;
+  reserved 1, 2, 3, 4;
+  reserved "tenant_id", "cell_id", "binding_generation", "write_authority_epoch";
+  ServingAuthorityInstanceV1 instance = 6;
+  SignedServingAuthorityInvocationV1 invocation = 7;
 }
 
 message RenewWriteAuthorityLeaseRequestV1 {
   BindingOperationKeyV1 operation = 1;
-  cell.placement.v1.CellId expected_cell_id = 2;
-  uint64 expected_generation = 3;
-  uint64 expected_binding_revision = 4;
-  Digest32 expected_binding_record_digest = 5;
   WriteAuthorityLeaseStatePreconditionV1 expected_lease_state = 6;
   uint64 requested_validity_seconds = 7;
   string idempotency_key = 8;
   Digest32 canonical_request_digest = 9;
+  reserved 2, 3, 4, 5;
+  reserved "expected_cell_id", "expected_generation", "expected_binding_revision", "expected_binding_record_digest";
+  InstalledServingAuthorityV1 expected_authority = 10;
+  SignedServingAuthorityInvocationV1 invocation = 11;
 }
 
 message WriteAuthorityLeaseRenewalResultV1 {

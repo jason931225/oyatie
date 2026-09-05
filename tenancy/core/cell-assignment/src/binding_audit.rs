@@ -42,6 +42,13 @@ impl BindingAuditRecordV1 {
         Err(BindingStoreError::NotImplemented)
     }
 
+    pub fn assemble_for_serving_authority(
+        _authority: &crate::VerifiedServingAuthorityInvocation,
+        _parts: BindingAuditRecordPartsV1,
+    ) -> Result<Self, crate::ServingAuthorityStoreError> {
+        Err(crate::ServingAuthorityStoreError::NotImplemented)
+    }
+
     #[must_use]
     pub fn parts(&self) -> &BindingAuditRecordPartsV1 {
         &self.parts

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package tenancy.binding.v1;
 
+import "tenancy/binding/v1/serving_authority.proto";
+
 import "cell/placement/v1/proof.proto";
 import "tenancy/binding/v1/proof.proto";
 import "tenancy/identity/v1/identity.proto";
@@ -20,12 +22,14 @@ message WriteAuthorityLeaseCommitAttestationPayloadV1 {
   Digest32 issuance_record_digest = 11;
   uint64 lease_state_revision = 12;
   Digest32 lease_state_record_digest = 13;
-  Digest32 reconciliation_candidate_digest = 14;
-  uint64 reconciliation_lease_epoch = 15;
-  Digest32 reconciliation_lease_digest = 16;
-  uint64 reconciliation_lease_expires_at_unix_seconds = 17;
   Digest32 committed_transaction_digest = 18;
   uint64 committed_at_unix_seconds = 19;
+  reserved 14, 15, 16, 17;
+  reserved "reconciliation_candidate_digest", "reconciliation_lease_epoch", "reconciliation_lease_digest", "reconciliation_lease_expires_at_unix_seconds";
+  ServingAuthorityInstanceV1 instance = 20;
+  uint64 publication_lease_epoch = 21;
+  Digest32 publication_lease_digest = 22;
+  uint64 publication_lease_expires_at_unix_seconds = 23;
 }
 
 message SignedWriteAuthorityLeaseCommitAttestationV1 {

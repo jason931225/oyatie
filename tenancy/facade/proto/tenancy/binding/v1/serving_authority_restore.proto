@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "cell/placement/v1/evidence.proto";
+
+message ServingAuthoritySurvivingQuorumEvidenceV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  uint64 committed_state_revision = 2;
+  Digest32 committed_state_digest = 3;
+  Digest32 rejection_high_water_digest = 4;
+  cell.placement.v1.ImmutableEvidenceRefV1 quorum_evidence = 5;
+}
+
+message ServingAuthorityReplacementEvidenceV1 {
+  ServingAuthorityInstanceV1 prior_instance = 1;
+  ServingAuthorityInstanceV1 replacement_instance = 2;
+  Digest32 prior_installation_issuance_digest = 3;
+  cell.placement.v1.ImmutableEvidenceRefV1 independent_physical_fence = 4;
+  Digest32 prior_effect_path_fencing_digest = 5;
+  Digest32 prior_installation_rejection_digest = 6;
+  Digest32 recovery_authority_digest = 7;
+}
+
+message ServingAuthorityFirstInstallationBasisV1 {
+  ServingAuthoritySurvivingQuorumEvidenceV1 surviving_partition = 1;
+  Digest32 uninstalled_precondition_digest = 2;
+}
+
+message ServingAuthorityRestoreBasisV1 {
+  oneof basis {
+    ServingAuthorityFirstInstallationBasisV1 first_installation = 1;
+    ServingAuthoritySurvivingQuorumEvidenceV1 surviving_quorum = 2;
+    ServingAuthorityReplacementEvidenceV1 independently_fenced_replacement = 3;
+  }
+}

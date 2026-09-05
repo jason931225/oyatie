@@ -10,14 +10,9 @@ use crate::{
     BindingMigrationWriteFenceWriteSetV1, BindingOperationKey, BindingOperationV1,
     BindingOperationWriteSetV1, BindingReadAuthorityV1, BindingRepairWriteSetV1,
     BindingReservationAttemptOpenWriteSetV1, BindingReservationAttemptV1,
-    BindingReservationAttemptWriteSetV1, BindingWriteSetV1,
-    CommittedWriteAuthorityLeaseIssuanceClaimV1, CommittedWriteAuthorityLeaseIssuanceQueryV1,
-    MigrationFenceClaimMutationResultV1, MigrationFenceClaimV1,
-    MigrationWriteFenceMutationResultV1, PublishedWriteAuthorityLeaseV1, SignedWriteFenceV1,
-    TenantCellBinding, TenantId, TenantWriteAuthorityHighWaterV1, WriteAuthorityEpoch,
-    WriteAuthorityLeaseIssuanceRecordV1, WriteAuthorityLeasePublicationResultV1,
-    WriteAuthorityLeasePublicationWriteSetV1, WriteAuthorityLeaseRenewalResultV1,
-    WriteAuthorityLeaseRenewalWriteSetV1, WriteAuthorityLeaseStateV1,
+    BindingReservationAttemptWriteSetV1, BindingWriteSetV1, MigrationFenceClaimMutationResultV1,
+    MigrationFenceClaimV1, MigrationWriteFenceMutationResultV1, SignedWriteFenceV1,
+    TenantCellBinding, TenantId, TenantWriteAuthorityHighWaterV1,
 };
 
 pub type BoxTenancyFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -96,26 +91,6 @@ pub trait TenantBindingStore: Send + Sync {
         write_set: &'a BindingMigrationWriteFenceWriteSetV1,
     ) -> BoxTenancyFuture<'a, Result<MigrationWriteFenceMutationResultV1, BindingStoreError>>;
 
-    fn renew_write_authority_lease<'a>(
-        &'a self,
-        write_set: &'a WriteAuthorityLeaseRenewalWriteSetV1,
-    ) -> BoxTenancyFuture<'a, Result<WriteAuthorityLeaseRenewalResultV1, BindingStoreError>>;
-
-    fn publish_write_authority_lease<'a>(
-        &'a self,
-        write_set: &'a WriteAuthorityLeasePublicationWriteSetV1,
-    ) -> BoxTenancyFuture<'a, Result<WriteAuthorityLeasePublicationResultV1, BindingStoreError>>;
-
-    fn load_committed_write_authority_lease_issuance<'a>(
-        &'a self,
-        authority: &'a crate::BindingReconciliationPersistenceAuthorityV1,
-        query: &'a CommittedWriteAuthorityLeaseIssuanceQueryV1,
-        reconciliation_lease: &'a crate::BindingReconciliationLeaseV1,
-    ) -> BoxTenancyFuture<
-        'a,
-        Result<Option<CommittedWriteAuthorityLeaseIssuanceClaimV1>, BindingStoreError>,
-    >;
-
     fn apply_reservation_attempt<'a>(
         &'a self,
         write_set: &'a BindingReservationAttemptWriteSetV1,
@@ -173,35 +148,6 @@ pub trait TenantBindingStore: Send + Sync {
         authority: &'a BindingReadAuthorityV1,
         tenant_id: &'a TenantId,
     ) -> BoxTenancyFuture<'a, Result<Option<TenantWriteAuthorityHighWaterV1>, BindingStoreError>>;
-
-    fn get_write_authority_lease_state<'a>(
-        &'a self,
-        authority: &'a BindingReadAuthorityV1,
-        tenant_id: &'a TenantId,
-        cell_id: &'a cell_placement::CellId,
-        generation: crate::BindingGeneration,
-        epoch: WriteAuthorityEpoch,
-    ) -> BoxTenancyFuture<'a, Result<Option<WriteAuthorityLeaseStateV1>, BindingStoreError>>;
-
-    fn get_write_authority_lease_issuance<'a>(
-        &'a self,
-        authority: &'a BindingReadAuthorityV1,
-        tenant_id: &'a TenantId,
-        cell_id: &'a cell_placement::CellId,
-        generation: crate::BindingGeneration,
-        epoch: WriteAuthorityEpoch,
-        lease_digest: crate::BindingDigest32,
-    ) -> BoxTenancyFuture<'a, Result<Option<WriteAuthorityLeaseIssuanceRecordV1>, BindingStoreError>>;
-
-    fn get_latest_published_write_authority_lease<'a>(
-        &'a self,
-        authority: &'a BindingReadAuthorityV1,
-        tenant_id: &'a TenantId,
-        cell_id: &'a cell_placement::CellId,
-        generation: crate::BindingGeneration,
-        epoch: WriteAuthorityEpoch,
-        minimum_valid_until_unix_seconds: u64,
-    ) -> BoxTenancyFuture<'a, Result<Option<PublishedWriteAuthorityLeaseV1>, BindingStoreError>>;
 
     fn list_history<'a>(
         &'a self,

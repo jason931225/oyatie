@@ -1,0 +1,26 @@
+syntax = "proto3";
+package tenancy.binding.v1;
+
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/cell_index.proto";
+import "cell/placement/v1/drain_seal.proto";
+
+message BindingControlPartitionMutationV1 {
+  TenantControlPartitionRefV1 binding_partition = 1;
+  TenantControlPartitionRefV1 cell_index_partition = 2;
+  TenantControlPartitionRefV1 drain_contributor_partition = 3;
+  CellBindingIndexMutationSetV1 cell_index_mutations = 4;
+  cell.placement.v1.DrainContributorMutationSetV1 drain_mutations = 5;
+  BindingControlContributionProjectionV1 contribution_projection_outbox = 6;
+}
+
+message BindingControlContributionProjectionV1 {
+  TenantControlPartitionRefV1 source_partition = 1;
+  uint64 binding_generation = 2;
+  uint64 binding_revision = 3;
+  Digest32 binding_record_digest = 4;
+  Digest32 cell_index_mutation_set_digest = 5;
+  Digest32 drain_mutation_set_digest = 6;
+  Digest32 projection_digest = 7;
+}

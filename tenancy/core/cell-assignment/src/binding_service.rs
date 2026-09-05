@@ -15,7 +15,7 @@ use crate::{
     SignedWriteFenceV1, TenantCellBinding, TenantId, VerifiedBindingInvocation,
     VerifiedBindingRepairAuthority, VerifiedParticipantManifest, VerifiedParticipantPhaseClosure,
     VerifiedResidencyTransferAuthorizationSet, VerifiedSourceFencingCompletionV1,
-    VerifiedTransferEffectManifest, VerifiedWriteFence, WriteAuthorityLeaseStatePreconditionV1,
+    VerifiedTransferEffectManifest, VerifiedWriteFence,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,7 +89,7 @@ pub struct ClaimMigrationFenceRequestV1 {
     pub expected_source_revision: BindingRevision,
     pub source_binding_record_digest: BindingDigest32,
     pub binding_attempt_digest: BindingDigest32,
-    pub expected_source_write_authority_lease_state: WriteAuthorityLeaseStatePreconditionV1,
+    pub expected_source_authority: crate::ServingAuthorityInstanceV1,
     pub participant_manifest: VerifiedParticipantManifest,
     pub placement_decision: VerifiedCellPlacementDecision,
     pub reservation_commit_permit: VerifiedReservationCommitPermit,
@@ -107,6 +107,8 @@ pub struct CommitMigrationWriteFenceRequestV1 {
     pub expected_operation_revision: BindingOperationRevision,
     pub write_fence: VerifiedWriteFence,
     pub source_fencing_completion: VerifiedSourceFencingCompletionV1,
+    pub source_authority_freeze: crate::VerifiedServingAuthorityFreezeResult,
+    pub terminal_authority_closure: crate::VerifiedServingAuthorityTerminalClosure,
     pub idempotency_key: BindingIdempotencyKey,
     pub canonical_request_digest: BindingDigest32,
 }

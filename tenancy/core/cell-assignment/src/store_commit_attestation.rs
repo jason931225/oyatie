@@ -2,10 +2,9 @@ use cell_placement::CellId;
 
 use crate::{
     BindingDigest32, BindingGeneration, BindingOperationKey, BindingProducerId,
-    BindingProofEnvelopeV1, BindingReconciliationLeaseV1, BindingRevision, TenantCellBinding,
-    TenantId, WriteAuthorityEpoch, WriteAuthorityLeaseIssuancePreconditionV1,
-    WriteAuthorityLeaseIssuanceRecordV1, WriteAuthorityLeaseStatePreconditionV1,
-    WriteAuthorityLeaseStateV1,
+    BindingProofEnvelopeV1, BindingRevision, TenantId, WriteAuthorityEpoch,
+    WriteAuthorityLeaseIssuancePreconditionV1, WriteAuthorityLeaseIssuanceRecordV1,
+    WriteAuthorityLeaseStatePreconditionV1, WriteAuthorityLeaseStateV1,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -23,10 +22,10 @@ pub struct WriteAuthorityLeaseCommitAttestationPayloadV1 {
     pub issuance_record_digest: BindingDigest32,
     pub lease_state_revision: crate::WriteAuthorityLeaseStateRevision,
     pub lease_state_record_digest: BindingDigest32,
-    pub reconciliation_candidate_digest: BindingDigest32,
-    pub reconciliation_lease_epoch: u64,
-    pub reconciliation_lease_digest: BindingDigest32,
-    pub reconciliation_lease_expires_at_unix_seconds: u64,
+    pub instance: crate::ServingAuthorityInstanceV1,
+    pub publication_lease_epoch: u64,
+    pub publication_lease_digest: BindingDigest32,
+    pub publication_lease_expires_at_unix_seconds: u64,
     pub committed_transaction_digest: BindingDigest32,
     pub committed_at_unix_seconds: u64,
 }
@@ -40,10 +39,10 @@ pub struct SignedWriteAuthorityLeaseCommitAttestationV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct CommittedWriteAuthorityLeaseIssuanceClaimV1 {
-    pub binding: TenantCellBinding,
+    pub installed: crate::InstalledServingAuthorityV1,
     pub lease_state: WriteAuthorityLeaseStateV1,
     pub issuance: WriteAuthorityLeaseIssuanceRecordV1,
-    pub reconciliation_lease: BindingReconciliationLeaseV1,
+    pub publication_lease: crate::ServingAuthorityPublicationLeaseV1,
     pub attestation: SignedWriteAuthorityLeaseCommitAttestationV1,
 }
 
@@ -59,9 +58,9 @@ pub struct WriteAuthorityLeaseCommitAttestationExpectationV1 {
     pub lease_intent_digest: BindingDigest32,
     pub issuance_precondition: WriteAuthorityLeaseIssuancePreconditionV1,
     pub lease_state_precondition: WriteAuthorityLeaseStatePreconditionV1,
-    pub reconciliation_candidate_digest: BindingDigest32,
-    pub reconciliation_lease_epoch: u64,
-    pub reconciliation_lease_digest: BindingDigest32,
+    pub instance: crate::ServingAuthorityInstanceV1,
+    pub publication_lease_epoch: u64,
+    pub publication_lease_digest: BindingDigest32,
     pub expected_producer: BindingProducerId,
     pub expected_audience: BindingProducerId,
     pub now_unix_seconds: u64,

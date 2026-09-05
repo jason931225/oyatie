@@ -1,0 +1,132 @@
+syntax = "proto3";
+package tenancy.binding.v1;
+
+import "cell/placement/v1/proof.proto";
+import "tenancy/binding/v1/proof.proto";
+import "tenancy/binding/v1/serving_authority.proto";
+import "tenancy/binding/v1/serving_authority_freeze.proto";
+
+message BindingMovedAuditEffectV1 {
+  cell.placement.v1.CellId source_cell_id = 1;
+  cell.placement.v1.CellId target_cell_id = 2;
+  uint64 expected_generation = 3;
+  uint64 expected_revision = 4;
+  uint64 committed_generation = 5;
+  uint64 committed_revision = 6;
+  uint64 write_authority_epoch = 7;
+  uint64 authority_high_water_revision = 8;
+  Digest32 authority_high_water_record_digest = 9;
+  Digest32 assurance_requirements_digest = 10;
+  Digest32 assurance_evidence_digest = 11;
+  Digest32 recovery_evidence_digest = 12;
+  Digest32 binding_attempt_digest = 13;
+  Digest32 required_reservation_set_digest = 14;
+  Digest32 placement_decision_digest = 15;
+  Digest32 reservation_commit_permit_digest = 16;
+  Digest32 transfer_authorization_set_digest = 17;
+  Digest32 write_fence_digest = 18;
+  Digest32 source_fencing_completion_digest = 19;
+  ServingAuthorityInstanceV1 source_authority = 20;
+  Digest32 source_authority_terminal_closure_digest = 21;
+  Digest32 migration_commit_seal_digest = 22;
+  Digest32 binding_outcome_digest = 23;
+  Digest32 projection_digest = 24;
+  ServingAuthorityInstanceV1 target_authority = 25;
+  Digest32 installation_issuance_digest = 26;
+  Digest32 primary_location_digest = 27;
+  Digest32 recovery_location_digest = 28;
+}
+
+message MigrationWithAuthorityAllocationAuditEffectV1 {
+  Digest32 migration_fence_claim_digest = 1;
+  Digest32 authority_high_water_record_digest = 2;
+  ServingAuthorityInstanceV1 source_authority = 3;
+  Digest32 source_freeze_intent_digest = 4;
+}
+
+message InitialBindingCommittedAuditEffectV1 {
+  cell.placement.v1.CellId target_cell_id = 1;
+  uint64 committed_generation = 2;
+  uint64 committed_revision = 3;
+  uint64 write_authority_epoch = 4;
+  uint64 authority_high_water_revision = 5;
+  Digest32 authority_high_water_record_digest = 6;
+  Digest32 assurance_requirements_digest = 7;
+  Digest32 assurance_evidence_digest = 8;
+  Digest32 recovery_evidence_digest = 9;
+  Digest32 binding_attempt_digest = 10;
+  Digest32 required_reservation_set_digest = 11;
+  Digest32 placement_decision_digest = 12;
+  Digest32 reservation_commit_permit_digest = 13;
+  Digest32 participant_preparation_closure_digest = 14;
+  Digest32 projection_audience_policy_digest = 15;
+  Digest32 binding_outcome_digest = 16;
+  Digest32 projection_digest = 17;
+  ServingAuthorityInstanceV1 target_authority = 18;
+  Digest32 installation_issuance_digest = 19;
+  Digest32 primary_location_digest = 20;
+  Digest32 recovery_location_digest = 21;
+}
+
+message MigrationFenceClaimedAuditEffectV1 {
+  cell.placement.v1.CellId source_cell_id = 1;
+  cell.placement.v1.CellId target_cell_id = 2;
+  uint64 source_generation = 3;
+  uint64 source_revision = 4;
+  uint64 successor_generation = 5;
+  uint64 write_authority_epoch = 6;
+  uint64 authority_high_water_revision = 7;
+  Digest32 authority_high_water_record_digest = 8;
+  ServingAuthorityInstanceV1 source_authority = 9;
+  Digest32 source_freeze_intent_digest = 10;
+  Digest32 binding_attempt_digest = 11;
+  Digest32 migration_fence_claim_digest = 12;
+  Digest32 movement_permit_digest = 13;
+  Digest32 transfer_authorization_set_digest = 14;
+  Digest32 transfer_effect_manifest_digest = 15;
+  Digest32 participant_manifest_digest = 16;
+  Digest32 prepared_participant_closure_digest = 17;
+}
+
+message ServingAuthorityInstalledAuditEffectV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 installation_issuance_digest = 2;
+  Digest32 first_local_lease_issuance_digest = 3;
+  Digest32 result_digest = 4;
+}
+
+message ServingAuthorityFrozenAuditEffectV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 freeze_intent_digest = 2;
+  Digest32 result_digest = 3;
+  ServingAuthorityCommittedIssuanceHorizonV1 committed_horizon = 4;
+}
+
+message ServingAuthorityHandoffRecordedAuditEffectV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  Digest32 handoff_record_digest = 2;
+  Digest32 authenticated_result_digest = 3;
+}
+
+message WriteAuthorityLeaseRenewalCommittedAuditEffectV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  cell.placement.v1.CellId cell_id = 2;
+  uint64 binding_generation = 3;
+  uint64 binding_revision = 4;
+  uint64 write_authority_epoch = 5;
+  Digest32 previous_lease_digest = 6;
+  Digest32 renewal_lease_digest = 7;
+  Digest32 renewal_lease_issuance_digest = 8;
+  uint64 maximum_write_authority_lease_expires_at_unix_seconds = 9;
+  Digest32 write_authority_lease_state_digest = 10;
+}
+
+message WriteAuthorityLeasePublishedAuditEffectV1 {
+  ServingAuthorityInstanceV1 instance = 1;
+  cell.placement.v1.CellId cell_id = 2;
+  uint64 binding_generation = 3;
+  uint64 binding_revision = 4;
+  uint64 write_authority_epoch = 5;
+  Digest32 lease_digest = 6;
+  Digest32 issuance_record_digest = 7;
+}
