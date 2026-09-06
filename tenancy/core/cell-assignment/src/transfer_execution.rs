@@ -461,6 +461,37 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     pub operation: BindingOperationV1,
     pub issuance_precondition: TransferExecutionPermitIssuancePreconditionV1,
     pub item_precondition: crate::TransferExecutionItemPreconditionV1,
+    /// The verified commit, bound in ALONGSIDE the signed permit.
+    ///
+    /// # When a committed claim belongs in a write set
+    ///
+    /// Of the twelve `VerifiedCommitted*` barriers across both crates, five
+    /// bind their claim into a write set and seven do not. The split is
+    /// principled and the rule is this:
+    ///
+    /// BIND the claim when the publishing write lands on the SAME store that
+    /// holds the committed record. There the store can independently re-check
+    /// that the signature it is persisting was minted from the commit it names,
+    /// instead of trusting the signer's derivation. All five bound cases are
+    /// exactly this: `TransferExecutionStore::issue_permit`/`publish_permit`,
+    /// `MigrationReleaseStore::commit_release_issuance`/`publish_release_permit`,
+    /// `CellServingAuthorityStore::renew_write_authority_lease`/`publish_write_authority_lease`,
+    /// and the two cell publication write sets.
+    ///
+    /// DO NOT BIND it when the signed product crosses a store boundary. The
+    /// receiving store does not hold the committed record and cannot condition
+    /// on it; it can only verify the signature. Binding there would demand a
+    /// precondition the receiving store is unable to read -- which is the
+    /// write-only-precondition defect, not a strengthening. The boundary is
+    /// visible in the types rather than inferred: the serving-authority control
+    /// commit attests a `TenantControlPartitionRefV1` while the install and
+    /// freeze write sets carry a `CellServingPartitionRefV1`, and the control
+    /// contribution commits against a `source_partition` while delivery targets
+    /// a `BindingControlContributionTargetV1`.
+    ///
+    /// So transfer-execution and control-contribution really are "the same
+    /// shape" as a barrier, and still differ here correctly: this one publishes
+    /// on the store that committed, and that one hands off to another partition.
     pub committed_issuance: VerifiedCommittedTransferExecutionPermitIssuance,
     pub permit: VerifiedTransferExecutionPermit,
     pub next_item: crate::TransferExecutionItemV1,
