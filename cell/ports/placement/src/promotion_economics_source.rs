@@ -405,6 +405,7 @@ fn advance_promotion_economics_closure_step<'a>(
 pub struct CellPromotionEconomicsClosureIssuerV1 {
     registry_reader: Box<dyn PromotionEconomicsSourceRegistryReader>,
     checkpoint_store: Box<dyn crate::PromotionEconomicsCheckpointStore>,
+    checkpoint_observer: Box<dyn crate::PromotionEconomicsCheckpointCommitObserver>,
     proof_verifier: Box<dyn CellProofVerifier>,
     registry: PromotionEconomicsSourceRegistryV1,
     policy: PromotionEconomicsPolicyV1,
@@ -420,6 +421,7 @@ impl CellPromotionEconomicsClosureIssuerV1 {
     pub fn admit(
         _registry_reader: Box<dyn PromotionEconomicsSourceRegistryReader>,
         _checkpoint_store: Box<dyn crate::PromotionEconomicsCheckpointStore>,
+        _checkpoint_observer: Box<dyn crate::PromotionEconomicsCheckpointCommitObserver>,
         _proof_verifier: Box<dyn CellProofVerifier>,
         _registry: PromotionEconomicsSourceRegistryV1,
         _policy: PromotionEconomicsPolicyV1,
@@ -450,6 +452,19 @@ impl CellPromotionEconomicsClosureIssuerV1 {
     #[must_use]
     pub fn checkpoint_store(&self) -> &dyn crate::PromotionEconomicsCheckpointStore {
         self.checkpoint_store.as_ref()
+    }
+
+    /// The checkpoint commit observer this issuer was admitted with.
+    ///
+    /// Required from CONSTRUCTION for the same A3 reason as the store: the
+    /// closure step is private and reaches every dependency through the issuer,
+    /// and since a checkpoint store now reports only durable records, resuming
+    /// retained progress needs this port to obtain an independently observed
+    /// claim before the module's verifier will mint a wrapper from it. Without
+    /// it the sealed step could not use the store its own contract mandates.
+    #[must_use]
+    pub fn checkpoint_observer(&self) -> &dyn crate::PromotionEconomicsCheckpointCommitObserver {
+        self.checkpoint_observer.as_ref()
     }
 
     /// The proof verifier this issuer was admitted with, used to authenticate

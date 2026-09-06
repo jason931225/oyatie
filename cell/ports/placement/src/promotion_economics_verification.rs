@@ -247,6 +247,14 @@ pub struct CommittedPromotionEconomicsCheckpointClaimV1 {
 /// occurred. This is the second half of the wave law that the store fix alone
 /// does not satisfy: a store that signs an observation of its own write vouches
 /// for itself, so the signature has to come from somewhere the write did not.
+///
+/// `None` means the observer found NOTHING at that key. When
+/// [`PromotionEconomicsCheckpointStore::acquire`] reported retained progress
+/// and the observer then finds none, that disagreement is a REFUSAL, never a
+/// quiet fallback to "no progress": the caller must not restart the
+/// verification from zero on the strength of a store report the observer could
+/// not corroborate. Only a `None` corroborating an `acquire` that also found
+/// nothing means a genuinely fresh verification.
 pub trait PromotionEconomicsCheckpointCommitObserver: Send + Sync {
     fn observe_committed_checkpoint<'a>(
         &'a self,
