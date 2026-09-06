@@ -498,12 +498,47 @@ impl VerifiedCellPromotionEconomics {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PromotionEconomicsVerificationErrorV1 {
     NotImplemented,
+    /// A retained input the closure said exists could not be read: the reader
+    /// reached its exact source, snapshot and ordinal and found nothing there.
+    ///
+    /// This is READER-LEVEL ABSENCE of a specific record, and it is the
+    /// narrowest of the four refusals in this enum that mention something
+    /// missing. The other three are about sets, not records:
+    /// `IncompleteInputSet` is the declared population failing its own
+    /// accounting — a count, root or byte total that does not reconcile after
+    /// the complete stream, or a page that ended early.
+    /// `CostScopeIncomplete` is the TAXONOMY not being covered — a category
+    /// total absent, or an admitted scope the total scope requires not present
+    /// in the population at all.
+    /// `SourceClosureRejected` is CLOSURE-TIME, the authority refusing to bind
+    /// a population that is missing an admitted scope.
+    /// So: a scope absent from the registry refuses at closure time; a scope
+    /// absent from the taxonomy coverage is `CostScopeIncomplete`; a population
+    /// that does not add up is `IncompleteInputSet`; and a single record whose
+    /// bytes are not where the manifest says they are is this one.
+    ///
+    /// Distinct from `RetentionInsufficient`, which is the same absence
+    /// FORESEEN rather than encountered: retention refuses before reading
+    /// because the bytes will be gone, this refuses after reading because they
+    /// already are.
     MissingInput,
     NotAuthorized,
     DependencyUnavailable,
     UnsupportedCalculation,
     PolicyMismatch,
     CellMismatch,
+    /// A window relation failed at REPLAY time: a retained input's window is
+    /// not inside the closure window, or the record's window disagrees with the
+    /// closure or policy, or a window is malformed — `start >= end`, or
+    /// `end` later than now, or a finalization claiming to close a window it
+    /// does not cover.
+    ///
+    /// BOUNDARY against `SourceClosureRejected`, which also names window
+    /// disagreement: that is CLOSURE-TIME and is about the admitted POPULATION
+    /// — the source scopes do not agree on a common window, so no closure is
+    /// bound. This one is about a SINGLE record or finalization measured
+    /// against a closure that already exists. Same relation, two different
+    /// moments, and only one of them has a closure to compare against.
     WindowMismatch,
     /// The declared population was not fully verified: a missing source, a
     /// missing record, an early terminal page or a count, root or byte
