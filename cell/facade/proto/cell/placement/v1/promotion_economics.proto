@@ -1,0 +1,429 @@
+syntax = "proto3";
+
+package cell.placement.v1;
+
+import "cell/placement/v1/capacity.proto";
+import "cell/placement/v1/compatibility.proto";
+import "cell/placement/v1/economics.proto";
+import "cell/placement/v1/evidence.proto";
+import "cell/placement/v1/proof.proto";
+import "cell/placement/v1/topology.proto";
+
+// Wire form of the Rust contracts in
+// cell/ports/placement/src/promotion_economics*.rs. Fields follow the Rust
+// declaration order at consecutive tags from 1, with identical snake_case
+// names.
+//
+// Enum tag 0 is always <ENUM>_UNSPECIFIED and is always rejected on read; an
+// absent required message field is likewise rejected rather than defaulted, and
+// an unsigned scalar whose rule requires positivity rejects zero. Enum tag order
+// is wire identity only and carries no rank.
+//
+// No Verified* wrapper, execution lease, checkpoint write or step outcome
+// appears here. Those are private-field capability types, never credentials on
+// a wire. Verification error enums stay Rust-side, as the assurance
+// compilation errors do.
+
+message PromotionEconomicsWindowV1 {
+  uint64 start_unix_seconds = 1;
+  uint64 end_unix_seconds = 2;
+}
+
+enum PromotionCostScopeV1 {
+  PROMOTION_COST_SCOPE_V1_UNSPECIFIED = 0;
+  PROMOTION_COST_SCOPE_V1_TOTAL_CELL_OPERATING_COST = 1;
+}
+
+enum PromotionCostCategoryV1 {
+  PROMOTION_COST_CATEGORY_V1_UNSPECIFIED = 0;
+  PROMOTION_COST_CATEGORY_V1_HOME_AND_IDLE_CAPACITY = 1;
+  PROMOTION_COST_CATEGORY_V1_RECOVERY_AND_BACKUP = 2;
+  PROMOTION_COST_CATEGORY_V1_NETWORK_AND_MOVEMENT = 3;
+  PROMOTION_COST_CATEGORY_V1_CONTROL_AND_OBSERVABILITY = 4;
+  PROMOTION_COST_CATEGORY_V1_SECURITY_AND_COMPLIANCE = 5;
+  PROMOTION_COST_CATEGORY_V1_SHARED_OPERATING_OVERHEAD = 6;
+}
+
+enum PromotionCostSignV1 {
+  PROMOTION_COST_SIGN_V1_UNSPECIFIED = 0;
+  PROMOTION_COST_SIGN_V1_CHARGE = 1;
+  PROMOTION_COST_SIGN_V1_CREDIT = 2;
+}
+
+enum PromotionCostValuationV1 {
+  PROMOTION_COST_VALUATION_V1_UNSPECIFIED = 0;
+  PROMOTION_COST_VALUATION_V1_AMORTIZED_EFFECTIVE_COST = 1;
+}
+
+enum PromotionUnitCostRoundingV1 {
+  PROMOTION_UNIT_COST_ROUNDING_V1_UNSPECIFIED = 0;
+  PROMOTION_UNIT_COST_ROUNDING_V1_CEILING_MICROUNIT = 1;
+}
+
+enum PromotionCostAllocationRoundingV1 {
+  PROMOTION_COST_ALLOCATION_ROUNDING_V1_UNSPECIFIED = 0;
+  PROMOTION_COST_ALLOCATION_ROUNDING_V1_CHARGE_CEILING_CREDIT_FLOOR = 1;
+}
+
+enum PromotionUsageBasisV1 {
+  PROMOTION_USAGE_BASIS_V1_UNSPECIFIED = 0;
+  PROMOTION_USAGE_BASIS_V1_COMMITTED_HOME_CAPACITY_SECONDS = 1;
+}
+
+message PromotionNormalizedUnitV1 {
+  CapacityDimensionV1 dimension = 1;
+  uint64 capacity_units_per_normalized_unit = 2;
+  uint64 seconds_per_normalized_unit = 3;
+}
+
+message PromotionNormalizedQuantityV1 {
+  PromotionNormalizedUnitV1 unit = 1;
+  uint64 raw_capacity_unit_seconds = 2;
+}
+
+enum PromotionEconomicsAlgorithmV1 {
+  PROMOTION_ECONOMICS_ALGORITHM_V1_UNSPECIFIED = 0;
+  PROMOTION_ECONOMICS_ALGORITHM_V1_TOTAL_EFFECTIVE_COST_PER_COMMITTED_CAPACITY_TIME = 1;
+}
+
+message PromotionEconomicsCalculationIdentityV1 {
+  uint32 schema_version = 1;
+  PromotionEconomicsAlgorithmV1 algorithm = 2;
+  Digest32 implementation_digest = 3;
+  uint32 canonical_encoding_version = 4;
+}
+
+message PromotionCostTaxonomyV1 {
+  uint32 version = 1;
+  Digest32 definition_digest = 2;
+}
+
+message PromotionEconomicsPolicyV1 {
+  uint64 policy_generation = 1;
+  string policy_version = 2;
+  Digest32 policy_digest = 3;
+  PromotionCostScopeV1 cost_scope = 4;
+  string currency = 5;
+  PromotionCostValuationV1 valuation = 6;
+  PromotionUsageBasisV1 usage_basis = 7;
+  PromotionNormalizedUnitV1 unit = 8;
+  PromotionUnitCostRoundingV1 rounding = 9;
+  PromotionCostAllocationRoundingV1 allocation_rounding = 10;
+  PromotionCostTaxonomyV1 taxonomy = 11;
+  PromotionEconomicsCalculationIdentityV1 calculation = 12;
+  MoneyMicrounitsV1 maximum_unit_cost = 13;
+  // Scheduling and backpressure limits, not admission limits. Exhausting one
+  // continues the verification; it never rejects a promotion for estate size.
+  uint32 maximum_rows_per_page = 14;
+  uint64 maximum_bytes_per_page = 15;
+  uint32 maximum_pages_per_step = 16;
+  uint64 maximum_bytes_per_step = 17;
+  uint32 maximum_concurrent_steps_per_partition = 18;
+  uint64 checkpoint_lease_seconds = 19;
+  uint64 minimum_retention_seconds = 20;
+}
+
+message PromotionCostCategoryTotalV1 {
+  PromotionCostCategoryV1 category = 1;
+  uint64 charge_microunits = 2;
+  uint64 credit_microunits = 3;
+  uint64 input_count = 4;
+}
+
+enum PromotionOutsideCostScopeReasonV1 {
+  PROMOTION_OUTSIDE_COST_SCOPE_REASON_V1_UNSPECIFIED = 0;
+  PROMOTION_OUTSIDE_COST_SCOPE_REASON_V1_DIFFERENT_CELL = 1;
+  PROMOTION_OUTSIDE_COST_SCOPE_REASON_V1_NON_OPERATING_BUSINESS_EXPENSE = 2;
+}
+
+message PromotionCostIncludedClassificationV1 {
+  PromotionCostCategoryV1 category = 1;
+}
+
+message PromotionCostOutsideScopeClassificationV1 {
+  PromotionOutsideCostScopeReasonV1 reason = 1;
+}
+
+// A missing oneof is rejected: a row with no classification is an unclassified
+// row, which is exactly what source finalization forbids.
+message PromotionCostClassificationV1 {
+  oneof classification {
+    PromotionCostIncludedClassificationV1 included = 1;
+    PromotionCostOutsideScopeClassificationV1 outside_cell_operating_scope = 2;
+  }
+}
+
+message PromotionRetainedCostInputV1 {
+  CommercialSourceRecordRefV1 source_record = 1;
+  PromotionCostClassificationV1 classification = 2;
+  PromotionEconomicsWindowV1 window = 3;
+  PromotionCostSignV1 sign = 4;
+  MoneyMicrounitsV1 effective_charge = 5;
+  uint64 cell_allocation_numerator = 6;
+  uint64 cell_allocation_denominator = 7;
+}
+
+message PromotionRetainedUsageInputV1 {
+  ImmutableEvidenceRefV1 source_record = 1;
+  ReservationRefV1 reservation = 2;
+  PromotionEconomicsWindowV1 window = 3;
+  CapacityAmountV1 committed_capacity = 4;
+}
+
+message PromotionEconomicsInputV1 {
+  oneof input {
+    PromotionRetainedCostInputV1 cost = 1;
+    PromotionRetainedUsageInputV1 usage = 2;
+  }
+}
+
+message PromotionEconomicsInputMemberV1 {
+  uint64 ordinal = 1;
+  PromotionEconomicsInputV1 input = 2;
+  Digest32 member_digest = 3;
+}
+
+// Retained without a consumer, matching the Rust type of the same name: the
+// adjudicated correction replaced the combined promoter-facing manifest with
+// PromotionEconomicsClosureV1.
+message PromotionEconomicsInputManifestV1 {
+  ImmutableEvidenceRefV1 immutable_record = 1;
+  CellRevisionIdentityV1 cell = 2;
+  PromotionEconomicsWindowV1 window = 3;
+  Digest32 policy_digest = 4;
+  Digest32 ordered_input_root_digest = 5;
+  uint64 input_count = 6;
+  uint64 canonical_input_bytes = 7;
+  repeated PromotionCostCategoryTotalV1 category_totals = 8;
+  uint64 finalized_at_unix_seconds = 9;
+  uint64 retained_until_unix_seconds = 10;
+  Digest32 manifest_digest = 11;
+}
+
+enum PromotionEconomicsSourceOwnerV1 {
+  PROMOTION_ECONOMICS_SOURCE_OWNER_V1_UNSPECIFIED = 0;
+  PROMOTION_ECONOMICS_SOURCE_OWNER_V1_ACCOUNTING = 1;
+  PROMOTION_ECONOMICS_SOURCE_OWNER_V1_BILLING = 2;
+  PROMOTION_ECONOMICS_SOURCE_OWNER_V1_OBSERVABILITY = 3;
+}
+
+enum PromotionEconomicsSourceKindV1 {
+  PROMOTION_ECONOMICS_SOURCE_KIND_V1_UNSPECIFIED = 0;
+  PROMOTION_ECONOMICS_SOURCE_KIND_V1_FINALIZED_EFFECTIVE_CHARGES = 1;
+  PROMOTION_ECONOMICS_SOURCE_KIND_V1_COMMITTED_HOME_CAPACITY_INTERVALS = 2;
+}
+
+message PromotionEconomicsSourceScopeV1 {
+  PromotionEconomicsSourceOwnerV1 owner = 1;
+  ProducerIdV1 producer = 2;
+  string authority_id = 3;
+  string repository_id = 4;
+  string scope_id = 5;
+  PlacementPartitionV1 partition = 6;
+  CellId cell_id = 7;
+  PromotionEconomicsSourceKindV1 kind = 8;
+  uint32 source_schema_version = 9;
+  uint32 canonical_encoding_version = 10;
+  uint32 native_key_encoding_version = 11;
+  // Half-open native key range under native_key_encoding_version. Admitted
+  // scopes are non-overlapping and canonically ordered, which is what lets a
+  // streaming verifier check adjacency without a global key set.
+  bytes native_key_range_start_inclusive = 12;
+  bytes native_key_range_end_exclusive = 13;
+  Digest32 scope_digest = 14;
+}
+
+message PromotionEconomicsSourceAdmissionV1 {
+  PromotionEconomicsSourceScopeV1 scope = 1;
+  uint64 admission_generation = 2;
+  KeyIdV1 expected_signing_key_id = 3;
+  Digest32 cost_taxonomy_digest = 4;
+  uint32 row_order_version = 5;
+  Digest32 admission_digest = 6;
+}
+
+message PromotionEconomicsSourceRegistryV1 {
+  PlacementPartitionV1 partition = 1;
+  CellId cell_id = 2;
+  uint64 generation = 3;
+  Digest32 ordered_admission_root_digest = 4;
+  uint64 admission_count = 5;
+  ImmutableEvidenceRefV1 immutable_record = 6;
+  Digest32 registry_digest = 7;
+}
+
+message PromotionEconomicsSourceFinalizationPayloadV1 {
+  Digest32 admission_digest = 1;
+  PromotionEconomicsSourceScopeV1 scope = 2;
+  PromotionEconomicsWindowV1 window = 3;
+  string snapshot_id = 4;
+  uint64 snapshot_revision = 5;
+  Digest32 ordered_record_root_digest = 6;
+  uint64 record_count = 7;
+  uint64 canonical_bytes = 8;
+  uint64 finalized_through_unix_seconds = 9;
+  uint64 retained_until_unix_seconds = 10;
+  Digest32 cost_taxonomy_digest = 11;
+  // Must be zero. A source that could not classify part of its own window has
+  // not finalized an exhaustive population.
+  uint64 unclassified_record_count = 12;
+  Digest32 payload_digest = 13;
+}
+
+// Signed under CELL_PROOF_DOMAIN_V1_PROMOTION_ECONOMICS_SOURCE_FINALIZATION.
+message SignedPromotionEconomicsSourceFinalizationV1 {
+  PromotionEconomicsSourceFinalizationPayloadV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message PromotionEconomicsClosureV1 {
+  PlacementPartitionV1 partition = 1;
+  CellRevisionIdentityV1 cell = 2;
+  PromotionEconomicsWindowV1 window = 3;
+  PromotionEconomicsSourceRegistryV1 registry = 4;
+  Digest32 policy_digest = 5;
+  PromotionCostTaxonomyV1 taxonomy = 6;
+  Digest32 ordered_finalization_root_digest = 7;
+  uint64 finalization_count = 8;
+  // The MINIMUM authenticated source retention deadline.
+  uint64 retained_until_unix_seconds = 9;
+  Digest32 closure_digest = 10;
+}
+
+// Deliberately unable to name a registry: the closure issuer holds its admitted
+// registry from construction.
+message PromotionEconomicsClosureRequestV1 {
+  PlacementPartitionV1 partition = 1;
+  CellRevisionIdentityV1 cell = 2;
+  PromotionEconomicsWindowV1 window = 3;
+  uint64 expected_policy_generation = 4;
+  uint64 now_unix_seconds = 5;
+}
+
+message PromotionEconomicsSourceRegistryPageRequestV1 {
+  PromotionEconomicsSourceRegistryV1 registry = 1;
+  PromotionEconomicsWindowV1 window = 2;
+  uint64 first_source_ordinal = 3;
+  uint32 maximum_rows = 4;
+  uint64 maximum_bytes = 5;
+}
+
+message PromotionEconomicsSourceRegistryMemberV1 {
+  uint64 ordinal = 1;
+  PromotionEconomicsSourceAdmissionV1 admission = 2;
+  SignedPromotionEconomicsSourceFinalizationV1 finalization = 3;
+}
+
+message PromotionEconomicsSourceRegistryPageV1 {
+  Digest32 registry_digest = 1;
+  uint64 first_source_ordinal = 2;
+  repeated PromotionEconomicsSourceRegistryMemberV1 members = 3;
+  uint64 canonical_bytes = 4;
+}
+
+message CellPromotionEconomicsV1 {
+  CellRevisionIdentityV1 cell = 1;
+  PromotionEconomicsWindowV1 window = 2;
+  PromotionEconomicsPolicyV1 policy = 3;
+  PromotionEconomicsClosureV1 closure = 4;
+  MoneyMicrounitsV1 total_cost = 5;
+  PromotionNormalizedQuantityV1 denominator = 6;
+  MoneyMicrounitsV1 unit_cost = 7;
+  Digest32 calculation_digest = 8;
+}
+
+// Retained without a consumer, matching the Rust type of the same name.
+message PromotionEconomicsExpectationV1 {
+  CellRevisionIdentityV1 cell = 1;
+  PromotionEconomicsWindowV1 window = 2;
+  PromotionEconomicsPolicyV1 policy = 3;
+  Digest32 expected_input_manifest_digest = 4;
+  uint64 now_unix_seconds = 5;
+  uint64 required_retention_until_unix_seconds = 6;
+}
+
+message PromotionEconomicsRetainedPageRequestV1 {
+  PlacementPartitionV1 partition = 1;
+  Digest32 closure_digest = 2;
+  uint64 source_ordinal = 3;
+  // The exact finalized snapshot. A mutable "latest" result is not a
+  // substitute.
+  string snapshot_id = 4;
+  uint64 snapshot_revision = 5;
+  uint64 first_record_ordinal = 6;
+  uint32 maximum_rows = 7;
+  uint64 maximum_bytes = 8;
+}
+
+message PromotionEconomicsRetainedPageV1 {
+  PlacementPartitionV1 partition = 1;
+  Digest32 closure_digest = 2;
+  uint64 source_ordinal = 3;
+  uint64 first_record_ordinal = 4;
+  SignedPromotionEconomicsSourceFinalizationV1 finalization = 5;
+  repeated PromotionEconomicsInputMemberV1 records = 6;
+  uint64 canonical_bytes = 7;
+}
+
+enum PromotionEconomicsVerificationPhaseV1 {
+  PROMOTION_ECONOMICS_VERIFICATION_PHASE_V1_UNSPECIFIED = 0;
+  PROMOTION_ECONOMICS_VERIFICATION_PHASE_V1_VERIFYING_SOURCE_CLOSURE = 1;
+  PROMOTION_ECONOMICS_VERIFICATION_PHASE_V1_REPLAYING_INPUTS = 2;
+  PROMOTION_ECONOMICS_VERIFICATION_PHASE_V1_COMPLETE = 3;
+}
+
+// Keyed on the registry digest, not on a closure digest: the closure digest is
+// this phase's output and does not exist while the phase runs.
+message PromotionEconomicsSourceClosureVerificationKeyV1 {
+  PlacementPartitionV1 partition = 1;
+  CellId cell_id = 2;
+  Digest32 registry_digest = 3;
+  PromotionEconomicsWindowV1 window = 4;
+  Digest32 policy_digest = 5;
+}
+
+message PromotionEconomicsInputReplayVerificationKeyV1 {
+  PlacementPartitionV1 partition = 1;
+  CellId cell_id = 2;
+  Digest32 closure_digest = 3;
+  Digest32 calculation_digest = 4;
+}
+
+message PromotionEconomicsVerificationKeyV1 {
+  oneof key {
+    PromotionEconomicsSourceClosureVerificationKeyV1 source_closure = 1;
+    PromotionEconomicsInputReplayVerificationKeyV1 input_replay = 2;
+  }
+}
+
+message PromotionEconomicsVerificationCursorV1 {
+  PromotionEconomicsVerificationPhaseV1 phase = 1;
+  uint64 next_source_ordinal = 2;
+  uint64 next_record_ordinal = 3;
+  uint64 source_records_verified = 4;
+  uint64 source_bytes_verified = 5;
+  // Format-defined bounded sizes validated by the pinned calculation encoding
+  // version, never arbitrary serialized hasher internals.
+  bytes source_ordered_hash_state = 6;
+  bytes closure_ordered_hash_state = 7;
+  optional bytes previous_canonical_record_key = 8;
+  optional uint64 previous_interval_end_unix_seconds = 9;
+}
+
+// Durable verification progress. This is retained data, not a credential: the
+// private-field VerifiedPromotionEconomicsCheckpoint has no wire form, and
+// decoding this message does not mint one.
+message PromotionEconomicsVerificationCheckpointV1 {
+  PromotionEconomicsVerificationKeyV1 key = 1;
+  uint64 revision = 2;
+  CellRevisionIdentityV1 expected_cell = 3;
+  Digest32 registry_digest = 4;
+  Digest32 policy_digest = 5;
+  PromotionEconomicsVerificationCursorV1 cursor = 6;
+  repeated PromotionCostCategoryTotalV1 category_totals = 7;
+  uint64 raw_capacity_unit_seconds = 8;
+  uint64 retained_until_unix_seconds = 9;
+  uint64 updated_at_unix_seconds = 10;
+  Digest32 checkpoint_digest = 11;
+}

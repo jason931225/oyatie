@@ -104,6 +104,11 @@ export_file(
 )
 
 export_file(
+    name = "promotion_economics.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "proof.proto",
     visibility = ["PUBLIC"],
 )

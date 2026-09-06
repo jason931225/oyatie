@@ -72,6 +72,7 @@ pub enum CellProofDomainV1 {
     RebalanceSourceCommit,
     MovementActionClosure,
     MovementActionResult,
+    PromotionEconomicsSourceFinalization,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
