@@ -145,6 +145,39 @@ impl CellProofConsumptionV1 {
     }
 }
 
+/// The verified proofs that can be recorded as CONSUMED by
+/// [`bind_cell_proof_consumption`].
+///
+/// This is not "every verified proof". A variant belongs here only when some
+/// write set actually carries the resulting [`CellProofConsumptionV1`], because
+/// a consumption with nowhere durable to land records nothing. Read evidence
+/// needs no variant at all: nothing is spent by reading.
+///
+/// The rebalance-source movement path deliberately has NO variant here, and the
+/// mechanical reason is checkable: every write set on that path that carries a
+/// verified value - `RebalancePublicationWriteSetPartsV1`,
+/// `RebalanceSourceIssuanceWriteSetPartsV1`, `RebalanceClosureWriteSetPartsV1`,
+/// `RebalanceObserveResultWriteSetPartsV1`,
+/// `MovementActionRejectionWriteSetPartsV1` - has no `proof_consumptions` field,
+/// while all four drain write sets do. That is exactly why
+/// `DrainContributorSealCommitAttestation` has a variant and the structurally
+/// identical rebalance commit observations do not: the difference is where the
+/// consumption can be written, not what the proof looks like.
+///
+/// `RebalanceJobWriteSetPartsV1` looks like a counterexample and is not. It does
+/// carry `proof_consumptions`, but it is the JOB-level write, taken under
+/// `CellControlPersistenceAuthorityV1` in a different transaction from any
+/// issuance or closure, and it carries none of this path's verified values. A
+/// consumption has to land in the same durable transaction as the thing it
+/// guards, so that slot is not a destination for a proof spent on the issuance
+/// or closure paths.
+///
+/// Replay on that path is refused by state instead: `RebalanceSourcePreconditionV1`
+/// pins the job revision, digest and claim, and `RebalanceActionPreconditionV1`
+/// pins the action's state, revision and record digest, so a second issuance from
+/// one authorization fails the compare-and-set. `PlacementAuthorizationError::RequestMismatch`
+/// separately binds a policy decision to one business action key. Adding a
+/// variant here would not refuse anything those do not already refuse.
 #[derive(Clone, Copy, Debug)]
 pub enum VerifiedCellProofRefV1<'a> {
     PlacementInvocation(&'a crate::VerifiedPlacementInvocation),
