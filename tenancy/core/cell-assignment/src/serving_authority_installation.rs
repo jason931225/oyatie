@@ -61,8 +61,14 @@ pub fn verify_committed_serving_authority_installation(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignedServingAuthorityInstallGrantV1 {
+pub struct ServingAuthorityInstallGrantPayloadV1 {
+    pub schema_version: u32,
     pub committed: CommittedServingAuthorityInstallationClaimV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedServingAuthorityInstallGrantV1 {
+    pub payload: ServingAuthorityInstallGrantPayloadV1,
     pub envelope: BindingProofEnvelopeV1,
     pub signature: Vec<u8>,
 }

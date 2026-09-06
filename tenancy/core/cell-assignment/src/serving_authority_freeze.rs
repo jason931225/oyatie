@@ -40,8 +40,14 @@ pub fn verify_committed_serving_authority_freeze(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignedServingAuthorityFreezeGrantV1 {
+pub struct ServingAuthorityFreezeGrantPayloadV1 {
+    pub schema_version: u32,
     pub committed: CommittedServingAuthorityFreezeClaimV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedServingAuthorityFreezeGrantV1 {
+    pub payload: ServingAuthorityFreezeGrantPayloadV1,
     pub envelope: BindingProofEnvelopeV1,
     pub signature: Vec<u8>,
 }

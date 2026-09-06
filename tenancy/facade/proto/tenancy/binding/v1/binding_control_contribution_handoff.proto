@@ -7,11 +7,16 @@ import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/binding/v1/binding_control_contribution.proto";
 import "tenancy/binding/v1/binding_control_contribution_ack.proto";
 
+message BindingControlContributionHandoffPayloadV1 {
+  uint32 schema_version = 1;
+  CommittedBindingControlContributionClaimV1 committed = 2;
+  BindingControlContributionTargetV1 target = 3;
+}
+
 message SignedBindingControlContributionHandoffV1 {
-  CommittedBindingControlContributionClaimV1 committed = 1;
-  BindingControlContributionTargetV1 target = 2;
-  BindingProofEnvelopeV1 envelope = 3;
-  bytes signature = 4;
+  BindingControlContributionHandoffPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
 }
 
 message BindingControlContributionPendingPublicationV1 {

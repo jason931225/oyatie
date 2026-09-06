@@ -91,9 +91,15 @@ pub fn verify_committed_binding_control_contribution(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignedBindingControlContributionHandoffV1 {
+pub struct BindingControlContributionHandoffPayloadV1 {
+    pub schema_version: u32,
     pub committed: CommittedBindingControlContributionClaimV1,
     pub target: BindingControlContributionTargetV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedBindingControlContributionHandoffV1 {
+    pub payload: BindingControlContributionHandoffPayloadV1,
     pub envelope: crate::BindingProofEnvelopeV1,
     pub signature: Vec<u8>,
 }

@@ -38,8 +38,13 @@ message CommittedServingAuthorityInstallationClaimV1 {
   SignedServingAuthorityControlCommitAttestationV1 attestation = 2;
 }
 
+message ServingAuthorityInstallGrantPayloadV1 {
+  uint32 schema_version = 1;
+  CommittedServingAuthorityInstallationClaimV1 committed = 2;
+}
+
 message SignedServingAuthorityInstallGrantV1 {
-  CommittedServingAuthorityInstallationClaimV1 committed = 1;
+  ServingAuthorityInstallGrantPayloadV1 payload = 1;
   BindingProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }

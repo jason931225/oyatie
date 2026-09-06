@@ -26,8 +26,13 @@ message CommittedServingAuthorityFreezeClaimV1 {
   SignedServingAuthorityControlCommitAttestationV1 attestation = 2;
 }
 
+message ServingAuthorityFreezeGrantPayloadV1 {
+  uint32 schema_version = 1;
+  CommittedServingAuthorityFreezeClaimV1 committed = 2;
+}
+
 message SignedServingAuthorityFreezeGrantV1 {
-  CommittedServingAuthorityFreezeClaimV1 committed = 1;
+  ServingAuthorityFreezeGrantPayloadV1 payload = 1;
   BindingProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
