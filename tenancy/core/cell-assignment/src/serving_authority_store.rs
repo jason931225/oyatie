@@ -1,5 +1,6 @@
 use crate::{
-    BoxTenancyFuture, ServingAuthorityFreezeResultV1, ServingAuthorityFreezeWriteSetV1,
+    BoxTenancyFuture, ServingAuthorityFreezeResultPayloadV1, ServingAuthorityFreezeResultV1,
+    ServingAuthorityFreezeWriteSetV1, ServingAuthorityInstallationResultPayloadV1,
     ServingAuthorityInstallationResultV1, ServingAuthorityInstallationWriteSetV1,
 };
 
@@ -90,18 +91,32 @@ pub struct ServingAuthorityResultQueryV1 {
 }
 
 pub trait CellServingAuthorityStore: Send + Sync {
+    /// Durably installs, returning the UNSIGNED result payload.
+    ///
+    /// A store must not mint a signature over the write it just performed: it
+    /// would be vouching for itself. The signed
+    /// [`ServingAuthorityInstallationResultV1`] is produced instead by
+    /// [`ServingAuthorityResultObserver::observe_installation_result`], which
+    /// re-reads the committed row by lookup key.
     fn install<'a>(
         &'a self,
         write_set: &'a ServingAuthorityInstallationWriteSetV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<ServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
+        Result<ServingAuthorityInstallationResultPayloadV1, ServingAuthorityStoreError>,
     >;
 
+    /// Durably freezes, returning the UNSIGNED result payload. See
+    /// [`Self::install`] for why this is not signed here; the freeze result is
+    /// the evidence on which a source is declared fenced, so it matters more
+    /// here than anywhere else that the writer is not the voucher.
     fn freeze<'a>(
         &'a self,
         write_set: &'a ServingAuthorityFreezeWriteSetV1,
-    ) -> BoxTenancyFuture<'a, Result<ServingAuthorityFreezeResultV1, ServingAuthorityStoreError>>;
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<ServingAuthorityFreezeResultPayloadV1, ServingAuthorityStoreError>,
+    >;
 
     fn renew_write_authority_lease<'a>(
         &'a self,
@@ -168,4 +183,34 @@ pub trait CellServingAuthorityStore: Send + Sync {
         'a,
         Result<Option<ServingAuthorityFreezeResultV1>, ServingAuthorityStoreError>,
     >;
+}
+
+/// Independently observes a committed serving-authority control result and
+/// signs what it read.
+///
+/// Separate from [`CellServingAuthorityStore`] on purpose: the party that
+/// performed the write must not be the party that attests it committed. Both
+/// methods accept a read authority and a lookup key only — never a caller's
+/// result, and never the write set — so the observation can only describe a row
+/// the observer itself re-read.
+///
+/// Neither method needs a new proof domain:
+/// `BindingProofDomainV1::ServingAuthorityInstallationResult` and
+/// `::ServingAuthorityFreezeResult` already exist, as do the verifiers and the
+/// `VerifiedBindingProofRefV1` arms. Only the producer was missing.
+pub trait ServingAuthorityResultObserver: Send + Sync {
+    fn observe_installation_result<'a>(
+        &'a self,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
+        query: &'a ServingAuthorityResultQueryV1,
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<ServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
+    >;
+
+    fn observe_freeze_result<'a>(
+        &'a self,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
+        query: &'a ServingAuthorityResultQueryV1,
+    ) -> BoxTenancyFuture<'a, Result<ServingAuthorityFreezeResultV1, ServingAuthorityStoreError>>;
 }
