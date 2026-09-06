@@ -121,6 +121,20 @@ impl BindingControlContributionDeliveryWriteSetV1 {
 }
 
 pub trait BindingControlContributionSourceStore: Send + Sync {
+    /// Reads back the UNSIGNED durable contribution projection, or `None` when
+    /// nothing was committed for that query.
+    ///
+    /// This returns the projection rather than
+    /// [`crate::CommittedBindingControlContributionClaimV1`] for the same reason
+    /// the serving-authority loaders return records: the claim's other member is
+    /// a signed commit attestation, and no write path on this store carries one
+    /// in. Returning the claim would have obliged the store to produce a
+    /// signature only it could have forged.
+    ///
+    /// The caller pairs this projection with a fresh attestation from
+    /// [`BindingControlContributionCommitObserver::observe_contribution_commit`],
+    /// assembles the claim and passes it through
+    /// `verify_committed_binding_control_contribution`.
     fn load_committed<'a>(
         &'a self,
         authority: &'a crate::BindingReconciliationReadAuthorityV1,
@@ -128,7 +142,10 @@ pub trait BindingControlContributionSourceStore: Send + Sync {
         limits: &'a crate::BindingControlContributionLimitsV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::CommittedBindingControlContributionClaimV1, BindingControlContributionError>,
+        Result<
+            Option<crate::BindingControlContributionProjectionV1>,
+            BindingControlContributionError,
+        >,
     >;
 
     fn checkpoint_delivery<'a>(
@@ -148,5 +165,38 @@ pub trait BindingControlContributionIssuer: Send + Sync {
     ) -> BoxTenancyFuture<
         'a,
         Result<crate::SignedBindingControlContributionHandoffV1, BindingControlContributionError>,
+    >;
+}
+
+/// Independently observes a committed binding control contribution and signs
+/// what it read.
+///
+/// `SignedBindingControlContributionCommitV1` occurred at exactly two sites in
+/// both crates -- its own definition and the `attestation` member of the claim
+/// returned by [`BindingControlContributionSourceStore::load_committed`] --
+/// while having a proof domain, a proto tag, a verifier, an expectation and a
+/// `VerifiedBindingProofRefV1` arm. Everything but a producer. This port is
+/// that producer, and it is the fourth instance of the same shape on this lane.
+///
+/// Separate from the source store on purpose: the party that committed the
+/// contribution must not be the party that attests it committed. Accepts a
+/// reconciliation read authority and the same
+/// [`BindingControlContributionQueryV1`] lookup key the loader takes -- never a
+/// caller's claim about the committed row. Returns `None` when there is nothing
+/// committed to observe.
+///
+/// No new proof domain is required; the existing one was always intended for
+/// this artifact.
+pub trait BindingControlContributionCommitObserver: Send + Sync {
+    fn observe_contribution_commit<'a>(
+        &'a self,
+        authority: &'a crate::BindingReconciliationReadAuthorityV1,
+        query: &'a BindingControlContributionQueryV1,
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<
+            Option<crate::SignedBindingControlContributionCommitV1>,
+            BindingControlContributionError,
+        >,
     >;
 }
