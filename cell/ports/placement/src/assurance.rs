@@ -283,6 +283,7 @@ pub enum AssuranceCompilationErrorV1 {
     IncomparableHardwareClass,
     IncomparableEncryptionRequirement,
     IncomparableRecoveryRequirement,
+    IncomparableRecoveryResilience,
     ArithmeticOverflow,
     VerificationFailed,
     NotImplemented,
@@ -333,16 +334,33 @@ pub trait AssuranceCompiler: Send + Sync {
     ///   `ExternalKeyManager` must never be ranked against each other.
     /// - `recovery`: SAME-VARIANT-ELSE-REJECT on the [`RecoveryRequirementV1`]
     ///   variant, yielding `IncomparableRecoveryRequirement`. Within a matching
-    ///   variant, its own location constraints intersect and its RPO/RTO combine by
-    ///   MIN; `Warm` recovery capacity combines per capacity dimension by MAX.
+    ///   variant, its own location constraints intersect by the rule below and its
+    ///   `maximum_rpo`/`maximum_rto` combine by MIN. Within a matching `Warm`,
+    ///   `recovery_capacity` combines per capacity dimension by MAX, and
+    ///   `recovery_resilience` is EQUAL-ELSE-REJECT, yielding
+    ///   `IncomparableRecoveryResilience`. A [`ResilienceObjectiveV1`] is a
+    ///   coverage attestation — a correlation-set root and count, an ordered
+    ///   scenario root and count, and a coverage proof digest — so two unequal
+    ///   objectives cannot be merged at all: synthesizing a combined coverage proof
+    ///   would fabricate evidence for scenarios nobody attested. Reject rather than
+    ///   rank or invent, exactly as for hardware and encryption.
     /// - Every [`LocationConstraintV1`] field (`primary_locations` and each recovery
-    ///   location field): INTERSECT, with `DenyAll` ABSORBING. `PlatformPolicyOnly`
-    ///   is the identity element; `Only(a)` combined with `Only(b)` is
-    ///   `Only(a INTERSECT b)`, and an empty intersection is `DenyAll`. A `DenyAll`
-    ///   on either side makes the result `DenyAll` regardless of the other side.
-    ///   Whether a resulting `DenyAll` is reported as
-    ///   `ContradictoryPrimaryLocation` or `ContradictoryRecoveryLocation` depends
-    ///   on which field produced it.
+    ///   location field): INTERSECT. The algebra has exactly three cases, and a
+    ///   DECLARED DENY IS NOT A CONTRADICTION:
+    ///     1. `PlatformPolicyOnly` is the IDENTITY element: combined with anything
+    ///        it yields that other side unchanged.
+    ///     2. `DenyAll` on either side is ABSORBING and COMPILES SUCCESSFULLY to
+    ///        `DenyAll`. A source that declares `DenyAll` genuinely permits nothing
+    ///        there; that is a well-formed requirement, and its consequence is a
+    ///        precise refusal later at selection, not a compilation error. Reporting
+    ///        a deliberate deny as a contradiction would be a misleading diagnostic.
+    ///     3. `Only(a)` combined with `Only(b)` yields `Only(a INTERSECT b)` when
+    ///        that intersection is non-empty, and otherwise REJECTS. Two non-empty
+    ///        location sets with nothing in common cannot both be satisfied, so this
+    ///        is the only case that raises `ContradictoryPrimaryLocation` (from
+    ///        `primary_locations`) or `ContradictoryRecoveryLocation` (from a
+    ///        recovery location field). A rejected compilation produces the error
+    ///        and NO requirement record; it does not first produce a `DenyAll`.
     ///
     /// Protobuf tag order in `cell/facade/proto/cell/placement/v1/assurance.proto`
     /// carries no rank for any of these enums; it is wire identity only. Rank exists
