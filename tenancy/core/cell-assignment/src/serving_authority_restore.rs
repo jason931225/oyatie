@@ -108,3 +108,50 @@ pub enum ServingAuthorityRestoreBasisV1 {
     SurvivingQuorum(Box<VerifiedServingAuthoritySurvivingQuorum>),
     IndependentlyFencedReplacement(Box<VerifiedServingAuthorityReplacement>),
 }
+
+/// Independently observes the surviving-quorum restore basis and signs what it
+/// read.
+///
+/// # Why this is an own-write attestation and not an external arrival
+///
+/// The wave rule is that a signed type whose subject is this store's own write
+/// needs an independent local producer, while one whose subject is another
+/// party's state arrives from outside and needs none. This type is the first
+/// case, established from the payload rather than inferred:
+///
+/// - [`ServingAuthorityInstallationWriteSetPartsV1`] carries `instance` and
+///   `next_rejection_high_water`, and its `precondition` carries a
+///   `rejection_high_water` in every arm. The payload carries `instance` and
+///   `rejection_high_water_digest`. The attestation therefore asserts a digest
+///   of the very row the write set conditions on and advances, for the very
+///   instance the write set installs.
+/// - The sibling [`ServingAuthorityReplacementEvidenceV1`] shows how this
+///   contract names a different party: `prior_instance` against
+///   `replacement_instance`, `prior_installation_issuance_digest`,
+///   `prior_effect_path_fencing_digest`. Every cross-party reference there is
+///   explicitly qualified. This payload's `instance` and `committed_state_*`
+///   are unqualified, which in that convention denotes the subject of the
+///   operation.
+/// - `quorum_evidence` does not make the subject external. An
+///   `ImmutableEvidenceRefV1` is `authority_id`, `repository_id`, `object_id`,
+///   `object_version`, `content_digest` — where the evidence is stored and what
+///   it hashes to. It identifies provenance, not whose state is attested.
+///
+/// So a quorum of replicas of THIS partition attests THIS partition's committed
+/// state, and without an independent producer the installing party would be
+/// vouching for the state it is about to write.
+///
+/// Accepts a read authority and the instance as a lookup key only. Returns
+/// `None` when there is no surviving committed state to observe. No new proof
+/// domain is required: `BindingProofDomainV1::ServingAuthoritySurvivingQuorum`
+/// already exists.
+pub trait ServingAuthoritySurvivingQuorumObserver: Send + Sync {
+    fn observe_surviving_quorum<'a>(
+        &'a self,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
+        instance: &'a ServingAuthorityInstanceV1,
+    ) -> crate::BoxTenancyFuture<
+        'a,
+        Result<Option<SignedServingAuthoritySurvivingQuorumV1>, crate::ServingAuthorityStoreError>,
+    >;
+}
