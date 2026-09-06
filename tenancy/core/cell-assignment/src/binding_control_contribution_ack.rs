@@ -64,7 +64,37 @@ pub fn verify_binding_control_contribution_acknowledgment(
 #[derive(Debug, Eq, PartialEq)]
 pub struct BindingCellIndexProjectionResultV1 {
     pub snapshot: crate::CellBindingIndexSnapshotV1,
-    pub acknowledgments: Vec<SignedBindingControlContributionAcknowledgmentV1>,
+    /// UNSIGNED acknowledgment payloads. The projection store applies the
+    /// contributions; it does not attest that it did. The signed form is
+    /// produced by
+    /// [`BindingControlContributionAcknowledgmentObserver::observe_acknowledgment`].
+    pub acknowledgments: Vec<BindingControlContributionAcknowledgmentPayloadV1>,
+}
+
+/// Independently observes a committed contribution application and signs the
+/// acknowledgment.
+///
+/// Separate from `TenantBindingCellIndexProjectionStore` on purpose: the party
+/// that applied the contribution must not be the party that attests it landed.
+/// Accepts a read authority and a lookup key only.
+///
+/// Mirrors the sibling `BindingControlContributionIssuer::sign_committed` on
+/// the handoff side, and needs no new proof domain:
+/// `BindingProofDomainV1::ControlContributionAcknowledgment` (36),
+/// `verify_binding_control_contribution_acknowledgment` and the
+/// `VerifiedBindingProofRefV1` arm all already exist.
+pub trait BindingControlContributionAcknowledgmentObserver: Send + Sync {
+    fn observe_acknowledgment<'a>(
+        &'a self,
+        authority: &'a crate::BindingReconciliationReadAuthorityV1,
+        query: &'a crate::BindingControlContributionAcknowledgmentQueryV1,
+    ) -> crate::BoxTenancyFuture<
+        'a,
+        Result<
+            SignedBindingControlContributionAcknowledgmentV1,
+            crate::BindingControlContributionError,
+        >,
+    >;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
