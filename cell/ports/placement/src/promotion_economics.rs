@@ -208,9 +208,22 @@ pub struct PromotionCostTaxonomyV1 {
 /// [`crate::PromotionEconomicsVerificationStepOutcomeV1::Continued`], never
 /// `IncompleteInputSet` and never a promotion refusal. A large estate is
 /// slower to verify, not permanently ineligible for promotion. Total input
-/// counts recorded elsewhere are completeness commitments, not size caps; the
-/// only size-shaped refusal is `ArithmeticOverflow`, which is a
-/// representability failure rather than a deliberate ceiling.
+/// counts recorded elsewhere are completeness commitments, not size caps.
+///
+/// NO DELIBERATE CEILING ON ESTATE SIZE EXISTS, but two refusals are
+/// size-related and the distinction between them matters:
+/// `ArithmeticOverflow` is a representability failure — a value that will not
+/// fit in its output type — and cannot be reached by a well-formed estate of
+/// any size that produces representable totals.
+/// `RetentionInsufficient` is size-SENSITIVE and CAN deny a replay that would
+/// otherwise have succeeded, because work remaining scales with the estate
+/// while a retention deadline does not. It is a liveness bound rather than a
+/// ceiling — it refuses because the evidence will cease to exist, not because
+/// a number was judged too large — and its remedy is longer source retention
+/// or more throughput, never a smaller estate. An earlier draft of this doc
+/// claimed `ArithmeticOverflow` was the only size-shaped refusal; that was too
+/// strong, and the correction is recorded here rather than left to be
+/// rediscovered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PromotionEconomicsPolicyV1 {
     pub policy_generation: u64,
@@ -507,6 +520,56 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     ZeroDenominator,
     ArithmeticOverflow,
     NegativeTotalCost,
+    /// The retained evidence this replay depends on will not survive long
+    /// enough to finish verifying it.
+    ///
+    /// The closure records the MINIMUM authenticated source retention deadline
+    /// and the checkpoint carries it forward, so a step can tell before reading
+    /// anything whether the bytes it still needs will outlive the work still to
+    /// do, with `minimum_retention_seconds` as the required margin.
+    ///
+    /// RECOVERY: TERMINAL FOR THIS VERIFICATION KEY, and it is the ONE REFUSAL
+    /// IN THIS ENUM WHERE RETRYING IS STRICTLY WORSE THAN NOT RETRYING. Every
+    /// other "come back later" variant — `LeaseHeldByAnotherWorker`,
+    /// `PartitionStepBudgetExhausted`, `CheckpointConflict` — describes a
+    /// condition that clears while you wait. Waiting here consumes the very
+    /// margin that was already short. Spinning does not merely fail to help; it
+    /// destroys the remaining chance of success.
+    ///
+    /// It is NOT terminal for promotion. The forward path is to re-finalize the
+    /// affected sources with renewed retention and issue a NEW closure, which
+    /// has a new closure digest and therefore a new verification key, so replay
+    /// starts fresh rather than inheriting accumulators bound to evidence that
+    /// is expiring. Renewing retention on an old closure is not a path: the
+    /// closure committed the deadline it was bound with.
+    ///
+    /// BOUNDARY against `SourceClosureRejected`, which names retention too —
+    /// this is the overlap that would otherwise be resolved arbitrarily.
+    /// `SourceClosureRejected` is CLOSURE-TIME: the authority declines to bind
+    /// at all because the admitted population's common retention cannot meet
+    /// the requirement, so no verification ever starts.
+    /// `RetentionInsufficient` is REPLAY-TIME: a closure WAS bound with an
+    /// adequate margin and that margin has since eroded, or a step reached a
+    /// source whose own deadline is nearer than the closure's minimum. One
+    /// refuses to begin; the other stops something already under way.
+    ///
+    /// BOUNDARY against `WorkLimitExceeded`: that is a reader breaking a bound
+    /// it was given. This is nothing breaking any bound — every party behaved
+    /// correctly and the evidence is simply expiring.
+    ///
+    /// ON WHETHER THIS IS A SIZE CEILING — it is size-SENSITIVE, and the
+    /// policy's claim about size-shaped refusals is qualified accordingly; see
+    /// [`PromotionEconomicsPolicyV1`]. Work remaining scales with the estate
+    /// while the retention deadline does not, so a large enough estate against
+    /// a short enough retention cannot finish, and this refusal CAN deny a
+    /// replay that would otherwise have succeeded. It is still not the defect
+    /// that `maximum_total_rows` was: that refused a large estate while all its
+    /// evidence was present and the replay could have completed, so the refusal
+    /// added nothing and had no remedy but a smaller estate. This one refuses
+    /// because the bytes will be gone, which no relaxation can fix — removing
+    /// the check would admit an unverifiable replay, not a large one — and its
+    /// remedy is longer source retention or more throughput, both properties of
+    /// the deployment rather than of the estate.
     RetentionInsufficient,
     /// A per-page or per-request bound was violated by the reader, or a zero
     /// limit was configured. Distinct from a `Continued` step outcome: this is a
