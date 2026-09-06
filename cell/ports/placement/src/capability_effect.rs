@@ -177,6 +177,8 @@ pub struct SignedCapabilityEffectGrantV1 {
     pub signature: Vec<u8>,
 }
 
+/// What the caller already knows, built from the capability's own installed
+/// state and never from the wire message under verification.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CapabilityEffectExpectationV1 {
     pub scope: CapabilityEffectScopeV1,
@@ -192,6 +194,15 @@ pub struct CapabilityEffectExpectationV1 {
     pub expected_audience: ProducerId,
     pub now_unix_seconds: u64,
     pub maximum_clock_uncertainty_millis: u64,
+    /// Digest over the canonical encoding of the expected
+    /// [`CapabilityAuthorityContextV1`], discriminant included.
+    ///
+    /// Without it the verifier has nothing to compare
+    /// [`CapabilityEffectGrantPayloadV1::context`] against, and the
+    /// Preparation-versus-Installed distinction is unenforceable at
+    /// verification. Every other authority input here is already a digest and
+    /// the caller holds this preimage for the same reason it holds those.
+    pub expected_authority_context_digest: Digest32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

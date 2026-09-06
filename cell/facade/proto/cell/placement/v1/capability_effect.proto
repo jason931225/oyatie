@@ -121,6 +121,10 @@ message CapabilityEffectExpectationV1 {
   ProducerIdV1 expected_audience = 11;
   uint64 now_unix_seconds = 12;
   uint64 maximum_clock_uncertainty_millis = 13;
+  // Digest over the canonical encoding of the expected authority context,
+  // oneof discriminant included. Appended at 14 rather than placed beside the
+  // other digests, so that no existing tag is renumbered.
+  Digest32 expected_authority_context_digest = 14;
 }
 
 enum LocalAuthorityDispositionV1 {

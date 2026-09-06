@@ -46,6 +46,21 @@ impl VerifiedCapabilityEffectGrantV1 {
     }
 }
 
+/// Verifies one signed grant against the caller's expectation and the
+/// adapter's acceptance.
+///
+/// `expected.expected_authority_context_digest` is compared against the digest
+/// of the CANONICAL ENCODING of `signed.payload.context`, discriminant
+/// included. Comparing only the variant tag is not sufficient, and is the
+/// exact hole this comparison closes: a Preparation-shaped wire message that
+/// carries fabricated installed fields, or a fabricated zero epoch, still
+/// presents a Preparation tag and would pass a tag-only check while its bytes
+/// say something else. The variant correspondence is checked too, but it is
+/// the weaker of the two checks, not a substitute for it.
+///
+/// A Preparation context authorizes Prepare, PreparationCleanup, and Transfer
+/// into non-serving staged data when the acceptance separately admits it, and
+/// nothing else. It can never satisfy Activate, Write, Fence or Release.
 pub fn verify_capability_effect_grant(
     _verifier: &dyn CellProofVerifier,
     _signed: SignedCapabilityEffectGrantV1,
