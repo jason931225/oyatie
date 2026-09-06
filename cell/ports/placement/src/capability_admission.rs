@@ -7,7 +7,17 @@
 
 use crate::{CapabilityEffectActionV1, CapabilityEffectScopeV1, CellProofEnvelopeV1, Digest32};
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+/// Which placement role an acceptance qualifies an adapter for.
+///
+/// The three are incomparable roles, not increasing scopes, and no ordering
+/// is derived. A migration source acceptance does not subsume a migration
+/// target acceptance in either direction: they cover different actions at
+/// different transaction domains, and an initial binding covers neither.
+/// Deriving an ordering would invite a future implementation to combine two
+/// acceptances with `max()` and silently discard the one it needed.
+/// Requirement is same-variant-else-reject. Declaration order and protobuf
+/// tag order carry no rank.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum CapabilityAdmissionUseV1 {
     InitialBinding,
     MigrationSource,

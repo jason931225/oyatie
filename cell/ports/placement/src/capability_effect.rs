@@ -11,6 +11,16 @@ use crate::{
     ProducerId, ProofConstructionError, TenantId, VerifiedCapabilityEffectGrantV1,
 };
 
+/// Opaque identifiers, matching the shape used by `proof.rs` and
+/// `economics.rs`.
+///
+/// These keep `Ord`, unlike the domain enums and the serving incarnation in
+/// this module. Lexicographic order over an opaque identifier is arbitrary
+/// but stable, which is what canonical ordering and duplicate detection need,
+/// and it asserts nothing: no reader takes `key_a < key_b` to mean that one
+/// was issued first or outranks the other. The derives removed elsewhere in
+/// this module were removed because their orderings would have been read as
+/// domain facts, not because ordering is suspect in itself.
 macro_rules! opaque_id {
     ($name:ident) => {
         #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -35,10 +45,22 @@ opaque_id!(CapabilityAdapterIdV1);
 
 /// A projected Tenancy write-authority epoch. Compared, never allocated by
 /// Cell.
+///
+/// Its ordering IS load-bearing and is derived deliberately: the owner issues
+/// these in sequence, so a lower fence than the installed one is exactly what
+/// makes an authority stale. Note the asymmetry with
+/// [`ProjectedServingIncarnationV1`], which derives no ordering: the fence
+/// answers "older or newer", the incarnation answers "the same one or a
+/// different one", and neither answers the other's question. Equal fences
+/// with different incarnations is the case that motivates carrying both.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct LocalAuthorityFenceV1(pub u64);
 
 /// The capability store's own durable record revision.
+///
+/// Its ordering is load-bearing for the same reason: revisions advance within
+/// one record, so comparing them is a real recency test rather than a
+/// coincidence of representation.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct LocalCommitRevisionV1(pub u64);
 
@@ -171,7 +193,17 @@ pub enum CapabilityAuthorityContextV1 {
 ///
 /// Every action must also appear in the acceptance's `supported_actions`;
 /// membership of this enum admits nothing on its own.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+///
+/// Actions are incomparable and no ordering is derived. Declaration order and
+/// protobuf tag order carry no rank, and the shape of this list makes that
+/// easy to get wrong: `Write` follows `Fence` and `PreparationCleanup`
+/// follows `Release`, so a comparison such as `action >= Fence` would read as
+/// a privilege test and answer something else entirely — it would admit
+/// `PreparationCleanup`, the least privileged action here, and reject
+/// `Prepare`. What an action may do is decided by the context matrix above
+/// and by `supported_actions`, never by a rank. `Hash` is retained because
+/// `supported_actions` must be checked for duplicates and membership.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum CapabilityEffectActionV1 {
     Prepare,
     Activate,
@@ -275,7 +307,17 @@ pub struct CapabilityEffectExpectationV1 {
 /// remain owner-decided: notably whether Transfer is admissible from
 /// `Fenced`, and whether a `Fenced` record may be released directly or must
 /// first be reinstalled.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+///
+/// No ordering is derived, because these are states in a branching relation
+/// and not stages on a scale. The declaration order almost reads as a
+/// lifecycle, which is precisely the trap: `PreparationDiscarded` sorts last
+/// while being reached from `Prepared` without ever passing through
+/// `Writable`, so `disposition > Writable` would silently merge two different
+/// branches, and `disposition >= Fenced` would read as "terminal" while
+/// `Fenced` is not terminal at all. Whether a record is terminal is stated by
+/// the transition relation above and by the two variants marked terminal,
+/// never by a comparison.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum LocalAuthorityDispositionV1 {
     Prepared,
     Writable,
