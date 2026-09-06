@@ -473,6 +473,33 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     /// arbitrarily, so the split is stated rather than left to a future
     /// implementer.
     SourceClosureRejected,
+    /// A LIVE LEASE FOR THIS KEY IS HELD BY ANOTHER WORKER, so `acquire`
+    /// declined to issue one.
+    ///
+    /// RECOVERY: back off until the observed lease expiry, then re-acquire.
+    /// This is not a failure and not a wedge — the work is progressing under
+    /// someone else, and the right response is to wait for them rather than to
+    /// duplicate them.
+    ///
+    /// BOUNDARY against `CheckpointConflict`: that one is AFTER THE FACT — you
+    /// held a lease and lost the compare-and-set. This one is BEFORE — you
+    /// never got a lease at all. BOUNDARY against
+    /// `PartitionStepBudgetExhausted`: this is per-KEY contention with a named
+    /// holder; that is per-PARTITION saturation with no holder to wait on.
+    LeaseHeldByAnotherWorker,
+    /// The partition's `maximum_concurrent_steps_per_partition` budget is
+    /// spent, so `acquire` declined to start another step here.
+    ///
+    /// RECOVERY: do NOT retry on this partition until a step completes
+    /// elsewhere. This is the one refusal in this enum where spinning is
+    /// actively wrong: retrying adds load to precisely the thing that is
+    /// saturated. Reschedule under partition-level backpressure.
+    ///
+    /// BOUNDARY against `WorkLimitExceeded`: that is a READER CONTRACT
+    /// VIOLATION on a single page — a bound the reader was told and broke.
+    /// This is the store's own scheduling budget behaving correctly. Neither
+    /// means the estate is too large; no refusal in this enum does.
+    PartitionStepBudgetExhausted,
     /// STORE-SIDE CONTENTION ONLY: an execution lease expired, or a commit lost
     /// its revision compare-and-set to a writer that got there first.
     ///
@@ -480,6 +507,11 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     /// is discarded — a lost race means another worker advanced the same key,
     /// not that the accumulated work is wrong. This is the ONLY variant with
     /// that recovery, which is why it must not also carry identity mismatches.
+    ///
+    /// It does NOT mean the lease was refused up front — that is
+    /// `LeaseHeldByAnotherWorker` or `PartitionStepBudgetExhausted`, which are
+    /// decisions `acquire` makes before any work starts and which carry
+    /// different recovery.
     ///
     /// It can no longer mean "bound a different cell, closure, registry, policy
     /// or calculation than the work being resumed". Every verification key
