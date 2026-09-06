@@ -77,7 +77,14 @@ enum CellProofDomainV1 {
   // is a different producer and a different trust claim. Reusing the tag would
   // let a signature produced under the old self-attesting semantics validate as
   // an independent observation; reserving it makes that structurally
-  // impossible. Replaced by tag 42 below.
+  // impossible. Replaced by
+  // CELL_PROOF_DOMAIN_V1_PROMOTION_ECONOMICS_CHECKPOINT_COMMIT_OBSERVATION
+  // below, which is tag 43. Named rather than numbered: this pointer was
+  // written as "tag 42" and a later collision fix moved the replacement from
+  // 42 to 43 without updating the prose, leaving it aimed at
+  // MOVEMENT_ACTION_RESULT_COMMIT - a different subject with a different
+  // producer. A name survives a renumber; a bare number does not, and no
+  // compiler checks a proto comment.
   reserved 34;
   reserved "CELL_PROOF_DOMAIN_V1_PROMOTION_ECONOMICS_CHECKPOINT_ATTESTATION";
   CELL_PROOF_DOMAIN_V1_CAPABILITY_EFFECT_GRANT = 35;
