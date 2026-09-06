@@ -36,6 +36,15 @@ pub enum LocationConstraintV1 {
     DenyAll,
 }
 
+/// Isolation strength is a genuine ladder: every `DedicatedPhysical` cell also
+/// satisfies `DedicatedLogical`, which also satisfies `SharedCertified`.
+///
+/// This enum therefore KEEPS `Ord`/`PartialOrd`, and `minimum_isolation` is
+/// combined across requirement sources with `max`. The asymmetry against
+/// [`HardwareClassV1`] and [`EncryptionRequirementV1`], which deliberately do
+/// NOT derive `Ord`, is intentional and is not an oversight: those two are sets
+/// of incomparable constraints, not rungs. Declaration order and protobuf tag
+/// order here express the ladder; for the other two they express nothing.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum IsolationClassV1 {
     SharedCertified,
@@ -43,14 +52,33 @@ pub enum IsolationClassV1 {
     DedicatedPhysical,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+/// Required hardware class is NOT a ladder, so this enum deliberately does not
+/// derive `Ord`/`PartialOrd`.
+///
+/// `ConfidentialCompute` and `Accelerator` are incomparable constraints: neither
+/// subsumes the other, and a cell satisfying one does not thereby satisfy the
+/// other. Deriving an ordering would invite a future implementation to combine
+/// two requirement sources with `max()` and silently discard one of them.
+/// Combination is same-variant-else-reject; see [`AssuranceCompiler::compile`].
+/// Declaration order and protobuf tag order carry no rank.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum HardwareClassV1 {
     GeneralPurpose,
     ConfidentialCompute,
     Accelerator,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+/// Encryption requirement is NOT a ladder, so this enum deliberately does not
+/// derive `Ord`/`PartialOrd`.
+///
+/// `CustomerManaged` and `ExternalKeyManager` are incomparable custody models,
+/// not increasing strengths: a customer-managed key in the platform key service
+/// does not satisfy an external key manager requirement, and the converse also
+/// fails. Deriving an ordering would invite a future implementation to combine
+/// two requirement sources with `max()` and silently discard one of them.
+/// Combination is same-variant-else-reject; see [`AssuranceCompiler::compile`].
+/// Declaration order and protobuf tag order carry no rank.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum EncryptionRequirementV1 {
     ProviderManaged,
     CustomerManaged,
@@ -106,6 +134,10 @@ pub struct StandardRecoveryRequirementV1 {
     pub maximum_rto: ObjectiveDurationSecondsV1,
 }
 
+/// Recovery model is NOT a ladder. `Standard` (backup and restore) and `Warm`
+/// (dedicated standing reserve) are different recovery architectures with
+/// different operand sets, not increasing strengths of one architecture.
+/// Combination is same-variant-else-reject; see [`AssuranceCompiler::compile`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RecoveryRequirementV1 {
     Standard(StandardRecoveryRequirementV1),
@@ -248,6 +280,9 @@ pub enum AssuranceCompilationErrorV1 {
     UnsupportedHardware,
     UnprovableCertification,
     UnprovableRecoveryObjective,
+    IncomparableHardwareClass,
+    IncomparableEncryptionRequirement,
+    IncomparableRecoveryRequirement,
     ArithmeticOverflow,
     VerificationFailed,
     NotImplemented,
@@ -261,7 +296,57 @@ pub fn verify_assurance_compilation(
     Err(ProofVerificationError::NotImplemented)
 }
 
+/// Compiles a tenant assurance floor and a capability requirement set into one
+/// effective requirement record.
 pub trait AssuranceCompiler: Send + Sync {
+    /// Compiles a tenant assurance floor and a capability requirement set into one
+    /// [`EffectiveAssuranceRequirementsV1`].
+    ///
+    /// # Combination law
+    ///
+    /// Two requirement sources are combined field by field. The result is the
+    /// strictest requirement that satisfies BOTH sources; where no such requirement
+    /// exists the compilation is rejected rather than resolved by ranking. This law
+    /// binds every future implementation of this trait, including ones that do not
+    /// exist yet.
+    ///
+    /// - `required_certifications`: UNION. A certification demanded by either source
+    ///   is demanded by the result. Duplicates collapse; `DuplicateRequirement`
+    ///   reports a repeated identity within one source.
+    /// - `key_custody.permitted_authorities`: INTERSECT. Only an authority permitted
+    ///   by both sources survives. An empty intersection is
+    ///   `ContradictoryKeyCustody`, never an empty "unconstrained" list.
+    /// - `key_custody.exclusive_tenant_key` and `audit.immutable_storage`: `Required`
+    ///   from either source wins over `NotRequired`.
+    /// - `audit.minimum_retention_seconds`: MAX. A floor combines upward.
+    /// - `maximum_rpo` and `maximum_rto` (on the recovery requirement): MIN. A
+    ///   ceiling combines downward.
+    /// - `minimum_isolation`: MAX over the [`IsolationClassV1`] ladder. This is the
+    ///   ONLY field combined by ordinal, and it is legitimate because the variants
+    ///   are genuine rungs.
+    /// - `required_hardware`: SAME-VARIANT-ELSE-REJECT. Equal variants combine to
+    ///   themselves; any two distinct [`HardwareClassV1`] variants are incomparable
+    ///   and yield `IncomparableHardwareClass`. `ConfidentialCompute` and
+    ///   `Accelerator` must never be ranked against each other.
+    /// - `encryption`: SAME-VARIANT-ELSE-REJECT, yielding
+    ///   `IncomparableEncryptionRequirement`. `CustomerManaged` and
+    ///   `ExternalKeyManager` must never be ranked against each other.
+    /// - `recovery`: SAME-VARIANT-ELSE-REJECT on the [`RecoveryRequirementV1`]
+    ///   variant, yielding `IncomparableRecoveryRequirement`. Within a matching
+    ///   variant, its own location constraints intersect and its RPO/RTO combine by
+    ///   MIN; `Warm` recovery capacity combines per capacity dimension by MAX.
+    /// - Every [`LocationConstraintV1`] field (`primary_locations` and each recovery
+    ///   location field): INTERSECT, with `DenyAll` ABSORBING. `PlatformPolicyOnly`
+    ///   is the identity element; `Only(a)` combined with `Only(b)` is
+    ///   `Only(a INTERSECT b)`, and an empty intersection is `DenyAll`. A `DenyAll`
+    ///   on either side makes the result `DenyAll` regardless of the other side.
+    ///   Whether a resulting `DenyAll` is reported as
+    ///   `ContradictoryPrimaryLocation` or `ContradictoryRecoveryLocation` depends
+    ///   on which field produced it.
+    ///
+    /// Protobuf tag order in `cell/facade/proto/cell/placement/v1/assurance.proto`
+    /// carries no rank for any of these enums; it is wire identity only. Rank exists
+    /// solely where this contract names a ladder.
     fn compile<'a>(
         &'a self,
         authority: &'a PlacementReadAuthorityV1,
