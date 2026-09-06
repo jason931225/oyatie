@@ -345,8 +345,18 @@ pub trait AssuranceCompiler: Send + Sync {
     ///   would fabricate evidence for scenarios nobody attested. Reject rather than
     ///   rank or invent, exactly as for hardware and encryption.
     /// - Every [`LocationConstraintV1`] field (`primary_locations` and each recovery
-    ///   location field): INTERSECT. The algebra has exactly three cases, and a
-    ///   DECLARED DENY IS NOT A CONTRADICTION:
+    ///   location field): INTERSECT. Each input is NORMALIZED first, then the
+    ///   algebra has exactly three cases, and a DECLARED DENY IS NOT A
+    ///   CONTRADICTION.
+    ///
+    ///   NORMALIZATION: `Only([])` — an explicitly declared but empty permitted
+    ///   set — normalizes to `DenyAll` before combination. An empty permitted set
+    ///   permits nothing, which is precisely what `DenyAll` means, so it absorbs
+    ///   and compiles like any other declared deny. Without this step the phrase
+    ///   "two non-empty sets" in case 3 would leave a third input shape with no
+    ///   defined behaviour, which is how a future implementer ends up choosing one
+    ///   arbitrarily.
+    ///
     ///     1. `PlatformPolicyOnly` is the IDENTITY element: combined with anything
     ///        it yields that other side unchanged.
     ///     2. `DenyAll` on either side is ABSORBING and COMPILES SUCCESSFULLY to
@@ -354,9 +364,10 @@ pub trait AssuranceCompiler: Send + Sync {
     ///        there; that is a well-formed requirement, and its consequence is a
     ///        precise refusal later at selection, not a compilation error. Reporting
     ///        a deliberate deny as a contradiction would be a misleading diagnostic.
-    ///     3. `Only(a)` combined with `Only(b)` yields `Only(a INTERSECT b)` when
-    ///        that intersection is non-empty, and otherwise REJECTS. Two non-empty
-    ///        location sets with nothing in common cannot both be satisfied, so this
+    ///     3. `Only(a)` combined with `Only(b)`, both non-empty after
+    ///        normalization, yields `Only(a INTERSECT b)` when that intersection is
+    ///        non-empty, and otherwise REJECTS. Two non-empty location sets with
+    ///        nothing in common cannot both be satisfied, so this
     ///        is the only case that raises `ContradictoryPrimaryLocation` (from
     ///        `primary_locations`) or `ContradictoryRecoveryLocation` (from a
     ///        recovery location field). A rejected compilation produces the error
