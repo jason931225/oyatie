@@ -405,29 +405,35 @@ message PromotionEconomicsVerificationCheckpointV1 {
   Digest32 checkpoint_digest = 11;
 }
 
-// The store's signed statement about what it durably committed. Signed under
-// CELL_PROOF_DOMAIN_V1_PROMOTION_ECONOMICS_CHECKPOINT_ATTESTATION.
-message PromotionEconomicsCheckpointAttestationPayloadV1 {
+// What an INDEPENDENT commit observer read at one verification key, by
+// re-reading under committed read isolation. Signed under
+// CELL_PROOF_DOMAIN_V1_PROMOTION_ECONOMICS_CHECKPOINT_COMMIT_OBSERVATION by the
+// observer's own identity, never by the store that performed the write.
+message PromotionEconomicsCheckpointCommitObservationV1 {
   uint32 schema_version = 1;
   PlacementPartitionV1 partition = 2;
   PromotionEconomicsVerificationKeyV1 key = 3;
   uint64 revision = 4;
   Digest32 checkpoint_digest = 5;
+  // Read out of the durable record.
   uint64 committed_at_unix_seconds = 6;
+  // When the observer itself looked.
+  uint64 observed_at_unix_seconds = 7;
 }
 
-message SignedPromotionEconomicsCheckpointAttestationV1 {
-  PromotionEconomicsCheckpointAttestationPayloadV1 payload = 1;
+message SignedPromotionEconomicsCheckpointCommitObservationV1 {
+  PromotionEconomicsCheckpointCommitObservationV1 payload = 1;
   CellProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
 
-// What a checkpoint store durably holds and can actually construct. A store
-// returns this; only the owning module's verifier turns it into the
-// private-field VerifiedPromotionEconomicsCheckpoint, which has no wire form.
-message PromotionEconomicsCheckpointClaimV1 {
+// A durable checkpoint record plus an independent observation of its commit.
+// Produced by the observer port, never by the store. This is a claim, not
+// evidence: only the owning module's verifier turns it into the private-field
+// VerifiedPromotionEconomicsCheckpoint, which has no wire form.
+message CommittedPromotionEconomicsCheckpointClaimV1 {
   PromotionEconomicsVerificationCheckpointV1 checkpoint = 1;
-  SignedPromotionEconomicsCheckpointAttestationV1 attestation = 2;
+  SignedPromotionEconomicsCheckpointCommitObservationV1 observation = 2;
 }
 
 // What a checkpoint store durably holds about who currently holds execution.

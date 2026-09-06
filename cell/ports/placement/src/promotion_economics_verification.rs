@@ -186,42 +186,79 @@ pub struct PromotionEconomicsVerificationCheckpointV1 {
     pub checkpoint_digest: Digest32,
 }
 
-/// What the store durably holds for one verification key, in the form the
-/// store can actually produce.
+/// What a checkpoint commit observer asserts it read, under committed read
+/// isolation, at ONE verification key.
 ///
-/// This is the public, unverified record. A store adapter reports it; a store
-/// adapter cannot turn it into progress. Both store methods return this shape
-/// rather than a verified wrapper, because a store that could construct a
-/// verified value could fabricate replay progress that no verifier ever
-/// checked.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PromotionEconomicsCheckpointClaimV1 {
-    pub checkpoint: PromotionEconomicsVerificationCheckpointV1,
-    pub attestation: SignedPromotionEconomicsCheckpointAttestationV1,
-}
-
-/// The store's signed statement about what it durably committed.
+/// Every field describes what the OBSERVER itself found by re-reading. The
+/// observer is given a lookup key and nothing else — never a caller's record,
+/// never a caller's claim that a commit occurred — so it cannot be steered into
+/// attesting to something it did not see.
 ///
-/// Signed under
-/// [`crate::CellProofDomainV1::PromotionEconomicsCheckpointAttestation`]. It
-/// binds the verification key, the committed revision and the checkpoint
-/// digest, which is what lets the owning module distinguish a checkpoint the
-/// store really committed from bytes handed to it by anything else.
+/// `committed_at_unix_seconds` is read out of the durable record;
+/// `observed_at_unix_seconds` is when the observer read it. Keeping both
+/// separate is deliberate: an observer can testify to when it looked, and only
+/// repeat what the record says about when the write happened.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PromotionEconomicsCheckpointAttestationPayloadV1 {
+pub struct PromotionEconomicsCheckpointCommitObservationV1 {
     pub schema_version: u32,
     pub partition: PlacementPartitionV1,
     pub key: PromotionEconomicsVerificationKeyV1,
     pub revision: u64,
     pub checkpoint_digest: Digest32,
     pub committed_at_unix_seconds: u64,
+    pub observed_at_unix_seconds: u64,
 }
 
+/// Signed under
+/// [`crate::CellProofDomainV1::PromotionEconomicsCheckpointCommitObservation`],
+/// by the observer port's own signing identity — NEVER by the store that
+/// performed the write.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignedPromotionEconomicsCheckpointAttestationV1 {
-    pub payload: PromotionEconomicsCheckpointAttestationPayloadV1,
+pub struct SignedPromotionEconomicsCheckpointCommitObservationV1 {
+    pub payload: PromotionEconomicsCheckpointCommitObservationV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
+}
+
+/// A durable checkpoint record together with an independent observation of its
+/// commit.
+///
+/// This is a CLAIM, not evidence: only
+/// [`verify_promotion_economics_checkpoint`] turns it into the private-field
+/// [`VerifiedPromotionEconomicsCheckpoint`]. It is produced by
+/// [`PromotionEconomicsCheckpointCommitObserver`] and NEVER by the store that
+/// performed the commit.
+///
+/// The observer returns the record it read together with its own observation,
+/// rather than the observation alone, for the reason the sibling rebalance
+/// observer gives: handing back only a signature would put the caller in charge
+/// of pairing it with a record, which reopens a narrower version of the
+/// steering hazard this port exists to close.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommittedPromotionEconomicsCheckpointClaimV1 {
+    pub checkpoint: PromotionEconomicsVerificationCheckpointV1,
+    pub observation: SignedPromotionEconomicsCheckpointCommitObservationV1,
+}
+
+/// Independently re-reads one committed checkpoint and signs what it read.
+///
+/// The port accepts a verification KEY only. It is not given, and cannot be
+/// given, a caller-supplied checkpoint or a caller's assertion that a commit
+/// occurred. This is the second half of the wave law that the store fix alone
+/// does not satisfy: a store that signs an observation of its own write vouches
+/// for itself, so the signature has to come from somewhere the write did not.
+pub trait PromotionEconomicsCheckpointCommitObserver: Send + Sync {
+    fn observe_committed_checkpoint<'a>(
+        &'a self,
+        authority: &'a CellControlReadAuthorityV1,
+        key: &'a PromotionEconomicsVerificationKeyV1,
+    ) -> BoxCellFuture<
+        'a,
+        Result<
+            Option<CommittedPromotionEconomicsCheckpointClaimV1>,
+            PromotionEconomicsVerificationErrorV1,
+        >,
+    >;
 }
 
 /// What the owning module independently expects a restored checkpoint to be.
@@ -229,6 +266,13 @@ pub struct SignedPromotionEconomicsCheckpointAttestationV1 {
 /// The expectation is computed by the verifier from the work it is resuming,
 /// never copied out of the claim: a claim that supplies its own expectation
 /// proves nothing.
+///
+/// There is deliberately NO `expected_checkpoint_digest`. A caller resuming
+/// after a crash does not know what digest it is about to find — discovering
+/// retained progress is the point — so requiring one would either be
+/// unsatisfiable or would be satisfied by copying the claim's own digest, which
+/// checks nothing. The verifier binds the observation to the key and to the
+/// cell, registry and policy identity the caller independently holds.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PromotionEconomicsCheckpointExpectationV1 {
     pub key: PromotionEconomicsVerificationKeyV1,
@@ -240,16 +284,16 @@ pub struct PromotionEconomicsCheckpointExpectationV1 {
     pub now_unix_seconds: u64,
 }
 
-/// A checkpoint whose store attestation, provenance and digest have been
-/// checked.
+/// A checkpoint whose independent commit observation, provenance and digest
+/// have been checked.
 ///
 /// Private field, no public constructor, no deserialization path. Only
 /// [`verify_promotion_economics_checkpoint`] mints one, and decoding an
-/// arbitrary checkpoint does not: restoration checks the store attestation's
-/// signature, producer and audience, the expected key, the expected cell,
-/// registry and policy identity, and the checkpoint digest first. An unverified
-/// checkpoint is never admissible promotion evidence and can never stand in for
-/// completed replay.
+/// arbitrary checkpoint does not: verification checks the observation's
+/// signature, producer and audience, that the observation names the expected
+/// key, the expected cell, registry and policy identity, and the checkpoint
+/// digest. An unverified checkpoint is never admissible promotion evidence and
+/// can never stand in for completed replay.
 #[derive(Debug, Eq, PartialEq)]
 pub struct VerifiedPromotionEconomicsCheckpoint(PromotionEconomicsVerificationCheckpointV1);
 
@@ -260,14 +304,15 @@ impl VerifiedPromotionEconomicsCheckpoint {
     }
 }
 
-/// Turns what the store reported into verified progress, or refuses.
+/// Turns an independently observed claim into verified progress, or refuses.
 ///
-/// This is the seam the store must not cross. The store says what it holds;
-/// this function, owned by the module that owns the private wrapper, decides
-/// whether that is progress.
+/// This is the seam neither the store nor the caller may cross. The store says
+/// what it durably holds; a separate observer re-reads it and signs what it
+/// found; this function, owned by the module that owns the private wrapper,
+/// decides whether that is progress.
 pub fn verify_promotion_economics_checkpoint(
     _verifier: &dyn CellProofVerifier,
-    _claim: PromotionEconomicsCheckpointClaimV1,
+    _claim: CommittedPromotionEconomicsCheckpointClaimV1,
     _expectation: &PromotionEconomicsCheckpointExpectationV1,
 ) -> Result<VerifiedPromotionEconomicsCheckpoint, PromotionEconomicsVerificationErrorV1> {
     Err(PromotionEconomicsVerificationErrorV1::NotImplemented)
@@ -422,26 +467,50 @@ fn assemble_promotion_economics_checkpoint_write(
     Err(PromotionEconomicsVerificationErrorV1::NotImplemented)
 }
 
-/// What `acquire` hands back: the reported lease claim, and the reported
-/// retained progress if any exists. Both are unverified store output; the
-/// caller passes each through this module's verifier before relying on it.
+/// What `acquire` hands back: the reported lease claim, and the DURABLE RECORD
+/// of retained progress if any exists.
+///
+/// Both are the store's own unverified report and neither is evidence. The
+/// retained checkpoint arrives here as a bare record with no signature attached,
+/// exactly as `commit` returns one: the store reports, it does not vouch. To
+/// resume from that progress the caller takes the same two steps it takes after
+/// a commit — ask [`PromotionEconomicsCheckpointCommitObserver`] for an
+/// independently observed claim at the same key, then mint the wrapper through
+/// [`verify_promotion_economics_checkpoint`].
+///
+/// The record is still returned here rather than only by the observer so that
+/// acquiring the lease and reading the progress it covers stay one atomic
+/// store operation, which is what makes the revision compare-and-set meaningful.
 pub type PromotionEconomicsCheckpointAcquisitionV1 = (
     PromotionEconomicsCheckpointLeaseClaimV1,
-    Option<PromotionEconomicsCheckpointClaimV1>,
+    Option<PromotionEconomicsVerificationCheckpointV1>,
 );
 
 /// The partition-local durable checkpoint store.
 ///
-/// A STORE RETURNS WHAT IT DURABLY HOLDS; ONLY THIS MODULE'S VERIFIERS MINT A
-/// PRIVATE-FIELD WRAPPER. Both methods therefore hand back
-/// [`PromotionEconomicsCheckpointClaimV1`] and
-/// [`PromotionEconomicsCheckpointLeaseClaimV1`] — public, unverified records an
-/// out-of-crate adapter can actually construct — and the caller passes each
-/// through [`verify_promotion_economics_checkpoint`] or
+/// THE LAW HAS TWO CLAUSES AND THIS TRAIT OBEYS BOTH.
+///
+/// (a) ONLY THE OWNING MODULE'S VERIFIER MINTS A PRIVATE-FIELD WRAPPER. Neither
+/// method returns one. They hand back
+/// [`PromotionEconomicsVerificationCheckpointV1`] and
+/// [`PromotionEconomicsCheckpointLeaseClaimV1`] — public records an out-of-crate
+/// adapter can actually construct — and the caller mints through
+/// [`verify_promotion_economics_checkpoint`] or
 /// [`verify_promotion_economics_checkpoint_lease`]. A store that could return a
-/// verified wrapper directly could fabricate replay progress nothing checked;
-/// a store that cannot construct its own return type is simply unimplementable.
-/// The seam has to be in the signature, not only in prose.
+/// verified wrapper could fabricate progress nothing checked; a store that
+/// cannot construct its own return type is simply unimplementable.
+///
+/// (b) ONLY AN INDEPENDENT PORT, RE-READING BY LOOKUP KEY ALONE, SIGNS AN
+/// OBSERVATION OF A WRITE. Neither method returns a signature over its own
+/// write. `commit` returns the durable record and nothing more; the signed
+/// observation comes from
+/// [`PromotionEconomicsCheckpointCommitObserver`], which is handed a key and
+/// cannot be told what to find. A store that signs an observation of its own
+/// write vouches for itself, and no amount of signature checking downstream
+/// recovers what that destroys.
+///
+/// Both seams have to be in the signature, not only in prose. Satisfying (a)
+/// alone still leaves a store attesting to its own work.
 ///
 /// Implementations must provide, atomically: lease-term and revision
 /// compare-and-set, exactly one active writer per key, the partition
@@ -462,12 +531,16 @@ pub trait PromotionEconomicsCheckpointStore: Send + Sync {
         Result<PromotionEconomicsCheckpointAcquisitionV1, PromotionEconomicsVerificationErrorV1>,
     >;
 
+    /// Durably advances the checkpoint under the lease's revision
+    /// compare-and-set, and returns THE DURABLE RECORD ALONE. It never returns a
+    /// signature, because a signature here would be the store attesting to its
+    /// own write.
     fn commit<'a>(
         &'a self,
         write: PromotionEconomicsCheckpointWriteV1,
     ) -> BoxCellFuture<
         'a,
-        Result<PromotionEconomicsCheckpointClaimV1, PromotionEconomicsVerificationErrorV1>,
+        Result<PromotionEconomicsVerificationCheckpointV1, PromotionEconomicsVerificationErrorV1>,
     >;
 }
 

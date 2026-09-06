@@ -72,7 +72,7 @@ pub enum CellProofDomainV1 {
     MovementActionClosure,
     MovementActionResult,
     PromotionEconomicsSourceFinalization,
-    PromotionEconomicsCheckpointAttestation,
+    PromotionEconomicsCheckpointCommitObservation,
     CapabilityEffectGrant,
     LocalEffectCommitReceipt,
     CapabilityAdapterAcceptance,
