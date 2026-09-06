@@ -438,7 +438,6 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     PolicyMismatch,
     CellMismatch,
     WindowMismatch,
-    ManifestMismatch,
     /// The declared population was not fully verified: a missing source, a
     /// missing record, an early terminal page or a count, root or byte
     /// mismatch after the complete stream.
@@ -461,8 +460,22 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     WorkLimitExceeded,
     CalculationMismatch,
     UnitCostThresholdExceeded,
-    /// A source finalization, admission, registry or closure failed its
-    /// authenticity, coverage, ownership or classification checks.
+    /// A CLOSURE-LEVEL refusal: the closure authority declined to bind a
+    /// closure at all, because the admitted source population disagreed on
+    /// coverage, registry identity, taxonomy, window or common retention.
+    ///
+    /// Boundary against the per-source errors: this is about the SET of
+    /// sources — a missing or additional or duplicated admitted scope,
+    /// overlapping canonical charge ownership between owners, a registry that
+    /// is not the one cell policy selects, a taxonomy digest that disagrees
+    /// with the policy taxonomy, or a retention deadline no source can meet.
+    /// A single source's own finalization failing its signature, producer,
+    /// key, domain, audience, admission or schema check is that source's
+    /// failure and is reported by
+    /// [`crate::verify_promotion_economics_source_finalization`], not here.
+    /// Two errors with overlapping and unstated boundaries get chosen
+    /// arbitrarily, so the split is stated rather than left to a future
+    /// implementer.
     SourceClosureRejected,
     /// A checkpoint lease expired, lost a compare-and-set race, or bound a
     /// different cell, closure, registry, policy or calculation than the work
