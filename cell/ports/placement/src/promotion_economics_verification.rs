@@ -580,6 +580,55 @@ pub enum PromotionEconomicsVerificationStepOutcomeV1 {
     Complete(Box<VerifiedCellPromotionEconomics>),
 }
 
+/// The ports one promotion economics replay collaborates with.
+///
+/// # What this is
+///
+/// A grouping of the four ports a single replay needs, passed together because
+/// they are always passed together. Seven loose arguments that must travel in a
+/// fixed relationship were a struct that had not been written yet, and needing
+/// an eighth is what made that visible.
+///
+/// # What this is NOT
+///
+/// IT IS NOT AN AUTHORITY OBJECT AND HOLDING ONE CONFERS NOTHING. It carries no
+/// permission, names no subject, and asserts nothing about the caller. Every
+/// question of what may be read and what the answer must be is settled by the
+/// per-call arguments it deliberately does NOT contain: the read authority, the
+/// already-verified closure, the record under test and the policy. Assembling
+/// this struct is not a step in gaining access to anything.
+///
+/// # Why its fields are public
+///
+/// None of the four is selection-relevant, so the private-constructor
+/// discipline the closure issuer needs does not apply here. A port supplies
+/// behaviour; it does not choose the answer. What the replay must reproduce is
+/// fixed by `closure` — itself a private-field wrapper only this module mints —
+/// and by `policy`, both of which stay per-call. Substituting a dishonest
+/// observer changes who vouches, not what is required, and that substitution is
+/// caught where it should be: the observation is signed under its own proof
+/// domain and checked against an expected producer and audience it cannot
+/// forge. Sealing this struct would add ceremony without adding a gate.
+///
+/// The closure issuer holds its own ports by value from construction instead,
+/// because A3 requires its selection-relevant registry and policy to be fixed
+/// at admission. That difference is deliberate, not drift: one is a sealed
+/// long-lived issuer, the other a per-call collaborator set.
+pub struct PromotionEconomicsReplayPortsV1<'a> {
+    /// Reads bounded pages of retained records from one admitted source.
+    pub retained_input_reader: &'a dyn PromotionEconomicsRetainedInputReader,
+    /// Leases execution and durably advances the checkpoint. Reports records;
+    /// signs nothing.
+    pub checkpoint_store: &'a dyn PromotionEconomicsCheckpointStore,
+    /// Independently re-reads a committed checkpoint by key and signs what it
+    /// found. Required to resume retained progress at all, since the store
+    /// deliberately cannot vouch for its own write.
+    pub checkpoint_observer: &'a dyn PromotionEconomicsCheckpointCommitObserver,
+    /// Checks the signatures the replay depends on: each admitted source's
+    /// finalization, and the observation backing a resumed checkpoint.
+    pub proof_verifier: &'a dyn CellProofVerifier,
+}
+
 /// Advances promotion economics replay by one bounded step.
 ///
 /// This is the ONLY way a [`VerifiedCellPromotionEconomics`] comes into
@@ -594,14 +643,21 @@ pub enum PromotionEconomicsVerificationStepOutcomeV1 {
 /// select a different source population. The policy and the record are both
 /// checked against that closure.
 ///
+/// The collaborator set arrives as [`PromotionEconomicsReplayPortsV1`]. Two of
+/// its four members were absent from this signature before: the checkpoint
+/// observer, without which a resumed checkpoint cannot be turned into verified
+/// progress at all, and the proof verifier, without which "recomputed against
+/// its authenticated finalization" above could not be performed — this function
+/// asserted it authenticated signatures while holding nothing able to check
+/// one. Both are collaborators of this replay, so both belong in the set.
+///
 /// A promotion proof that expires while verification runs may be reissued over
 /// the same immutable calculation and closure once replay completes, provided
 /// the cell revision, policy and retention still hold: the completed replay is
 /// not tied to an expiring outer signature. The promotion verifier still checks
 /// its own current signature, expiry and exact economics tuple regardless.
 pub fn advance_cell_promotion_economics<'a>(
-    _reader: &'a dyn PromotionEconomicsRetainedInputReader,
-    _store: &'a dyn PromotionEconomicsCheckpointStore,
+    _ports: &'a PromotionEconomicsReplayPortsV1<'a>,
     _authority: &'a CellControlReadAuthorityV1,
     _closure: &'a VerifiedPromotionEconomicsClosure,
     _evidence: &'a crate::CellPromotionEconomicsV1,
