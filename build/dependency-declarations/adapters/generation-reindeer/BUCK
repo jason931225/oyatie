@@ -88,18 +88,36 @@ rust_binary(
     within_view = _PACKAGE_VIEW,
 )
 
+rust_binary(
+    name = "reindeer_candidate_head_qualification",
+    srcs = ["src/bin/reindeer_candidate_head_qualification.rs"],
+    crate = "reindeer_candidate_head_qualification",
+    crate_root = "src/bin/reindeer_candidate_head_qualification.rs",
+    visibility = [],
+    within_view = _PACKAGE_VIEW,
+    deps = [":dependency-declarations-generation-reindeer"],
+)
+
 rust_test(
     name = "dependency-declarations-generation-reindeer-candidate-head-qualification-test",
     srcs = [
         "tests/candidate_head_qualification.rs",
+        "tests/candidate_head_qualification/candidate_inputs.rs",
+        "tests/candidate_head_qualification/cli.rs",
+        "tests/candidate_head_qualification/provider_outcomes.rs",
+        "tests/candidate_head_qualification/resource_bounds.rs",
         "tests/fixtures/reindeer_fixture.rs",
     ],
     crate = "dependency_declarations_generation_reindeer_candidate_head_qualification_test",
     crate_root = "tests/candidate_head_qualification.rs",
     env = {
+        "REINDEER_QUALIFICATION_CLI": "$(location :reindeer_candidate_head_qualification)",
         "REINDEER_QUALIFICATION_FIXTURE_PROVIDER": "$(location :dependency-declarations-generation-reindeer-qualification-fixture-provider)",
     },
-    resources = [":dependency-declarations-generation-reindeer-qualification-fixture-provider"],
+    resources = [
+        ":dependency-declarations-generation-reindeer-qualification-fixture-provider",
+        ":reindeer_candidate_head_qualification",
+    ],
     visibility = [],
     within_view = _PACKAGE_VIEW + [
         "//build/dependency-declarations/ports/generation/...",
