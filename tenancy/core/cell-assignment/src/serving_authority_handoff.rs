@@ -132,32 +132,45 @@ pub trait ServingAuthorityControlHandoffStore: Send + Sync {
         instance: &'a crate::ServingAuthorityInstanceV1,
     ) -> BoxTenancyFuture<'a, Result<Option<ServingAuthorityHandoffRecordV1>, BindingStoreError>>;
 
-    /// Returns `None` when no installation claim was ever committed.
+    /// Reads back the UNSIGNED durable installation issuance, or `None` when
+    /// none was ever committed.
     ///
-    /// Absence must stay distinct from "result unknown": this is a reconciler
+    /// This returns the issuance rather than the full
+    /// [`crate::CommittedServingAuthorityInstallationClaimV1`] because the
+    /// claim's other member is a signed control-commit attestation, and no
+    /// write path carries one into this store: the handoff write set's
+    /// `evidence` and `next_handoff` members carry grants and results, never an
+    /// attestation. Returning the claim would have obliged the store to produce
+    /// a signature only it could have forged.
+    ///
+    /// The caller pairs this record with a fresh attestation from
+    /// [`ServingAuthorityControlCommitObserver::observe_installation_commit`],
+    /// assembles the claim and verifies it.
+    ///
+    /// Absence stays distinct from "result unknown": this is a reconciler
     /// decision path, and collapsing "never committed" into an error would make
-    /// the reconciler unable to tell a missing commit from a failed read. The
-    /// sibling `get_handoff` five lines above already returns `Option`.
-    fn load_installation_claim<'a>(
+    /// the reconciler unable to tell a missing commit from a failed read.
+    fn load_installation_issuance<'a>(
         &'a self,
         authority: &'a crate::BindingReconciliationPersistenceAuthorityV1,
         query: &'a crate::ServingAuthorityHandoffExpectationV1,
         lease: &'a crate::BindingReconciliationLeaseV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<Option<crate::CommittedServingAuthorityInstallationClaimV1>, BindingStoreError>,
+        Result<Option<crate::ServingAuthorityInstallationIssuanceV1>, BindingStoreError>,
     >;
 
-    /// Returns `None` when no freeze claim was ever committed. See
-    /// [`Self::load_installation_claim`] for why absence is not an error here.
-    fn load_freeze_claim<'a>(
+    /// Reads back the UNSIGNED durable freeze intent, or `None` when none was
+    /// ever committed. See [`Self::load_installation_issuance`] for why this is
+    /// the intent rather than the claim, and why absence is not an error.
+    fn load_freeze_intent<'a>(
         &'a self,
         authority: &'a crate::BindingReconciliationPersistenceAuthorityV1,
         query: &'a crate::ServingAuthorityHandoffExpectationV1,
         lease: &'a crate::BindingReconciliationLeaseV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<Option<crate::CommittedServingAuthorityFreezeClaimV1>, BindingStoreError>,
+        Result<Option<crate::ServingAuthorityFreezeIntentV1>, BindingStoreError>,
     >;
 
     fn record_handoff_result<'a>(

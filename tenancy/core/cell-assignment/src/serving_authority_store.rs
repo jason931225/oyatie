@@ -166,22 +166,39 @@ pub trait CellServingAuthorityStore: Send + Sync {
         Result<Option<crate::PublishedWriteAuthorityLeaseV1>, ServingAuthorityStoreError>,
     >;
 
+    /// Reads back the UNSIGNED durable installation result.
+    ///
+    /// This getter cannot return the signed form, because no signed form is
+    /// ever in this store's durable state: `install` writes
+    /// [`ServingAuthorityInstallationWriteSetV1`], whose `result` member is the
+    /// unsigned payload, and no other write path carries a signed result. A
+    /// getter typed to the signed form would have been either dead or
+    /// self-vouching -- only the store itself could have produced what it
+    /// claimed to be reading back.
+    ///
+    /// The signed form is produced on demand by
+    /// [`ServingAuthorityResultObserver::observe_installation_result`], which
+    /// re-reads this same row under its own authority.
     fn get_installation_result<'a>(
         &'a self,
         authority: &'a crate::ServingAuthorityReadAuthorityV1,
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<Option<SignedServingAuthorityInstallationResultV1>, ServingAuthorityStoreError>,
+        Result<Option<ServingAuthorityInstallationResultPayloadV1>, ServingAuthorityStoreError>,
     >;
 
+    /// Reads back the UNSIGNED durable freeze result. See
+    /// [`Self::get_installation_result`] for why this is not the signed form;
+    /// the signed form comes from
+    /// [`ServingAuthorityResultObserver::observe_freeze_result`].
     fn get_freeze_result<'a>(
         &'a self,
         authority: &'a crate::ServingAuthorityReadAuthorityV1,
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<Option<SignedServingAuthorityFreezeResultV1>, ServingAuthorityStoreError>,
+        Result<Option<ServingAuthorityFreezeResultPayloadV1>, ServingAuthorityStoreError>,
     >;
 }
 

@@ -42,8 +42,16 @@ impl BindingCellIndexProjectionWriteSetV1 {
 }
 
 pub trait TenantBindingCellIndexProjectionStore: Send + Sync {
-    /// Returns `None` when no acknowledgment has been observed for that
-    /// contribution.
+    /// Reads back the UNSIGNED durable acknowledgment, or `None` when none was
+    /// recorded for that contribution.
+    ///
+    /// `apply_contributions` writes unsigned
+    /// [`crate::BindingControlContributionAcknowledgmentPayloadV1`]s and, as its
+    /// own documentation says, does not attest that it applied them. No write
+    /// path carries a signed acknowledgment into this store, so a getter typed
+    /// to the signed form could only have been satisfied by the store forging
+    /// it. The signed form comes from
+    /// [`crate::BindingControlContributionAcknowledgmentObserver::observe_acknowledgment`].
     ///
     /// Absence must stay distinct from "result unknown". A reconciler asking
     /// whether the target acknowledged needs to tell "not yet" from "the read
@@ -58,7 +66,7 @@ pub trait TenantBindingCellIndexProjectionStore: Send + Sync {
     ) -> BoxTenancyFuture<
         'a,
         Result<
-            Option<crate::SignedBindingControlContributionAcknowledgmentV1>,
+            Option<crate::BindingControlContributionAcknowledgmentPayloadV1>,
             BindingControlContributionError,
         >,
     >;
