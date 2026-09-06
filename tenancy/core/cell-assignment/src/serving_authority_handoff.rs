@@ -165,3 +165,46 @@ pub trait ServingAuthorityControlHandoffStore: Send + Sync {
         write_set: &'a ServingAuthorityControlHandoffWriteSetV1,
     ) -> BoxTenancyFuture<'a, Result<ServingAuthorityControlHandoffResultV1, BindingStoreError>>;
 }
+
+/// Independently observes a committed serving-authority control write and signs
+/// what it read.
+///
+/// `SignedServingAuthorityControlCommitAttestationV1` had a consumer, a proof
+/// domain (`BindingProofDomainV1::ServingAuthorityControlCommitAttestation`)
+/// and a verifier, but no producer: the claims embedding it
+/// (`CommittedServingAuthorityInstallationClaimV1`,
+/// `CommittedServingAuthorityFreezeClaimV1`) are loaded by
+/// [`ServingAuthorityControlHandoffStore`] and were never built. This port is
+/// that missing producer, for both control actions.
+///
+/// Separate from the store on purpose: the party that performed the control
+/// write must not be the party that attests it committed. Both methods take a
+/// reconciliation read authority and the same lookup the loaders take —
+/// control partition, instance and business id, plus the producer, audience and
+/// clock the observer needs to mint an envelope. Neither accepts a caller's
+/// claim about the committed row; every committed value in the attestation
+/// describes what the observer itself re-read.
+///
+/// No new proof domain is required for either method: one attestation type
+/// covers both control actions, disambiguated by
+/// [`crate::ServingAuthorityBusinessIdV1`], which is how the existing domain
+/// was already designed.
+pub trait ServingAuthorityControlCommitObserver: Send + Sync {
+    fn observe_installation_commit<'a>(
+        &'a self,
+        authority: &'a crate::BindingReconciliationReadAuthorityV1,
+        query: &'a crate::ServingAuthorityHandoffExpectationV1,
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<crate::SignedServingAuthorityControlCommitAttestationV1, BindingStoreError>,
+    >;
+
+    fn observe_freeze_commit<'a>(
+        &'a self,
+        authority: &'a crate::BindingReconciliationReadAuthorityV1,
+        query: &'a crate::ServingAuthorityHandoffExpectationV1,
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<crate::SignedServingAuthorityControlCommitAttestationV1, BindingStoreError>,
+    >;
+}
