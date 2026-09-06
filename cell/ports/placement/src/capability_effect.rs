@@ -135,6 +135,23 @@ pub enum CapabilityAuthorityContextV1 {
     Installed(InstalledCapabilityAuthorityContextV1),
 }
 
+/// What a grant can authorize.
+///
+/// Action and context are not independent. The matrix below is enforced at
+/// verification and again at the effect transaction, because a grant that
+/// passed verification can still arrive after its authority was fenced:
+///
+/// Under a [`CapabilityAuthorityContextV1::Preparation`] context, and nothing
+/// else: `Prepare`; `PreparationCleanup`; and `Transfer` into non-serving
+/// staged data when the adapter's acceptance separately admits it. A
+/// preparation grant can never satisfy `Activate`, `Write`, `Fence` or
+/// `Release`.
+///
+/// Under a [`CapabilityAuthorityContextV1::Installed`] context: `Activate`,
+/// `Write`, `Fence`, `Release` and `Transfer`. Never `PreparationCleanup`.
+///
+/// Every action must also appear in the acceptance's `supported_actions`;
+/// membership of this enum admits nothing on its own.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CapabilityEffectActionV1 {
     Prepare,
@@ -143,6 +160,14 @@ pub enum CapabilityEffectActionV1 {
     Write,
     Transfer,
     Release,
+    /// Removes staged data left by a preparation that never activated.
+    ///
+    /// It exists because the alternative is to spend `Release`, which is
+    /// installed-authority retirement: reusing it here would let preparation
+    /// authority perform a retirement it was never granted, and would make a
+    /// cleanup indistinguishable in the audit record from a real release.
+    /// Authorized only under a Preparation context; refused under Installed.
+    PreparationCleanup,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

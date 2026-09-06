@@ -17,6 +17,10 @@ enum CapabilityEffectActionV1 {
   CAPABILITY_EFFECT_ACTION_V1_WRITE = 4;
   CAPABILITY_EFFECT_ACTION_V1_TRANSFER = 5;
   CAPABILITY_EFFECT_ACTION_V1_RELEASE = 6;
+  // Preparation context only; refused under an installed context. It is a
+  // distinct action rather than a reuse of RELEASE, which is
+  // installed-authority retirement.
+  CAPABILITY_EFFECT_ACTION_V1_PREPARATION_CLEANUP = 7;
 }
 
 message CapabilityPartitionRefV1 {
