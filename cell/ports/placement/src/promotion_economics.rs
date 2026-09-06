@@ -656,10 +656,25 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     /// The partition's `maximum_concurrent_steps_per_partition` budget is
     /// spent, so `acquire` declined to start another step here.
     ///
-    /// RECOVERY: do NOT retry on this partition until a step completes
-    /// elsewhere. This is the one refusal in this enum where spinning is
-    /// actively wrong: retrying adds load to precisely the thing that is
-    /// saturated. Reschedule under partition-level backpressure.
+    /// RECOVERY: reschedule under partition-level backoff. Do not spin on this
+    /// key, and do not hold the caller waiting on a specific moment — retrying
+    /// adds load to precisely the thing that is saturated.
+    ///
+    /// THIS VARIANT DELIBERATELY NAMES NO OBSERVABLE, unlike its neighbour
+    /// `LeaseHeldByAnotherWorker`, which names one and now has
+    /// [`crate::PromotionEconomicsCheckpointStore::read_lease`] to supply it.
+    /// The asymmetry is real rather than an omission. A lease has ONE holder
+    /// and ONE expiry, so a read returns a concrete "wait until T" that makes
+    /// the recovery precise. Partition occupancy has neither: it is a
+    /// continuously changing count with no holder to wait on, any read of it is
+    /// stale the moment it returns, and there is no moment a caller could
+    /// correctly sleep until. An occupancy read would look like the lease read
+    /// and answer nothing, which is worse than not offering it.
+    ///
+    /// So this recovery prescribes only what a caller can actually perform. An
+    /// earlier wording said "do not retry until a step completes elsewhere",
+    /// which named an event no caller can observe — the same defect as telling
+    /// a refused worker to wait for an expiry it had no way to read.
     ///
     /// BOUNDARY against `WorkLimitExceeded`: that is a READER CONTRACT
     /// VIOLATION on a single page — a bound the reader was told and broke.
