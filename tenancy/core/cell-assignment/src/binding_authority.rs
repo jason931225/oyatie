@@ -215,6 +215,7 @@ pub enum VerifiedBindingProofRefV1<'a> {
     ReconciliationInvocation(&'a crate::VerifiedBindingReconciliationInvocation),
     RollbackWindowElapsed(&'a crate::VerifiedRollbackWindowElapsed),
     SourceReleaseCommitAttestation(&'a crate::VerifiedCommittedSourceReservationReleaseIssuance),
+    TransferExecutionCommitObservation(&'a crate::VerifiedCommittedTransferExecutionPermitIssuance),
 }
 
 impl<'a> VerifiedBindingProofRefV1<'a> {
@@ -251,6 +252,7 @@ impl<'a> VerifiedBindingProofRefV1<'a> {
             Self::ReconciliationInvocation(proof) => &proof.signed().envelope,
             Self::RollbackWindowElapsed(proof) => &proof.signed().envelope,
             Self::SourceReleaseCommitAttestation(proof) => &proof.claim().attestation.envelope,
+            Self::TransferExecutionCommitObservation(proof) => &proof.claim().observation.envelope,
         }
     }
 }
