@@ -7,6 +7,7 @@ pub enum ServingAuthorityProofKindV1 {
     FreezeGrant,
     LocalLease,
     LocalLeaseCommit,
+    SurvivingQuorum,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -42,6 +43,7 @@ pub enum VerifiedServingAuthorityProofRefV1<'a> {
     FreezeGrant(&'a crate::VerifiedServingAuthorityFreezeGrant),
     LocalLease(&'a crate::VerifiedWriteAuthorityLease),
     LocalLeaseCommit(&'a crate::VerifiedCommittedWriteAuthorityLeaseIssuance),
+    SurvivingQuorum(&'a crate::VerifiedServingAuthoritySurvivingQuorum),
 }
 
 pub fn bind_serving_authority_proof_consumption(
