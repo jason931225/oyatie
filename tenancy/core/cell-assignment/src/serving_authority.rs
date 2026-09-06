@@ -17,11 +17,37 @@ pub struct CellServingPartitionRefV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServingAuthorityIncarnationV1(Vec<u8>);
 
+/// Why an independently generated incarnation cannot be accepted.
+///
+/// Separate from [`crate::ServingAuthorityStoreError`] because that taxonomy
+/// describes what a STORE did with a write, and has no variant for malformed
+/// input: the closest, `Conflict`, is documented as a precondition failure
+/// against durable state, which a parse has not yet touched. Every sibling
+/// constructor in this crate takes the same shape --
+/// `BindingProofConstructionError`, `BindingConstructionError`,
+/// `BindingOperationConstructionError`,
+/// `SourceReservationReleaseIssuanceConstructionErrorV1` and
+/// `TransferExecutionPermitIssuanceConstructionErrorV1`.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum ServingAuthorityIncarnationConstructionErrorV1 {
+    /// No implementation exists yet.
+    NotImplemented,
+    /// The value is empty. An incarnation must distinguish one lifetime of a
+    /// serving authority from the next, and an empty value cannot.
+    Empty,
+    /// The value exceeds the permitted length.
+    TooLong,
+    /// The value was not independently generated to the required strength --
+    /// for instance a counter or a caller-chosen constant. An incarnation that
+    /// a peer can predict does not fence anything.
+    NotIndependentlyGenerated,
+}
+
 impl ServingAuthorityIncarnationV1 {
     pub fn parse(
         _independently_generated: Vec<u8>,
-    ) -> Result<Self, crate::ServingAuthorityStoreError> {
-        Err(crate::ServingAuthorityStoreError::NotImplemented)
+    ) -> Result<Self, ServingAuthorityIncarnationConstructionErrorV1> {
+        Err(ServingAuthorityIncarnationConstructionErrorV1::NotImplemented)
     }
 
     #[must_use]
