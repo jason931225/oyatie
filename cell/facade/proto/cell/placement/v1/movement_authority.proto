@@ -1,0 +1,377 @@
+syntax = "proto3";
+package cell.placement.v1;
+
+import "cell/placement/v1/proof.proto";
+import "cell/placement/v1/placement_authorizer.proto";
+import "cell/placement/v1/placement.proto";
+import "cell/placement/v1/assurance.proto";
+import "cell/placement/v1/capacity.proto";
+import "cell/placement/v1/economics.proto";
+import "cell/placement/v1/topology.proto";
+import "cell/placement/v1/movement.proto";
+import "cell/placement/v1/movement_issuance.proto";
+import "cell/placement/v1/movement_settlement.proto";
+import "cell/placement/v1/reservation.proto";
+import "cell/placement/v1/rebalance.proto";
+import "cell/placement/v1/rebalance_candidates.proto";
+import "cell/placement/v1/rebalance_budget.proto";
+import "cell/placement/v1/reconciliation_authority.proto";
+import "cell/placement/v1/control_audit.proto";
+import "cell/placement/v1/control_operation.proto";
+import "cell/placement/v1/lifecycle.proto";
+import "tenancy/identity/v1/identity.proto";
+
+message RebalanceJobAddressV1 { string partition = 1; string job_id = 2; }
+
+message RebalanceJobClaimV1 {
+  RebalanceJobAddressV1 address = 1;
+  string worker_id = 2;
+  uint64 epoch = 3;
+  uint64 revision = 4;
+  uint64 expires_at_unix_seconds = 5;
+  Digest32 record_digest = 6;
+}
+
+message RebalanceSourcePreconditionV1 {
+  RebalanceJobAddressV1 address = 1;
+  uint64 expected_job_revision = 2;
+  Digest32 expected_job_digest = 3;
+  RebalanceJobClaimV1 expected_claim = 4;
+}
+
+message RebalanceEvaluationV1 {
+  RebalanceJobAddressV1 address = 1;
+  string evaluation_id = 2;
+  RebalanceCandidateV1 candidate = 3;
+  PlacementOperationKeyV1 operation = 4;
+  PlacementBusinessActionKeyV1 requirements_action = 5;
+  Digest32 record_digest = 6;
+}
+
+message RebalanceStableRequirementsV1 {
+  tenancy.identity.v1.TenantId tenant_id = 1;
+  PlacementIncumbentV1 incumbent = 2;
+  AssuranceCompilationPayloadV1 assurance = 3;
+  CapacityVectorV1 home_capacity = 4;
+  CapacityPurchasePreferenceV1 capacity_purchase_preference = 5;
+  ResilienceObjectiveV1 resilience = 6;
+  MovementBudgetV1 ordinary_movement_ceiling = 7;
+  MovementBudgetV1 forward_completion_ceiling = 8;
+}
+
+message RebalanceSelectionBusinessInputV1 {
+  RebalanceStableRequirementsV1 requirements = 1;
+  PlacementIntentPurposeV1 purpose = 2;
+  MovementBudgetRequestV1 budget = 3;
+}
+
+message RebalanceMovementBusinessInputV1 {
+  BindingOutcomeQueryRefV1 binding_operation = 1;
+  MovementBudgetRequestV1 budget = 2;
+  uint64 requested_deadline_unix_seconds = 3;
+}
+
+message RebalanceBusinessInputV1 {
+  oneof input {
+    RebalanceCandidateRequirementsRequestV1 requirements = 1;
+    RebalanceSelectionBusinessInputV1 selection = 2;
+    RebalanceMovementBusinessInputV1 movement = 3;
+  }
+}
+
+message RebalanceBusinessRequestV1 {
+  PlacementBusinessActionKeyV1 key = 1;
+  RebalanceBusinessInputV1 input = 2;
+  Digest32 business_digest = 3;
+}
+
+message RebalanceMovementProofInputsV1 {
+  SignedPlacementDecisionV1 decision = 1;
+  SignedReservationCommitPermitV1 reservation = 2;
+  SignedBindingParticipantManifestCommitmentV1 manifest = 3;
+}
+
+message RebalanceRequirementsProofInputsV1 {}
+
+message RebalanceProofInputsV1 {
+  oneof inputs {
+    RebalanceRequirementsProofInputsV1 requirements = 1;
+    SignedPlacementIntentV1 selection = 2;
+    RebalanceMovementProofInputsV1 movement = 3;
+  }
+}
+
+message RebalanceProofPackageV1 {
+  PlacementBusinessActionKeyV1 key = 1;
+  Digest32 business_digest = 2;
+  RebalanceProofInputsV1 inputs = 3;
+  string package_id = 4;
+  uint64 expires_at_unix_seconds = 5;
+  Digest32 package_digest = 6;
+}
+
+enum RebalanceActionStateV1 {
+  REBALANCE_ACTION_STATE_V1_UNSPECIFIED = 0;
+  REBALANCE_ACTION_STATE_V1_ELIGIBLE = 1;
+  REBALANCE_ACTION_STATE_V1_AUTHORIZED_RESULT_UNKNOWN = 2;
+  REBALANCE_ACTION_STATE_V1_GRANTED = 3;
+  REBALANCE_ACTION_STATE_V1_CLOSURE_COMMITTED = 4;
+  REBALANCE_ACTION_STATE_V1_DURABLY_REJECTED = 5;
+  REBALANCE_ACTION_STATE_V1_SETTLED = 6;
+  REBALANCE_ACTION_STATE_V1_REQUIREMENTS_READ = 7;
+  REBALANCE_ACTION_STATE_V1_SELECTION_COMPLETED = 8;
+  REBALANCE_ACTION_STATE_V1_NO_CAPACITY = 9;
+  REBALANCE_ACTION_STATE_V1_DEFERRED = 10;
+}
+
+message RebalanceSelectedActionV1 {
+  RebalanceEvaluationOutcomeV1 evaluation_outcome = 8;
+  RebalanceBusinessRequestV1 request = 1;
+  RebalanceActionStateV1 state = 2;
+  uint64 revision = 3;
+  RebalanceBudgetUsageV1 ordinary_encumbrance = 4;
+  RebalanceBudgetUsageV1 forward_encumbrance = 5;
+  SignedMovementActionResultV1 last_leaf_result = 6;
+  Digest32 record_digest = 7;
+}
+
+message RebalanceActionPreconditionV1 {
+  PlacementBusinessActionKeyV1 key = 1;
+  Digest32 business_digest = 2;
+  uint64 expected_revision = 3;
+  RebalanceActionStateV1 expected_state = 4;
+  Digest32 expected_record_digest = 5;
+}
+
+message RebalanceIssuanceAddressV1 {
+  RebalanceJobAddressV1 job = 1;
+  PlacementBusinessActionKeyV1 key = 2;
+  string issuance_id = 3;
+}
+
+message RebalanceInvocationIssuanceV1 {
+  PlacementDispatchInputV1 dispatch = 8;
+  RebalanceIssuanceAddressV1 address = 1;
+  RebalanceBusinessRequestV1 business = 2;
+  RebalanceProofPackageV1 package = 3;
+  PlacementPolicyDecisionEvidenceV1 decision = 4;
+  PlacementInvocationPayloadV1 unsigned_invocation = 5;
+  Digest32 dispatch_digest = 6;
+  Digest32 record_digest = 7;
+}
+
+message PlacementDispatchInputV1 {
+  PlacementBusinessActionKeyV1 key = 1;
+  Digest32 business_digest = 2;
+  Digest32 package_digest = 3;
+  PlacementActorEvidenceV1 actor = 4;
+  PlacementIntentPurposeV1 purpose = 5;
+  string realm = 6;
+  string jurisdiction = 7;
+  ProducerIdV1 audience = 8;
+  uint64 deadline_unix_seconds = 9;
+  RebalanceJobClaimV1 claim = 10;
+}
+
+message RebalanceSourceCommitEvidenceV1 {
+  RebalanceJobAddressV1 address = 1;
+  uint64 committed_job_revision = 2;
+  uint64 claim_epoch_at_commit = 3;
+  Digest32 record_digest = 4;
+  string transaction_id = 5;
+  uint64 committed_at_unix_seconds = 6;
+  CellProofEnvelopeV1 envelope = 7;
+  bytes signature = 8;
+}
+
+message CommittedRebalanceIssuanceV1 {
+  RebalanceInvocationIssuanceV1 issuance = 1;
+  RebalanceSourceCommitEvidenceV1 commit = 2;
+}
+
+message RebalanceActionPageQueryV1 {
+  RebalanceJobAddressV1 address = 1;
+  optional bytes continuation = 2;
+  uint32 maximum_records = 3;
+  uint64 maximum_encoded_bytes = 4;
+}
+
+message RebalanceActionPageV1 {
+  RebalanceJobAddressV1 address = 1;
+  repeated RebalanceSelectedActionV1 actions = 2;
+  optional bytes continuation = 3;
+}
+
+message MovementActionResultKeyV1 {
+  tenancy.identity.v1.TenantId tenant_id = 1;
+  PlacementBusinessActionKeyV1 action = 2;
+  Digest32 business_digest = 3;
+}
+
+message MovementActionClosureV1 {
+  RebalanceJobAddressV1 source = 1;
+  MovementActionResultKeyV1 key = 2;
+  string closure_id = 3;
+  uint64 closed_action_revision = 4;
+  Digest32 record_digest = 5;
+}
+
+message CommittedMovementActionClosureV1 {
+  MovementActionClosureV1 closure = 1;
+  RebalanceSourceCommitEvidenceV1 commit = 2;
+}
+
+message SignedMovementActionClosureV1 {
+  MovementActionClosureV1 closure = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message MovementActionGrantedV1 { MovementBudgetGrantV1 grant = 1; MovementPermitIssuanceRecordV1 issuance = 2; }
+message MovementActionSettledV1 { MovementBudgetGrantV1 grant = 1; MovementBudgetSettlementV1 settlement = 2; }
+
+message MovementActionResultV1 {
+  string partition = 1;
+  MovementActionResultKeyV1 key = 2;
+  oneof disposition {
+    MovementActionGrantedV1 granted = 3;
+    SignedMovementActionClosureV1 rejected = 4;
+    MovementActionSettledV1 settled = 5;
+  }
+  uint64 revision = 6;
+  Digest32 record_digest = 7;
+}
+
+message SignedMovementActionResultV1 {
+  MovementActionResultV1 result = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message MovementActionRestoreCheckpointV1 {
+  string partition = 1;
+  MovementActionResultKeyV1 key = 2;
+  MovementActionResultV1 retained_terminal_result = 3;
+  uint64 monotonic_restore_epoch = 4;
+}
+
+message RebalanceClosureRestoreCheckpointV1 {
+  RebalanceJobAddressV1 source = 1;
+  CommittedMovementActionClosureV1 closure = 2;
+  uint64 monotonic_restore_epoch = 3;
+}
+
+message CellControlIdempotencyRecordV1 {
+  CellControlSubjectV1 subject = 1;
+  string idempotency_key = 2;
+  Digest32 request_digest = 3;
+  CellControlOperationKeyV1 operation = 4;
+  Digest32 immutable_result_digest = 5;
+}
+
+message RebalanceSourceIssuanceWriteSetPartsV1 {
+  SignedReconciliationInvocationV1 authority = 1;
+  RebalanceSourcePreconditionV1 precondition = 2;
+  RebalanceActionPreconditionV1 action_precondition = 3;
+  PlacementPolicyDecisionEvidenceV1 decision = 4;
+  RebalanceInvocationIssuanceV1 issuance = 5;
+  RebalanceSelectedActionV1 next_action = 6;
+  RebalanceJobV1 next_job = 7;
+  CellControlIdempotencyRecordV1 idempotency = 8;
+  CellControlAuditRecordV1 audit_outbox = 9;
+}
+
+message RebalanceEvaluationWriteSetPartsV1 {
+  SignedReconciliationInvocationV1 authority = 1;
+  RebalanceSourcePreconditionV1 precondition = 2;
+  RebalanceEvaluationV1 evaluation = 3;
+  RebalanceSelectedActionV1 requirements_action = 4;
+  RebalanceJobV1 next_job = 5;
+  CellControlIdempotencyRecordV1 idempotency = 6;
+  CellControlAuditRecordV1 audit_outbox = 7;
+}
+
+message RebalanceEvaluationOutcomeV1 {
+  oneof outcome {
+    RebalanceCandidateRequirementsV1 requirements_read = 1;
+    SignedPlacementDecisionV1 selected = 2;
+    SignedPlacementExhaustionV1 no_capacity = 3;
+    SignedPlacementContinuationV1 deferred = 4;
+  }
+}
+
+message RebalanceProgressWriteSetPartsV1 {
+  SignedReconciliationInvocationV1 authority = 1;
+  RebalanceSourcePreconditionV1 precondition = 2;
+  RebalanceActionPreconditionV1 action_precondition = 3;
+  RebalanceEvaluationOutcomeV1 outcome = 4;
+  RebalanceSelectedActionV1 completed_action = 5;
+  RebalanceSelectedActionV1 next_action = 6;
+  RebalanceJobV1 next_job = 7;
+  CellControlAuditRecordV1 audit_outbox = 8;
+}
+
+message RebalanceClosureWriteSetPartsV1 {
+  SignedReconciliationInvocationV1 authority = 1;
+  RebalanceSourcePreconditionV1 precondition = 2;
+  RebalanceActionPreconditionV1 action_precondition = 3;
+  MovementActionClosureV1 closure = 4;
+  RebalanceSelectedActionV1 next_action = 5;
+  RebalanceJobV1 next_job = 6;
+  CellControlAuditRecordV1 audit_outbox = 7;
+}
+
+message RebalanceObserveResultWriteSetPartsV1 {
+  SignedReconciliationInvocationV1 authority = 1;
+  RebalanceSourcePreconditionV1 precondition = 2;
+  RebalanceActionPreconditionV1 action_precondition = 3;
+  SignedMovementActionResultV1 result = 4;
+  RebalanceSelectedActionV1 next_action = 5;
+  RebalanceJobV1 next_job = 6;
+  CellControlAuditRecordV1 audit_outbox = 7;
+}
+
+message RebalancePublicationWriteSetPartsV1 {
+  SignedReconciliationInvocationV1 authority = 1;
+  RebalanceSourcePreconditionV1 precondition = 2;
+  CommittedRebalanceIssuanceV1 committed_issuance = 3;
+  SignedPlacementInvocationV1 invocation = 4;
+  CellControlAuditRecordV1 audit_outbox = 5;
+}
+
+message RebalanceClaimAbsentV1 {}
+message RebalanceClaimPreconditionV1 {
+  oneof precondition {
+    RebalanceClaimAbsentV1 absent = 1;
+    RebalanceJobClaimV1 matches = 2;
+  }
+}
+
+message RebalanceClaimWriteSetPartsV1 {
+  SignedReconciliationInvocationV1 authority = 1;
+  RebalanceJobAddressV1 address = 2;
+  uint64 expected_job_revision = 3;
+  Digest32 expected_job_digest = 4;
+  RebalanceClaimPreconditionV1 previous_claim = 5;
+  RebalanceJobClaimV1 next_claim = 6;
+  CellControlAuditRecordV1 audit_outbox = 7;
+}
+
+message RebalanceCommitExpectationV1 {
+  RebalanceJobAddressV1 address = 1;
+  Digest32 expected_record_digest = 2;
+  ProducerIdV1 producer = 3;
+  ProducerIdV1 audience = 4;
+  Digest32 custody_configuration_digest = 5;
+  uint64 now_unix_seconds = 6;
+}
+
+message MovementActionProofExpectationV1 {
+  MovementActionResultKeyV1 key = 1;
+  RebalanceJobAddressV1 source = 2;
+  string leaf_partition = 3;
+  ProducerIdV1 producer = 4;
+  ProducerIdV1 audience = 5;
+  Digest32 custody_configuration_digest = 6;
+  uint64 now_unix_seconds = 7;
+}

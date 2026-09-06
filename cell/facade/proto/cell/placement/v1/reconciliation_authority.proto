@@ -3,6 +3,7 @@ syntax = "proto3";
 package cell.placement.v1;
 
 import "cell/placement/v1/authority.proto";
+import "cell/placement/v1/placement_authorizer.proto";
 import "cell/placement/v1/control_reconciliation.proto";
 import "cell/placement/v1/proof.proto";
 import "cell/placement/v1/reconciliation.proto";
@@ -15,6 +16,14 @@ enum ReconciliationActionV1 {
   RECONCILIATION_ACTION_V1_LIST_CELL_CONTROL_CANDIDATES = 4;
   RECONCILIATION_ACTION_V1_CLAIM_CELL_CONTROL_CANDIDATE = 5;
   RECONCILIATION_ACTION_V1_COMPLETE_CELL_CONTROL_CANDIDATE = 6;
+  RECONCILIATION_ACTION_V1_CLAIM_REBALANCE_JOB = 7;
+  RECONCILIATION_ACTION_V1_READ_REBALANCE_JOB = 8;
+  RECONCILIATION_ACTION_V1_PERSIST_REBALANCE_EVALUATION = 9;
+  RECONCILIATION_ACTION_V1_ISSUE_REBALANCE_ACTION = 10;
+  RECONCILIATION_ACTION_V1_PUBLISH_REBALANCE_ACTION = 11;
+  RECONCILIATION_ACTION_V1_ADVANCE_REBALANCE_ACTION = 12;
+  RECONCILIATION_ACTION_V1_CLOSE_REBALANCE_ACTION = 13;
+  RECONCILIATION_ACTION_V1_OBSERVE_REBALANCE_RESULT = 14;
 }
 
 message PlacementReconciliationScopeV1 {
@@ -35,7 +44,14 @@ message ReconciliationScopeV1 {
   oneof scope {
     PlacementReconciliationScopeV1 placement = 1;
     CellControlReconciliationScopeV1 cell_control = 2;
+    RebalanceJobReconciliationScopeV1 rebalance_job = 3;
   }
+}
+
+message RebalanceJobReconciliationScopeV1 {
+  string partition = 1;
+  string job_id = 2;
+  PlacementBusinessActionKeyV1 action = 3;
 }
 
 message ReconciliationInvocationPayloadV1 {

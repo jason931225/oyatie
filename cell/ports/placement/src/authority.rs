@@ -7,6 +7,7 @@ pub const PLACEMENT_INVOCATION_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PlacementActionV1 {
+    ReadRebalanceRequirements,
     SelectAndReserve,
     ArmReservation,
     FinalizeReservationCommitPermit,
@@ -18,7 +19,7 @@ pub enum PlacementActionV1 {
     RepairOperation,
 }
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PolicyVersionToken(String);
 
 impl PolicyVersionToken {
@@ -43,6 +44,7 @@ pub struct AuthorizationDecisionReceiptV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PlacementInvocationPayloadV1 {
+    pub authorization_evidence: Box<crate::PlacementPolicyDecisionEvidenceV1>,
     pub schema_version: u32,
     pub action: PlacementActionV1,
     pub tenant_id: TenantId,
@@ -62,6 +64,8 @@ pub struct SignedPlacementInvocationV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PlacementInvocationExpectation {
+    pub authorization_request: crate::PlacementAuthorizationRequestV1,
+    pub authorization_trust: crate::PlacementAuthorizationTrustV1,
     pub action: PlacementActionV1,
     pub tenant_id: TenantId,
     pub operation: PlacementOperationKey,

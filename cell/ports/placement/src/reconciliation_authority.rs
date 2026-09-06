@@ -7,6 +7,14 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ReconciliationActionV1 {
+    ClaimRebalanceJob,
+    ReadRebalanceJob,
+    PersistRebalanceEvaluation,
+    IssueRebalanceAction,
+    PublishRebalanceAction,
+    AdvanceRebalanceAction,
+    CloseRebalanceAction,
+    ObserveRebalanceResult,
     ListPlacementCandidates,
     ClaimPlacementCandidate,
     CompletePlacementCandidate,
@@ -17,6 +25,11 @@ pub enum ReconciliationActionV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReconciliationScopeV1 {
+    RebalanceJob {
+        partition: crate::RebalanceJobPartitionV1,
+        job_id: crate::RebalanceJobId,
+        action: Option<crate::PlacementBusinessActionKeyV1>,
+    },
     Placement {
         partition: CellReconciliationPartitionKey,
         work_class: CellReconciliationWorkClassV1,

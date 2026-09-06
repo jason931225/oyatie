@@ -60,6 +60,7 @@ enum RebalanceJobStateV1 {
   REBALANCE_JOB_STATE_V1_SUCCEEDED = 4;
   REBALANCE_JOB_STATE_V1_FAILED = 5;
   REBALANCE_JOB_STATE_V1_CANCELLED = 6;
+  REBALANCE_JOB_STATE_V1_CANCELLATION_REQUESTED = 7;
 }
 
 message RebalanceJobV1 {
@@ -83,4 +84,5 @@ message RebalanceJobV1 {
   RebalanceCandidateCursorV1 candidate_cursor = 16;
   RebalanceCandidateSnapshotV1 snapshot = 17;
   RebalanceBudgetAccountingV1 budget_accounting = 18;
+  string source_partition = 19;
 }

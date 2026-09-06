@@ -72,6 +72,7 @@ pub enum PlacementIntentPurposeV1 {
     Drain,
     Recovery,
     DeploymentPolicy,
+    SustainedCapacityBandCrossing,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

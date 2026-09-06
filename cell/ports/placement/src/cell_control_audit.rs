@@ -75,6 +75,12 @@ pub struct CellControlAuditRecordV1 {
 }
 
 impl CellControlAuditRecordV1 {
+    pub fn assemble_reconciliation(
+        _authority: &crate::CellControlReconciliationPersistenceAuthorityV1,
+        _parts: CellControlAuditRecordPartsV1,
+    ) -> Result<Self, PlacementContractError> {
+        Err(PlacementContractError::NotImplemented)
+    }
     pub fn assemble(
         _authority: &CellControlPersistenceAuthorityV1,
         _parts: CellControlAuditRecordPartsV1,

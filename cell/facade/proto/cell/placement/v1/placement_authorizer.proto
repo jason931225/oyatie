@@ -1,0 +1,123 @@
+syntax = "proto3";
+package cell.placement.v1;
+
+import "cell/placement/v1/authority.proto";
+import "cell/placement/v1/proof.proto";
+import "cell/placement/v1/placement.proto";
+import "tenancy/identity/v1/identity.proto";
+
+enum PlacementActionV1 {
+  PLACEMENT_ACTION_V1_UNSPECIFIED = 0;
+  PLACEMENT_ACTION_V1_READ_REBALANCE_REQUIREMENTS = 1;
+  PLACEMENT_ACTION_V1_SELECT_AND_RESERVE = 2;
+  PLACEMENT_ACTION_V1_ARM_RESERVATION = 3;
+  PLACEMENT_ACTION_V1_FINALIZE_RESERVATION_COMMIT_PERMIT = 4;
+  PLACEMENT_ACTION_V1_SCHEDULE_MOVEMENT = 5;
+  PLACEMENT_ACTION_V1_APPLY_BINDING_OUTCOME = 6;
+  PLACEMENT_ACTION_V1_APPLY_SOURCE_RESERVATION_RELEASE = 7;
+  PLACEMENT_ACTION_V1_GET_OPERATION = 8;
+  PLACEMENT_ACTION_V1_CANCEL_OPERATION = 9;
+  PLACEMENT_ACTION_V1_REPAIR_OPERATION = 10;
+}
+
+enum PlacementPolicyMappingV1 {
+  PLACEMENT_POLICY_MAPPING_V1_UNSPECIFIED = 0;
+  PLACEMENT_POLICY_MAPPING_V1_CELL_PLACEMENT_ACTION_RESOURCE = 1;
+}
+
+message PlacementActorEvidenceV1 {
+  string trust_domain = 1;
+  string subject = 2;
+  string credential_id = 3;
+  uint64 valid_from_unix_seconds = 4;
+  uint64 valid_until_unix_seconds = 5;
+  CellProofEnvelopeV1 envelope = 6;
+  bytes signature = 7;
+}
+
+message RebalanceBusinessOriginV1 {
+  string partition = 1;
+  string job_id = 2;
+  string evaluation_id = 3;
+}
+
+message PlacementBusinessOriginV1 {
+  oneof origin {
+    string direct_request_id = 1;
+    RebalanceBusinessOriginV1 rebalance = 2;
+  }
+}
+
+message PlacementBusinessActionKeyV1 {
+  PlacementBusinessOriginV1 origin = 1;
+  string action_id = 2;
+  tenancy.identity.v1.TenantId tenant_id = 3;
+  PlacementOperationKeyV1 operation = 4;
+  PlacementActionV1 action = 5;
+}
+
+message PlacementAuthorizationRequestV1 {
+  PlacementPolicyResourceV1 resource = 12;
+  PlacementPolicyMappingV1 mapping = 1;
+  PlacementActorEvidenceV1 actor = 2;
+  PlacementBusinessActionKeyV1 key = 3;
+  PlacementIntentPurposeV1 purpose = 4;
+  string realm = 5;
+  string jurisdiction = 6;
+  Digest32 business_digest = 7;
+  Digest32 dispatch_digest = 8;
+  bytes canonical_request = 9;
+  ProducerIdV1 audience = 10;
+  uint64 deadline_unix_seconds = 11;
+}
+
+enum PlacementPolicyResourceV1 {
+  PLACEMENT_POLICY_RESOURCE_V1_UNSPECIFIED = 0;
+  PLACEMENT_POLICY_RESOURCE_V1_PLACEMENT_OPERATION = 1;
+}
+
+message PlacementPolicyObligationV1 {
+  string obligation_id = 1;
+  uint32 schema_version = 2;
+  bytes canonical_requirement = 3;
+  bytes canonical_fulfillment = 4;
+}
+
+message PlacementPolicyDecisionEvidenceV1 {
+  PlacementAuthorizationRequestV1 request = 1;
+  string decision_id = 2;
+  string policy_version = 3;
+  repeated string determining_policy_ids = 4;
+  repeated PlacementPolicyObligationV1 obligations = 5;
+  bytes canonical_pdp_outcome = 6;
+  CellProofEnvelopeV1 envelope = 7;
+  bytes signature = 8;
+}
+
+message PlacementInvocationPayloadV1 {
+  uint32 schema_version = 1;
+  PlacementActionV1 action = 2;
+  tenancy.identity.v1.TenantId tenant_id = 3;
+  PlacementOperationKeyV1 operation = 4;
+  Digest32 canonical_request_digest = 5;
+  Digest32 actor_digest = 6;
+  AuthorizationDecisionReceiptV1 authorization = 7;
+  uint64 deadline_unix_seconds = 8;
+  PlacementPolicyDecisionEvidenceV1 authorization_evidence = 9;
+}
+
+message SignedPlacementInvocationV1 {
+  PlacementInvocationPayloadV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message PlacementAuthorizationTrustV1 {
+  ProducerIdV1 identity_producer = 1;
+  ProducerIdV1 decision_producer = 2;
+  ProducerIdV1 audience = 3;
+  Digest32 custody_configuration_digest = 4;
+  PlacementPolicyMappingV1 admitted_mapping = 5;
+  string exact_policy_version = 6;
+  uint64 now_unix_seconds = 7;
+}

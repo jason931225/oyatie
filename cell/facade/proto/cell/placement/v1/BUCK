@@ -4,6 +4,16 @@ export_file(
 )
 
 export_file(
+    name = "placement_authorizer.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "movement_authority.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "authority.proto",
     visibility = ["PUBLIC"],
 )

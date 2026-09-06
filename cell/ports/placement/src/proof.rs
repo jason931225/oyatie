@@ -67,6 +67,11 @@ pub enum CellProofDomainV1 {
     DrainContributorSeal,
     DrainContributorSealCommitAttestation,
     CellControlRepairAuthority,
+    PlacementActor,
+    PlacementPolicyDecision,
+    RebalanceSourceCommit,
+    MovementActionClosure,
+    MovementActionResult,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

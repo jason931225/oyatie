@@ -91,6 +91,8 @@ pub struct MovementBudgetSettlementWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct MovementBudgetSettlementWriteSetPartsV1 {
+    pub result_precondition: crate::MovementActionResultPreconditionV1,
+    pub result: crate::MovementActionResultV1,
     pub authority: PlacementReconciliationPersistenceAuthorityV1,
     pub leaf_authority_precondition: MovementBudgetAuthorityPreconditionV1,
     pub next_leaf_authority_state: MovementBudgetAuthorityStateV1,

@@ -61,10 +61,12 @@ pub enum RebalanceJobStateV1 {
     Succeeded,
     Failed,
     Cancelled,
+    CancellationRequested,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceJobV1 {
+    pub source_partition: crate::RebalanceJobPartitionV1,
     pub job_id: RebalanceJobId,
     pub partition: PlacementPartitionV1,
     pub trigger: RebalanceTriggerV1,
@@ -100,6 +102,7 @@ pub struct RebalanceJobWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct RebalanceJobWriteSetPartsV1 {
+    pub source_partition: crate::RebalanceJobPartitionV1,
     pub authority: CellControlPersistenceAuthorityV1,
     pub precondition: RebalanceJobPreconditionV1,
     pub job: RebalanceJobV1,
@@ -131,7 +134,7 @@ pub trait RebalanceJobStore: Send + Sync {
     fn get<'a>(
         &'a self,
         authority: &'a CellControlReadAuthorityV1,
-        partition: &'a PlacementPartitionV1,
+        partition: &'a crate::RebalanceJobPartitionV1,
         job_id: &'a RebalanceJobId,
     ) -> BoxCellFuture<'a, Result<Option<RebalanceJobV1>, PlacementContractError>>;
 }

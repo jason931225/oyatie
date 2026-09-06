@@ -14,6 +14,8 @@ pub struct MovementBudgetGrantWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct MovementBudgetGrantWriteSetPartsV1 {
+    pub result_precondition: crate::MovementActionResultPreconditionV1,
+    pub result: crate::MovementActionResultV1,
     pub authority: PlacementPersistenceAuthorityV1,
     pub leaf_authority_precondition: MovementBudgetAuthorityPreconditionV1,
     pub next_leaf_authority_state: MovementBudgetAuthorityStateV1,

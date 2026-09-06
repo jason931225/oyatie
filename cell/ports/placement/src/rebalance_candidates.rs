@@ -114,6 +114,7 @@ pub struct RebalanceCandidateRequirementsV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceCandidateRequirementsRequestV1 {
+    pub action: crate::PlacementBusinessActionKeyV1,
     pub snapshot: RebalanceCandidateSnapshotV1,
     pub candidate: RebalanceCandidateV1,
     pub maximum_encoded_bytes: u64,

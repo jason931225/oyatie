@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package cell.placement.v1;
+import "cell/placement/v1/placement_authorizer.proto";
 
 import "cell/placement/v1/assurance.proto";
 import "cell/placement/v1/capacity.proto";
@@ -99,6 +100,7 @@ message RebalanceCandidateRequirementsV1 {
 }
 
 message RebalanceCandidateRequirementsRequestV1 {
+  PlacementBusinessActionKeyV1 action = 5;
   RebalanceCandidateSnapshotV1 snapshot = 1;
   RebalanceCandidateV1 candidate = 2;
   uint64 maximum_encoded_bytes = 3;
