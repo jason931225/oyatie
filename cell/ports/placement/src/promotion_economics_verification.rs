@@ -275,6 +275,13 @@ pub trait PromotionEconomicsCheckpointCommitObserver: Send + Sync {
 /// never copied out of the claim: a claim that supplies its own expectation
 /// proves nothing.
 ///
+/// The three identity fields have a source: the observer admission on the
+/// policy. Before that admission existed this type could not be populated by
+/// the one caller that must build it — `advance_cell_promotion_economics`
+/// constructs this expectation itself, and no input it held named an observer.
+/// A verifier holding an expectation nothing can fill is the same non-check one
+/// level down: rigorous-looking, comparing against nothing.
+///
 /// There is deliberately NO `expected_checkpoint_digest`. A caller resuming
 /// after a crash does not know what digest it is about to find — discovering
 /// retained progress is the point — so requiring one would either be
@@ -287,8 +294,15 @@ pub struct PromotionEconomicsCheckpointExpectationV1 {
     pub expected_cell: CellRevisionIdentityV1,
     pub expected_registry_digest: Digest32,
     pub expected_policy_digest: Digest32,
+    /// All three identity fields are populated from
+    /// [`crate::PromotionEconomicsPolicyV1::checkpoint_observer`], the cell's
+    /// admission of the observer, which the verified closure's `policy_digest`
+    /// commits. They are never taken from the observation being checked: an
+    /// expectation copied out of its own subject compares a value against
+    /// itself.
     pub expected_producer: ProducerId,
     pub expected_audience: ProducerId,
+    pub expected_signing_key_id: crate::KeyId,
     pub now_unix_seconds: u64,
 }
 

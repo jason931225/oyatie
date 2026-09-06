@@ -21,7 +21,8 @@
 
 use crate::{
     CapacityAmountV1, CapacityDimensionV1, CellRevisionIdentityV1, CommercialSourceRecordRefV1,
-    CurrencyCode, Digest32, ImmutableEvidenceRefV1, MoneyMicrounitsV1, ReservationRefV1,
+    CurrencyCode, Digest32, ImmutableEvidenceRefV1, KeyId, MoneyMicrounitsV1, ProducerId,
+    ReservationRefV1,
 };
 
 /// Half-open observation window `[start, end)`.
@@ -236,6 +237,64 @@ pub struct PromotionEconomicsPolicyV1 {
     pub maximum_concurrent_steps_per_partition: u32,
     pub checkpoint_lease_seconds: u64,
     pub minimum_retention_seconds: u64,
+    /// The signing identity the checkpoint commit observer must present.
+    ///
+    /// It lives on the POLICY, not on the replay ports bundle, and the
+    /// difference is the whole safety property. See
+    /// [`PromotionEconomicsCheckpointObserverAdmissionV1`].
+    pub checkpoint_observer: PromotionEconomicsCheckpointObserverAdmissionV1,
+}
+
+/// The cell's admission of the checkpoint commit observer's signing identity.
+///
+/// # Why this is on the policy and not on the ports bundle
+///
+/// The module's whole answer to "a dishonest observer is caught" is that its
+/// observation is signed under its own proof domain and checked against an
+/// expected producer and audience it cannot forge. That argument only holds if
+/// the EXPECTED identity comes from somewhere the caller cannot choose.
+///
+/// A member of [`crate::PromotionEconomicsReplayPortsV1`] would not be such a
+/// place. The bundle is assembled per call, so a caller supplying a dishonest
+/// observer would supply its matching identity in the same breath and the check
+/// would pass — the A3 steering hazard in a new coat, verifying a signature
+/// against whatever the signer nominated.
+///
+/// The policy is different in kind, and the chain is worth stating because a
+/// reader who sees only "identity lives in policy" will read it as another
+/// per-call plain argument:
+///
+/// 1. `advance_cell_promotion_economics` compares its `policy` argument against
+///    `closure.policy_digest`.
+/// 2. `closure` is a [`crate::VerifiedPromotionEconomicsClosure`] — a
+///    private-field wrapper only the closure issuer mints.
+/// 3. The issuer resolves its policy from native cell policy at admission, not
+///    from anything a caller passes.
+///
+/// So substituting an observer identity changes `policy_digest`, which
+/// mismatches a closure the caller cannot forge, and the substitution fails
+/// before any observation is examined. The identity is reachable and it is not
+/// caller-chosen.
+///
+/// This mirrors how the module already admits SOURCE identities:
+/// [`crate::PromotionEconomicsSourceAdmissionV1`] carries a producer and an
+/// `expected_signing_key_id` per admitted scope. Sources are admitted per scope
+/// through the registry; the checkpoint observer is one port per cell, so it is
+/// admitted once, here.
+///
+/// # Operational coupling, stated rather than discovered
+///
+/// Because the identity is committed by the policy digest, ROTATING THE
+/// OBSERVER'S SIGNING KEY REQUIRES A NEW POLICY GENERATION. That is the same
+/// coupling admitted sources already have through `admission_generation`, and
+/// it is the price of the property above: an identity that can be changed
+/// without changing the policy identity is an identity a caller can change.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromotionEconomicsCheckpointObserverAdmissionV1 {
+    pub producer: ProducerId,
+    pub audience: ProducerId,
+    pub expected_signing_key_id: KeyId,
+    pub admission_digest: Digest32,
 }
 
 /// Per-category totals over the retained population.

@@ -121,6 +121,18 @@ message PromotionEconomicsPolicyV1 {
   uint32 maximum_concurrent_steps_per_partition = 18;
   uint64 checkpoint_lease_seconds = 19;
   uint64 minimum_retention_seconds = 20;
+  // On the policy, not on a per-call ports bundle: the policy digest is
+  // committed by a verified closure the caller cannot forge, so the admitted
+  // observer identity is not caller-chosen. Rotating the observer's key is
+  // therefore a policy generation bump.
+  PromotionEconomicsCheckpointObserverAdmissionV1 checkpoint_observer = 21;
+}
+
+message PromotionEconomicsCheckpointObserverAdmissionV1 {
+  ProducerIdV1 producer = 1;
+  ProducerIdV1 audience = 2;
+  KeyIdV1 expected_signing_key_id = 3;
+  Digest32 admission_digest = 4;
 }
 
 message PromotionCostCategoryTotalV1 {
@@ -456,6 +468,7 @@ message PromotionEconomicsCheckpointExpectationV1 {
   ProducerIdV1 expected_producer = 5;
   ProducerIdV1 expected_audience = 6;
   uint64 now_unix_seconds = 7;
+  KeyIdV1 expected_signing_key_id = 8;
 }
 
 message PromotionEconomicsCheckpointLeaseExpectationV1 {
