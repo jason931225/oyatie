@@ -6,11 +6,23 @@ use crate::{
 
 /// Failures of the serving-authority store.
 ///
-/// Variants are ordered from most specific to least. An implementation MUST
-/// return the most specific variant that applies; [`Self::Conflict`] is the
-/// residual for precondition failures no other variant names. Two variants
-/// never describe the same situation — where two could plausibly apply, the
-/// boundary is stated on both.
+/// An implementation MUST return the most specific variant that applies;
+/// [`Self::Conflict`] is the residual for precondition failures no other
+/// variant names. Two variants never describe the same situation — where two
+/// could plausibly apply, the boundary is stated on both, and any ordering
+/// between them that matters is stated there too (for example
+/// [`Self::ScopeMismatch`] is evaluated before any precondition, so it never
+/// competes with [`Self::Conflict`]).
+///
+/// DECLARATION ORDER CARRIES NO MEANING. An earlier version of this header
+/// claimed the variants ran from most specific to least; they did not, and the
+/// residual sat third of fifteen. The claim is dropped rather than the list
+/// resorted, because specificity here is a partial order and not a total one:
+/// `PageLimitExceeded` and `StaleIncarnation` are not comparable, and
+/// "evaluated first" and "most specific" are different axes that the old
+/// wording conflated. Asserting a total order invites a future editor to
+/// restore an order that cannot exist. What is enforceable is the MUST above
+/// and the per-variant boundaries below.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ServingAuthorityStoreError {
     /// No implementation exists yet. Every method of this contract returns this
