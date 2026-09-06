@@ -24,6 +24,11 @@ export_file(
 )
 
 export_file(
+    name = "cell_revision.proto",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "compatibility.proto",
     visibility = ["PUBLIC"],
 )

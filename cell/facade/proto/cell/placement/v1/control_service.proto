@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package cell.placement.v1;
 
+import "cell/placement/v1/cell_revision.proto";
 import "cell/placement/v1/compatibility.proto";
 import "cell/placement/v1/control_operation.proto";
 import "cell/placement/v1/control_repair.proto";

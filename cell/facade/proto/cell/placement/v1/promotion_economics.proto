@@ -3,7 +3,7 @@ syntax = "proto3";
 package cell.placement.v1;
 
 import "cell/placement/v1/capacity.proto";
-import "cell/placement/v1/compatibility.proto";
+import "cell/placement/v1/cell_revision.proto";
 import "cell/placement/v1/economics.proto";
 import "cell/placement/v1/evidence.proto";
 import "cell/placement/v1/proof.proto";

@@ -2,8 +2,10 @@ syntax = "proto3";
 
 package cell.placement.v1;
 
+import "cell/placement/v1/cell_revision.proto";
 import "cell/placement/v1/evidence.proto";
 import "cell/placement/v1/lifecycle.proto";
+import "cell/placement/v1/promotion_economics.proto";
 import "cell/placement/v1/proof.proto";
 
 message ProtocolVersionRangeV1 {
@@ -83,23 +85,6 @@ message RegionalRolloutCompatibilityEvidenceV1 {
   Digest32 compatibility_record_digest = 6;
 }
 
-message CellRevisionIdentityV1 {
-  CellId cell_id = 1;
-  Digest32 cell_identity_digest = 2;
-  string deployment_unit_id = 3;
-  uint64 spec_revision = 4;
-  Digest32 spec_digest = 5;
-  Digest32 resource_digest = 6;
-  uint64 lifecycle_revision = 7;
-  uint64 admission_epoch = 8;
-  uint64 capacity_revision = 9;
-  Digest32 capacity_record_digest = 10;
-  Digest32 topology_inventory_digest = 11;
-  Digest32 resilience_objective_digest = 12;
-  Digest32 capability_inventory_digest = 13;
-  Digest32 revision_identity_digest = 14;
-}
-
 message TwoCellIsolationEvidenceV1 {
   CellRevisionIdentityV1 subject = 1;
   CellRevisionIdentityV1 counterpart = 2;
@@ -117,11 +102,18 @@ message PromotionMetricPopulationV1 {
 }
 
 message CellPromotionMetricsV1 {
+  // Tags 4, 5 and 28 carried the unreplayable economics scalar
+  // (unit_cost_microunits + currency) and the opaque economics_evidence
+  // reference. They are replaced by `economics` at tag 32, which commits the
+  // full closure-backed record. This is an INCOMPATIBLE promotion proof
+  // contract correction: an old signed payload fails required-economics
+  // presence and does not upgrade by defaults, so release compatibility
+  // declarations must reflect it before any runtime writer activates.
+  reserved 4, 5, 28;
+  reserved "unit_cost_microunits", "currency", "economics_evidence";
   ImmutableEvidenceRefV1 slo_snapshot = 1;
   TwoCellIsolationEvidenceV1 two_cell_isolation_evidence = 2;
   ImmutableEvidenceRefV1 failure_injection_evidence = 3;
-  uint64 unit_cost_microunits = 4;
-  string currency = 5;
   uint32 stranded_headroom_basis_points = 6;
   uint32 recovery_reserve_headroom_basis_points = 7;
   uint64 reservation_leakage_count = 8;
@@ -144,10 +136,13 @@ message CellPromotionMetricsV1 {
   PromotionMetricPopulationV1 tenant_population = 25;
   PromotionMetricPopulationV1 reservation_population = 26;
   PromotionMetricPopulationV1 movement_population = 27;
-  ImmutableEvidenceRefV1 economics_evidence = 28;
   ImmutableEvidenceRefV1 slo_threshold_policy = 29;
+  // The general metric calculation policy above governs the other metrics
+  // only. economics.policy governs economics and is not a second authority
+  // for anything else.
   string calculation_policy_version = 30;
   Digest32 calculation_policy_digest = 31;
+  CellPromotionEconomicsV1 economics = 32;
 }
 
 message CellPromotionEvidencePayloadV1 {

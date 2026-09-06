@@ -175,13 +175,22 @@ pub struct CellPromotionMetricsV1 {
     pub tenant_population: PromotionMetricPopulationV1,
     pub reservation_population: PromotionMetricPopulationV1,
     pub movement_population: PromotionMetricPopulationV1,
-    pub economics_evidence: ImmutableEvidenceRefV1,
+    /// The reproducible, closure-backed promotion economics record.
+    ///
+    /// This replaces the previous `economics_evidence` reference plus the
+    /// `unit_cost_microunits` / `currency` scalar pair. A scalar with an opaque
+    /// reference cannot be replayed: its cost scope was unnamed, so excluding
+    /// reserve, idle, network or control cost lowered it without changing any
+    /// declared field, and its denominator was not stated at all.
+    ///
+    /// `economics.policy` governs economics ONLY. It is not a second authority
+    /// for the general metric calculation policy below, which continues to
+    /// govern every other metric and population on this record.
+    pub economics: crate::CellPromotionEconomicsV1,
     pub slo_threshold_policy: ImmutableEvidenceRefV1,
     pub calculation_policy_version: String,
     pub calculation_policy_digest: Digest32,
     pub regional_rollout_compatibility: RegionalRolloutCompatibilityEvidenceV1,
-    pub unit_cost_microunits: u64,
-    pub currency: crate::CurrencyCode,
     pub stranded_headroom_basis_points: u32,
     pub recovery_reserve_headroom_basis_points: u32,
     pub reservation_leakage_count: u64,
@@ -235,6 +244,17 @@ pub struct CellPromotionEvidenceExpectationV1 {
     pub required_release_owner_root_digest: Digest32,
     pub required_release_owner_count: u64,
     pub expected_policy_generation: u64,
+    /// The approved economics policy and the cell-issued source closure this
+    /// promotion must have been priced under.
+    ///
+    /// Both are supplied by the calling policy loader from trusted finalized
+    /// cell accounting inputs and from
+    /// [`crate::PromotionEconomicsClosureAuthority`]. Neither is ever copied
+    /// out of the submitted promotion proof: a promoter that supplies its own
+    /// expectation has proved nothing, and a promoter that assembles a smaller
+    /// self-signed closure must fail against an independently selected one.
+    pub economics_policy_digest: Digest32,
+    pub economics_closure_digest: Digest32,
     pub expected_producer: ProducerId,
     pub expected_audience: ProducerId,
     pub now_unix_seconds: u64,
@@ -251,9 +271,32 @@ pub fn verify_owner_release_compatibility(
     Err(ProofVerificationError::NotImplemented)
 }
 
+/// Verifies a signed cell promotion proof.
+///
+/// The `economics` argument is the private-field proof that a complete bounded
+/// replay of the promotion economics record actually finished. It is required,
+/// not optional: without it this function would once again be trusting a
+/// number carried inside the payload it is verifying. The gate checks that
+/// `economics.evidence()` equals `signed.payload.metrics.economics` exactly,
+/// and that its cell revision, window, policy digest and closure digest match
+/// the expectation, whose economics digests came from trusted state rather
+/// than from the proof.
+///
+/// A missing or stale replay proof therefore cannot produce a
+/// [`VerifiedCellPromotionEvidence`], and verified economics for one proof
+/// cannot be substituted into another. Economics replay reports its own
+/// precise refusals through
+/// [`crate::PromotionEconomicsVerificationErrorV1`] before this gate is
+/// reached; here a mismatch is `RelationMismatch` and the existing typed
+/// errors continue to cover unsupported and expired proofs.
+///
+/// Verified economics is not itself a mutation authority and not a
+/// transferable standalone promotion permit. The control service still
+/// rechecks the current revision, readiness and policy on its own.
 pub fn verify_cell_promotion_evidence(
     _verifier: &dyn CellProofVerifier,
     _signed: SignedCellPromotionEvidenceV1,
+    _economics: &crate::VerifiedCellPromotionEconomics,
     _expectation: &CellPromotionEvidenceExpectationV1,
 ) -> Result<VerifiedCellPromotionEvidence, ProofVerificationError> {
     Err(ProofVerificationError::NotImplemented)

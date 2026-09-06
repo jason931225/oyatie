@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package cell.placement.v1;
+
+import "cell/placement/v1/proof.proto";
+
+// Extracted verbatim from compatibility.proto. Package, message name and all
+// fourteen field numbers are unchanged, so this is a source move and not a
+// wire change.
+//
+// The extraction is forced by the promotion economics gate. compatibility.proto
+// must import promotion_economics.proto to carry CellPromotionEconomicsV1 on
+// CellPromotionMetricsV1, and promotion_economics.proto needs
+// CellRevisionIdentityV1. Leaving the identity in compatibility.proto would
+// make those two files import each other. Both now depend on this leaf, which
+// depends only on proof.proto.
+message CellRevisionIdentityV1 {
+  CellId cell_id = 1;
+  Digest32 cell_identity_digest = 2;
+  string deployment_unit_id = 3;
+  uint64 spec_revision = 4;
+  Digest32 spec_digest = 5;
+  Digest32 resource_digest = 6;
+  uint64 lifecycle_revision = 7;
+  uint64 admission_epoch = 8;
+  uint64 capacity_revision = 9;
+  Digest32 capacity_record_digest = 10;
+  Digest32 topology_inventory_digest = 11;
+  Digest32 resilience_objective_digest = 12;
+  Digest32 capability_inventory_digest = 13;
+  Digest32 revision_identity_digest = 14;
+}
