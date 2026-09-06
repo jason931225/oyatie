@@ -7,19 +7,35 @@ pub struct MovementActionResultKeyV1 {
     pub business_digest: Digest32,
 }
 
+/// The typed address of one movement-action closure.
+///
+/// This is the closure's identity, separated from its content so that it can
+/// be named on its own by
+/// [`RebalanceSourceCommitSubjectV1::MovementActionClosure`]. The peer
+/// [`RebalanceIssuanceAddressV1`] plays the same role for the other subject a
+/// rebalance-source commit observation can witness, so both subjects are
+/// compared as one typed address rather than field by field.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MovementActionClosureV1 {
+pub struct MovementActionClosureAddressV1 {
     pub source: RebalanceJobAddressV1,
     pub key: MovementActionResultKeyV1,
     pub closure_id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MovementActionClosureV1 {
+    pub address: MovementActionClosureAddressV1,
     pub closed_action_revision: u64,
     pub record_digest: Digest32,
 }
 
+/// A durable closure record together with the observation that witnesses its
+/// commit. The observation's subject is what binds the two together; see
+/// [`RebalanceSourceCommitSubjectV1`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommittedMovementActionClosureV1 {
     pub closure: MovementActionClosureV1,
-    pub commit: RebalanceSourceCommitEvidenceV1,
+    pub commit: SignedRebalanceSourceCommitObservationV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]

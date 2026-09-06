@@ -173,20 +173,31 @@ message PlacementDispatchInputV1 {
   RebalanceJobClaimV1 claim = 10;
 }
 
-message RebalanceSourceCommitEvidenceV1 {
-  RebalanceJobAddressV1 address = 1;
+message RebalanceSourceCommitSubjectV1 {
+  oneof subject {
+    RebalanceIssuanceAddressV1 invocation_issuance = 1;
+    MovementActionClosureAddressV1 movement_action_closure = 2;
+  }
+}
+
+message RebalanceSourceCommitObservationV1 {
+  RebalanceSourceCommitSubjectV1 subject = 1;
   uint64 committed_job_revision = 2;
   uint64 claim_epoch_at_commit = 3;
   Digest32 record_digest = 4;
   string transaction_id = 5;
   uint64 committed_at_unix_seconds = 6;
-  CellProofEnvelopeV1 envelope = 7;
-  bytes signature = 8;
+}
+
+message SignedRebalanceSourceCommitObservationV1 {
+  RebalanceSourceCommitObservationV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
 }
 
 message CommittedRebalanceIssuanceV1 {
   RebalanceInvocationIssuanceV1 issuance = 1;
-  RebalanceSourceCommitEvidenceV1 commit = 2;
+  SignedRebalanceSourceCommitObservationV1 commit = 2;
 }
 
 message RebalanceActionPageQueryV1 {
@@ -208,17 +219,21 @@ message MovementActionResultKeyV1 {
   Digest32 business_digest = 3;
 }
 
-message MovementActionClosureV1 {
+message MovementActionClosureAddressV1 {
   RebalanceJobAddressV1 source = 1;
   MovementActionResultKeyV1 key = 2;
   string closure_id = 3;
-  uint64 closed_action_revision = 4;
-  Digest32 record_digest = 5;
+}
+
+message MovementActionClosureV1 {
+  MovementActionClosureAddressV1 address = 1;
+  uint64 closed_action_revision = 2;
+  Digest32 record_digest = 3;
 }
 
 message CommittedMovementActionClosureV1 {
   MovementActionClosureV1 closure = 1;
-  RebalanceSourceCommitEvidenceV1 commit = 2;
+  SignedRebalanceSourceCommitObservationV1 commit = 2;
 }
 
 message SignedMovementActionClosureV1 {
@@ -358,7 +373,7 @@ message RebalanceClaimWriteSetPartsV1 {
 }
 
 message RebalanceCommitExpectationV1 {
-  RebalanceJobAddressV1 address = 1;
+  RebalanceSourceCommitSubjectV1 expected_subject = 1;
   Digest32 expected_record_digest = 2;
   ProducerIdV1 producer = 3;
   ProducerIdV1 audience = 4;

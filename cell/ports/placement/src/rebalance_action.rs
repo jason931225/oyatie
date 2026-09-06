@@ -176,22 +176,60 @@ pub fn digest_placement_dispatch(
     Err(PlacementContractError::NotImplemented)
 }
 
+/// Which durable record a rebalance-source commit observation witnesses.
+///
+/// The rebalance source commits two structurally different records under the
+/// same job and the same claim: an invocation issuance
+/// ([`RebalanceInvocationIssuanceV1`], addressed by
+/// [`RebalanceIssuanceAddressV1`]) and a movement-action closure
+/// ([`MovementActionClosureV1`], addressed by
+/// [`MovementActionClosureAddressV1`]).
+///
+/// Both are witnessed under the single proof domain
+/// [`CellProofDomainV1::RebalanceSourceCommit`], so the subject MUST live
+/// inside the signed payload. Without it the two witnesses differ only in the
+/// value of an untyped `record_digest`, an observation minted for one subject
+/// is a well-formed observation of the other, and a verifier has no typed
+/// ground on which to refuse. Naming the subject makes the two payloads
+/// distinct preimages and gives
+/// [`RebalanceCommitExpectationV1::expected_subject`] something to compare.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RebalanceSourceCommitEvidenceV1 {
-    pub address: RebalanceJobAddressV1,
+pub enum RebalanceSourceCommitSubjectV1 {
+    InvocationIssuance(Box<RebalanceIssuanceAddressV1>),
+    MovementActionClosure(Box<MovementActionClosureAddressV1>),
+}
+
+/// What a rebalance-source commit observer asserts it read, under committed
+/// read isolation, about one named subject.
+///
+/// `record_digest` is the digest of the durable record the observer actually
+/// found at `subject`; it is meaningful only in combination with `subject`,
+/// never on its own.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RebalanceSourceCommitObservationV1 {
+    pub subject: RebalanceSourceCommitSubjectV1,
     pub committed_job_revision: u64,
     pub claim_epoch_at_commit: u64,
     pub record_digest: Digest32,
     pub transaction_id: String,
     pub committed_at_unix_seconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedRebalanceSourceCommitObservationV1 {
+    pub payload: RebalanceSourceCommitObservationV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
 
+/// A durable issuance record together with the observation that witnesses its
+/// commit. This is a claim, not evidence: only
+/// [`verify_committed_rebalance_issuance`] turns it into the private-field
+/// [`VerifiedCommittedRebalanceIssuance`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommittedRebalanceIssuanceV1 {
     pub issuance: RebalanceInvocationIssuanceV1,
-    pub commit: RebalanceSourceCommitEvidenceV1,
+    pub commit: SignedRebalanceSourceCommitObservationV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -204,9 +242,16 @@ impl VerifiedCommittedRebalanceIssuance {
     }
 }
 
+/// What a caller requires of a rebalance-source commit observation.
+///
+/// `expected_subject` is the whole point of the type: a verifier is obliged to
+/// refuse an observation whose payload subject is not equal to this one, so a
+/// witness for an invocation issuance can never satisfy a closure check and the
+/// converse also fails. `expected_record_digest` is then compared only within
+/// that already-agreed subject.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceCommitExpectationV1 {
-    pub address: RebalanceJobAddressV1,
+    pub expected_subject: RebalanceSourceCommitSubjectV1,
     pub expected_record_digest: Digest32,
     pub producer: ProducerId,
     pub audience: ProducerId,
