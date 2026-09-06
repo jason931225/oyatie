@@ -48,7 +48,27 @@ pub struct LocalCommitRevisionV1(pub u64);
 /// only operations. Comparing a numeric epoch alone cannot distinguish a
 /// replaced incarnation from the one it replaced, which is why this is not
 /// folded into [`LocalAuthorityFenceV1`].
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+///
+/// Two incarnations are incomparable. They are distinct identities of which
+/// at most one serves, not two points on a scale, and the bytes are
+/// independently generated rather than issued in a sequence. Deriving an
+/// ordering would invite a future implementation to write a comparison that
+/// reads as a recency test — take the greater of two incarnations, or check
+/// that an observed one is not less than the installed one — and get a
+/// confident answer to a question the bytes cannot answer. A replaced
+/// incarnation may sort either side of its replacement. The only sound test
+/// is identity against the installed instance, plus membership in durable
+/// rejection state.
+///
+/// `Eq` and `Hash` are therefore the derives the semantics justify, and they
+/// are deliberate rather than incidental: `Eq` is that identity test, and
+/// `Hash` lets an implementation hold observed incarnations in a set while it
+/// reconciles them against the rejection root and count that the store
+/// durably owns. Byte order carries no rank.
+///
+/// The Tenancy counterpart this projects, `ServingAuthorityIncarnationV1`,
+/// likewise derives no ordering.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ProjectedServingIncarnationV1(Vec<u8>);
 
 impl ProjectedServingIncarnationV1 {
