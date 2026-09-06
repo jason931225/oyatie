@@ -171,12 +171,19 @@ pub trait BindingControlContributionIssuer: Send + Sync {
 /// Independently observes a committed binding control contribution and signs
 /// what it read.
 ///
-/// `SignedBindingControlContributionCommitV1` occurred at exactly two sites in
-/// both crates -- its own definition and the `attestation` member of the claim
-/// returned by [`BindingControlContributionSourceStore::load_committed`] --
-/// while having a proof domain, a proto tag, a verifier, an expectation and a
-/// `VerifiedBindingProofRefV1` arm. Everything but a producer. This port is
-/// that producer, and it is the fourth instance of the same shape on this lane.
+/// `SignedBindingControlContributionCommitV1` had a proof domain, a proto tag, a
+/// verifier, an expectation and a `VerifiedBindingProofRefV1` arm -- everything
+/// but a producer. This port is that producer, and it is the fourth instance of
+/// the same shape on this lane.
+///
+/// The type now occurs at three sites: its own definition, the `attestation`
+/// member of [`crate::CommittedBindingControlContributionClaimV1`], and this
+/// port's return. It is NOT reachable through
+/// [`BindingControlContributionSourceStore::load_committed`], which returns the
+/// projection and never the claim -- see that method's own documentation for
+/// why. An earlier version of this comment said the opposite, describing the
+/// pre-fix shape; the two were written in the same commit and the doc was not
+/// updated when the loader was.
 ///
 /// Separate from the source store on purpose: the party that committed the
 /// contribution must not be the party that attests it committed. Accepts a
