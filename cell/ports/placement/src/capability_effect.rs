@@ -8,8 +8,7 @@
 
 use crate::{
     CellId, CellProofEnvelopeV1, CurrencyCode, Digest32, DrainContributorStateMutationV1,
-    PlacementContractError, ProducerId, ProofConstructionError, TenantId,
-    VerifiedCapabilityEffectGrantV1,
+    ProducerId, ProofConstructionError, TenantId, VerifiedCapabilityEffectGrantV1,
 };
 
 macro_rules! opaque_id {
@@ -230,12 +229,48 @@ pub struct CapabilityEffectExpectationV1 {
     pub expected_authority_context_digest: Digest32,
 }
 
+/// What the durable authority record says the participant may do next.
+///
+/// Action-to-disposition, which is a DIFFERENT relation from the
+/// action-to-context matrix on [`CapabilityEffectActionV1`]: that one says
+/// which authority may request an action, this one says which record the
+/// action leaves behind. A grant can satisfy the first and still be refused
+/// by the second.
+///
+///   Prepare             -> `Prepared`, from no record at all.
+///   Activate            -> `Writable`, from `Prepared` only.
+///   Write               -> `Writable` unchanged. A Write that would change
+///                          the disposition is not a Write.
+///   Fence               -> `Fenced`, and monotonically: no action returns a
+///                          record from `Fenced` to `Writable`. Only an
+///                          authenticated higher owner authority, installed
+///                          afresh, serves again.
+///   Release             -> `Released`. TERMINAL.
+///   PreparationCleanup  -> `PreparationDiscarded`, from `Prepared` only.
+///                          TERMINAL.
+///   Transfer            -> the disposition is unchanged, because a transfer
+///                          targets staged data and cannot activate it.
+///
+/// Transitions the source documents do not state are NOT invented here and
+/// remain owner-decided: notably whether Transfer is admissible from
+/// `Fenced`, and whether a `Fenced` record may be released directly or must
+/// first be reinstalled.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum LocalAuthorityDispositionV1 {
     Prepared,
     Writable,
     Fenced,
+    /// Terminal, reached only by `Release` under installed authority.
     Released,
+    /// Terminal, reached only by `PreparationCleanup` under preparation
+    /// authority.
+    ///
+    /// It exists because `PreparationCleanup` was given no terminal state when
+    /// it was introduced. Mapping it onto `Released` would have made a
+    /// discarded preparation indistinguishable, in the durable record and in
+    /// the audit trail, from a real installed-authority retirement, which is
+    /// the confusion that action was created to prevent.
+    PreparationDiscarded,
 }
 
 /// Durable rejection membership retained by the capability store.
@@ -253,34 +288,26 @@ pub struct CapabilityAuthorityRejectionHighWaterV1 {
     pub record_digest: Digest32,
 }
 
-/// Durable local authority state.
+/// The durable local authority record.
 ///
-/// Fields are private and the assembler is the only mint, so no caller can
-/// hand a store a state record it did not read.
-#[derive(Debug, Eq, PartialEq)]
-pub struct LocalAuthorityStateV1 {
-    parts: LocalAuthorityStatePartsV1,
-}
-
+/// Fields are public, matching the peer durable-state records in this crate
+/// and in the binding crate. This type carries no signature and has no
+/// verifier: its integrity comes from the capability's own transaction, not
+/// from a check anyone could run on it. A private field with no mint would
+/// protect nothing and would make the record unwritable by the out-of-crate
+/// adapter that has to write it.
+///
+/// It deliberately does NOT embed the rejection high water. That is a
+/// separately revisioned durable row, carried beside this one in the same
+/// commit; embedding a copy of it here would let its revision advance while
+/// this record's `record_digest` still covered the stale snapshot.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct LocalAuthorityStatePartsV1 {
+pub struct LocalAuthorityStateV1 {
     pub scope: CapabilityEffectScopeV1,
     pub context: CapabilityAuthorityContextV1,
     pub disposition: LocalAuthorityDispositionV1,
-    pub rejection_high_water: CapabilityAuthorityRejectionHighWaterV1,
     pub revision: LocalCommitRevisionV1,
     pub record_digest: Digest32,
-}
-
-impl LocalAuthorityStateV1 {
-    pub fn assemble(_parts: LocalAuthorityStatePartsV1) -> Result<Self, PlacementContractError> {
-        Err(PlacementContractError::NotImplemented)
-    }
-
-    #[must_use]
-    pub fn parts(&self) -> &LocalAuthorityStatePartsV1 {
-        &self.parts
-    }
 }
 
 /// Compare-and-set precondition for the local authority record.
@@ -305,6 +332,26 @@ pub enum LocalAuthorityPreconditionV1 {
 pub struct LocalEffectCommitRequestV1<E> {
     pub authority: VerifiedCapabilityEffectGrantV1,
     pub precondition: LocalAuthorityPreconditionV1,
+    /// The authority record this effect leaves behind.
+    ///
+    /// Never optional. Every admitted action writes a record, terminals
+    /// included: `LocalAuthorityPreconditionV1::Absent` describes only the
+    /// state before a participant's first `Prepare`, never a state an action
+    /// returns to. A terminal disposition retains the row so that a later
+    /// request cannot read absence and start over.
+    ///
+    /// Its `disposition` must be the one the grant's action produces, per
+    /// [`LocalAuthorityDispositionV1`]. The store recomputes that rather than
+    /// trusting the caller.
+    pub next_state: LocalAuthorityStateV1,
+    /// The rejection membership this effect leaves behind, carried separately
+    /// because it is a separately revisioned row, exactly as the peer serving
+    /// authority write sets carry theirs.
+    ///
+    /// A Fence records rejection membership and the state mutation in one
+    /// commit; an action that rejects nothing still restates the high water it
+    /// observed, so that "unchanged" is written down rather than inferred.
+    pub next_rejection_high_water: CapabilityAuthorityRejectionHighWaterV1,
     pub effect: E,
     pub idempotency_key_digest: Digest32,
     pub canonical_request_digest: Digest32,

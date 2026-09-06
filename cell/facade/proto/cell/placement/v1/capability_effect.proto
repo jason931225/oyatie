@@ -131,12 +131,18 @@ message CapabilityEffectExpectationV1 {
   Digest32 expected_authority_context_digest = 14;
 }
 
+// Action-to-disposition is a different relation from action-to-context: one
+// says which authority may request an action, the other which record the
+// action leaves behind. See the Rust enum for the full relation. Both
+// terminals are distinct on purpose, so that a discarded preparation is never
+// mistaken for an installed-authority retirement.
 enum LocalAuthorityDispositionV1 {
   LOCAL_AUTHORITY_DISPOSITION_V1_UNSPECIFIED = 0;
   LOCAL_AUTHORITY_DISPOSITION_V1_PREPARED = 1;
   LOCAL_AUTHORITY_DISPOSITION_V1_WRITABLE = 2;
   LOCAL_AUTHORITY_DISPOSITION_V1_FENCED = 3;
   LOCAL_AUTHORITY_DISPOSITION_V1_RELEASED = 4;
+  LOCAL_AUTHORITY_DISPOSITION_V1_PREPARATION_DISCARDED = 5;
 }
 
 // Root and count of durable rejection membership the capability store retains
@@ -150,15 +156,17 @@ message CapabilityAuthorityRejectionHighWaterV1 {
   Digest32 record_digest = 6;
 }
 
-// Maps the assembled parts of the Rust LocalAuthorityStateV1, whose fields are
-// private so that only its assembler mints one.
+// The durable authority record. It does not carry the rejection high water:
+// that is a separately revisioned row written beside this one in the same
+// commit, and an embedded copy could go stale behind this record's digest.
+// Tags 4 and 5 were reassigned when that field was removed, which is
+// admissible only because this message is unpublished and has no consumer.
 message LocalAuthorityStateV1 {
   CapabilityEffectScopeV1 scope = 1;
   CapabilityAuthorityContextV1 context = 2;
   LocalAuthorityDispositionV1 disposition = 3;
-  CapabilityAuthorityRejectionHighWaterV1 rejection_high_water = 4;
-  uint64 revision = 5;
-  Digest32 record_digest = 6;
+  uint64 revision = 4;
+  Digest32 record_digest = 5;
 }
 
 message LocalAuthorityPreconditionV1 {
