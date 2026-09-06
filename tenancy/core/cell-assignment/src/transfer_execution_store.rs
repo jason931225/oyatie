@@ -99,13 +99,22 @@ pub trait TransferExecutionCommitObserver: Send + Sync {
 
 /// Mints the transfer-execution permit signature.
 ///
-/// The only argument is a private-field verified wrapper, so no signature can
-/// be produced from an unverified or precommit claim.
+/// The input is a private-field verified wrapper, so no signature can be
+/// produced from an unverified or precommit claim. That is where this port's
+/// gating lives.
+///
+/// The output is the raw signed value, NOT a verified wrapper. A signing
+/// adapter lives outside this crate and cannot construct a private-field
+/// wrapper, so returning one would leave self-verification — the signer
+/// checking its own signature against an expectation it built itself — as the
+/// only implementable shape, which gates nothing. The caller mints the wrapper
+/// by passing this value through
+/// [`crate::verify_transfer_execution_permit`].
 pub trait TransferExecutionPermitAuthority: Send + Sync {
     fn sign_committed<'a>(
         &'a self,
         issuance: &'a VerifiedCommittedTransferExecutionPermitIssuance,
-    ) -> BoxTenancyFuture<'a, Result<VerifiedTransferExecutionPermit, BindingStoreError>>;
+    ) -> BoxTenancyFuture<'a, Result<SignedTransferExecutionPermitV1, BindingStoreError>>;
 }
 
 pub trait CapabilityTransferEffectStore: Send + Sync {
