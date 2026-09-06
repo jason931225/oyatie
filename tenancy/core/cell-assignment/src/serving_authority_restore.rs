@@ -1,12 +1,53 @@
-use crate::{BindingDigest32, ServingAuthorityInstanceV1};
+use crate::{BindingDigest32, BindingProofEnvelopeV1, ServingAuthorityInstanceV1};
 
+/// The restore basis a surviving quorum asserts.
+///
+/// This is the signed payload, not the evidence itself: nothing here is
+/// trustworthy until it arrives inside
+/// [`SignedServingAuthoritySurvivingQuorumV1`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ServingAuthoritySurvivingQuorumEvidenceV1 {
+pub struct ServingAuthoritySurvivingQuorumPayloadV1 {
+    pub schema_version: u32,
     pub instance: ServingAuthorityInstanceV1,
     pub committed_state_revision: u64,
     pub committed_state_digest: BindingDigest32,
     pub rejection_high_water_digest: BindingDigest32,
     pub quorum_evidence: cell_placement::ImmutableEvidenceRefV1,
+}
+
+/// Authenticated surviving-quorum attestation.
+///
+/// Restore is how serving authority returns after loss, and two of the three
+/// [`ServingAuthorityRestoreBasisV1`] arms rest on this alone, so the state
+/// revision and digests it carries MUST be bound by a signature. Mirrors
+/// [`ServingAuthorityReplacementEvidenceV1`], whose basis is anchored by an
+/// embedded `SignedServingAuthorityIndependentRetirementV1`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedServingAuthoritySurvivingQuorumV1 {
+    pub payload: ServingAuthoritySurvivingQuorumPayloadV1,
+    pub envelope: BindingProofEnvelopeV1,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ServingAuthoritySurvivingQuorumEvidenceV1 {
+    pub attestation: SignedServingAuthoritySurvivingQuorumV1,
+}
+
+/// What [`verify_serving_authority_surviving_quorum`] checks the attestation
+/// against. Replaces the bare `&ServingAuthorityInstanceV1` the verifier used
+/// to take, which named no producer, no audience and no clock, and so gave the
+/// `&dyn BindingProofVerifier` argument nothing to verify.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ServingAuthoritySurvivingQuorumExpectationV1 {
+    pub instance: ServingAuthorityInstanceV1,
+    pub expected_committed_state_revision: u64,
+    pub expected_committed_state_digest: BindingDigest32,
+    pub expected_rejection_high_water_digest: BindingDigest32,
+    pub expected_producer: crate::BindingProducerId,
+    pub expected_audience: crate::BindingProducerId,
+    pub now_unix_seconds: u64,
+    pub maximum_clock_uncertainty_millis: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -43,7 +84,7 @@ impl VerifiedServingAuthorityReplacement {
 pub fn verify_serving_authority_surviving_quorum(
     _verifier: &dyn crate::BindingProofVerifier,
     _evidence: ServingAuthoritySurvivingQuorumEvidenceV1,
-    _expected: &ServingAuthorityInstanceV1,
+    _expectation: &ServingAuthoritySurvivingQuorumExpectationV1,
 ) -> Result<VerifiedServingAuthoritySurvivingQuorum, crate::BindingProofVerificationError> {
     Err(crate::BindingProofVerificationError::NotImplemented)
 }

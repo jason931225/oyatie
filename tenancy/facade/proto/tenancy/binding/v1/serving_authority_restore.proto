@@ -8,12 +8,23 @@ import "tenancy/binding/v1/proof.proto";
 import "tenancy/binding/v1/serving_authority.proto";
 import "cell/placement/v1/evidence.proto";
 
+message ServingAuthoritySurvivingQuorumPayloadV1 {
+  uint32 schema_version = 1;
+  ServingAuthorityInstanceV1 instance = 2;
+  uint64 committed_state_revision = 3;
+  Digest32 committed_state_digest = 4;
+  Digest32 rejection_high_water_digest = 5;
+  cell.placement.v1.ImmutableEvidenceRefV1 quorum_evidence = 6;
+}
+
+message SignedServingAuthoritySurvivingQuorumV1 {
+  ServingAuthoritySurvivingQuorumPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
 message ServingAuthoritySurvivingQuorumEvidenceV1 {
-  ServingAuthorityInstanceV1 instance = 1;
-  uint64 committed_state_revision = 2;
-  Digest32 committed_state_digest = 3;
-  Digest32 rejection_high_water_digest = 4;
-  cell.placement.v1.ImmutableEvidenceRefV1 quorum_evidence = 5;
+  SignedServingAuthoritySurvivingQuorumV1 attestation = 1;
 }
 
 message ServingAuthorityReplacementEvidenceV1 {
