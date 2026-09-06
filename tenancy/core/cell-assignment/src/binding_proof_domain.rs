@@ -36,4 +36,5 @@ pub enum BindingProofDomainV1 {
     ControlContributionCommit,
     ControlContributionHandoff,
     ControlContributionAcknowledgment,
+    TransferExecutionCommitObservation,
 }
