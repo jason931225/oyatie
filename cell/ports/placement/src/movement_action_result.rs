@@ -50,7 +50,7 @@ impl VerifiedCommittedMovementActionClosure {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignedMovementActionClosureV1 {
-    pub closure: MovementActionClosureV1,
+    pub payload: MovementActionClosureV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
@@ -139,7 +139,7 @@ pub enum MovementActionResultPreconditionV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignedMovementActionResultV1 {
-    pub result: MovementActionResultV1,
+    pub payload: MovementActionResultV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
 }

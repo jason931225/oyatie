@@ -25,14 +25,18 @@ enum PlacementPolicyMappingV1 {
   PLACEMENT_POLICY_MAPPING_V1_CELL_PLACEMENT_ACTION_RESOURCE = 1;
 }
 
-message PlacementActorEvidenceV1 {
+message PlacementActorPayloadV1 {
   string trust_domain = 1;
   string subject = 2;
   string credential_id = 3;
   uint64 valid_from_unix_seconds = 4;
   uint64 valid_until_unix_seconds = 5;
-  CellProofEnvelopeV1 envelope = 6;
-  bytes signature = 7;
+}
+
+message SignedPlacementActorV1 {
+  PlacementActorPayloadV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
 }
 
 message RebalanceBusinessOriginV1 {
@@ -59,7 +63,7 @@ message PlacementBusinessActionKeyV1 {
 message PlacementAuthorizationRequestV1 {
   PlacementPolicyResourceV1 resource = 12;
   PlacementPolicyMappingV1 mapping = 1;
-  PlacementActorEvidenceV1 actor = 2;
+  SignedPlacementActorV1 actor = 2;
   PlacementBusinessActionKeyV1 key = 3;
   PlacementIntentPurposeV1 purpose = 4;
   string realm = 5;
@@ -83,15 +87,19 @@ message PlacementPolicyObligationV1 {
   bytes canonical_fulfillment = 4;
 }
 
-message PlacementPolicyDecisionEvidenceV1 {
+message PlacementPolicyDecisionPayloadV1 {
   PlacementAuthorizationRequestV1 request = 1;
   string decision_id = 2;
   string policy_version = 3;
   repeated string determining_policy_ids = 4;
   repeated PlacementPolicyObligationV1 obligations = 5;
   bytes canonical_pdp_outcome = 6;
-  CellProofEnvelopeV1 envelope = 7;
-  bytes signature = 8;
+}
+
+message SignedPlacementPolicyDecisionV1 {
+  PlacementPolicyDecisionPayloadV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
 }
 
 message PlacementInvocationPayloadV1 {
@@ -103,7 +111,7 @@ message PlacementInvocationPayloadV1 {
   Digest32 actor_digest = 6;
   AuthorizationDecisionReceiptV1 authorization = 7;
   uint64 deadline_unix_seconds = 8;
-  PlacementPolicyDecisionEvidenceV1 authorization_evidence = 9;
+  SignedPlacementPolicyDecisionV1 authorization_evidence = 9;
 }
 
 message SignedPlacementInvocationV1 {

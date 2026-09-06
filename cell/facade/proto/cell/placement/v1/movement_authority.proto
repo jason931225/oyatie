@@ -154,7 +154,7 @@ message RebalanceInvocationIssuanceV1 {
   RebalanceIssuanceAddressV1 address = 1;
   RebalanceBusinessRequestV1 business = 2;
   RebalanceProofPackageV1 package = 3;
-  PlacementPolicyDecisionEvidenceV1 decision = 4;
+  SignedPlacementPolicyDecisionV1 decision = 4;
   PlacementInvocationPayloadV1 unsigned_invocation = 5;
   Digest32 dispatch_digest = 6;
   Digest32 record_digest = 7;
@@ -164,7 +164,7 @@ message PlacementDispatchInputV1 {
   PlacementBusinessActionKeyV1 key = 1;
   Digest32 business_digest = 2;
   Digest32 package_digest = 3;
-  PlacementActorEvidenceV1 actor = 4;
+  SignedPlacementActorV1 actor = 4;
   PlacementIntentPurposeV1 purpose = 5;
   string realm = 6;
   string jurisdiction = 7;
@@ -237,7 +237,7 @@ message CommittedMovementActionClosureV1 {
 }
 
 message SignedMovementActionClosureV1 {
-  MovementActionClosureV1 closure = 1;
+  MovementActionClosureV1 payload = 1;
   CellProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
@@ -258,7 +258,7 @@ message MovementActionResultV1 {
 }
 
 message SignedMovementActionResultV1 {
-  MovementActionResultV1 result = 1;
+  MovementActionResultV1 payload = 1;
   CellProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
@@ -288,7 +288,7 @@ message RebalanceSourceIssuanceWriteSetPartsV1 {
   SignedReconciliationInvocationV1 authority = 1;
   RebalanceSourcePreconditionV1 precondition = 2;
   RebalanceActionPreconditionV1 action_precondition = 3;
-  PlacementPolicyDecisionEvidenceV1 decision = 4;
+  SignedPlacementPolicyDecisionV1 decision = 4;
   RebalanceInvocationIssuanceV1 issuance = 5;
   RebalanceSelectedActionV1 next_action = 6;
   RebalanceJobV1 next_job = 7;

@@ -1,22 +1,32 @@
 use crate::*;
 
+/// The actor attestation's signed content.
+///
+/// `valid_from_unix_seconds` and `valid_until_unix_seconds` are the
+/// credential's own validity window, which is not the proof envelope's
+/// `issued_at`/`expires_at`; the two are checked separately.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PlacementActorEvidenceV1 {
+pub struct PlacementActorPayloadV1 {
     pub trust_domain: String,
     pub subject: String,
     pub credential_id: String,
     pub valid_from_unix_seconds: u64,
     pub valid_until_unix_seconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedPlacementActorV1 {
+    pub payload: PlacementActorPayloadV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct VerifiedPlacementActor(PlacementActorEvidenceV1);
+pub struct VerifiedPlacementActor(SignedPlacementActorV1);
 
 impl VerifiedPlacementActor {
     #[must_use]
-    pub fn evidence(&self) -> &PlacementActorEvidenceV1 {
+    pub fn signed(&self) -> &SignedPlacementActorV1 {
         &self.0
     }
 }
@@ -56,7 +66,7 @@ pub struct PlacementBusinessActionKeyV1 {
 pub struct PlacementAuthorizationRequestV1 {
     pub resource: PlacementPolicyResourceV1,
     pub mapping: PlacementPolicyMappingV1,
-    pub actor: PlacementActorEvidenceV1,
+    pub actor: SignedPlacementActorV1,
     pub key: PlacementBusinessActionKeyV1,
     pub purpose: PlacementIntentPurposeV1,
     pub realm: RealmId,
@@ -76,14 +86,21 @@ pub struct PlacementPolicyObligationV1 {
     pub canonical_fulfillment: Vec<u8>,
 }
 
+/// The policy decision's signed content: the exact request the policy decision
+/// point evaluated, and what it decided.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PlacementPolicyDecisionEvidenceV1 {
+pub struct PlacementPolicyDecisionPayloadV1 {
     pub request: PlacementAuthorizationRequestV1,
     pub decision_id: String,
     pub policy_version: PolicyVersionToken,
     pub determining_policy_ids: Vec<String>,
     pub obligations: Vec<PlacementPolicyObligationV1>,
     pub canonical_pdp_outcome: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedPlacementPolicyDecisionV1 {
+    pub payload: PlacementPolicyDecisionPayloadV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
@@ -116,18 +133,18 @@ pub enum PlacementAuthorizationError {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct VerifiedPlacementPolicyDecision(PlacementPolicyDecisionEvidenceV1);
+pub struct VerifiedPlacementPolicyDecision(SignedPlacementPolicyDecisionV1);
 
 impl VerifiedPlacementPolicyDecision {
     #[must_use]
-    pub fn evidence(&self) -> &PlacementPolicyDecisionEvidenceV1 {
+    pub fn signed(&self) -> &SignedPlacementPolicyDecisionV1 {
         &self.0
     }
 }
 
 pub fn verify_placement_actor(
     _verifier: &dyn CellProofVerifier,
-    _evidence: PlacementActorEvidenceV1,
+    _signed: SignedPlacementActorV1,
     _trust: &PlacementAuthorizationTrustV1,
 ) -> Result<VerifiedPlacementActor, PlacementAuthorizationError> {
     Err(PlacementAuthorizationError::NotImplemented)
@@ -135,7 +152,7 @@ pub fn verify_placement_actor(
 
 pub fn verify_placement_policy_decision(
     _verifier: &dyn CellProofVerifier,
-    _evidence: PlacementPolicyDecisionEvidenceV1,
+    _signed: SignedPlacementPolicyDecisionV1,
     _expected: &PlacementAuthorizationRequestV1,
     _trust: &PlacementAuthorizationTrustV1,
 ) -> Result<VerifiedPlacementPolicyDecision, PlacementAuthorizationError> {
@@ -147,7 +164,7 @@ pub trait CellPlacementAuthorizer: Send + Sync {
         &'a self,
         actor: &'a VerifiedPlacementActor,
         request: &'a PlacementAuthorizationRequestV1,
-    ) -> BoxCellFuture<'a, Result<PlacementPolicyDecisionEvidenceV1, PlacementAuthorizationError>>;
+    ) -> BoxCellFuture<'a, Result<SignedPlacementPolicyDecisionV1, PlacementAuthorizationError>>;
 }
 
 #[derive(Debug, Eq, PartialEq)]

@@ -44,7 +44,7 @@ pub struct AuthorizationDecisionReceiptV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PlacementInvocationPayloadV1 {
-    pub authorization_evidence: Box<crate::PlacementPolicyDecisionEvidenceV1>,
+    pub authorization_evidence: Box<crate::SignedPlacementPolicyDecisionV1>,
     pub schema_version: u32,
     pub action: PlacementActionV1,
     pub tenant_id: TenantId,
