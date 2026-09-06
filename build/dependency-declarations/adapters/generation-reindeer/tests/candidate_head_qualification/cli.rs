@@ -60,8 +60,14 @@ fn candidate_cli_refuses_each_required_input_before_qualification() {
         );
         assert!(!fixture.first_target.exists(), "{omitted}");
         assert!(!fixture.second_target.exists(), "{omitted}");
-        assert!(!fixture.first_target.join("provider-ran").exists(), "{omitted}");
-        assert!(!fixture.second_target.join("provider-ran").exists(), "{omitted}");
+        assert!(
+            !fixture.first_target.join("provider-ran").exists(),
+            "{omitted}"
+        );
+        assert!(
+            !fixture.second_target.join("provider-ran").exists(),
+            "{omitted}"
+        );
     }
 }
 

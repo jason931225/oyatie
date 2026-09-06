@@ -48,12 +48,14 @@ fn execute_provider(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = command
-        .spawn()
-        .map_err(|error| CandidateHeadQualificationFailure::ProviderSpawn {
-            run,
-            kind: error.kind(),
-        })?;
+    configure_provider_group(&mut command);
+    let mut child =
+        command
+            .spawn()
+            .map_err(|error| CandidateHeadQualificationFailure::ProviderSpawn {
+                run,
+                kind: error.kind(),
+            })?;
     let stdout = child.stdout.take().expect("piped stdout must exist");
     let stderr = child.stderr.take().expect("piped stderr must exist");
     let stdout_observed = Arc::new(AtomicUsize::new(0));
@@ -65,55 +67,67 @@ fn execute_provider(
 
     let start = Instant::now();
     let mut termination = None;
-    let status = loop {
+    let mut wait_failure = None;
+    loop {
         if stdout_observed.load(Ordering::Relaxed) > limits.stdout_bytes {
-            termination = Some(TerminationReason::OutputLimit(
-                QualificationStream::Stdout,
-            ));
-            break terminate_child(run, &mut child)?;
+            termination = Some(TerminationReason::OutputLimit(QualificationStream::Stdout));
+            break;
         }
         if stderr_observed.load(Ordering::Relaxed) > limits.stderr_bytes {
-            termination = Some(TerminationReason::OutputLimit(
-                QualificationStream::Stderr,
-            ));
-            break terminate_child(run, &mut child)?;
+            termination = Some(TerminationReason::OutputLimit(QualificationStream::Stderr));
+            break;
         }
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if start.elapsed() >= limits.runtime => {
+        match provider_exited(&child) {
+            Ok(true) => break,
+            Ok(false) if start.elapsed() >= limits.runtime => {
                 termination = Some(TerminationReason::Timeout);
-                break terminate_child(run, &mut child)?;
+                break;
             }
-            Ok(None) => thread::sleep(PIPE_POLL_INTERVAL),
+            Ok(false) => thread::sleep(PIPE_POLL_INTERVAL),
             Err(error) => {
-                let wait_kind = error.kind();
-                terminate_child(run, &mut child)?;
-                return Err(CandidateHeadQualificationFailure::ProviderWait {
+                wait_failure = Some(CandidateHeadQualificationFailure::ProviderWait {
                     run,
-                    kind: wait_kind,
+                    kind: error.kind(),
                 });
+                break;
             }
         }
-    };
+    }
+    let status = terminate_child(run, &mut child);
 
+    let drain_deadline = Instant::now() + PIPE_DRAIN_GRACE;
+    let stdout_capture = receive_pipe(
+        run,
+        QualificationStream::Stdout,
+        stdout_receiver,
+        drain_deadline,
+    );
+    let stderr_capture = receive_pipe(
+        run,
+        QualificationStream::Stderr,
+        stderr_receiver,
+        drain_deadline,
+    );
+    let status = status?;
+    let stdout_capture = stdout_capture?;
+    let stderr_capture = stderr_capture?;
+    if let Some(failure) = wait_failure {
+        return Err(failure);
+    }
     if let Some(reason) = termination {
         return match reason {
-            TerminationReason::Timeout => {
-                Err(CandidateHeadQualificationFailure::ProviderTimeout {
-                    run,
-                    limit: limits.runtime,
-                })
-            }
+            TerminationReason::Timeout => Err(CandidateHeadQualificationFailure::ProviderTimeout {
+                run,
+                limit: limits.runtime,
+            }),
             TerminationReason::OutputLimit(stream) => {
                 let (limit, observed) = match stream {
-                    QualificationStream::Stdout => (
-                        limits.stdout_bytes,
-                        stdout_observed.load(Ordering::Relaxed),
-                    ),
-                    QualificationStream::Stderr => (
-                        limits.stderr_bytes,
-                        stderr_observed.load(Ordering::Relaxed),
-                    ),
+                    QualificationStream::Stdout => {
+                        (limits.stdout_bytes, stdout_observed.load(Ordering::Relaxed))
+                    }
+                    QualificationStream::Stderr => {
+                        (limits.stderr_bytes, stderr_observed.load(Ordering::Relaxed))
+                    }
                 };
                 Err(CandidateHeadQualificationFailure::OutputLimitExceeded {
                     run,
@@ -125,11 +139,6 @@ fn execute_provider(
         };
     }
 
-    let drain_deadline = Instant::now() + PIPE_DRAIN_GRACE;
-    let stdout_capture =
-        receive_pipe(run, QualificationStream::Stdout, stdout_receiver, drain_deadline)?;
-    let stderr_capture =
-        receive_pipe(run, QualificationStream::Stderr, stderr_receiver, drain_deadline)?;
     if stdout_capture.total > limits.stdout_bytes {
         return Err(CandidateHeadQualificationFailure::OutputLimitExceeded {
             run,
@@ -158,31 +167,40 @@ fn terminate_child(
     run: QualificationRun,
     child: &mut Child,
 ) -> Result<ExitStatus, CandidateHeadQualificationFailure> {
-    child
-        .kill()
-        .map_err(|error| CandidateHeadQualificationFailure::ProviderKill {
-            run,
-            kind: error.kind(),
-        })?;
-    child
+    let group_result = terminate_provider_group(run, child.id());
+    if group_result.is_err() {
+        let _ = child.kill();
+    }
+    let status = child
         .wait()
         .map_err(|error| CandidateHeadQualificationFailure::ProviderReap {
             run,
             kind: error.kind(),
-        })
+        });
+    group_result?;
+    status
 }
 
-fn spawn_pipe_reader<R: Read + Send + 'static>(
+fn spawn_pipe_reader<R: QualificationPipe + Send + 'static>(
     mut reader: R,
     limit: usize,
     observed: Arc<AtomicUsize>,
-) -> mpsc::Receiver<Result<PipeCapture, io::ErrorKind>> {
+) -> PipeReader {
     let (sender, receiver) = mpsc::channel();
-    thread::spawn(move || {
+    let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let worker_cancelled = Arc::clone(&cancelled);
+    let worker = thread::spawn(move || {
+        if let Err(error) = nonblocking_pipe(&reader) {
+            let _ = sender.send(Err(error.kind()));
+            return;
+        }
         let mut bytes = Vec::with_capacity(cmp::min(limit, FILE_BUFFER_BYTES));
         let mut total = 0_usize;
         let mut buffer = [0_u8; 8 * 1024];
         let result = loop {
+            if worker_cancelled.load(Ordering::Relaxed) {
+                break Ok(PipeCapture { bytes, total });
+            }
             match reader.read(&mut buffer) {
                 Ok(0) => break Ok(PipeCapture { bytes, total }),
                 Ok(count) => {
@@ -193,28 +211,32 @@ fn spawn_pipe_reader<R: Read + Send + 'static>(
                         bytes.extend_from_slice(&buffer[..keep]);
                     }
                 }
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    thread::sleep(PIPE_POLL_INTERVAL);
+                }
                 Err(error) => break Err(error.kind()),
             }
         };
         let _ = sender.send(result);
     });
-    receiver
+    PipeReader {
+        receiver,
+        cancelled,
+        worker: Some(worker),
+    }
 }
 
 fn receive_pipe(
     run: QualificationRun,
     stream: QualificationStream,
-    receiver: mpsc::Receiver<Result<PipeCapture, io::ErrorKind>>,
+    reader: PipeReader,
     deadline: Instant,
 ) -> Result<PipeCapture, CandidateHeadQualificationFailure> {
     let remaining = deadline.saturating_duration_since(Instant::now());
-    match receiver.recv_timeout(remaining) {
+    match reader.receiver.recv_timeout(remaining) {
         Ok(Ok(capture)) => Ok(capture),
-        Ok(Err(kind)) => Err(CandidateHeadQualificationFailure::OutputRead {
-            run,
-            stream,
-            kind,
-        }),
+        Ok(Err(kind)) => Err(CandidateHeadQualificationFailure::OutputRead { run, stream, kind }),
         Err(mpsc::RecvTimeoutError::Timeout) => {
             Err(CandidateHeadQualificationFailure::OutputDrainTimeout { run, stream })
         }

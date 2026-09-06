@@ -18,12 +18,14 @@ fn qualify_candidate_head_with_limits(
     reject_ancestor_cargo_config(CandidateRoot::Second, &validated.second_root)?;
 
     let tool_identities = external_tool_identities(&validated)?;
+    let mut storage = IndependentStorage::default();
     let semantic_snapshot = compare_trees(
         &validated.first_root,
         &validated.second_root,
         CandidateTreeScope::Semantic,
         limits,
         &tool_identities,
+        &mut storage,
     )?;
     let cargo_seed_snapshot = compare_trees(
         &validated.first_cargo_home,
@@ -31,6 +33,7 @@ fn qualify_candidate_head_with_limits(
         CandidateTreeScope::CargoSeed,
         limits,
         &tool_identities,
+        &mut storage,
     )?;
 
     create_target(QualificationRun::First, &validated.first_target)?;
@@ -134,12 +137,12 @@ fn qualify_candidate_head_with_limits(
     })
 }
 
-#[cfg(unix)]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn ensure_supported_platform() -> Result<(), CandidateHeadQualificationFailure> {
     Ok(())
 }
 
-#[cfg(not(unix))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn ensure_supported_platform() -> Result<(), CandidateHeadQualificationFailure> {
     Err(CandidateHeadQualificationFailure::UnsupportedPlatform)
 }

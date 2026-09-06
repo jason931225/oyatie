@@ -9,6 +9,7 @@ license = "Apache-2.0"
 [dependencies]
 dependency-declarations-generation = { path = "../../ports/generation" }
 dependency-declarations-reconcile = { path = "../../core/reconcile" }
+rustix = { workspace = true, features = ["process"] }
 
 [lib]
 doctest = false

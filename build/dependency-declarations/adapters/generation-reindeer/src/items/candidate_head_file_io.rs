@@ -13,14 +13,15 @@ fn compare_published_output(
         }
     })?;
     let published_bytes = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
-    let mut published = File::open(path).map_err(|error| {
-        CandidateHeadQualificationFailure::CandidateTreeRead {
-            root,
-            scope: CandidateTreeScope::Semantic,
-            path: path.to_path_buf(),
-            kind: error.kind(),
-        }
-    })?;
+    let mut published =
+        File::open(path).map_err(
+            |error| CandidateHeadQualificationFailure::CandidateTreeRead {
+                root,
+                scope: CandidateTreeScope::Semantic,
+                path: path.to_path_buf(),
+                kind: error.kind(),
+            },
+        )?;
     let mut offset = 0_usize;
     let mut buffer = [0_u8; FILE_BUFFER_BYTES];
     loop {
@@ -99,13 +100,15 @@ fn compare_regular_files(
             return Ok(contents);
         }
         if (contents.len() as u64).saturating_add(first_count as u64) > maximum {
-            return Err(CandidateHeadQualificationFailure::CandidateTreeLimitExceeded {
-                root: CandidateRoot::First,
-                scope,
-                limit: QualificationLimit::TreeFileBytes,
-                value: (contents.len() as u64).saturating_add(first_count as u64),
-                maximum,
-            });
+            return Err(
+                CandidateHeadQualificationFailure::CandidateTreeLimitExceeded {
+                    root: CandidateRoot::First,
+                    scope,
+                    limit: QualificationLimit::TreeFileBytes,
+                    value: (contents.len() as u64).saturating_add(first_count as u64),
+                    maximum,
+                },
+            );
         }
         contents.extend_from_slice(&first_buffer[..first_count]);
     }
@@ -130,15 +133,16 @@ fn read_regular_file(
             return Ok(contents);
         }
         if (contents.len() as u64).saturating_add(count as u64) > maximum {
-            return Err(CandidateHeadQualificationFailure::CandidateTreeLimitExceeded {
-                root,
-                scope,
-                limit: QualificationLimit::TreeFileBytes,
-                value: (contents.len() as u64).saturating_add(count as u64),
-                maximum,
-            });
+            return Err(
+                CandidateHeadQualificationFailure::CandidateTreeLimitExceeded {
+                    root,
+                    scope,
+                    limit: QualificationLimit::TreeFileBytes,
+                    value: (contents.len() as u64).saturating_add(count as u64),
+                    maximum,
+                },
+            );
         }
         contents.extend_from_slice(&buffer[..count]);
     }
 }
-

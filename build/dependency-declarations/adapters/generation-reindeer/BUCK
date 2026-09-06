@@ -63,10 +63,12 @@ rust_library(
         "//build/dependency-declarations/adapters/generation-reindeer/...",
         "//build/dependency-declarations/core/reconcile/...",
         "//build/dependency-declarations/ports/generation/...",
+        "third-party//:rustix",
     ],
     deps = [
         "//build/dependency-declarations/core/reconcile:dependency-declarations-reconcile",
         "//build/dependency-declarations/ports/generation:dependency-declarations-generation",
+        "third-party//:rustix",
     ],
 )
 

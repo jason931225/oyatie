@@ -1,4 +1,33 @@
 #[test]
+fn provider_exit_does_not_leave_descendants_holding_output_pipes() {
+    let fixture = Fixture::new("exit-descendant");
+    let result = qualify(&fixture.request());
+    assert!(result.is_ok(), "{result:?}");
+    assert!(fixture.first_target.join("descendant-pid").is_file());
+}
+
+#[test]
+fn provider_timeout_cleans_up_descendant_pipe_holders() {
+    let fixture = Fixture::new("wait-descendant");
+    let limit = Duration::from_secs(1);
+    let result = qualify_with(
+        &fixture.request(),
+        QualificationLimits {
+            runtime: limit,
+            ..QualificationLimits::default()
+        },
+    );
+    assert_eq!(
+        result,
+        Err(CandidateHeadQualificationFailure::ProviderTimeout {
+            run: QualificationRun::First,
+            limit,
+        })
+    );
+    assert!(fixture.first_target.join("descendant-pid").is_file());
+}
+
+#[test]
 fn nondeterministic_provider_output_is_refused() {
     let fixture = Fixture::new("nondeterministic");
     assert!(matches!(
@@ -61,4 +90,3 @@ fn successful_provider_with_empty_stdout_is_refused() {
         })
     );
 }
-

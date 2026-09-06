@@ -22,10 +22,7 @@ fn external_tool_identities(
     request: &ValidatedRequest,
 ) -> Result<[FileIdentity; 3], CandidateHeadQualificationFailure> {
     Ok([
-        external_tool_identity(
-            QualificationTool::Provider,
-            &request.provider,
-        )?,
+        external_tool_identity(QualificationTool::Provider, &request.provider)?,
         external_tool_identity(QualificationTool::Cargo, &request.cargo)?,
         external_tool_identity(QualificationTool::Rustc, &request.rustc)?,
     ])
@@ -53,11 +50,7 @@ struct TreeBudget {
 }
 
 impl TreeBudget {
-    fn new(
-        root: CandidateRoot,
-        scope: CandidateTreeScope,
-        limits: QualificationLimits,
-    ) -> Self {
+    fn new(root: CandidateRoot, scope: CandidateTreeScope, limits: QualificationLimits) -> Self {
         Self {
             root,
             scope,
@@ -136,10 +129,12 @@ fn compare_trees(
     scope: CandidateTreeScope,
     limits: QualificationLimits,
     tool_identities: &[FileIdentity],
+    storage: &mut IndependentStorage,
 ) -> Result<TreeSnapshot, CandidateHeadQualificationFailure> {
     let mut first_budget = TreeBudget::new(CandidateRoot::First, scope, limits);
     let mut second_budget = TreeBudget::new(CandidateRoot::Second, scope, limits);
-    let first_metadata = tree_directory_metadata(CandidateRoot::First, scope, first, Path::new(""))?;
+    let first_metadata =
+        tree_directory_metadata(CandidateRoot::First, scope, first, Path::new(""))?;
     let second_metadata =
         tree_directory_metadata(CandidateRoot::Second, scope, second, Path::new(""))?;
     if metadata_mode(&first_metadata) != metadata_mode(&second_metadata) {
@@ -165,6 +160,7 @@ fn compare_trees(
         &mut second_budget,
         &mut snapshot,
         tool_identities,
+        storage,
     )?;
     Ok(snapshot)
 }
@@ -180,6 +176,7 @@ fn compare_directories(
     second_budget: &mut TreeBudget,
     snapshot: &mut TreeSnapshot,
     tool_identities: &[FileIdentity],
+    storage: &mut IndependentStorage,
 ) -> Result<(), CandidateHeadQualificationFailure> {
     let first_entries = read_tree_entries(
         CandidateRoot::First,
@@ -213,10 +210,7 @@ fn compare_directories(
                 path: relative_path,
             });
         }
-        first_budget.enter(
-            depth,
-            (!first.is_directory).then_some(first.metadata.len()),
-        )?;
+        first_budget.enter(depth, (!first.is_directory).then_some(first.metadata.len()))?;
         second_budget.enter(
             depth,
             (!second.is_directory).then_some(second.metadata.len()),
@@ -237,6 +231,7 @@ fn compare_directories(
                 second_budget,
                 snapshot,
                 tool_identities,
+                storage,
             )?;
         } else {
             reject_tool_alias(
@@ -253,12 +248,7 @@ fn compare_directories(
                 &second.metadata,
                 tool_identities,
             )?;
-            if file_identity(&first.metadata) == file_identity(&second.metadata) {
-                return Err(CandidateHeadQualificationFailure::CandidateTreesShareStorage {
-                    scope,
-                    path: relative_path,
-                });
-            }
+            storage.observe(&first.metadata, &second.metadata, scope, &relative_path)?;
             if first.metadata.len() != second.metadata.len() {
                 return Err(CandidateHeadQualificationFailure::CandidateTreesDiffer {
                     scope,
@@ -281,4 +271,3 @@ fn compare_directories(
     }
     Ok(())
 }
-

@@ -1,4 +1,47 @@
 #[test]
+fn permuted_cross_root_hardlinks_are_refused() {
+    let fixture = Fixture::new("exact-contract");
+    for root in [&fixture.first_root, &fixture.second_root] {
+        fs::write(root.join("src/a"), b"same").unwrap();
+        fs::write(root.join("src/b"), b"same").unwrap();
+    }
+    fs::remove_file(fixture.second_root.join("src/a")).unwrap();
+    fs::remove_file(fixture.second_root.join("src/b")).unwrap();
+    fs::hard_link(
+        fixture.first_root.join("src/b"),
+        fixture.second_root.join("src/a"),
+    )
+    .unwrap();
+    fs::hard_link(
+        fixture.first_root.join("src/a"),
+        fixture.second_root.join("src/b"),
+    )
+    .unwrap();
+    assert!(matches!(
+        qualify(&fixture.request()),
+        Err(CandidateHeadQualificationFailure::CandidateTreesShareStorage { .. })
+    ));
+}
+
+#[test]
+fn semantic_and_cargo_seed_cross_root_aliases_are_refused() {
+    let fixture = Fixture::new("exact-contract");
+    for root in [&fixture.first_root, &fixture.second_root] {
+        fs::write(root.join("src/shared"), b"identical seed\n").unwrap();
+    }
+    fs::remove_file(fixture.second_root.join("third-party/.cargo/seed")).unwrap();
+    fs::hard_link(
+        fixture.first_root.join("src/shared"),
+        fixture.second_root.join("third-party/.cargo/seed"),
+    )
+    .unwrap();
+    assert!(matches!(
+        qualify(&fixture.request()),
+        Err(CandidateHeadQualificationFailure::CandidateTreesShareStorage { .. })
+    ));
+}
+
+#[test]
 fn every_semantic_candidate_mutation_is_refused() {
     for mode in [
         "mutate-cargo-lock",
@@ -243,4 +286,3 @@ fn symlinks_in_candidate_trees_are_refused() {
         )
     );
 }
-

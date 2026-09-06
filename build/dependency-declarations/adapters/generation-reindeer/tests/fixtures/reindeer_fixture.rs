@@ -7,6 +7,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 fn main() {
+    if env::args_os().nth(1).as_deref() == Some(OsStr::new("--retained-pipe")) {
+        std::thread::sleep(Duration::from_secs(30));
+        return;
+    }
     if let Err(message) = run() {
         eprintln!("fixture provider contract refusal: {message}");
         std::process::exit(64);
@@ -105,6 +109,20 @@ fn run() -> Result<(), String> {
     if mode.contains("timeout") {
         std::thread::sleep(Duration::from_secs(2));
     }
+    if mode.contains("descendant") {
+        let mut descendant = std::process::Command::new(env::current_exe().unwrap())
+            .arg("--retained-pipe")
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        fs::write(
+            target_dir.join("descendant-pid"),
+            descendant.id().to_string(),
+        )
+        .map_err(|error| error.to_string())?;
+        if mode.contains("wait-descendant") {
+            descendant.wait().map_err(|error| error.to_string())?;
+        }
+    }
     if mode.contains("stdout-limit") {
         io::stdout()
             .write_all(&vec![b'x'; 4096])
@@ -151,8 +169,11 @@ fn run() -> Result<(), String> {
     }
     if mode.contains("mutate-second-cache") && first_run {
         let second = sibling_root(candidate_root, "candidate-two")?;
-        fs::write(second.join("third-party/.cargo/seed"), b"cross-cache mutation\n")
-            .map_err(|error| error.to_string())?;
+        fs::write(
+            second.join("third-party/.cargo/seed"),
+            b"cross-cache mutation\n",
+        )
+        .map_err(|error| error.to_string())?;
     }
     if mode.contains("mutate-own-cache") {
         fs::write(

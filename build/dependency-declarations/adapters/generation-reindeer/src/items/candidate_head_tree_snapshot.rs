@@ -47,10 +47,7 @@ fn snapshot_directory(
     )?;
     for entry in entries {
         let relative_path = relative_directory.join(&entry.name);
-        budget.enter(
-            depth,
-            (!entry.is_directory).then_some(entry.metadata.len()),
-        )?;
+        budget.enter(depth, (!entry.is_directory).then_some(entry.metadata.len()))?;
         if entry.is_directory {
             snapshot.entries.push(SnapshotEntry {
                 path: relative_path.clone(),
@@ -120,13 +117,15 @@ fn read_tree_entries(
     let mut result = Vec::with_capacity(initial_capacity);
     for entry in entries {
         if result.len() as u64 >= entry_bound {
-            return Err(CandidateHeadQualificationFailure::CandidateTreeLimitExceeded {
-                root,
-                scope,
-                limit: QualificationLimit::TreeEntries,
-                value: (result.len() as u64).saturating_add(1),
-                maximum: entry_bound,
-            });
+            return Err(
+                CandidateHeadQualificationFailure::CandidateTreeLimitExceeded {
+                    root,
+                    scope,
+                    limit: QualificationLimit::TreeEntries,
+                    value: (result.len() as u64).saturating_add(1),
+                    maximum: entry_bound,
+                },
+            );
         }
         let entry =
             entry.map_err(|error| tree_read_error(root, scope, relative_directory, error))?;
@@ -150,28 +149,34 @@ fn read_tree_entries(
             continue;
         }
         if name == ".git" {
-            return Err(CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
-                root,
-                scope,
-                path: relative_path,
-                kind: UnsupportedCandidateEntryKind::ScmMetadata,
-            });
+            return Err(
+                CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
+                    root,
+                    scope,
+                    path: relative_path,
+                    kind: UnsupportedCandidateEntryKind::ScmMetadata,
+                },
+            );
         }
         if file_type.is_symlink() {
-            return Err(CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
-                root,
-                scope,
-                path: relative_path,
-                kind: UnsupportedCandidateEntryKind::Symlink,
-            });
+            return Err(
+                CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
+                    root,
+                    scope,
+                    path: relative_path,
+                    kind: UnsupportedCandidateEntryKind::Symlink,
+                },
+            );
         }
         if !file_type.is_file() && !file_type.is_dir() {
-            return Err(CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
-                root,
-                scope,
-                path: relative_path,
-                kind: UnsupportedCandidateEntryKind::Special,
-            });
+            return Err(
+                CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
+                    root,
+                    scope,
+                    path: relative_path,
+                    kind: UnsupportedCandidateEntryKind::Special,
+                },
+            );
         }
         let metadata = entry
             .metadata()
@@ -218,12 +223,14 @@ fn reject_tool_alias(
     tool_identities: &[FileIdentity],
 ) -> Result<(), CandidateHeadQualificationFailure> {
     if tool_identities.contains(&file_identity(metadata)) {
-        Err(CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
-            root,
-            scope,
-            path: relative_path.to_path_buf(),
-            kind: UnsupportedCandidateEntryKind::AliasesExternalTool,
-        })
+        Err(
+            CandidateHeadQualificationFailure::UnsupportedCandidateEntry {
+                root,
+                scope,
+                path: relative_path.to_path_buf(),
+                kind: UnsupportedCandidateEntryKind::AliasesExternalTool,
+            },
+        )
     } else {
         Ok(())
     }
@@ -239,4 +246,3 @@ fn metadata_mode(metadata: &Metadata) -> u32 {
 fn metadata_mode(_metadata: &Metadata) -> u32 {
     0
 }
-

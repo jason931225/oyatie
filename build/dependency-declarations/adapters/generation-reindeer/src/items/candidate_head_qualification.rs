@@ -27,7 +27,7 @@ pub const MAX_TREE_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
 /// Deepest directory nesting admitted in one compared tree.
 pub const MAX_TREE_DEPTH: u64 = 128;
 
-/// Caller-supplied paths used by one two-root qualification attempt.
+/// Trusted provider and input paths for two-root qualification, not a security sandbox.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CandidateHeadQualificationRequest {
     pub provider_executable: PathBuf,

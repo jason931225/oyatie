@@ -101,8 +101,8 @@ fn canonical_file(
     executable: bool,
 ) -> Result<PathBuf, CandidateHeadQualificationFailure> {
     ensure_absolute(field, path)?;
-    let metadata = fs::symlink_metadata(path)
-        .map_err(|error| invalid_path_from_io(field, path, error))?;
+    let metadata =
+        fs::symlink_metadata(path).map_err(|error| invalid_path_from_io(field, path, error))?;
     if metadata.file_type().is_symlink() {
         return Err(invalid_path(field, path, PathRefusal::Symlink));
     }
@@ -112,8 +112,8 @@ fn canonical_file(
     if executable && !is_executable(&metadata) {
         return Err(invalid_path(field, path, PathRefusal::NotExecutable));
     }
-    let canonical = fs::canonicalize(path)
-        .map_err(|error| invalid_path_from_io(field, path, error))?;
+    let canonical =
+        fs::canonicalize(path).map_err(|error| invalid_path_from_io(field, path, error))?;
     if canonical != path {
         return Err(invalid_path(field, path, PathRefusal::NonCanonical));
     }
@@ -125,16 +125,16 @@ fn canonical_directory(
     path: &Path,
 ) -> Result<PathBuf, CandidateHeadQualificationFailure> {
     ensure_absolute(field, path)?;
-    let metadata = fs::symlink_metadata(path)
-        .map_err(|error| invalid_path_from_io(field, path, error))?;
+    let metadata =
+        fs::symlink_metadata(path).map_err(|error| invalid_path_from_io(field, path, error))?;
     if metadata.file_type().is_symlink() {
         return Err(invalid_path(field, path, PathRefusal::Symlink));
     }
     if !metadata.is_dir() {
         return Err(invalid_path(field, path, PathRefusal::NotADirectory));
     }
-    let canonical = fs::canonicalize(path)
-        .map_err(|error| invalid_path_from_io(field, path, error))?;
+    let canonical =
+        fs::canonicalize(path).map_err(|error| invalid_path_from_io(field, path, error))?;
     if canonical != path {
         return Err(invalid_path(field, path, PathRefusal::NonCanonical));
     }
@@ -157,13 +157,13 @@ fn canonical_nonexistent_path(
     let name = path
         .file_name()
         .ok_or_else(|| invalid_path(field, path, PathRefusal::InvalidName))?;
-    let parent_metadata = fs::symlink_metadata(parent)
-        .map_err(|error| invalid_path_from_io(field, parent, error))?;
+    let parent_metadata =
+        fs::symlink_metadata(parent).map_err(|error| invalid_path_from_io(field, parent, error))?;
     if parent_metadata.file_type().is_symlink() || !parent_metadata.is_dir() {
         return Err(invalid_path(field, parent, PathRefusal::ParentMissing));
     }
-    let canonical_parent = fs::canonicalize(parent)
-        .map_err(|error| invalid_path_from_io(field, parent, error))?;
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|error| invalid_path_from_io(field, parent, error))?;
     let canonical = canonical_parent.join(name);
     if canonical != path {
         return Err(invalid_path(field, path, PathRefusal::NonCanonical));
@@ -198,7 +198,7 @@ fn is_executable(_metadata: &Metadata) -> bool {
 }
 
 #[cfg(unix)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct FileIdentity {
     device: u64,
     inode: u64,
@@ -214,7 +214,7 @@ fn file_identity(metadata: &Metadata) -> FileIdentity {
 }
 
 #[cfg(not(unix))]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct FileIdentity;
 
 #[cfg(not(unix))]
@@ -227,8 +227,8 @@ fn reject_executable_aliases(
 ) -> Result<(), CandidateHeadQualificationFailure> {
     let mut identities = Vec::with_capacity(tools.len());
     for (field, path) in tools {
-        let metadata = fs::metadata(path)
-            .map_err(|error| invalid_path_from_io(field, path, error))?;
+        let metadata =
+            fs::metadata(path).map_err(|error| invalid_path_from_io(field, path, error))?;
         identities.push((field, path, file_identity(&metadata)));
     }
     for first in 0..identities.len() {

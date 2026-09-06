@@ -18,15 +18,19 @@ fn provider_runtime_and_output_are_natively_bounded() {
         stdout_bytes: 32,
         ..QualificationLimits::default()
     };
-    assert!(matches!(
-        qualify_with(&fixture.request(), limits),
-        Err(CandidateHeadQualificationFailure::OutputLimitExceeded {
-            run: QualificationRun::First,
-            stream: QualificationStream::Stdout,
-            limit: 32,
-            ..
-        })
-    ));
+    let result = qualify_with(&fixture.request(), limits);
+    assert!(
+        matches!(
+            result,
+            Err(CandidateHeadQualificationFailure::OutputLimitExceeded {
+                run: QualificationRun::First,
+                stream: QualificationStream::Stdout,
+                limit: 32,
+                ..
+            })
+        ),
+        "{result:?}"
+    );
 
     let fixture = Fixture::new("stderr-limit");
     let limits = QualificationLimits {
@@ -147,4 +151,3 @@ fn independently_materialized_roots_must_not_share_file_storage() {
         )
     );
 }
-
