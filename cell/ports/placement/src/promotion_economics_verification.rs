@@ -282,6 +282,31 @@ pub struct PromotionEconomicsCheckpointLeaseExpectationV1 {
 
 /// An execution lease over one verification key.
 ///
+/// # What holding one does NOT prove
+///
+/// This is a private-field wrapper, and every other private-field wrapper in
+/// this module is minted only after a signature check. This one is not, so read
+/// it precisely rather than by analogy:
+///
+/// - IT IS NOT AN AUTHENTICATION. [`verify_promotion_economics_checkpoint_lease`]
+///   takes no [`CellProofVerifier`] and checks no signature. It checks SHAPE AND
+///   EXPECTATION only: that the claim names the key, worker and revision being
+///   resumed, and that it has not expired at the stated time. A store that
+///   fabricated the claim passes that check.
+/// - IT IS NOT PROOF OF EXCLUSIVITY. Holding one does not establish that no
+///   other worker is executing the same key. Exclusivity is enforced solely by
+///   the store's revision compare-and-set at commit, and a lease that lost its
+///   race still looks exactly like this.
+///
+/// Fabricating a lease therefore gains nothing, which is why no signature is
+/// required here: progress integrity rests entirely on the signed checkpoint
+/// attestation and the revision CAS, and a store dishonest enough to forge a
+/// lease is dishonest enough to accept two conflicting commits — which no
+/// signature on this type would prevent. The cryptography belongs where the
+/// progress is.
+///
+/// # What it is
+///
 /// All fields are private and there is no public constructor: a lease is not a
 /// credential a caller or a store may assemble. A lease authorizes ONLY writes
 /// to its own local verification checkpoint. It is never authority to mutate
