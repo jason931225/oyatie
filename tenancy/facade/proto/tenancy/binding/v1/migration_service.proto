@@ -22,7 +22,9 @@ service TenancyMigrationCoordinationService {
   rpc CloseParticipantPhase(CloseParticipantPhaseRequestV1) returns (SignedParticipantPhaseClosureV1);
   rpc AppendTransferAuthorization(AppendTransferAuthorizationRequestV1) returns (TransferAuthorizationJournalV1);
   rpc SealTransferAuthorizationSet(SealTransferAuthorizationSetRequestV1) returns (SignedResidencyTransferAuthorizationSetV1);
-  rpc IssueTransferExecutionPermit(IssueTransferExecutionPermitRequestV1) returns (SignedTransferExecutionPermitV1);
+  rpc IssueTransferExecutionPermit(IssueTransferExecutionPermitRequestV1) returns (IssueTransferExecutionPermitResultV1);
+  rpc PublishTransferExecutionPermit(PublishTransferExecutionPermitRequestV1) returns (SignedTransferExecutionPermitV1);
+  rpc GetTransferExecutionPermit(GetTransferExecutionPermitRequestV1) returns (GetTransferExecutionPermitResultV1);
   rpc RecordTransferExecutionOutcome(RecordTransferExecutionOutcomeRequestV1) returns (SignedTransferExecutionOutcomeV1);
   rpc IssueSourceFenceDirective(IssueSourceFenceDirectiveRequestV1) returns (IssueSourceFenceDirectiveResultV1);
 }
@@ -153,4 +155,56 @@ message TransferAuthorizationJournalV1 {
   uint64 authorized_maximum_cost_microunits = 10;
   uint64 revision = 11;
   Digest32 record_digest = 12;
+}
+
+// Result of IssueTransferExecutionPermit.
+//
+// Carries the durable UNSIGNED issuance only. There is deliberately no
+// signature-typed field on this message: a signed permit is reachable only
+// through PublishTransferExecutionPermit, and only after an independent commit
+// observation of the issuance row has been produced and verified.
+message IssueTransferExecutionPermitResultV1 {
+  TransferExecutionPermitIssuanceRecordV1 issuance = 1;
+  TransferExecutionLedgerV1 ledger = 2;
+  BindingOperationV1 operation = 3;
+}
+
+// Request for PublishTransferExecutionPermit.
+//
+// Every field is either a lookup key or a precondition that the service checks
+// against its own read. This message deliberately CANNOT carry an issuance
+// record, a commit observation, or a signature: the commit observer, the
+// verifier and the signer are internal collaborators of the service and are not
+// nameable by a caller. Do not add a committed_issuance field here.
+message PublishTransferExecutionPermitRequestV1 {
+  BindingOperationKeyV1 operation = 1;
+  uint64 expected_operation_revision = 2;
+  uint64 expected_ledger_revision = 3;
+  TransferExecutionPermitIssuanceAddressV1 issuance_address = 4;
+  uint64 expected_issuance_revision = 5;
+  Digest32 expected_issuance_record_digest = 6;
+  TransferExecutionIssuanceReadIsolationV1 required_read_isolation = 7;
+  string idempotency_key = 8;
+  Digest32 canonical_request_digest = 9;
+}
+
+// Request for GetTransferExecutionPermit. Read-only, so it carries no
+// idempotency key.
+message GetTransferExecutionPermitRequestV1 {
+  BindingOperationKeyV1 operation = 1;
+  TransferExecutionPermitIssuanceAddressV1 issuance_address = 2;
+  Digest32 canonical_request_digest = 3;
+}
+
+// Result of GetTransferExecutionPermit. The pair of presence bits is what makes
+// a lost reply distinguishable from a permit that was never durably issued:
+//   issuance absent                -> nothing was ever durably issued
+//   issuance present, permit absent -> issuance committed, publication not
+//                                      observed yet; the reply was lost and
+//                                      PublishTransferExecutionPermit may be
+//                                      called again
+//   issuance present, permit present -> published
+message GetTransferExecutionPermitResultV1 {
+  TransferExecutionPermitIssuanceRecordV1 issuance = 1;
+  SignedTransferExecutionPermitV1 permit = 2;
 }

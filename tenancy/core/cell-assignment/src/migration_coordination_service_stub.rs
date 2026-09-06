@@ -1,12 +1,15 @@
 use crate::{
     AppendParticipantReceiptRequestV1, AppendTransferAuthorizationRequestV1, BindingContractError,
-    BoxTenancyFuture, CloseParticipantPhaseRequestV1, IssueSourceFenceDirectiveRequestV1,
-    IssueTransferExecutionPermitRequestV1, PutParticipantManifestRequestV1,
+    BoxTenancyFuture, CloseParticipantPhaseRequestV1, GetTransferExecutionPermitRequestV1,
+    IssueSourceFenceDirectiveRequestV1, IssueTransferExecutionPermitRequestV1,
+    PublishTransferExecutionPermitRequestV1, PutParticipantManifestRequestV1,
     PutParticipantManifestResultV1, RecordTransferExecutionOutcomeRequestV1,
     SealTransferAuthorizationSetRequestV1, SignedParticipantPhaseClosureV1,
     SignedResidencyTransferAuthorizationSetV1, SignedTransferExecutionOutcomeV1,
     SignedTransferExecutionPermitV1, SourceFenceDirectiveIssueResultV1,
-    TenancyMigrationCoordinationService, TransferAuthorizationJournalV1, VerifiedBindingInvocation,
+    TenancyMigrationCoordinationService, TransferAuthorizationJournalV1,
+    TransferExecutionPermitGetResultV1, TransferExecutionPermitIssueResultV1,
+    VerifiedBindingInvocation,
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -62,7 +65,25 @@ impl TenancyMigrationCoordinationService for NotImplementedTenancyMigrationCoord
         &'a self,
         _: VerifiedBindingInvocation,
         _: IssueTransferExecutionPermitRequestV1,
+    ) -> BoxTenancyFuture<'a, Result<TransferExecutionPermitIssueResultV1, BindingContractError>>
+    {
+        not_implemented()
+    }
+
+    fn publish_transfer_execution_permit<'a>(
+        &'a self,
+        _: VerifiedBindingInvocation,
+        _: PublishTransferExecutionPermitRequestV1,
     ) -> BoxTenancyFuture<'a, Result<SignedTransferExecutionPermitV1, BindingContractError>> {
+        not_implemented()
+    }
+
+    fn get_transfer_execution_permit<'a>(
+        &'a self,
+        _: VerifiedBindingInvocation,
+        _: GetTransferExecutionPermitRequestV1,
+    ) -> BoxTenancyFuture<'a, Result<TransferExecutionPermitGetResultV1, BindingContractError>>
+    {
         not_implemented()
     }
 

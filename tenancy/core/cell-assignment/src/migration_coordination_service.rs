@@ -7,6 +7,8 @@ use crate::{
     SignedTransferExecutionOutcomeV1, SignedTransferExecutionPermitV1,
     SourceFenceDirectiveIssueResultV1, SourceFenceDirectiveLedgerRevision,
     TransferAuthorizationJournalRevision, TransferExecutionLedgerRevision,
+    TransferExecutionLedgerV1, TransferExecutionPermitIssuanceAddressV1,
+    TransferExecutionPermitIssuanceRecordV1, TransferExecutionPermitIssuanceRevision,
     VerifiedBindingInvocation, VerifiedParticipantManifest, VerifiedParticipantPhaseClosure,
     VerifiedParticipantReceipt, VerifiedResidencyTransferAuthorization,
     VerifiedResidencyTransferAuthorizationSet, VerifiedTransferEffectManifest,
@@ -81,6 +83,69 @@ pub struct IssueTransferExecutionPermitRequestV1 {
     pub canonical_request_digest: BindingDigest32,
 }
 
+/// Result of [`TenancyMigrationCoordinationService::issue_transfer_execution_permit`].
+///
+/// Carries the durable UNSIGNED issuance only. There is deliberately no
+/// signature-typed field on this type: a signed permit is reachable only through
+/// [`TenancyMigrationCoordinationService::publish_transfer_execution_permit`],
+/// and only after an independent commit observation of the issuance row has been
+/// produced and verified.
+#[derive(Debug, Eq, PartialEq)]
+pub struct TransferExecutionPermitIssueResultV1 {
+    pub issuance: TransferExecutionPermitIssuanceRecordV1,
+    pub ledger: TransferExecutionLedgerV1,
+    pub operation: crate::BindingOperationV1,
+}
+
+/// Request for
+/// [`TenancyMigrationCoordinationService::publish_transfer_execution_permit`].
+///
+/// Every field is either a lookup key or a precondition that the service checks
+/// against its own read. This type deliberately CANNOT carry an issuance record,
+/// a commit observation, or a signature: the commit observer, the verifier and
+/// the signer are internal collaborators of the service and are not nameable by
+/// a caller. Do not add a `committed_issuance` field here.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PublishTransferExecutionPermitRequestV1 {
+    pub operation: BindingOperationKey,
+    pub expected_operation_revision: BindingOperationRevision,
+    pub expected_ledger_revision: TransferExecutionLedgerRevision,
+    pub issuance_address: TransferExecutionPermitIssuanceAddressV1,
+    pub expected_issuance_revision: TransferExecutionPermitIssuanceRevision,
+    pub expected_issuance_record_digest: BindingDigest32,
+    pub required_read_isolation: crate::TransferExecutionIssuanceReadIsolationV1,
+    pub idempotency_key: BindingIdempotencyKey,
+    pub canonical_request_digest: BindingDigest32,
+}
+
+/// Request for
+/// [`TenancyMigrationCoordinationService::get_transfer_execution_permit`].
+/// Read-only, so it carries no idempotency key.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GetTransferExecutionPermitRequestV1 {
+    pub operation: BindingOperationKey,
+    pub issuance_address: TransferExecutionPermitIssuanceAddressV1,
+    pub canonical_request_digest: BindingDigest32,
+}
+
+/// Result of
+/// [`TenancyMigrationCoordinationService::get_transfer_execution_permit`].
+///
+/// The pair of `Option`s is what makes a lost reply distinguishable from a
+/// permit that was never durably issued:
+///
+/// - `issuance: None` — nothing was ever durably issued.
+/// - `issuance: Some(_), permit: None` — the issuance committed but no
+///   publication has been observed; the reply was lost and
+///   [`TenancyMigrationCoordinationService::publish_transfer_execution_permit`]
+///   may be called again for the same immutable issuance.
+/// - `issuance: Some(_), permit: Some(_)` — published.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferExecutionPermitGetResultV1 {
+    pub issuance: Option<TransferExecutionPermitIssuanceRecordV1>,
+    pub permit: Option<SignedTransferExecutionPermitV1>,
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct RecordTransferExecutionOutcomeRequestV1 {
     pub operation: BindingOperationKey,
@@ -141,11 +206,45 @@ pub trait TenancyMigrationCoordinationService: Send + Sync {
         Result<SignedResidencyTransferAuthorizationSetV1, BindingContractError>,
     >;
 
+    /// Durably issues an UNSIGNED transfer-execution permit.
+    ///
+    /// This call can never return a signature. Obtaining one requires
+    /// [`Self::publish_transfer_execution_permit`], which runs behind an
+    /// independent commit observation and its verification.
     fn issue_transfer_execution_permit<'a>(
         &'a self,
         invocation: VerifiedBindingInvocation,
         request: IssueTransferExecutionPermitRequestV1,
+    ) -> crate::BoxTenancyFuture<
+        'a,
+        Result<TransferExecutionPermitIssueResultV1, BindingContractError>,
+    >;
+
+    /// Mints and returns the signed permit for an already-committed issuance.
+    ///
+    /// The request names the issuance by key only. The service is responsible
+    /// for re-reading the committed row through
+    /// [`crate::TransferExecutionCommitObserver`], verifying the observation
+    /// through
+    /// [`crate::verify_committed_transfer_execution_permit_issuance`], signing
+    /// through [`crate::TransferExecutionPermitAuthority`] and publishing
+    /// through [`crate::TransferExecutionStore::publish_permit`]. Republishing
+    /// the same immutable issuance is permitted; byte-identical signatures are
+    /// not required.
+    fn publish_transfer_execution_permit<'a>(
+        &'a self,
+        invocation: VerifiedBindingInvocation,
+        request: PublishTransferExecutionPermitRequestV1,
     ) -> crate::BoxTenancyFuture<'a, Result<SignedTransferExecutionPermitV1, BindingContractError>>;
+
+    /// Reads issuance and publication state without mutating anything, so a
+    /// caller that lost a reply can tell "never issued" from "issued, not yet
+    /// published".
+    fn get_transfer_execution_permit<'a>(
+        &'a self,
+        invocation: VerifiedBindingInvocation,
+        request: GetTransferExecutionPermitRequestV1,
+    ) -> crate::BoxTenancyFuture<'a, Result<TransferExecutionPermitGetResultV1, BindingContractError>>;
 
     fn record_transfer_execution_outcome<'a>(
         &'a self,
