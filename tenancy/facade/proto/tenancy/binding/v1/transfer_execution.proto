@@ -141,3 +141,65 @@ message TransferExecutionItemPageV1 {
   bytes next_page_token = 4;
   Digest32 page_digest = 5;
 }
+
+enum TransferExecutionIssuanceReadIsolationV1 {
+  TRANSFER_EXECUTION_ISSUANCE_READ_ISOLATION_V1_UNSPECIFIED = 0;
+  TRANSFER_EXECUTION_ISSUANCE_READ_ISOLATION_V1_READ_COMMITTED = 1;
+}
+
+message TransferExecutionPermitIssuanceAddressV1 {
+  BindingOperationKeyV1 operation = 1;
+  tenancy.identity.v1.TenantId tenant_id = 2;
+  string participant_id = 3;
+  uint64 effect_ordinal = 4;
+  Digest32 effect_fingerprint = 5;
+  string issuance_id = 6;
+}
+
+message TransferExecutionPermitIssuanceRecordV1 {
+  TransferExecutionPermitIssuanceAddressV1 address = 1;
+  TransferExecutionPermitPayloadV1 unsigned_permit = 2;
+  Digest32 unsigned_permit_digest = 3;
+  uint64 ledger_revision = 4;
+  uint64 item_revision = 5;
+  uint64 revision = 6;
+  Digest32 record_digest = 7;
+}
+
+message TransferExecutionPermitIssuancePreconditionV1 {
+  TransferExecutionPermitIssuanceAddressV1 address = 1;
+  uint64 revision = 2;
+  Digest32 record_digest = 3;
+}
+
+message TransferExecutionPermitIssuanceLookupV1 {
+  TransferExecutionPermitIssuanceAddressV1 address = 1;
+  TransferExecutionIssuanceReadIsolationV1 read_isolation = 2;
+  BindingProducerIdV1 observation_audience = 3;
+  uint64 now_unix_seconds = 4;
+}
+
+message TransferExecutionCommitObservationPayloadV1 {
+  uint32 schema_version = 1;
+  TransferExecutionPermitIssuanceAddressV1 address = 2;
+  TransferExecutionIssuanceReadIsolationV1 read_isolation = 3;
+  uint64 observed_issuance_revision = 4;
+  Digest32 observed_issuance_record_digest = 5;
+  Digest32 observed_unsigned_permit_digest = 6;
+  uint64 observed_ledger_revision = 7;
+  Digest32 observed_ledger_record_digest = 8;
+  uint64 observed_item_revision = 9;
+  Digest32 observed_item_record_digest = 10;
+  uint64 observed_at_unix_seconds = 11;
+}
+
+message SignedTransferExecutionCommitObservationV1 {
+  TransferExecutionCommitObservationPayloadV1 payload = 1;
+  BindingProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message CommittedTransferExecutionPermitIssuanceClaimV1 {
+  TransferExecutionPermitIssuanceRecordV1 issuance = 1;
+  SignedTransferExecutionCommitObservationV1 observation = 2;
+}

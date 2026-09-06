@@ -180,7 +180,7 @@ pub struct IssueTransferExecutionPermitWriteSetPartsV1 {
     pub authorization: VerifiedResidencyTransferAuthorization,
     pub authorization_set: VerifiedResidencyTransferAuthorizationSet,
     pub participant: VerifiedParticipantManifestMember,
-    pub permit: VerifiedTransferExecutionPermit,
+    pub issuance: TransferExecutionPermitIssuanceRecordV1,
     pub next_ledger: TransferExecutionLedgerV1,
     pub next_item: crate::TransferExecutionItemV1,
     pub idempotency: BindingIdempotencyRecordV1,
@@ -276,4 +276,205 @@ pub fn verify_transfer_execution_outcome(
     _expectation: &TransferExecutionOutcomeExpectationV1,
 ) -> Result<VerifiedTransferExecutionOutcome, BindingProofVerificationError> {
     Err(BindingProofVerificationError::NotImplemented)
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TransferExecutionPermitIssuanceRevision(pub u64);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum TransferExecutionIssuanceReadIsolationV1 {
+    ReadCommitted,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct TransferExecutionPermitIssuanceAddressV1 {
+    pub operation: BindingOperationKey,
+    pub tenant_id: TenantId,
+    pub participant_id: CapabilityParticipantId,
+    pub effect_ordinal: u64,
+    pub effect_fingerprint: BindingDigest32,
+    pub issuance_id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferExecutionPermitIssuanceRecordV1 {
+    address: TransferExecutionPermitIssuanceAddressV1,
+    unsigned_permit: TransferExecutionPermitPayloadV1,
+    unsigned_permit_digest: BindingDigest32,
+    ledger_revision: TransferExecutionLedgerRevision,
+    item_revision: crate::TransferExecutionItemRevision,
+    revision: TransferExecutionPermitIssuanceRevision,
+    record_digest: BindingDigest32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferExecutionPermitIssuanceRecordPartsV1 {
+    pub address: TransferExecutionPermitIssuanceAddressV1,
+    pub unsigned_permit: TransferExecutionPermitPayloadV1,
+    pub unsigned_permit_digest: BindingDigest32,
+    pub ledger_revision: TransferExecutionLedgerRevision,
+    pub item_revision: crate::TransferExecutionItemRevision,
+    pub revision: TransferExecutionPermitIssuanceRevision,
+    pub record_digest: BindingDigest32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum TransferExecutionPermitIssuanceConstructionErrorV1 {
+    NotImplemented,
+    InvalidRevision,
+    UnsignedPermitDigestMismatch,
+    AddressMismatch,
+    RecordDigestMismatch,
+}
+
+impl TransferExecutionPermitIssuanceRecordV1 {
+    pub fn rehydrate(
+        _parts: TransferExecutionPermitIssuanceRecordPartsV1,
+    ) -> Result<Self, TransferExecutionPermitIssuanceConstructionErrorV1> {
+        Err(TransferExecutionPermitIssuanceConstructionErrorV1::NotImplemented)
+    }
+
+    #[must_use]
+    pub fn address(&self) -> &TransferExecutionPermitIssuanceAddressV1 {
+        &self.address
+    }
+
+    #[must_use]
+    pub fn unsigned_permit(&self) -> &TransferExecutionPermitPayloadV1 {
+        &self.unsigned_permit
+    }
+
+    #[must_use]
+    pub fn unsigned_permit_digest(&self) -> BindingDigest32 {
+        self.unsigned_permit_digest
+    }
+
+    #[must_use]
+    pub fn ledger_revision(&self) -> TransferExecutionLedgerRevision {
+        self.ledger_revision
+    }
+
+    #[must_use]
+    pub fn item_revision(&self) -> crate::TransferExecutionItemRevision {
+        self.item_revision
+    }
+
+    #[must_use]
+    pub fn revision(&self) -> TransferExecutionPermitIssuanceRevision {
+        self.revision
+    }
+
+    #[must_use]
+    pub fn record_digest(&self) -> BindingDigest32 {
+        self.record_digest
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferExecutionPermitIssuancePreconditionV1 {
+    pub address: TransferExecutionPermitIssuanceAddressV1,
+    pub revision: TransferExecutionPermitIssuanceRevision,
+    pub record_digest: BindingDigest32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferExecutionPermitIssuanceLookupV1 {
+    pub address: TransferExecutionPermitIssuanceAddressV1,
+    pub read_isolation: TransferExecutionIssuanceReadIsolationV1,
+    pub observation_audience: crate::BindingProducerId,
+    pub now_unix_seconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferExecutionCommitObservationPayloadV1 {
+    pub schema_version: u32,
+    pub address: TransferExecutionPermitIssuanceAddressV1,
+    pub read_isolation: TransferExecutionIssuanceReadIsolationV1,
+    pub observed_issuance_revision: TransferExecutionPermitIssuanceRevision,
+    pub observed_issuance_record_digest: BindingDigest32,
+    pub observed_unsigned_permit_digest: BindingDigest32,
+    pub observed_ledger_revision: TransferExecutionLedgerRevision,
+    pub observed_ledger_record_digest: BindingDigest32,
+    pub observed_item_revision: crate::TransferExecutionItemRevision,
+    pub observed_item_record_digest: BindingDigest32,
+    pub observed_at_unix_seconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedTransferExecutionCommitObservationV1 {
+    pub payload: TransferExecutionCommitObservationPayloadV1,
+    pub envelope: BindingProofEnvelopeV1,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommittedTransferExecutionPermitIssuanceClaimV1 {
+    pub issuance: TransferExecutionPermitIssuanceRecordV1,
+    pub observation: SignedTransferExecutionCommitObservationV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferExecutionCommitObservationExpectationV1 {
+    pub address: TransferExecutionPermitIssuanceAddressV1,
+    pub expected_read_isolation: TransferExecutionIssuanceReadIsolationV1,
+    pub expected_issuance_revision: TransferExecutionPermitIssuanceRevision,
+    pub expected_issuance_record_digest: BindingDigest32,
+    pub expected_unsigned_permit_digest: BindingDigest32,
+    pub expected_producer: crate::BindingProducerId,
+    pub expected_audience: crate::BindingProducerId,
+    pub now_unix_seconds: u64,
+    pub maximum_clock_uncertainty_millis: u64,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct VerifiedCommittedTransferExecutionPermitIssuance(
+    CommittedTransferExecutionPermitIssuanceClaimV1,
+);
+
+impl VerifiedCommittedTransferExecutionPermitIssuance {
+    #[must_use]
+    pub fn claim(&self) -> &CommittedTransferExecutionPermitIssuanceClaimV1 {
+        &self.0
+    }
+}
+
+pub fn verify_committed_transfer_execution_permit_issuance(
+    _verifier: &dyn BindingProofVerifier,
+    _claim: CommittedTransferExecutionPermitIssuanceClaimV1,
+    _expectation: &TransferExecutionCommitObservationExpectationV1,
+) -> Result<VerifiedCommittedTransferExecutionPermitIssuance, BindingProofVerificationError> {
+    Err(BindingProofVerificationError::NotImplemented)
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct PublishTransferExecutionPermitWriteSetV1 {
+    parts: PublishTransferExecutionPermitWriteSetPartsV1,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
+    pub authority: BindingPersistenceAuthorityV1,
+    pub expected_operation_revision: BindingOperationRevision,
+    pub operation: BindingOperationV1,
+    pub issuance_precondition: TransferExecutionPermitIssuancePreconditionV1,
+    pub item_precondition: crate::TransferExecutionItemPreconditionV1,
+    pub committed_issuance: VerifiedCommittedTransferExecutionPermitIssuance,
+    pub permit: VerifiedTransferExecutionPermit,
+    pub next_item: crate::TransferExecutionItemV1,
+    pub idempotency: BindingIdempotencyRecordV1,
+    pub audit_outbox: BindingAuditRecordV1,
+    pub proof_consumptions: Vec<BindingProofConsumptionV1>,
+}
+
+impl PublishTransferExecutionPermitWriteSetV1 {
+    pub fn assemble(
+        _parts: PublishTransferExecutionPermitWriteSetPartsV1,
+    ) -> Result<Self, BindingStoreError> {
+        Err(BindingStoreError::NotImplemented)
+    }
+
+    #[must_use]
+    pub fn parts(&self) -> &PublishTransferExecutionPermitWriteSetPartsV1 {
+        &self.parts
+    }
 }
