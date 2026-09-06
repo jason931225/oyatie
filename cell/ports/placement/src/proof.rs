@@ -73,6 +73,7 @@ pub enum CellProofDomainV1 {
     MovementActionClosure,
     MovementActionResult,
     PromotionEconomicsSourceFinalization,
+    PromotionEconomicsCheckpointAttestation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

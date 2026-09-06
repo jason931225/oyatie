@@ -20,9 +20,9 @@
 //! closed with a typed `NotImplemented`.
 
 use crate::{
-    BoxCellFuture, CellControlReadAuthorityV1, CellId, CellRevisionIdentityV1, Digest32,
-    PlacementPartitionV1, ProducerId, PromotionCostCategoryTotalV1,
-    PromotionEconomicsInputMemberV1, PromotionEconomicsPolicyV1,
+    BoxCellFuture, CellControlReadAuthorityV1, CellId, CellProofEnvelopeV1, CellProofVerifier,
+    CellRevisionIdentityV1, Digest32, PlacementPartitionV1, ProducerId,
+    PromotionCostCategoryTotalV1, PromotionEconomicsInputMemberV1, PromotionEconomicsPolicyV1,
     PromotionEconomicsVerificationErrorV1, PromotionEconomicsWindowV1,
     SignedPromotionEconomicsSourceFinalizationV1, VerifiedCellPromotionEconomics,
     VerifiedPromotionEconomicsClosure,
@@ -172,12 +172,70 @@ pub struct PromotionEconomicsVerificationCheckpointV1 {
     pub checkpoint_digest: Digest32,
 }
 
-/// A checkpoint restored under verified store attestation and provenance.
+/// What the store durably holds for one verification key, in the form the
+/// store can actually produce.
 ///
-/// Private field, no public constructor. Decoding an arbitrary checkpoint does
-/// not mint one: restoration verifies the store's attestation and the
-/// checkpoint digest first. An unverified checkpoint is never admissible
-/// promotion evidence and can never stand in for completed replay.
+/// This is the public, unverified record. A store adapter reports it; a store
+/// adapter cannot turn it into progress. Both store methods return this shape
+/// rather than a verified wrapper, because a store that could construct a
+/// verified value could fabricate replay progress that no verifier ever
+/// checked.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromotionEconomicsCheckpointClaimV1 {
+    pub checkpoint: PromotionEconomicsVerificationCheckpointV1,
+    pub attestation: SignedPromotionEconomicsCheckpointAttestationV1,
+}
+
+/// The store's signed statement about what it durably committed.
+///
+/// Signed under
+/// [`crate::CellProofDomainV1::PromotionEconomicsCheckpointAttestation`]. It
+/// binds the verification key, the committed revision and the checkpoint
+/// digest, which is what lets the owning module distinguish a checkpoint the
+/// store really committed from bytes handed to it by anything else.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromotionEconomicsCheckpointAttestationPayloadV1 {
+    pub schema_version: u32,
+    pub partition: PlacementPartitionV1,
+    pub key: PromotionEconomicsVerificationKeyV1,
+    pub revision: u64,
+    pub checkpoint_digest: Digest32,
+    pub committed_at_unix_seconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedPromotionEconomicsCheckpointAttestationV1 {
+    pub payload: PromotionEconomicsCheckpointAttestationPayloadV1,
+    pub envelope: CellProofEnvelopeV1,
+    pub signature: Vec<u8>,
+}
+
+/// What the owning module independently expects a restored checkpoint to be.
+///
+/// The expectation is computed by the verifier from the work it is resuming,
+/// never copied out of the claim: a claim that supplies its own expectation
+/// proves nothing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromotionEconomicsCheckpointExpectationV1 {
+    pub key: PromotionEconomicsVerificationKeyV1,
+    pub expected_cell: CellRevisionIdentityV1,
+    pub expected_registry_digest: Digest32,
+    pub expected_policy_digest: Digest32,
+    pub expected_producer: ProducerId,
+    pub expected_audience: ProducerId,
+    pub now_unix_seconds: u64,
+}
+
+/// A checkpoint whose store attestation, provenance and digest have been
+/// checked.
+///
+/// Private field, no public constructor, no deserialization path. Only
+/// [`verify_promotion_economics_checkpoint`] mints one, and decoding an
+/// arbitrary checkpoint does not: restoration checks the store attestation's
+/// signature, producer and audience, the expected key, the expected cell,
+/// registry and policy identity, and the checkpoint digest first. An unverified
+/// checkpoint is never admissible promotion evidence and can never stand in for
+/// completed replay.
 #[derive(Debug, Eq, PartialEq)]
 pub struct VerifiedPromotionEconomicsCheckpoint(PromotionEconomicsVerificationCheckpointV1);
 
@@ -188,13 +246,48 @@ impl VerifiedPromotionEconomicsCheckpoint {
     }
 }
 
+/// Turns what the store reported into verified progress, or refuses.
+///
+/// This is the seam the store must not cross. The store says what it holds;
+/// this function, owned by the module that owns the private wrapper, decides
+/// whether that is progress.
+pub fn verify_promotion_economics_checkpoint(
+    _verifier: &dyn CellProofVerifier,
+    _claim: PromotionEconomicsCheckpointClaimV1,
+    _expectation: &PromotionEconomicsCheckpointExpectationV1,
+) -> Result<VerifiedPromotionEconomicsCheckpoint, PromotionEconomicsVerificationErrorV1> {
+    Err(PromotionEconomicsVerificationErrorV1::NotImplemented)
+}
+
+/// What the store durably holds about who currently holds execution, in the
+/// form the store can actually produce.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromotionEconomicsCheckpointLeaseClaimV1 {
+    pub key: PromotionEconomicsVerificationKeyV1,
+    pub expected_revision: u64,
+    pub term: u64,
+    pub expires_at_unix_seconds: u64,
+    pub worker: ProducerId,
+    pub lease_digest: Digest32,
+}
+
+/// What the owning module independently expects of a lease claim.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromotionEconomicsCheckpointLeaseExpectationV1 {
+    pub key: PromotionEconomicsVerificationKeyV1,
+    pub expected_worker: ProducerId,
+    pub expected_revision: u64,
+    pub now_unix_seconds: u64,
+}
+
 /// An execution lease over one verification key.
 ///
 /// All fields are private and there is no public constructor: a lease is not a
-/// credential a caller may assemble. A lease authorizes ONLY writes to its own
-/// local verification checkpoint. It is never authority to mutate cell
-/// resources or readiness, and the store checks the holder's read authority
-/// against the same cell partition rather than accepting ambient credentials.
+/// credential a caller or a store may assemble. A lease authorizes ONLY writes
+/// to its own local verification checkpoint. It is never authority to mutate
+/// cell resources or readiness, and the store checks the holder's read
+/// authority against the same cell partition rather than accepting ambient
+/// credentials.
 ///
 /// Expiry relinquishes execution, not accumulated progress: the next holder
 /// resumes from the last committed checkpoint under a new term.
@@ -240,11 +333,29 @@ impl PromotionEconomicsCheckpointLeaseV1 {
     }
 }
 
-/// One durable checkpoint advance: an expected lease and revision, plus the
+/// Turns a reported lease claim into an execution lease, or refuses.
+///
+/// Deliberately takes no [`CellProofVerifier`]: unlike a checkpoint, a lease
+/// carries no accumulated progress and asserts nothing about what was verified.
+/// It is local execution scheduling state, so fabricating one gains nothing —
+/// a commit still requires a signed checkpoint attestation, and an expired or
+/// superseded lease loses its compare-and-set regardless of how it was
+/// obtained. What this function checks is that the claim names the key, worker
+/// and revision the caller is actually resuming, and that it has not expired at
+/// `now_unix_seconds`.
+pub fn verify_promotion_economics_checkpoint_lease(
+    _claim: PromotionEconomicsCheckpointLeaseClaimV1,
+    _expectation: &PromotionEconomicsCheckpointLeaseExpectationV1,
+) -> Result<PromotionEconomicsCheckpointLeaseV1, PromotionEconomicsVerificationErrorV1> {
+    Err(PromotionEconomicsVerificationErrorV1::NotImplemented)
+}
+
+/// One durable checkpoint advance: the execution lease being spent, and the
 /// verified next checkpoint.
 ///
-/// Private fields and no public assemble shortcut, so a caller cannot hand the
-/// store a checkpoint it did not earn.
+/// Private fields and no public assemble shortcut. Both members are
+/// private-field wrappers that only this module's verifiers mint, so a store
+/// cannot hand itself a write it did not earn.
 #[derive(Debug, Eq, PartialEq)]
 pub struct PromotionEconomicsCheckpointWriteV1 {
     lease: PromotionEconomicsCheckpointLeaseV1,
@@ -263,35 +374,35 @@ impl PromotionEconomicsCheckpointWriteV1 {
     }
 }
 
-/// Mints an execution lease. Private to this module by design: lease
-/// construction belongs to the cell verifier, not to a store implementation or
-/// an external caller.
-fn mint_promotion_economics_checkpoint_lease(
-    _key: PromotionEconomicsVerificationKeyV1,
-    _expected_revision: u64,
-    _term: u64,
-    _expires_at_unix_seconds: u64,
-    _worker: ProducerId,
-) -> Result<PromotionEconomicsCheckpointLeaseV1, PromotionEconomicsVerificationErrorV1> {
-    Err(PromotionEconomicsVerificationErrorV1::NotImplemented)
-}
-
-/// Mints a durable checkpoint write. Private for the same reason as the lease.
-fn mint_promotion_economics_checkpoint_write(
+/// Assembles a durable checkpoint write. Private to this module: the write is
+/// the verifier's own input to the store, not a value any caller supplies.
+fn assemble_promotion_economics_checkpoint_write(
     _lease: PromotionEconomicsCheckpointLeaseV1,
     _next: VerifiedPromotionEconomicsCheckpoint,
 ) -> Result<PromotionEconomicsCheckpointWriteV1, PromotionEconomicsVerificationErrorV1> {
     Err(PromotionEconomicsVerificationErrorV1::NotImplemented)
 }
 
-/// What `acquire` hands back: the execution lease, and the retained progress if
-/// any exists.
+/// What `acquire` hands back: the reported lease claim, and the reported
+/// retained progress if any exists. Both are unverified store output; the
+/// caller passes each through this module's verifier before relying on it.
 pub type PromotionEconomicsCheckpointAcquisitionV1 = (
-    PromotionEconomicsCheckpointLeaseV1,
-    Option<VerifiedPromotionEconomicsCheckpoint>,
+    PromotionEconomicsCheckpointLeaseClaimV1,
+    Option<PromotionEconomicsCheckpointClaimV1>,
 );
 
 /// The partition-local durable checkpoint store.
+///
+/// A STORE RETURNS WHAT IT DURABLY HOLDS; ONLY THIS MODULE'S VERIFIERS MINT A
+/// PRIVATE-FIELD WRAPPER. Both methods therefore hand back
+/// [`PromotionEconomicsCheckpointClaimV1`] and
+/// [`PromotionEconomicsCheckpointLeaseClaimV1`] — public, unverified records an
+/// out-of-crate adapter can actually construct — and the caller passes each
+/// through [`verify_promotion_economics_checkpoint`] or
+/// [`verify_promotion_economics_checkpoint_lease`]. A store that could return a
+/// verified wrapper directly could fabricate replay progress nothing checked;
+/// a store that cannot construct its own return type is simply unimplementable.
+/// The seam has to be in the signature, not only in prose.
 ///
 /// Implementations must provide, atomically: lease-term and revision
 /// compare-and-set, exactly one active writer per key, the partition
@@ -317,7 +428,7 @@ pub trait PromotionEconomicsCheckpointStore: Send + Sync {
         write: PromotionEconomicsCheckpointWriteV1,
     ) -> BoxCellFuture<
         'a,
-        Result<VerifiedPromotionEconomicsCheckpoint, PromotionEconomicsVerificationErrorV1>,
+        Result<PromotionEconomicsCheckpointClaimV1, PromotionEconomicsVerificationErrorV1>,
     >;
 }
 

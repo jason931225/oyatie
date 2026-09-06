@@ -19,8 +19,8 @@ import "cell/placement/v1/topology.proto";
 // an unsigned scalar whose rule requires positivity rejects zero. Enum tag order
 // is wire identity only and carries no rank.
 //
-// No Verified* wrapper, execution lease, checkpoint write or step outcome
-// appears here. Those are private-field capability types, never credentials on
+// No Verified* wrapper, minted execution lease, checkpoint write or step
+// outcome appears here. Those are private-field capability types, never credentials on
 // a wire. Verification error enums stay Rust-side, as the assurance
 // compilation errors do.
 
@@ -426,4 +426,58 @@ message PromotionEconomicsVerificationCheckpointV1 {
   uint64 retained_until_unix_seconds = 9;
   uint64 updated_at_unix_seconds = 10;
   Digest32 checkpoint_digest = 11;
+}
+
+// The store's signed statement about what it durably committed. Signed under
+// CELL_PROOF_DOMAIN_V1_PROMOTION_ECONOMICS_CHECKPOINT_ATTESTATION.
+message PromotionEconomicsCheckpointAttestationPayloadV1 {
+  uint32 schema_version = 1;
+  PlacementPartitionV1 partition = 2;
+  PromotionEconomicsVerificationKeyV1 key = 3;
+  uint64 revision = 4;
+  Digest32 checkpoint_digest = 5;
+  uint64 committed_at_unix_seconds = 6;
+}
+
+message SignedPromotionEconomicsCheckpointAttestationV1 {
+  PromotionEconomicsCheckpointAttestationPayloadV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+// What a checkpoint store durably holds and can actually construct. A store
+// returns this; only the owning module's verifier turns it into the
+// private-field VerifiedPromotionEconomicsCheckpoint, which has no wire form.
+message PromotionEconomicsCheckpointClaimV1 {
+  PromotionEconomicsVerificationCheckpointV1 checkpoint = 1;
+  SignedPromotionEconomicsCheckpointAttestationV1 attestation = 2;
+}
+
+// What a checkpoint store durably holds about who currently holds execution.
+// Unsigned: a lease carries no accumulated progress, and a commit still
+// requires the signed checkpoint attestation above.
+message PromotionEconomicsCheckpointLeaseClaimV1 {
+  PromotionEconomicsVerificationKeyV1 key = 1;
+  uint64 expected_revision = 2;
+  uint64 term = 3;
+  uint64 expires_at_unix_seconds = 4;
+  ProducerIdV1 worker = 5;
+  Digest32 lease_digest = 6;
+}
+
+message PromotionEconomicsCheckpointExpectationV1 {
+  PromotionEconomicsVerificationKeyV1 key = 1;
+  CellRevisionIdentityV1 expected_cell = 2;
+  Digest32 expected_registry_digest = 3;
+  Digest32 expected_policy_digest = 4;
+  ProducerIdV1 expected_producer = 5;
+  ProducerIdV1 expected_audience = 6;
+  uint64 now_unix_seconds = 7;
+}
+
+message PromotionEconomicsCheckpointLeaseExpectationV1 {
+  PromotionEconomicsVerificationKeyV1 key = 1;
+  ProducerIdV1 expected_worker = 2;
+  uint64 expected_revision = 3;
+  uint64 now_unix_seconds = 4;
 }
