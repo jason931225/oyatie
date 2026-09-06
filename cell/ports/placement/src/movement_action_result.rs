@@ -293,13 +293,34 @@ pub fn verify_committed_movement_action_result(
 /// The port accepts the same lookup [`MovementActionResultStore::get_result`]
 /// takes and nothing else: never a caller-supplied record, never a caller's
 /// claim that a commit occurred.
+///
+/// `None` means the observer looked and found NOTHING at that key. It is an
+/// outcome, not a failure: the observer read under committed read isolation with
+/// authority, and there was no committed row. That is precisely the fact
+/// `[`MovementActionResultStore::get_result`]` exists to establish - it is what separates
+/// "never durably committed" from "committed, reply lost" - so an observer that
+/// could not say it would be unable to do its one job.
+///
+/// It is deliberately NOT `PlacementContractError::NotFoundOrNotAuthorized`.
+/// That variant conflates absence with an authorization refusal, on purpose, so
+/// that a lookup does not tell an unauthorized caller whether a record exists.
+/// An observer already runs under authority, so for it the conflation destroys
+/// exactly the distinction it is here to draw.
+///
+/// A `None` that DISAGREES with `[`MovementActionResultStore::get_result`]` reporting a record is a
+/// REFUSAL, never a quiet fallback to "nothing was committed". The caller must
+/// not proceed as if the write never happened on the strength of a store report
+/// the observer could not corroborate.
 pub trait MovementActionResultCommitObserver: Send + Sync {
     fn observe_committed_result<'a>(
         &'a self,
         authority: &'a PlacementReadAuthorityV1,
         partition: &'a MovementBudgetAuthorityPartition,
         key: &'a MovementActionResultKeyV1,
-    ) -> BoxCellFuture<'a, Result<CommittedMovementActionResultClaimV1, PlacementContractError>>;
+    ) -> BoxCellFuture<
+        'a,
+        Result<Option<CommittedMovementActionResultClaimV1>, PlacementContractError>,
+    >;
 }
 
 /// Mints the published movement-action result signature.

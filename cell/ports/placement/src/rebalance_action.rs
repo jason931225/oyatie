@@ -345,10 +345,28 @@ pub trait RebalanceSourceIssuanceStore: Send + Sync {
 /// the attestation alone. Handing back only the attestation would put the caller
 /// in charge of pairing it with a record, which reopens a narrower version of
 /// the steering hazard this port exists to close.
+///
+/// `None` means the observer looked and found NOTHING at that key. It is an
+/// outcome, not a failure: the observer read under committed read isolation with
+/// authority, and there was no committed row. That is precisely the fact
+/// `[`RebalanceSourceIssuanceStore::load_issuance`]` exists to establish - it is what separates
+/// "never durably committed" from "committed, reply lost" - so an observer that
+/// could not say it would be unable to do its one job.
+///
+/// It is deliberately NOT `PlacementContractError::NotFoundOrNotAuthorized`.
+/// That variant conflates absence with an authorization refusal, on purpose, so
+/// that a lookup does not tell an unauthorized caller whether a record exists.
+/// An observer already runs under authority, so for it the conflation destroys
+/// exactly the distinction it is here to draw.
+///
+/// A `None` that DISAGREES with `[`RebalanceSourceIssuanceStore::load_issuance`]` reporting a record is a
+/// REFUSAL, never a quiet fallback to "nothing was committed". The caller must
+/// not proceed as if the write never happened on the strength of a store report
+/// the observer could not corroborate.
 pub trait RebalanceInvocationIssuanceCommitObserver: Send + Sync {
     fn observe_committed_issuance<'a>(
         &'a self,
         authority: &'a CellControlReconciliationReadAuthorityV1,
         address: &'a RebalanceIssuanceAddressV1,
-    ) -> BoxCellFuture<'a, Result<CommittedRebalanceIssuanceClaimV1, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<Option<CommittedRebalanceIssuanceClaimV1>, PlacementContractError>>;
 }
