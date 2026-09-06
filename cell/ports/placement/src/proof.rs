@@ -69,7 +69,6 @@ pub enum CellProofDomainV1 {
     CellControlRepairAuthority,
     PlacementActor,
     PlacementPolicyDecision,
-    RebalanceSourceCommit,
     MovementActionClosure,
     MovementActionResult,
     PromotionEconomicsSourceFinalization,
@@ -79,6 +78,8 @@ pub enum CellProofDomainV1 {
     CapabilityAdapterAcceptance,
     CapabilityReceiptRecovery,
     LocalEffectReceiptCommitObservation,
+    RebalanceInvocationIssuanceCommit,
+    MovementActionClosureCommit,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

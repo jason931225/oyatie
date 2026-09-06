@@ -173,15 +173,8 @@ message PlacementDispatchInputV1 {
   RebalanceJobClaimV1 claim = 10;
 }
 
-message RebalanceSourceCommitSubjectV1 {
-  oneof subject {
-    RebalanceIssuanceAddressV1 invocation_issuance = 1;
-    MovementActionClosureAddressV1 movement_action_closure = 2;
-  }
-}
-
-message RebalanceSourceCommitObservationV1 {
-  RebalanceSourceCommitSubjectV1 subject = 1;
+message RebalanceInvocationIssuanceCommitObservationV1 {
+  RebalanceIssuanceAddressV1 address = 1;
   uint64 committed_job_revision = 2;
   uint64 claim_epoch_at_commit = 3;
   Digest32 record_digest = 4;
@@ -189,15 +182,15 @@ message RebalanceSourceCommitObservationV1 {
   uint64 committed_at_unix_seconds = 6;
 }
 
-message SignedRebalanceSourceCommitObservationV1 {
-  RebalanceSourceCommitObservationV1 payload = 1;
+message SignedRebalanceInvocationIssuanceCommitObservationV1 {
+  RebalanceInvocationIssuanceCommitObservationV1 payload = 1;
   CellProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
 
 message CommittedRebalanceIssuanceV1 {
   RebalanceInvocationIssuanceV1 issuance = 1;
-  SignedRebalanceSourceCommitObservationV1 commit = 2;
+  SignedRebalanceInvocationIssuanceCommitObservationV1 commit = 2;
 }
 
 message RebalanceActionPageQueryV1 {
@@ -231,9 +224,33 @@ message MovementActionClosureV1 {
   Digest32 record_digest = 3;
 }
 
+message MovementActionClosureCommitObservationV1 {
+  MovementActionClosureAddressV1 address = 1;
+  uint64 committed_job_revision = 2;
+  uint64 claim_epoch_at_commit = 3;
+  Digest32 record_digest = 4;
+  string transaction_id = 5;
+  uint64 committed_at_unix_seconds = 6;
+}
+
+message SignedMovementActionClosureCommitObservationV1 {
+  MovementActionClosureCommitObservationV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message MovementActionClosureCommitExpectationV1 {
+  MovementActionClosureAddressV1 address = 1;
+  Digest32 expected_record_digest = 2;
+  ProducerIdV1 producer = 3;
+  ProducerIdV1 audience = 4;
+  Digest32 custody_configuration_digest = 5;
+  uint64 now_unix_seconds = 6;
+}
+
 message CommittedMovementActionClosureV1 {
   MovementActionClosureV1 closure = 1;
-  SignedRebalanceSourceCommitObservationV1 commit = 2;
+  SignedMovementActionClosureCommitObservationV1 commit = 2;
 }
 
 message SignedMovementActionClosureV1 {
@@ -372,8 +389,8 @@ message RebalanceClaimWriteSetPartsV1 {
   CellControlAuditRecordV1 audit_outbox = 7;
 }
 
-message RebalanceCommitExpectationV1 {
-  RebalanceSourceCommitSubjectV1 expected_subject = 1;
+message RebalanceInvocationIssuanceCommitExpectationV1 {
+  RebalanceIssuanceAddressV1 address = 1;
   Digest32 expected_record_digest = 2;
   ProducerIdV1 producer = 3;
   ProducerIdV1 audience = 4;

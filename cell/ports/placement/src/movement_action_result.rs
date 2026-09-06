@@ -9,12 +9,11 @@ pub struct MovementActionResultKeyV1 {
 
 /// The typed address of one movement-action closure.
 ///
-/// This is the closure's identity, separated from its content so that it can
-/// be named on its own by
-/// [`RebalanceSourceCommitSubjectV1::MovementActionClosure`]. The peer
-/// [`RebalanceIssuanceAddressV1`] plays the same role for the other subject a
-/// rebalance-source commit observation can witness, so both subjects are
-/// compared as one typed address rather than field by field.
+/// This is the closure's identity, separated from its content so that it can be
+/// named on its own by [`MovementActionClosureCommitObservationV1`]. The peer
+/// [`RebalanceIssuanceAddressV1`] plays the same role for the invocation
+/// issuance, and the two are never interchangeable: each is reachable only from
+/// its own signed observation type under its own proof domain.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MovementActionClosureAddressV1 {
     pub source: RebalanceJobAddressV1,
@@ -29,13 +28,58 @@ pub struct MovementActionClosureV1 {
     pub record_digest: Digest32,
 }
 
+/// What a rebalance-source commit observer asserts it read, under committed
+/// read isolation, about ONE movement-action closure.
+///
+/// `address` is the only subject this payload can name, and the type is signed
+/// under its own proof domain
+/// [`CellProofDomainV1::MovementActionClosureCommit`]. Its peer,
+/// [`RebalanceInvocationIssuanceCommitObservationV1`], names a
+/// [`RebalanceIssuanceAddressV1`] under
+/// [`CellProofDomainV1::RebalanceInvocationIssuanceCommit`]. Separation between
+/// the two subjects is therefore carried by the type and the domain, not by a
+/// comparison an implementer must remember to perform.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MovementActionClosureCommitObservationV1 {
+    pub address: MovementActionClosureAddressV1,
+    pub committed_job_revision: u64,
+    pub claim_epoch_at_commit: u64,
+    pub record_digest: Digest32,
+    pub transaction_id: String,
+    pub committed_at_unix_seconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedMovementActionClosureCommitObservationV1 {
+    pub payload: MovementActionClosureCommitObservationV1,
+    pub envelope: CellProofEnvelopeV1,
+    pub signature: Vec<u8>,
+}
+
+/// What a caller requires of a movement-action closure commit observation.
+///
+/// No `expected_subject` field is needed: this expectation reaches only
+/// [`verify_committed_movement_action_closure`], which accepts only a
+/// [`SignedMovementActionClosureCommitObservationV1`], which can name only a
+/// [`MovementActionClosureAddressV1`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MovementActionClosureCommitExpectationV1 {
+    pub address: MovementActionClosureAddressV1,
+    pub expected_record_digest: Digest32,
+    pub producer: ProducerId,
+    pub audience: ProducerId,
+    pub custody_configuration_digest: Digest32,
+    pub now_unix_seconds: u64,
+}
+
 /// A durable closure record together with the observation that witnesses its
-/// commit. The observation's subject is what binds the two together; see
-/// [`RebalanceSourceCommitSubjectV1`].
+/// commit. This is a claim, not evidence: only
+/// [`verify_committed_movement_action_closure`] turns it into the private-field
+/// [`VerifiedCommittedMovementActionClosure`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommittedMovementActionClosureV1 {
     pub closure: MovementActionClosureV1,
-    pub commit: SignedRebalanceSourceCommitObservationV1,
+    pub commit: SignedMovementActionClosureCommitObservationV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -79,7 +123,7 @@ pub struct MovementActionProofExpectationV1 {
 pub fn verify_committed_movement_action_closure(
     _verifier: &dyn CellProofVerifier,
     _claim: CommittedMovementActionClosureV1,
-    _expectation: &RebalanceCommitExpectationV1,
+    _expectation: &MovementActionClosureCommitExpectationV1,
 ) -> Result<VerifiedCommittedMovementActionClosure, PlacementContractError> {
     Err(PlacementContractError::NotImplemented)
 }
