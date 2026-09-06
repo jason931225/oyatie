@@ -280,6 +280,36 @@ message SignedMovementActionResultV1 {
   bytes signature = 3;
 }
 
+message MovementActionResultCommitObservationV1 {
+  string partition = 1;
+  MovementActionResultKeyV1 key = 2;
+  uint64 observed_revision = 3;
+  Digest32 observed_record_digest = 4;
+  string transaction_id = 5;
+  uint64 observed_at_unix_seconds = 6;
+}
+
+message SignedMovementActionResultCommitObservationV1 {
+  MovementActionResultCommitObservationV1 payload = 1;
+  CellProofEnvelopeV1 envelope = 2;
+  bytes signature = 3;
+}
+
+message CommittedMovementActionResultClaimV1 {
+  MovementActionResultV1 result = 1;
+  SignedMovementActionResultCommitObservationV1 observation = 2;
+}
+
+message MovementActionResultCommitExpectationV1 {
+  string partition = 1;
+  MovementActionResultKeyV1 key = 2;
+  Digest32 expected_record_digest = 3;
+  ProducerIdV1 producer = 4;
+  ProducerIdV1 audience = 5;
+  Digest32 custody_configuration_digest = 6;
+  uint64 now_unix_seconds = 7;
+}
+
 message MovementActionRestoreCheckpointV1 {
   string partition = 1;
   MovementActionResultKeyV1 key = 2;

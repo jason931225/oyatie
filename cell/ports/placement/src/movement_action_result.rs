@@ -210,6 +210,103 @@ pub fn verify_movement_action_result(
     Err(PlacementContractError::NotImplemented)
 }
 
+/// What a result commit observer asserts it read, under committed read
+/// isolation, about ONE movement-action result.
+///
+/// Signed under its own proof domain
+/// [`CellProofDomainV1::MovementActionResultCommit`], which is NOT
+/// [`CellProofDomainV1::MovementActionResult`]: this witnesses that a result was
+/// durably committed, while that one carries the published result itself. An
+/// observation can therefore never be presented as the result.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MovementActionResultCommitObservationV1 {
+    pub partition: MovementBudgetAuthorityPartition,
+    pub key: MovementActionResultKeyV1,
+    pub observed_revision: u64,
+    pub observed_record_digest: Digest32,
+    pub transaction_id: String,
+    pub observed_at_unix_seconds: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedMovementActionResultCommitObservationV1 {
+    pub payload: MovementActionResultCommitObservationV1,
+    pub envelope: CellProofEnvelopeV1,
+    pub signature: Vec<u8>,
+}
+
+/// A durable result record together with an independent observation of its
+/// commit.
+///
+/// This is a CLAIM, not evidence: only
+/// [`verify_committed_movement_action_result`] turns it into the private-field
+/// [`VerifiedCommittedMovementActionResult`]. It is produced by
+/// [`MovementActionResultCommitObserver`] and NEVER by the store that performed
+/// the commit - the same rule
+/// [`CommittedMovementActionClosureClaimV1`] states, now obeyed by the result
+/// path as well as the closure path.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommittedMovementActionResultClaimV1 {
+    pub result: MovementActionResultV1,
+    pub observation: SignedMovementActionResultCommitObservationV1,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct VerifiedCommittedMovementActionResult(CommittedMovementActionResultClaimV1);
+
+impl VerifiedCommittedMovementActionResult {
+    #[must_use]
+    pub fn claim(&self) -> &CommittedMovementActionResultClaimV1 {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MovementActionResultCommitExpectationV1 {
+    pub partition: MovementBudgetAuthorityPartition,
+    pub key: MovementActionResultKeyV1,
+    pub expected_record_digest: Digest32,
+    pub producer: ProducerId,
+    pub audience: ProducerId,
+    pub custody_configuration_digest: Digest32,
+    pub now_unix_seconds: u64,
+}
+
+pub fn verify_committed_movement_action_result(
+    _verifier: &dyn CellProofVerifier,
+    _claim: CommittedMovementActionResultClaimV1,
+    _expectation: &MovementActionResultCommitExpectationV1,
+) -> Result<VerifiedCommittedMovementActionResult, PlacementContractError> {
+    Err(PlacementContractError::NotImplemented)
+}
+
+/// Independently re-reads a committed movement-action result and signs what it
+/// read.
+///
+/// The port accepts the same lookup [`MovementActionResultStore::get_result`]
+/// takes and nothing else: never a caller-supplied record, never a caller's
+/// claim that a commit occurred.
+pub trait MovementActionResultCommitObserver: Send + Sync {
+    fn observe_committed_result<'a>(
+        &'a self,
+        authority: &'a PlacementReadAuthorityV1,
+        partition: &'a MovementBudgetAuthorityPartition,
+        key: &'a MovementActionResultKeyV1,
+    ) -> BoxCellFuture<'a, Result<CommittedMovementActionResultClaimV1, PlacementContractError>>;
+}
+
+/// Mints the published movement-action result signature.
+///
+/// Its only argument is a private-field verified wrapper, so a signature cannot
+/// be produced from an unverified claim, and in particular cannot be produced by
+/// the storage adapter that performed the write.
+pub trait MovementActionResultAuthority: Send + Sync {
+    fn sign_committed<'a>(
+        &'a self,
+        committed: &'a VerifiedCommittedMovementActionResult,
+    ) -> BoxCellFuture<'a, Result<SignedMovementActionResultV1, PlacementContractError>>;
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct MovementActionRejectionWriteSetPartsV1 {
     pub closure: VerifiedMovementActionClosure,
@@ -234,16 +331,29 @@ impl MovementActionRejectionWriteSetV1 {
 }
 
 pub trait MovementActionResultStore: Send + Sync {
+    /// Durably records the rejection, or reads back the already-committed result
+    /// for this key, and returns the record it holds. It returns NO envelope and
+    /// NO signature.
+    ///
+    /// The write set it takes carries only the unsigned
+    /// [`MovementActionResultV1`], so before this change the storage adapter was
+    /// the only party that could have produced the signature it returned: it was
+    /// vouching for its own write. The published signature now comes from
+    /// [`MovementActionResultAuthority`], over a claim that
+    /// [`MovementActionResultCommitObserver`] produced by re-reading.
     fn reject_or_load_grant<'a>(
         &'a self,
         write: &'a MovementActionRejectionWriteSetV1,
-    ) -> BoxCellFuture<'a, Result<SignedMovementActionResultV1, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<MovementActionResultV1, PlacementContractError>>;
+    /// Reads one already-committed result. Returns the durable record, for the
+    /// same reason: nothing on this path durably holds a published signature, so
+    /// a store that returned one would have had to mint it.
     fn get_result<'a>(
         &'a self,
         authority: &'a PlacementReadAuthorityV1,
         partition: &'a MovementBudgetAuthorityPartition,
         key: &'a MovementActionResultKeyV1,
-    ) -> BoxCellFuture<'a, Result<Option<SignedMovementActionResultV1>, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<Option<MovementActionResultV1>, PlacementContractError>>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

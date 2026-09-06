@@ -80,6 +80,7 @@ pub enum CellProofDomainV1 {
     LocalEffectReceiptCommitObservation,
     RebalanceInvocationIssuanceCommit,
     MovementActionClosureCommit,
+    MovementActionResultCommit,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
