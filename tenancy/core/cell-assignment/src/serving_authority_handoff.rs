@@ -209,7 +209,7 @@ pub trait ServingAuthorityControlCommitObserver: Send + Sync {
         query: &'a crate::ServingAuthorityHandoffExpectationV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::SignedServingAuthorityControlCommitAttestationV1, BindingStoreError>,
+        Result<Option<crate::SignedServingAuthorityControlCommitAttestationV1>, BindingStoreError>,
     >;
 
     fn observe_freeze_commit<'a>(
@@ -218,6 +218,6 @@ pub trait ServingAuthorityControlCommitObserver: Send + Sync {
         query: &'a crate::ServingAuthorityHandoffExpectationV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::SignedServingAuthorityControlCommitAttestationV1, BindingStoreError>,
+        Result<Option<crate::SignedServingAuthorityControlCommitAttestationV1>, BindingStoreError>,
     >;
 }

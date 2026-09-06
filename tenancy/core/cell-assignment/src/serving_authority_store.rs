@@ -215,6 +215,11 @@ pub trait CellServingAuthorityStore: Send + Sync {
 /// `BindingProofDomainV1::ServingAuthorityInstallationResult` and
 /// `::ServingAuthorityFreezeResult` already exist, as do the verifiers and the
 /// `VerifiedBindingProofRefV1` arms. Only the producer was missing.
+/// Both methods return `None` when the row named by the lookup does not
+/// exist. An observer signs what it read; when there is nothing to read
+/// there is nothing to sign, and that is a normal answer rather than an
+/// error -- the same rule already applied to every store lookup on this
+/// lane, and `get_installation_result` takes the very same query.
 pub trait ServingAuthorityResultObserver: Send + Sync {
     fn observe_installation_result<'a>(
         &'a self,
@@ -222,7 +227,7 @@ pub trait ServingAuthorityResultObserver: Send + Sync {
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<SignedServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
+        Result<Option<SignedServingAuthorityInstallationResultV1>, ServingAuthorityStoreError>,
     >;
 
     fn observe_freeze_result<'a>(
@@ -231,6 +236,6 @@ pub trait ServingAuthorityResultObserver: Send + Sync {
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<SignedServingAuthorityFreezeResultV1, ServingAuthorityStoreError>,
+        Result<Option<SignedServingAuthorityFreezeResultV1>, ServingAuthorityStoreError>,
     >;
 }

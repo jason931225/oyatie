@@ -92,6 +92,9 @@ pub trait WriteAuthorityLeaseCommitObserver: Send + Sync {
         query: &'a crate::CommittedWriteAuthorityLeaseIssuanceQueryV1,
     ) -> crate::BoxTenancyFuture<
         'a,
-        Result<SignedWriteAuthorityLeaseCommitAttestationV1, crate::ServingAuthorityStoreError>,
+        Result<
+            Option<SignedWriteAuthorityLeaseCommitAttestationV1>,
+            crate::ServingAuthorityStoreError,
+        >,
     >;
 }

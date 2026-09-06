@@ -91,7 +91,7 @@ pub trait BindingControlContributionAcknowledgmentObserver: Send + Sync {
     ) -> crate::BoxTenancyFuture<
         'a,
         Result<
-            SignedBindingControlContributionAcknowledgmentV1,
+            Option<SignedBindingControlContributionAcknowledgmentV1>,
             crate::BindingControlContributionError,
         >,
     >;

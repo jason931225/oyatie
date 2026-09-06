@@ -94,7 +94,10 @@ pub trait TransferExecutionCommitObserver: Send + Sync {
         &'a self,
         authority: &'a BindingReadAuthorityV1,
         lookup: &'a TransferExecutionPermitIssuanceLookupV1,
-    ) -> BoxTenancyFuture<'a, Result<SignedTransferExecutionCommitObservationV1, BindingStoreError>>;
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<Option<SignedTransferExecutionCommitObservationV1>, BindingStoreError>,
+    >;
 }
 
 /// Mints the transfer-execution permit signature.
