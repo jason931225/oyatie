@@ -270,10 +270,19 @@ pub struct PromotionEconomicsClosureRequestV1 {
 ///
 /// Large registries use the same bounded resumable machinery as input replay:
 /// while closure construction is unfinished, `resolve_expected` returns
-/// [`PromotionEconomicsVerificationErrorV1::ContinuationRequired`] rather than
-/// scanning without bound, and its background build advances under the
+/// [`PromotionEconomicsClosureStepOutcomeV1::Continued`] rather than scanning
+/// without bound, and its background build advances under the
 /// [`crate::PromotionEconomicsVerificationPhaseV1::VerifyingSourceClosure`]
 /// phase.
+///
+/// Continuation is reported on the OK channel carrying the verification key and
+/// the checkpoint revision, exactly as the sibling
+/// [`crate::advance_cell_promotion_economics`] reports it. That is not
+/// cosmetic. A bare "still working" refusal collapses "advancing" and "stuck"
+/// into one observable, so a caller polling a long closure build over
+/// successive calls cannot tell progress from a wedge. The revision is the
+/// progress token: it strictly advances while work is being done and stands
+/// still when it is not.
 pub trait PromotionEconomicsClosureAuthority: Send + Sync {
     fn resolve_expected<'a>(
         &'a self,
@@ -281,7 +290,7 @@ pub trait PromotionEconomicsClosureAuthority: Send + Sync {
         request: &'a PromotionEconomicsClosureRequestV1,
     ) -> BoxCellFuture<
         'a,
-        Result<VerifiedPromotionEconomicsClosure, PromotionEconomicsVerificationErrorV1>,
+        Result<PromotionEconomicsClosureStepOutcomeV1, PromotionEconomicsVerificationErrorV1>,
     >;
 }
 
@@ -453,15 +462,10 @@ impl PromotionEconomicsClosureAuthority for CellPromotionEconomicsClosureIssuerV
         request: &'a PromotionEconomicsClosureRequestV1,
     ) -> BoxCellFuture<
         'a,
-        Result<VerifiedPromotionEconomicsClosure, PromotionEconomicsVerificationErrorV1>,
+        Result<PromotionEconomicsClosureStepOutcomeV1, PromotionEconomicsVerificationErrorV1>,
     > {
-        Box::pin(async move {
-            match advance_promotion_economics_closure_step(self, authority, request).await? {
-                PromotionEconomicsClosureStepOutcomeV1::Continued { .. } => {
-                    Err(PromotionEconomicsVerificationErrorV1::ContinuationRequired)
-                }
-                PromotionEconomicsClosureStepOutcomeV1::Complete(closure) => Ok(*closure),
-            }
-        })
+        Box::pin(
+            async move { advance_promotion_economics_closure_step(self, authority, request).await },
+        )
     }
 }

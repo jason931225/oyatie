@@ -426,11 +426,6 @@ impl VerifiedCellPromotionEconomics {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PromotionEconomicsVerificationErrorV1 {
     NotImplemented,
-    /// A step budget was exhausted and durable progress was committed. This is
-    /// backpressure, NOT a refusal: the caller reschedules and the verification
-    /// resumes from its checkpoint. It must never be reported as failed
-    /// readiness and never converted into a promotion rejection.
-    ContinuationRequired,
     MissingInput,
     NotAuthorized,
     DependencyUnavailable,
@@ -455,8 +450,9 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     NegativeTotalCost,
     RetentionInsufficient,
     /// A per-page or per-request bound was violated by the reader, or a zero
-    /// limit was configured. Distinct from `ContinuationRequired`: this is a
-    /// contract violation, not budget exhaustion.
+    /// limit was configured. Distinct from a `Continued` step outcome: this is a
+    /// contract violation, not budget exhaustion. Budget exhaustion is never an
+    /// error at all — it is reported on the OK channel with its progress token.
     WorkLimitExceeded,
     CalculationMismatch,
     UnitCostThresholdExceeded,
