@@ -70,7 +70,7 @@ pub struct WriteAuthorityLeaseCommitAttestationExpectationV1 {
 /// what it read.
 ///
 /// `SignedWriteAuthorityLeaseCommitAttestationV1` had a consumer
-/// (`VerifiedBindingProofRefV1::WriteAuthorityLeaseCommitAttestation`), a proof
+/// (`VerifiedServingAuthorityProofRefV1::LocalLeaseCommit`), a proof
 /// domain (`BindingProofDomainV1::WriteAuthorityLeaseCommitAttestation`), a
 /// verifier and an expectation, but no producer anywhere: the claim it sits
 /// inside was loaded by
