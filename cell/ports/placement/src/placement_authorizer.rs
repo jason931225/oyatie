@@ -116,19 +116,170 @@ pub struct PlacementAuthorizationTrustV1 {
     pub now_unix_seconds: u64,
 }
 
+/// Every way placement authorization refuses.
+///
+/// Five surfaces return this type and they do not all reach every variant:
+/// [`verify_placement_actor`] judges one actor attestation against
+/// [`PlacementAuthorizationTrustV1`]; [`verify_placement_policy_decision`]
+/// judges one already-obtained decision against an expected request and the
+/// same trust; [`CellPlacementAuthorizer::authorize`] is the only surface that
+/// talks to a policy decision point; and
+/// [`AuthorizedDirectPlacementIssuanceV1::assemble`] and
+/// [`CellPlacementInvocationIssuer`] relate already-verified values. Each
+/// variant below names the surface that raises it and the sibling it is not.
+///
+/// Where two checks could both fire on one input, the earlier of these wins,
+/// so the refusal an operator sees does not depend on implementation order:
+///
+/// 1. `Proof` — envelope and signature, before any field is read as meaningful
+/// 2. `InvalidIdentity`, `ActorCredentialNotYetValid`, `ActorCredentialExpired`
+/// 3. `UnadmittedMapping`
+/// 4. `RequestMismatch`
+/// 5. `PolicyVersionMismatch`
+/// 6. `NoDeterminingPolicy`
+/// 7. `UnsupportedObligation`, then `UnmetObligation`
+/// 8. `Denied`
+/// 9. `RequestDeadlinePassed`
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PlacementAuthorizationError {
     NotImplemented,
+
+    /// The actor attestation is cryptographically sound but its attested
+    /// identity is not one this trust anchor admits: `trust_domain`, `subject`
+    /// or `credential_id` is not issued by
+    /// [`PlacementAuthorizationTrustV1::identity_producer`].
+    ///
+    /// Not `Proof`, which is signature and envelope failure and is checked
+    /// first. Not `Denied`: nothing has been submitted to a policy decision
+    /// point yet, and an admitted actor can still be denied. Raised only by
+    /// [`verify_placement_actor`].
     InvalidIdentity,
+
+    /// [`PlacementActorPayloadV1::valid_from_unix_seconds`] is later than
+    /// [`PlacementAuthorizationTrustV1::now_unix_seconds`]. The credential is
+    /// well formed and admitted; it has not started.
+    ///
+    /// This exists because the payload declares a validity window with two
+    /// ends. Refusing a not-yet-valid credential as `InvalidIdentity` would
+    /// report a permanent admission failure for a condition that resolves on
+    /// its own. Raised only by [`verify_placement_actor`].
+    ActorCredentialNotYetValid,
+
+    /// [`PlacementActorPayloadV1::valid_until_unix_seconds`] is at or before
+    /// [`PlacementAuthorizationTrustV1::now_unix_seconds`].
+    ///
+    /// This is the credential's OWN window, which is not the attestation
+    /// envelope's `expires_at_unix_seconds`: a credential can sit inside its
+    /// window under an expired envelope, and a live envelope can carry a
+    /// credential whose window has closed. Envelope expiry is
+    /// `Proof(ProofVerificationError::Expired)` and is checked first. Raised
+    /// only by [`verify_placement_actor`].
+    ActorCredentialExpired,
+
+    /// [`PlacementAuthorizationRequestV1::deadline_unix_seconds`] is at or
+    /// before [`PlacementAuthorizationTrustV1::now_unix_seconds`]: authorizing
+    /// this request could only produce an invocation that is already too late
+    /// to dispatch.
+    ///
+    /// A third distinct clock, separate from both the actor credential window
+    /// and the proof envelope. It is checked last, so a request that is also
+    /// wrong on its merits reports the substantive refusal rather than the
+    /// deadline.
+    RequestDeadlinePassed,
+
+    /// A policy decision point evaluated the request and returned deny.
+    ///
+    /// The only variant that reports a policy OUTCOME. Every other variant
+    /// means authorization did not get a usable answer, or got one that failed
+    /// a check the authorizer owns. A decision that permits but leaves an
+    /// obligation unfulfilled is `UnmetObligation`, never this.
     Denied,
+
+    /// The policy decision point could not be reached, or reached and would
+    /// not answer. No decision exists.
+    ///
+    /// Raised only by [`CellPlacementAuthorizer::authorize`].
+    /// [`verify_placement_policy_decision`] takes the decision by value and so
+    /// can never raise it. Not `Denied`: nothing evaluated. Not
+    /// `NoDeterminingPolicy`: no decision arrived at all, rather than one
+    /// arriving that fails to describe itself. Retrying may succeed.
     DecisionUnavailable,
-    MissingPolicyEvidence,
+
+    /// A decision arrived and permits, but
+    /// [`PlacementPolicyDecisionPayloadV1::determining_policy_ids`] is empty:
+    /// it does not name the policies that produced it, so the permit cannot be
+    /// audited or replayed against a policy set.
+    ///
+    /// The decision itself is present and signed; it is the decision's
+    /// self-description that is absent. The name says exactly that: no
+    /// determining policy is named. It is deliberately not "missing evidence",
+    /// which would assert an absence this surface cannot observe -
+    /// [`verify_placement_policy_decision`] takes the decision BY VALUE, so a
+    /// decision is always present at the only site that raises this. Contrast
+    /// `DecisionUnavailable`, where no decision arrived at all.
+    NoDeterminingPolicy,
+
+    /// [`PlacementAuthorizationRequestV1::mapping`] is not
+    /// [`PlacementAuthorizationTrustV1::admitted_mapping`]: the request asks to
+    /// be judged under a resource mapping this trust anchor does not admit.
+    ///
+    /// Checked BEFORE `RequestMismatch`, deliberately. A request whose mapping
+    /// is inadmissible is always this and never `RequestMismatch`, even when it
+    /// also differs from the expected request in other fields, because an
+    /// inadmissible mapping is a configuration fault while a mismatch is a
+    /// substitution.
     UnadmittedMapping,
-    UnsupportedObligation,
-    UnmetObligation,
+
+    /// The request embedded in the decision payload is not equal to the request
+    /// the caller expected, on some field other than `mapping`.
+    ///
+    /// This is the anti-substitution check: it catches a genuine decision for a
+    /// different actor, action, tenant, purpose, realm, jurisdiction, digest,
+    /// audience or deadline being presented for this one. See `UnadmittedMapping`
+    /// for the `mapping` field, which is checked first. Raised only by
+    /// [`verify_placement_policy_decision`].
     RequestMismatch,
-    PolicyFreshnessUnavailable,
-    Expired,
+
+    /// [`PlacementPolicyDecisionPayloadV1::policy_version`] is not
+    /// [`PlacementAuthorizationTrustV1::exact_policy_version`].
+    ///
+    /// Both values are required and present at every raise site, so this
+    /// condition is always determinate. It replaces a variant that named an
+    /// availability failure the type structurally cannot have: there is no
+    /// freshness oracle here, only an exact version the caller pins. A policy
+    /// decision point that cannot state the version it evaluated under fails
+    /// earlier, as `DecisionUnavailable`. Raised only by
+    /// [`verify_placement_policy_decision`].
+    PolicyVersionMismatch,
+
+    /// An obligation on the decision carries an `obligation_id` or
+    /// `schema_version` this authorizer does not implement, so whether it is
+    /// satisfied cannot be decided at all.
+    ///
+    /// Checked before `UnmetObligation` and never collapsed into it: an
+    /// unknown obligation must never be reported as an unsatisfied one,
+    /// because "we cannot tell" and "we checked and it failed" call for
+    /// different operator responses.
+    UnsupportedObligation,
+
+    /// A supported obligation's `canonical_fulfillment` does not satisfy its
+    /// `canonical_requirement`.
+    ///
+    /// The obligation was understood and evaluated. Contrast
+    /// `UnsupportedObligation`, which was not understood, and `Denied`, which
+    /// is the decision point's own verdict rather than the authorizer's check
+    /// of an obligation attached to a permit.
+    UnmetObligation,
+
+    /// Envelope and signature failure on either the actor attestation or the
+    /// policy decision: wrong domain, wrong producer, wrong audience, wrong
+    /// key, rejected signature, payload digest mismatch, or an envelope
+    /// outside its own validity window.
+    ///
+    /// Checked first on every signed input, so no variant above ever fires on
+    /// a payload whose signature has not already been accepted. Envelope
+    /// expiry belongs here; credential expiry is `ActorCredentialExpired` and
+    /// request expiry is `RequestDeadlinePassed`.
     Proof(ProofVerificationError),
 }
 
