@@ -43,9 +43,49 @@ pub struct ServingAuthorityInvocationExpectationV1 {
 #[derive(Debug, Eq, PartialEq)]
 pub struct VerifiedServingAuthorityInvocation(SignedServingAuthorityInvocationV1);
 
+/// Write authority for the serving-authority store, minted from a verified
+/// invocation. Distinct from [`ServingAuthorityReadAuthorityV1`] so that a
+/// read-authorized invocation cannot reach a write path by type, rather than
+/// by a per-call-site check of the invocation's
+/// [`ServingAuthorityActionV1`].
+#[derive(Debug, Eq, PartialEq)]
+pub struct ServingAuthorityPersistenceAuthorityV1(SignedServingAuthorityInvocationV1);
+
+/// Read authority for the serving-authority store. See
+/// [`ServingAuthorityPersistenceAuthorityV1`] for why the two are separate
+/// types.
+#[derive(Debug, Eq, PartialEq)]
+pub struct ServingAuthorityReadAuthorityV1(SignedServingAuthorityInvocationV1);
+
 impl VerifiedServingAuthorityInvocation {
     #[must_use]
     pub fn signed(&self) -> &SignedServingAuthorityInvocationV1 {
+        &self.0
+    }
+
+    pub fn into_persistence_authority(
+        self,
+    ) -> Result<ServingAuthorityPersistenceAuthorityV1, crate::BindingProofVerificationError> {
+        Err(crate::BindingProofVerificationError::NotImplemented)
+    }
+
+    pub fn into_read_authority(
+        self,
+    ) -> Result<ServingAuthorityReadAuthorityV1, crate::BindingProofVerificationError> {
+        Err(crate::BindingProofVerificationError::NotImplemented)
+    }
+}
+
+impl ServingAuthorityPersistenceAuthorityV1 {
+    #[must_use]
+    pub fn invocation(&self) -> &SignedServingAuthorityInvocationV1 {
+        &self.0
+    }
+}
+
+impl ServingAuthorityReadAuthorityV1 {
+    #[must_use]
+    pub fn invocation(&self) -> &SignedServingAuthorityInvocationV1 {
         &self.0
     }
 }

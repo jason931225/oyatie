@@ -34,7 +34,7 @@ pub struct ClaimServingAuthorityPublicationWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ClaimServingAuthorityPublicationWriteSetPartsV1 {
-    pub authority: crate::VerifiedServingAuthorityInvocation,
+    pub authority: crate::ServingAuthorityPersistenceAuthorityV1,
     pub installed: crate::InstalledServingAuthorityV1,
     pub issuance: crate::WriteAuthorityLeaseIssuancePreconditionV1,
     pub expected_lease_epoch: Option<u64>,
@@ -57,7 +57,7 @@ impl ClaimServingAuthorityPublicationWriteSetV1 {
 pub trait ServingAuthorityPublicationReconciliationStore: Send + Sync {
     fn list_pending<'a>(
         &'a self,
-        authority: &'a crate::VerifiedServingAuthorityInvocation,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
         query: &'a ServingAuthorityPendingIssuanceQueryV1,
     ) -> BoxTenancyFuture<
         'a,

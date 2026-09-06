@@ -21,7 +21,7 @@ pub struct WriteAuthorityLeaseRenewalWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeaseRenewalWriteSetPartsV1 {
-    pub authority: VerifiedServingAuthorityInvocation,
+    pub authority: crate::ServingAuthorityPersistenceAuthorityV1,
     pub partition: crate::CellServingPartitionRefV1,
     pub installed_precondition: crate::InstalledServingAuthorityV1,
     pub lease_state_precondition: crate::WriteAuthorityLeaseStatePreconditionV1,
@@ -73,7 +73,7 @@ pub struct WriteAuthorityLeasePublicationWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct WriteAuthorityLeasePublicationWriteSetPartsV1 {
-    pub authority: VerifiedServingAuthorityInvocation,
+    pub authority: crate::ServingAuthorityPersistenceAuthorityV1,
     pub partition: crate::CellServingPartitionRefV1,
     pub installed_precondition: crate::InstalledServingAuthorityV1,
     pub publication_lease: crate::ServingAuthorityPublicationLeaseV1,

@@ -152,7 +152,7 @@ pub struct ServingAuthorityFreezeWriteSetV1 {
 pub struct ServingAuthorityFreezeWriteSetPartsV1 {
     pub partition: crate::CellServingPartitionRefV1,
     pub instance: ServingAuthorityInstanceV1,
-    pub authority: crate::VerifiedServingAuthorityInvocation,
+    pub authority: crate::ServingAuthorityPersistenceAuthorityV1,
     pub precondition: crate::ServingAuthorityLocalPreconditionV1,
     pub grant: VerifiedServingAuthorityFreezeGrant,
     pub next_state: ServingAuthorityFrozenStateV1,

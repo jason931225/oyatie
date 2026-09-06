@@ -121,7 +121,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
 
     fn load_committed_write_authority_lease_issuance<'a>(
         &'a self,
-        authority: &'a crate::VerifiedServingAuthorityInvocation,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
         query: &'a crate::CommittedWriteAuthorityLeaseIssuanceQueryV1,
         lease: &'a crate::ServingAuthorityPublicationLeaseV1,
     ) -> BoxTenancyFuture<
@@ -134,7 +134,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
 
     fn get_lease_state<'a>(
         &'a self,
-        authority: &'a crate::VerifiedServingAuthorityInvocation,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
         instance: &'a crate::ServingAuthorityInstanceV1,
     ) -> BoxTenancyFuture<
         'a,
@@ -143,7 +143,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
 
     fn get_latest_published_lease<'a>(
         &'a self,
-        authority: &'a crate::VerifiedServingAuthorityInvocation,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
         instance: &'a crate::ServingAuthorityInstanceV1,
         minimum_valid_until_unix_seconds: u64,
     ) -> BoxTenancyFuture<
@@ -153,7 +153,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
 
     fn get_installation_result<'a>(
         &'a self,
-        authority: &'a crate::VerifiedServingAuthorityInvocation,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
@@ -162,7 +162,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
 
     fn get_freeze_result<'a>(
         &'a self,
-        authority: &'a crate::VerifiedServingAuthorityInvocation,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,

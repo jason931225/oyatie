@@ -100,7 +100,7 @@ pub struct ServingAuthorityInstallationWriteSetV1 {
 pub struct ServingAuthorityInstallationWriteSetPartsV1 {
     pub partition: crate::CellServingPartitionRefV1,
     pub instance: ServingAuthorityInstanceV1,
-    pub authority: crate::VerifiedServingAuthorityInvocation,
+    pub authority: crate::ServingAuthorityPersistenceAuthorityV1,
     pub precondition: crate::ServingAuthorityLocalPreconditionV1,
     pub grant: VerifiedServingAuthorityInstallGrant,
     pub restore_basis: crate::ServingAuthorityRestoreBasisV1,
