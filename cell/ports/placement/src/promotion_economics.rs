@@ -633,10 +633,19 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     /// A LIVE LEASE FOR THIS KEY IS HELD BY ANOTHER WORKER, so `acquire`
     /// declined to issue one.
     ///
-    /// RECOVERY: back off until the observed lease expiry, then re-acquire.
-    /// This is not a failure and not a wedge — the work is progressing under
-    /// someone else, and the right response is to wait for them rather than to
-    /// duplicate them.
+    /// RECOVERY: read the current lease with
+    /// [`crate::PromotionEconomicsCheckpointStore::read_lease`], back off until
+    /// the expiry it reports, then re-acquire. This is not a failure and not a
+    /// wedge — the work is progressing under someone else, and the right
+    /// response is to wait for them rather than to duplicate them.
+    ///
+    /// The variant carries no payload ON PURPOSE, and the doc names the read
+    /// instead. An error that embedded an expiry would be handing out a
+    /// snapshot that a renewal can invalidate before the caller acts on it; the
+    /// read gives current truth each time it is asked. What is NOT acceptable
+    /// is what this doc used to do — name a value and provide neither, so the
+    /// caller was told to wait for something only `acquire`'s success channel
+    /// ever produced.
     ///
     /// BOUNDARY against `CheckpointConflict`: that one is AFTER THE FACT — you
     /// held a lease and lost the compare-and-set. This one is BEFORE — you

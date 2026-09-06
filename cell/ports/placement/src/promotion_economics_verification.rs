@@ -586,6 +586,39 @@ pub trait PromotionEconomicsCheckpointStore: Send + Sync {
     /// compare-and-set, and returns THE DURABLE RECORD ALONE. It never returns a
     /// signature, because a signature here would be the store attesting to its
     /// own write.
+    /// Reads the lease currently held for one key WITHOUT acquiring it, so a
+    /// worker refused by `acquire` can find out how long to wait.
+    ///
+    /// `None` means no live lease: re-acquire immediately. `Some` carries the
+    /// holder and the expiry that
+    /// [`crate::PromotionEconomicsVerificationErrorV1::LeaseHeldByAnotherWorker`]
+    /// tells the caller to wait for. Without this read that recovery named a
+    /// value only `acquire`'s SUCCESS channel produced, so a caller that had
+    /// been refused was told to wait for something it could not obtain.
+    ///
+    /// READING A LEASE IS NOT A STEP TOWARD HOLDING ONE. The claim comes back
+    /// unverified, and it is not the reader's:
+    /// [`verify_promotion_economics_checkpoint_lease`] compares
+    /// `expected_worker` against the caller's own identity, so a foreign lease
+    /// claim cannot be minted into a
+    /// [`PromotionEconomicsCheckpointLeaseV1`] by whoever read it. The read
+    /// answers "how long", never "may I".
+    ///
+    /// The expiry is a SNAPSHOT, not a promise. A holder may renew, so a caller
+    /// that wakes at the reported time and is refused again reads again rather
+    /// than assuming the lease must have lapsed.
+    fn read_lease<'a>(
+        &'a self,
+        authority: &'a CellControlReadAuthorityV1,
+        key: &'a PromotionEconomicsVerificationKeyV1,
+    ) -> BoxCellFuture<
+        'a,
+        Result<
+            Option<PromotionEconomicsCheckpointLeaseClaimV1>,
+            PromotionEconomicsVerificationErrorV1,
+        >,
+    >;
+
     fn commit<'a>(
         &'a self,
         write: PromotionEconomicsCheckpointWriteV1,
