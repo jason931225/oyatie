@@ -51,6 +51,27 @@ pub struct BindingParticipantManifestCommitmentPayloadV1 {
     pub committed_at_unix_seconds: u64,
 }
 
+/// Tenancy's attestation that it committed a binding participant manifest.
+///
+/// THIS TYPE HAS NO PRODUCER IN THIS CRATE, AND MUST NOT BE GIVEN ONE. It is an
+/// external arrival: a verifier and consumers live here, the producer lives in
+/// the Tenancy binding coordinator. Cell has no participant-manifest store and
+/// writes no participant manifest, so there is no local write for a local
+/// observer to witness. Adding a producer port would invent a minting path for
+/// evidence this cell does not generate, which is worse than the gap it appears
+/// to close, because it would look like a fix.
+///
+/// Recorded because an automated sweep for the "signed, verified, consumed, but
+/// never produced" defect species will keep selecting this type. That sweep keys
+/// on payload fields named `committed_*`, and the only such field here is
+/// `committed_at_unix_seconds`, a timestamp - the instrument cannot see WHOSE
+/// state is attested, which is the fact that decides the case. Peers in the same
+/// position: [`crate::SignedBindingOutcomeV1`] and
+/// [`crate::SignedReservationCommitPermitV1`].
+///
+/// The rule that separates this from a real defect: a signed type whose subject
+/// is a store's OWN committed row needs an independent local producer; one whose
+/// subject is another party's state arrives from outside and needs none.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignedBindingParticipantManifestCommitmentV1 {
     pub payload: BindingParticipantManifestCommitmentPayloadV1,
