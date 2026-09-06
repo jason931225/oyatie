@@ -89,7 +89,10 @@ pub struct TransferExecutionPermitExpectationV1 {
     pub worker_lease_epoch: u64,
     pub phase: ParticipantReceiptPhaseV1,
     pub assurance_audit_policy: AssuranceAuditPolicyV1,
+    pub expected_producer: crate::BindingProducerId,
+    pub expected_audience: crate::BindingProducerId,
     pub now_unix_seconds: u64,
+    pub maximum_clock_uncertainty_millis: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
