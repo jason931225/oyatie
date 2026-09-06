@@ -42,6 +42,15 @@ impl BindingCellIndexProjectionWriteSetV1 {
 }
 
 pub trait TenantBindingCellIndexProjectionStore: Send + Sync {
+    /// Returns `None` when no acknowledgment has been observed for that
+    /// contribution.
+    ///
+    /// Absence must stay distinct from "result unknown". A reconciler asking
+    /// whether the target acknowledged needs to tell "not yet" from "the read
+    /// failed", and `BindingControlContributionError` folds neither into the
+    /// other only if absence never becomes an error. `MissingAcknowledgment`
+    /// exists but names a required member absent from a record that WAS found,
+    /// which is a different fact from no record existing.
     fn get_acknowledgment<'a>(
         &'a self,
         authority: &'a crate::BindingReconciliationReadAuthorityV1,
@@ -49,7 +58,7 @@ pub trait TenantBindingCellIndexProjectionStore: Send + Sync {
     ) -> BoxTenancyFuture<
         'a,
         Result<
-            crate::SignedBindingControlContributionAcknowledgmentV1,
+            Option<crate::SignedBindingControlContributionAcknowledgmentV1>,
             BindingControlContributionError,
         >,
     >;
