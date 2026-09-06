@@ -140,7 +140,14 @@ pub fn verify_movement_action_closure(
     Err(PlacementContractError::NotImplemented)
 }
 
-pub trait MovementActionClosureSigner: Send + Sync {
+/// Mints the movement-action closure signature.
+///
+/// Named `Authority` rather than `Signer` to match every other minting port in
+/// this crate and its Tenancy peer - `CellMovementAuthority`,
+/// `DrainContributorSealAuthority`, `PromotionEconomicsClosureAuthority`,
+/// `TransferExecutionPermitAuthority` - and, in this file, its sibling
+/// [`MovementActionResultAuthority`].
+pub trait MovementActionClosureAuthority: Send + Sync {
     fn sign_committed<'a>(
         &'a self,
         claim: &'a VerifiedCommittedMovementActionClosure,
