@@ -183,23 +183,6 @@ message PromotionEconomicsInputMemberV1 {
   Digest32 member_digest = 3;
 }
 
-// Retained without a consumer, matching the Rust type of the same name: the
-// adjudicated correction replaced the combined promoter-facing manifest with
-// PromotionEconomicsClosureV1.
-message PromotionEconomicsInputManifestV1 {
-  ImmutableEvidenceRefV1 immutable_record = 1;
-  CellRevisionIdentityV1 cell = 2;
-  PromotionEconomicsWindowV1 window = 3;
-  Digest32 policy_digest = 4;
-  Digest32 ordered_input_root_digest = 5;
-  uint64 input_count = 6;
-  uint64 canonical_input_bytes = 7;
-  repeated PromotionCostCategoryTotalV1 category_totals = 8;
-  uint64 finalized_at_unix_seconds = 9;
-  uint64 retained_until_unix_seconds = 10;
-  Digest32 manifest_digest = 11;
-}
-
 enum PromotionEconomicsSourceOwnerV1 {
   PROMOTION_ECONOMICS_SOURCE_OWNER_V1_UNSPECIFIED = 0;
   PROMOTION_ECONOMICS_SOURCE_OWNER_V1_ACCOUNTING = 1;
@@ -331,16 +314,6 @@ message CellPromotionEconomicsV1 {
   PromotionNormalizedQuantityV1 denominator = 6;
   MoneyMicrounitsV1 unit_cost = 7;
   Digest32 calculation_digest = 8;
-}
-
-// Retained without a consumer, matching the Rust type of the same name.
-message PromotionEconomicsExpectationV1 {
-  CellRevisionIdentityV1 cell = 1;
-  PromotionEconomicsWindowV1 window = 2;
-  PromotionEconomicsPolicyV1 policy = 3;
-  Digest32 expected_input_manifest_digest = 4;
-  uint64 now_unix_seconds = 5;
-  uint64 required_retention_until_unix_seconds = 6;
 }
 
 message PromotionEconomicsRetainedPageRequestV1 {

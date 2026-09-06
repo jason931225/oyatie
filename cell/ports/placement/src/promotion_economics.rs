@@ -356,32 +356,6 @@ pub struct PromotionEconomicsInputMemberV1 {
     pub member_digest: Digest32,
 }
 
-/// A finalized manifest over one combined input population.
-///
-/// RETAINED WITHOUT A CONSUMER. The adjudicated correction replaced the
-/// combined promoter-facing manifest with
-/// [`crate::PromotionEconomicsClosureV1`], which commits every finalized
-/// source independently instead of one assembled root, and replaced the
-/// original paging contract with the per-source retained page contract. This
-/// type is kept because the correction did not explicitly delete it, and it
-/// remains the precise statement of what a single-manifest input population
-/// would have to declare. Nothing in this crate consumes it; an adjudicator
-/// may strike it.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PromotionEconomicsInputManifestV1 {
-    pub immutable_record: ImmutableEvidenceRefV1,
-    pub cell: CellRevisionIdentityV1,
-    pub window: PromotionEconomicsWindowV1,
-    pub policy_digest: Digest32,
-    pub ordered_input_root_digest: Digest32,
-    pub input_count: u64,
-    pub canonical_input_bytes: u64,
-    pub category_totals: Vec<PromotionCostCategoryTotalV1>,
-    pub finalized_at_unix_seconds: u64,
-    pub retained_until_unix_seconds: u64,
-    pub manifest_digest: Digest32,
-}
-
 /// The reproducible promotion economics record.
 ///
 /// `total_cost`, `denominator` and `unit_cost` are all recomputable from the
@@ -442,32 +416,6 @@ impl VerifiedCellPromotionEconomics {
     pub fn evidence(&self) -> &CellPromotionEconomicsV1 {
         &self.0
     }
-}
-
-/// What a caller independently expects a promotion economics record to be.
-///
-/// RETAINED WITHOUT A CONSUMER, alongside
-/// [`PromotionEconomicsInputManifestV1`]. It was the expectation argument of
-/// the one-shot `verify_cell_promotion_economics` entrypoint that the
-/// adjudicated correction removed in favour of the resumable
-/// [`crate::advance_cell_promotion_economics`] step, whose expected closure
-/// comes from [`crate::PromotionEconomicsClosureAuthority`] rather than from a
-/// caller-supplied manifest digest. Kept because the correction did not
-/// explicitly delete it; an adjudicator may strike it.
-///
-/// `required_retention_until_unix_seconds` is the retention deadline the
-/// caller computes from the signed promotion proof and trusted policy, at
-/// least `max(now, proof expiry) + minimum_retention_seconds` computed without
-/// overflow. Insufficient remaining retention refuses as
-/// `RetentionInsufficient`; it never yields a weaker success.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PromotionEconomicsExpectationV1 {
-    pub cell: CellRevisionIdentityV1,
-    pub window: PromotionEconomicsWindowV1,
-    pub policy: PromotionEconomicsPolicyV1,
-    pub expected_input_manifest_digest: Digest32,
-    pub now_unix_seconds: u64,
-    pub required_retention_until_unix_seconds: u64,
 }
 
 /// Every way promotion economics verification refuses.
