@@ -57,7 +57,7 @@ pub fn verify_serving_authority_independent_retirement(
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ServingAuthorityRetirementEvidenceV1 {
-    LocalFreeze(Box<crate::ServingAuthorityFreezeResultV1>),
+    LocalFreeze(Box<crate::SignedServingAuthorityFreezeResultV1>),
     Independent(Box<SignedServingAuthorityIndependentRetirementV1>),
 }
 
@@ -69,7 +69,7 @@ pub enum VerifiedServingAuthorityRetirementV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServingAuthorityLeaseExpiryRecoveryBasisV1 {
-    pub freeze_result: crate::ServingAuthorityFreezeResultV1,
+    pub freeze_result: crate::SignedServingAuthorityFreezeResultV1,
     pub qualified_time_evidence: cell_placement::ImmutableEvidenceRefV1,
     pub source_isolation_proof: cell_placement::ImmutableEvidenceRefV1,
     pub clock_authority_digest: BindingDigest32,

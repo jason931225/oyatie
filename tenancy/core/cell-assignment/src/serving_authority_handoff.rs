@@ -3,7 +3,7 @@ use crate::{BindingDigest32, BindingStoreError, BoxTenancyFuture};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ServingAuthorityHandoffProgressV1 {
     CommittedPotentiallyInstallable,
-    Installed(Box<crate::ServingAuthorityInstallationResultV1>),
+    Installed(Box<crate::SignedServingAuthorityInstallationResultV1>),
     FreezeRequested(Box<crate::ServingAuthorityFreezeIntentV1>),
     RetiredAwaitingEffectFencing(Box<crate::ServingAuthorityRetirementEvidenceV1>),
     TerminalFenced { closure_digest: BindingDigest32 },

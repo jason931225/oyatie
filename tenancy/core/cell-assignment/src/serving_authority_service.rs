@@ -22,7 +22,7 @@ pub trait CellServingAuthorityService: Send + Sync {
         request: InstallServingAuthorityRequestV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::ServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
+        Result<crate::SignedServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
     >;
 
     fn freeze<'a>(
@@ -31,7 +31,7 @@ pub trait CellServingAuthorityService: Send + Sync {
         request: FreezeServingAuthorityRequestV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::ServingAuthorityFreezeResultV1, ServingAuthorityStoreError>,
+        Result<crate::SignedServingAuthorityFreezeResultV1, ServingAuthorityStoreError>,
     >;
 }
 
@@ -45,7 +45,7 @@ impl CellServingAuthorityService for NotImplementedCellServingAuthorityService {
         _: InstallServingAuthorityRequestV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::ServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
+        Result<crate::SignedServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
     > {
         Box::pin(async { Err(ServingAuthorityStoreError::NotImplemented) })
     }
@@ -56,7 +56,7 @@ impl CellServingAuthorityService for NotImplementedCellServingAuthorityService {
         _: FreezeServingAuthorityRequestV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::ServingAuthorityFreezeResultV1, ServingAuthorityStoreError>,
+        Result<crate::SignedServingAuthorityFreezeResultV1, ServingAuthorityStoreError>,
     > {
         Box::pin(async { Err(ServingAuthorityStoreError::NotImplemented) })
     }

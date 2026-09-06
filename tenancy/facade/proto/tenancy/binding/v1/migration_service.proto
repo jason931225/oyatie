@@ -116,7 +116,7 @@ message IssueSourceFenceDirectiveRequestV1 {
   Digest32 canonical_request_digest = 8;
   reserved 9, 10;
   reserved "source_write_authority_lease", "expected_write_authority_token_ledger_digest";
-  ServingAuthorityFreezeResultV1 source_authority_freeze = 11;
+  SignedServingAuthorityFreezeResultV1 source_authority_freeze = 11;
 }
 
 message SourceFenceDirectiveLedgerV1 {

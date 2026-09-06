@@ -89,7 +89,7 @@ message ServingAuthorityFreezeResultPayloadV1 {
   Digest32 result_digest = 10;
 }
 
-message ServingAuthorityFreezeResultV1 {
+message SignedServingAuthorityFreezeResultV1 {
   ServingAuthorityFreezeResultPayloadV1 payload = 1;
   BindingProofEnvelopeV1 envelope = 2;
   bytes signature = 3;

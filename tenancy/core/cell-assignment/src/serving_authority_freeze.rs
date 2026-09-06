@@ -118,25 +118,25 @@ pub struct ServingAuthorityFreezeResultPayloadV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ServingAuthorityFreezeResultV1 {
+pub struct SignedServingAuthorityFreezeResultV1 {
     pub payload: ServingAuthorityFreezeResultPayloadV1,
     pub envelope: BindingProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct VerifiedServingAuthorityFreezeResult(ServingAuthorityFreezeResultV1);
+pub struct VerifiedServingAuthorityFreezeResult(SignedServingAuthorityFreezeResultV1);
 
 impl VerifiedServingAuthorityFreezeResult {
     #[must_use]
-    pub fn signed(&self) -> &ServingAuthorityFreezeResultV1 {
+    pub fn signed(&self) -> &SignedServingAuthorityFreezeResultV1 {
         &self.0
     }
 }
 
 pub fn verify_serving_authority_freeze_result(
     _verifier: &dyn crate::BindingProofVerifier,
-    _signed: ServingAuthorityFreezeResultV1,
+    _signed: SignedServingAuthorityFreezeResultV1,
     _expectation: &crate::ServingAuthorityHandoffExpectationV1,
     _claim_identity: &crate::MigrationClaimIdentityV1,
 ) -> Result<VerifiedServingAuthorityFreezeResult, crate::BindingProofVerificationError> {

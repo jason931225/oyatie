@@ -42,13 +42,13 @@ message ServingAuthorityRetirementExpectationV1 {
 
 message ServingAuthorityRetirementEvidenceV1 {
   oneof evidence {
-    ServingAuthorityFreezeResultV1 local_freeze = 1;
+    SignedServingAuthorityFreezeResultV1 local_freeze = 1;
     SignedServingAuthorityIndependentRetirementV1 independent = 2;
   }
 }
 
 message ServingAuthorityLeaseExpiryRecoveryBasisV1 {
-  ServingAuthorityFreezeResultV1 freeze_result = 1;
+  SignedServingAuthorityFreezeResultV1 freeze_result = 1;
   cell.placement.v1.ImmutableEvidenceRefV1 qualified_time_evidence = 2;
   cell.placement.v1.ImmutableEvidenceRefV1 source_isolation_proof = 3;
   Digest32 clock_authority_digest = 4;

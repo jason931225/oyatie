@@ -18,7 +18,7 @@ message ServingAuthorityTerminalFencedV1 {
 message ServingAuthorityHandoffProgressV1 {
   oneof progress {
     ServingAuthorityPotentiallyInstallableV1 committed_potentially_installable = 1;
-    ServingAuthorityInstallationResultV1 installed = 2;
+    SignedServingAuthorityInstallationResultV1 installed = 2;
     ServingAuthorityFreezeIntentV1 freeze_requested = 3;
     ServingAuthorityRetirementEvidenceV1 retired_awaiting_effect_fencing = 6;
     ServingAuthorityTerminalFencedV1 terminal_fenced = 5;

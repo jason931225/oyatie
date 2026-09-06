@@ -52,6 +52,6 @@ message ServingAuthorityPendingIssuanceCallV1 {
 }
 
 service CellServingAuthorityService {
-  rpc Install(ServingAuthorityInstallCallV1) returns (ServingAuthorityInstallationResultV1);
-  rpc Freeze(ServingAuthorityFreezeCallV1) returns (ServingAuthorityFreezeResultV1);
+  rpc Install(ServingAuthorityInstallCallV1) returns (SignedServingAuthorityInstallationResultV1);
+  rpc Freeze(ServingAuthorityFreezeCallV1) returns (SignedServingAuthorityFreezeResultV1);
 }

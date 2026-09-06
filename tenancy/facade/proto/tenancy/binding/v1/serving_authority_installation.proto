@@ -60,7 +60,7 @@ message ServingAuthorityInstallationResultPayloadV1 {
   Digest32 result_digest = 8;
 }
 
-message ServingAuthorityInstallationResultV1 {
+message SignedServingAuthorityInstallationResultV1 {
   ServingAuthorityInstallationResultPayloadV1 payload = 1;
   BindingProofEnvelopeV1 envelope = 2;
   bytes signature = 3;

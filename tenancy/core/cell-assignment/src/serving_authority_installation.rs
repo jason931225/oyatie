@@ -140,25 +140,25 @@ pub struct ServingAuthorityInstallationResultPayloadV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ServingAuthorityInstallationResultV1 {
+pub struct SignedServingAuthorityInstallationResultV1 {
     pub payload: ServingAuthorityInstallationResultPayloadV1,
     pub envelope: BindingProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct VerifiedServingAuthorityInstallationResult(ServingAuthorityInstallationResultV1);
+pub struct VerifiedServingAuthorityInstallationResult(SignedServingAuthorityInstallationResultV1);
 
 impl VerifiedServingAuthorityInstallationResult {
     #[must_use]
-    pub fn signed(&self) -> &ServingAuthorityInstallationResultV1 {
+    pub fn signed(&self) -> &SignedServingAuthorityInstallationResultV1 {
         &self.0
     }
 }
 
 pub fn verify_serving_authority_installation_result(
     _verifier: &dyn crate::BindingProofVerifier,
-    _signed: ServingAuthorityInstallationResultV1,
+    _signed: SignedServingAuthorityInstallationResultV1,
     _expectation: &crate::ServingAuthorityHandoffExpectationV1,
 ) -> Result<VerifiedServingAuthorityInstallationResult, crate::BindingProofVerificationError> {
     Err(crate::BindingProofVerificationError::NotImplemented)

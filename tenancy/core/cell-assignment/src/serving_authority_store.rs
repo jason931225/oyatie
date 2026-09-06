@@ -1,7 +1,7 @@
 use crate::{
-    BoxTenancyFuture, ServingAuthorityFreezeResultPayloadV1, ServingAuthorityFreezeResultV1,
-    ServingAuthorityFreezeWriteSetV1, ServingAuthorityInstallationResultPayloadV1,
-    ServingAuthorityInstallationResultV1, ServingAuthorityInstallationWriteSetV1,
+    BoxTenancyFuture, ServingAuthorityFreezeResultPayloadV1, ServingAuthorityFreezeWriteSetV1,
+    ServingAuthorityInstallationResultPayloadV1, ServingAuthorityInstallationWriteSetV1,
+    SignedServingAuthorityFreezeResultV1, SignedServingAuthorityInstallationResultV1,
 };
 
 /// Failures of the serving-authority store.
@@ -95,7 +95,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
     ///
     /// A store must not mint a signature over the write it just performed: it
     /// would be vouching for itself. The signed
-    /// [`ServingAuthorityInstallationResultV1`] is produced instead by
+    /// [`SignedServingAuthorityInstallationResultV1`] is produced instead by
     /// [`ServingAuthorityResultObserver::observe_installation_result`], which
     /// re-reads the committed row by lookup key.
     fn install<'a>(
@@ -172,7 +172,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<Option<ServingAuthorityInstallationResultV1>, ServingAuthorityStoreError>,
+        Result<Option<SignedServingAuthorityInstallationResultV1>, ServingAuthorityStoreError>,
     >;
 
     fn get_freeze_result<'a>(
@@ -181,7 +181,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<Option<ServingAuthorityFreezeResultV1>, ServingAuthorityStoreError>,
+        Result<Option<SignedServingAuthorityFreezeResultV1>, ServingAuthorityStoreError>,
     >;
 }
 
@@ -205,12 +205,15 @@ pub trait ServingAuthorityResultObserver: Send + Sync {
         query: &'a ServingAuthorityResultQueryV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<ServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
+        Result<SignedServingAuthorityInstallationResultV1, ServingAuthorityStoreError>,
     >;
 
     fn observe_freeze_result<'a>(
         &'a self,
         authority: &'a crate::ServingAuthorityReadAuthorityV1,
         query: &'a ServingAuthorityResultQueryV1,
-    ) -> BoxTenancyFuture<'a, Result<ServingAuthorityFreezeResultV1, ServingAuthorityStoreError>>;
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<SignedServingAuthorityFreezeResultV1, ServingAuthorityStoreError>,
+    >;
 }
