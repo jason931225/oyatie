@@ -342,10 +342,15 @@ pub trait PromotionEconomicsSourceRegistryReader: Send + Sync {
 /// closure is boxed because it embeds two full cell-scale identities and the
 /// whole registry, which would otherwise make every `Continued` value as large
 /// as a completed one.
+///
+/// `key` is boxed. Growing the key so it commits the cell revision made
+/// `Continued` the large variant against a `Complete` whose payload was already
+/// boxed, so both sides are now behind one pointer and neither shape pays for
+/// the other.
 #[derive(Debug, Eq, PartialEq)]
 pub enum PromotionEconomicsClosureStepOutcomeV1 {
     Continued {
-        key: PromotionEconomicsVerificationKeyV1,
+        key: Box<PromotionEconomicsVerificationKeyV1>,
         checkpoint_revision: u64,
     },
     Complete(Box<VerifiedPromotionEconomicsClosure>),

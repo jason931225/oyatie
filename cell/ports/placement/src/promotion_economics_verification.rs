@@ -95,11 +95,25 @@ pub enum PromotionEconomicsVerificationPhaseV1 {
 /// `SourceClosure` is keyed on the registry digest rather than a closure
 /// digest, because the closure digest is that phase's output and does not exist
 /// while the phase runs.
+///
+/// EVERY KEY COMMITS EVERYTHING ITS CHECKPOINT PINS. `SourceClosure` carries
+/// `cell_revision_identity_digest` for that reason: a registry digest binds
+/// partition, cell id and generation but NOT the cell revision, so without it
+/// an ordinary capacity-revision bump would leave the key unchanged while the
+/// checkpoint's `expected_cell` no longer matched — addressing the same durable
+/// slot with incompatible work. `InputReplay` needs no such field because its
+/// `closure_digest` transitively commits the revision through the closure's own
+/// `cell`. With both, a changed cell revision yields a DIFFERENT KEY and
+/// therefore a fresh verification, rather than a collision against retained
+/// accumulators that must not be inherited.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PromotionEconomicsVerificationKeyV1 {
     SourceClosure {
         partition: PlacementPartitionV1,
         cell_id: CellId,
+        /// `CellRevisionIdentityV1::revision_identity_digest` of the cell
+        /// revision this verification is over.
+        cell_revision_identity_digest: Digest32,
         registry_digest: Digest32,
         window: PromotionEconomicsWindowV1,
         policy_digest: Digest32,
@@ -463,10 +477,15 @@ pub trait PromotionEconomicsCheckpointStore: Send + Sync {
 /// `Complete` is boxed because a completed record embeds a full cell revision
 /// identity, the whole policy and the whole closure, which would otherwise make
 /// every `Continued` value that large.
+///
+/// `key` is boxed. Growing the key so it commits the cell revision made
+/// `Continued` the large variant against a `Complete` whose payload was already
+/// boxed, so both sides are now behind one pointer and neither shape pays for
+/// the other.
 #[derive(Debug, Eq, PartialEq)]
 pub enum PromotionEconomicsVerificationStepOutcomeV1 {
     Continued {
-        key: PromotionEconomicsVerificationKeyV1,
+        key: Box<PromotionEconomicsVerificationKeyV1>,
         checkpoint_revision: u64,
     },
     Complete(Box<VerifiedCellPromotionEconomics>),

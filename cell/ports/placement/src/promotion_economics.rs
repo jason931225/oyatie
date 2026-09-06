@@ -473,8 +473,26 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     /// arbitrarily, so the split is stated rather than left to a future
     /// implementer.
     SourceClosureRejected,
-    /// A checkpoint lease expired, lost a compare-and-set race, or bound a
-    /// different cell, closure, registry, policy or calculation than the work
-    /// being resumed.
+    /// STORE-SIDE CONTENTION ONLY: an execution lease expired, or a commit lost
+    /// its revision compare-and-set to a writer that got there first.
+    ///
+    /// RECOVERY: retry from persisted progress under a fresh acquire. Nothing
+    /// is discarded — a lost race means another worker advanced the same key,
+    /// not that the accumulated work is wrong. This is the ONLY variant with
+    /// that recovery, which is why it must not also carry identity mismatches.
+    ///
+    /// It can no longer mean "bound a different cell, closure, registry, policy
+    /// or calculation than the work being resumed". Every verification key
+    /// commits everything its checkpoint pins, so different work is a DIFFERENT
+    /// KEY and starts a fresh verification instead of colliding. Collapsing the
+    /// two would be actively harmful: the module prescribes opposite recovery
+    /// for them — resume from persisted progress, versus must not inherit the
+    /// accumulators at all — and one error cannot direct both.
+    ///
+    /// BOUNDARY against the identity errors: `CellMismatch` and `PolicyMismatch`
+    /// fire when the RECORD OR EXPECTATION the caller supplied disagrees with
+    /// the cell revision or policy being verified. They are about what was
+    /// handed in. `CheckpointConflict` is about the durable store alone and says
+    /// nothing about whether the caller's inputs agree.
     CheckpointConflict,
 }

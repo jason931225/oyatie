@@ -351,9 +351,13 @@ enum PromotionEconomicsVerificationPhaseV1 {
 message PromotionEconomicsSourceClosureVerificationKeyV1 {
   PlacementPartitionV1 partition = 1;
   CellId cell_id = 2;
-  Digest32 registry_digest = 3;
-  PromotionEconomicsWindowV1 window = 4;
-  Digest32 policy_digest = 5;
+  // A registry digest binds partition, cell id and generation but not the cell
+  // revision, so without this field a capacity-revision bump would address the
+  // same durable slot with incompatible work.
+  Digest32 cell_revision_identity_digest = 3;
+  Digest32 registry_digest = 4;
+  PromotionEconomicsWindowV1 window = 5;
+  Digest32 policy_digest = 6;
 }
 
 message PromotionEconomicsInputReplayVerificationKeyV1 {
