@@ -130,12 +130,26 @@ pub trait WriteAuthorityLeaseAuthority: Send + Sync {
 }
 
 pub trait TenancyWriteAuthorityLeaseService: Send + Sync {
+    /// Returns `None` when no published write-authority lease is valid until
+    /// `minimum_valid_until_unix_seconds`.
+    ///
+    /// Absence is a normal, expressible answer and must not be folded into an
+    /// error: "there is no lease valid until T" is the exact question an
+    /// operator asks when writes start failing, and
+    /// `ServingAuthorityStoreError` names no absence — its closest variant,
+    /// `Unavailable`, states in its own documentation that the caller learns
+    /// nothing. `CellServingAuthorityStore::get_latest_published_lease`
+    /// underneath already returns `Option`, and so does the sibling
+    /// `ServingAuthorityControlHandoffStore::get_handoff`.
     fn get_latest_published_write_authority_lease<'a>(
         &'a self,
         invocation: VerifiedServingAuthorityInvocation,
         instance: &'a crate::ServingAuthorityInstanceV1,
         minimum_valid_until_unix_seconds: u64,
-    ) -> BoxTenancyFuture<'a, Result<PublishedWriteAuthorityLeaseV1, ServingAuthorityStoreError>>;
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<Option<PublishedWriteAuthorityLeaseV1>, ServingAuthorityStoreError>,
+    >;
 
     fn renew_write_authority_lease<'a>(
         &'a self,
@@ -153,8 +167,10 @@ impl TenancyWriteAuthorityLeaseService for NotImplementedTenancyWriteAuthorityLe
         _: VerifiedServingAuthorityInvocation,
         _: &'a crate::ServingAuthorityInstanceV1,
         _: u64,
-    ) -> BoxTenancyFuture<'a, Result<PublishedWriteAuthorityLeaseV1, ServingAuthorityStoreError>>
-    {
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<Option<PublishedWriteAuthorityLeaseV1>, ServingAuthorityStoreError>,
+    > {
         Box::pin(async { Err(ServingAuthorityStoreError::NotImplemented) })
     }
 
