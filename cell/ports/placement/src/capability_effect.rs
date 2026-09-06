@@ -363,6 +363,12 @@ pub struct CapabilityAuthorityRejectionHighWaterV1 {
 /// separately revisioned durable row, carried beside this one in the same
 /// commit; embedding a copy of it here would let its revision advance while
 /// this record's `record_digest` still covered the stale snapshot.
+///
+/// Public fields make the record writable by the adapter that has to write
+/// it; they do not make it choosable. `context` in particular is a projection
+/// the store copies from the signed grant, never a value a caller selects: see
+/// [`LocalEffectCommitRequestV1::next_state`] for the obligation on each field
+/// and the refusal that covers it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LocalAuthorityStateV1 {
     pub scope: CapabilityEffectScopeV1,
@@ -402,9 +408,34 @@ pub struct LocalEffectCommitRequestV1<E> {
     /// returns to. A terminal disposition retains the row so that a later
     /// request cannot read absence and start over.
     ///
-    /// Its `disposition` must be the one the grant's action produces, per
-    /// [`LocalAuthorityDispositionV1`]. The store recomputes that rather than
-    /// trusting the caller.
+    /// It is an ASSERTION, not an authority to write. Every one of its fields
+    /// is derivable by the store from the grant, the action and the
+    /// precondition, so the caller proposes nothing the store does not
+    /// independently recompute. It is carried because the write set must be a
+    /// complete, digestible description of the mutation that conformance can
+    /// compare against the persisted row, and because a caller that has
+    /// misunderstood the transition should be refused rather than silently
+    /// corrected.
+    ///
+    /// Every field therefore has an obligation and a refusal:
+    ///
+    /// - `scope` must equal the grant's scope. A successor naming a different
+    ///   tenant, participant or partition would write outside the grant.
+    ///   Refusal: [`CapabilityEffectErrorV1::RelationMismatch`].
+    /// - `context` must be the grant's context, field for field. Cell never
+    ///   assigns owner generation, revision, fence or incarnation; it only
+    ///   projects what the owner signed. A caller proposing different ones is
+    ///   proposing to install authority that was never granted, which Cell has
+    ///   no power to accept at any disposition.
+    ///   Refusal: [`CapabilityEffectErrorV1::AuthorityContextMismatch`].
+    /// - `disposition` must be the one the grant's action produces, per
+    ///   [`LocalAuthorityDispositionV1`].
+    ///   Refusal: [`CapabilityEffectErrorV1::DispositionMismatch`].
+    /// - `revision` must be the successor of the revision the precondition
+    ///   matched. Refusal: [`CapabilityEffectErrorV1::Conflict`].
+    /// - `record_digest` must equal the store's own recomputation over the
+    ///   canonical successor record.
+    ///   Refusal: [`CapabilityEffectErrorV1::RelationMismatch`].
     pub next_state: LocalAuthorityStateV1,
     /// The rejection membership this effect leaves behind, carried separately
     /// because it is a separately revisioned row, exactly as the peer serving
@@ -493,8 +524,15 @@ pub enum CapabilityEffectErrorV1 {
     /// expected: scope, partition, action, effect key, a digest, or the
     /// authority context digest.
     ///
+    /// Also covers a proposed successor record whose `scope` is not the
+    /// grant's, or whose `record_digest` is not the store's own recomputation
+    /// over the canonical successor.
+    ///
     /// Not `VerificationFailed`. Reporting a relation failure as an
-    /// authenticity failure hides which side is wrong.
+    /// authenticity failure hides which side is wrong. Not
+    /// `AuthorityContextMismatch`, which is reserved for the owner-assigned
+    /// half of the successor's context, where the caller is not merely
+    /// inconsistent but is proposing authority it does not hold.
     RelationMismatch,
     /// The grant, lease or recovery authority is authentic and its validity
     /// window has passed against a trusted bounded clock.
@@ -531,6 +569,10 @@ pub enum CapabilityEffectErrorV1 {
     StaleIncarnation,
     /// A compare-and-set precondition did not hold: the record moved under
     /// the caller between read and write.
+    ///
+    /// Also covers a proposed successor `revision` that is not the successor
+    /// of the revision the precondition matched: both are the caller's belief
+    /// about where the record stands, and both are wrong in the same way.
     ///
     /// Not `StaleAuthority`: the authority may be perfectly current and the
     /// caller simply lost a race. Retryable after re-reading.
@@ -611,4 +653,22 @@ pub enum CapabilityEffectErrorV1 {
     /// about the authority presented, and it is the refusal the two separate
     /// issuer ports exist to make unconstructible in the first place.
     ActionNotPermittedByContext,
+    /// The proposed successor record's authority context is not the one the
+    /// verified grant carries.
+    ///
+    /// Cell projects owner generation, revision, fence and incarnation and
+    /// never assigns them, so a caller proposing a successor context that
+    /// differs from the grant's is asking Cell to install authority the owner
+    /// did not issue. There is no disposition at which that is admissible, and
+    /// no reading under which it is a formatting error.
+    ///
+    /// Not `ActionNotPermittedByContext`, which is about the context the GRANT
+    /// carries being wrong for the action; here the grant's context may be
+    /// perfectly valid and the successor disagrees with it. Not
+    /// `StaleAuthority` or `StaleIncarnation`, which compare a presented
+    /// authority against what the record already holds; this compares the
+    /// caller's proposed future record against the grant authorizing it. Not
+    /// `RelationMismatch`, which is the same shape of disagreement over fields
+    /// Cell may legitimately compute.
+    AuthorityContextMismatch,
 }
