@@ -74,6 +74,11 @@ pub enum CellProofDomainV1 {
     MovementActionResult,
     PromotionEconomicsSourceFinalization,
     PromotionEconomicsCheckpointAttestation,
+    CapabilityEffectGrant,
+    LocalEffectCommitReceipt,
+    CapabilityAdapterAcceptance,
+    CapabilityReceiptRecovery,
+    LocalEffectReceiptCommitObservation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
