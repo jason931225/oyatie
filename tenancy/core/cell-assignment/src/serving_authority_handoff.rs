@@ -132,6 +132,12 @@ pub trait ServingAuthorityControlHandoffStore: Send + Sync {
         instance: &'a crate::ServingAuthorityInstanceV1,
     ) -> BoxTenancyFuture<'a, Result<Option<ServingAuthorityHandoffRecordV1>, BindingStoreError>>;
 
+    /// Returns `None` when no installation claim was ever committed.
+    ///
+    /// Absence must stay distinct from "result unknown": this is a reconciler
+    /// decision path, and collapsing "never committed" into an error would make
+    /// the reconciler unable to tell a missing commit from a failed read. The
+    /// sibling `get_handoff` five lines above already returns `Option`.
     fn load_installation_claim<'a>(
         &'a self,
         authority: &'a crate::BindingReconciliationPersistenceAuthorityV1,
@@ -139,9 +145,11 @@ pub trait ServingAuthorityControlHandoffStore: Send + Sync {
         lease: &'a crate::BindingReconciliationLeaseV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::CommittedServingAuthorityInstallationClaimV1, BindingStoreError>,
+        Result<Option<crate::CommittedServingAuthorityInstallationClaimV1>, BindingStoreError>,
     >;
 
+    /// Returns `None` when no freeze claim was ever committed. See
+    /// [`Self::load_installation_claim`] for why absence is not an error here.
     fn load_freeze_claim<'a>(
         &'a self,
         authority: &'a crate::BindingReconciliationPersistenceAuthorityV1,
@@ -149,7 +157,7 @@ pub trait ServingAuthorityControlHandoffStore: Send + Sync {
         lease: &'a crate::BindingReconciliationLeaseV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<crate::CommittedServingAuthorityFreezeClaimV1, BindingStoreError>,
+        Result<Option<crate::CommittedServingAuthorityFreezeClaimV1>, BindingStoreError>,
     >;
 
     fn record_handoff_result<'a>(
