@@ -71,6 +71,19 @@ pub enum ServingAuthorityStoreError {
     /// [`crate::ServingAuthorityRestoreBasisV1`] was supplied where the
     /// contract requires one. Absence of evidence, not incomplete evidence.
     RestoreEvidenceRequired,
+    /// The issuance's publication lease is held by another worker whose lease
+    /// has NOT expired against the claimant's `now_unix_seconds`.
+    ///
+    /// Distinct from [`Self::Conflict`], which contention previously collapsed
+    /// into: a conflict invites a re-read and retry, whereas this says another
+    /// worker legitimately holds the work and the caller should stop.
+    ///
+    /// This variant carries no payload, so it deliberately does NOT tell the
+    /// caller when to come back -- an error that names a value it cannot carry
+    /// is worse than one that names none. The expiry is obtained by reading:
+    /// [`crate::ServingAuthorityPublicationReconciliationStore::get_publication_lease`]
+    /// returns the held lease including its `expires_at_unix_seconds`.
+    PublicationLeaseHeldByAnotherWorker,
     /// A page request asked for more records, or more encoded bytes, than the
     /// store will return in one response. The caller should re-request with a
     /// smaller bound; the durable state is unchanged.
