@@ -392,26 +392,161 @@ pub struct SignedLocalEffectCommitReceiptV1 {
     pub signature: Vec<u8>,
 }
 
+/// Refusals at the capability effect boundary.
+///
+/// Every variant states its boundary against the neighbour it is most easily
+/// confused with. An unstated overlap is not neutral: it gets resolved
+/// arbitrarily by whoever implements first, and two adapters then disagree
+/// about what the same refusal means.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CapabilityEffectErrorV1 {
+    /// The contract exists and nothing implements it yet. Every constructor
+    /// and verifier in this module returns this today. Not `NotAdmitted`:
+    /// that one means an implementation exists and is not qualified to run.
     NotImplemented,
+    /// No current, verified acceptance covers this adapter at this
+    /// transaction domain, or the acceptance does not list the requested
+    /// action in `supported_actions`.
+    ///
+    /// Not `UnsupportedSink`: this is a missing or insufficient
+    /// qualification for a store that could in principle qualify. Not
+    /// `NotAuthorized`-shaped either; the caller's authority is not in
+    /// question here, the adapter's admission is.
     NotAdmitted,
+    /// The sink cannot provide same-boundary fencing, dedup and receipt
+    /// semantics at all, so no acceptance could ever be issued for it.
+    ///
+    /// Not `NotAdmitted`: that is a qualification this deployment lacks;
+    /// this is a property the sink does not have. A bare network call
+    /// between local begin and commit lands here, permanently.
     UnsupportedSink,
+    /// A signature, envelope, domain, producer, audience or key check failed:
+    /// the bytes are not authentic.
+    ///
+    /// Not `RelationMismatch`: authenticity failed before any field was
+    /// compared. A forged grant is this; an authentic grant for the wrong
+    /// tenant is that.
     VerificationFailed,
+    /// The bytes are authentic and a compared field disagrees with what was
+    /// expected: scope, partition, action, effect key, a digest, or the
+    /// authority context digest.
+    ///
+    /// Not `VerificationFailed`. Reporting a relation failure as an
+    /// authenticity failure hides which side is wrong.
     RelationMismatch,
+    /// The grant, lease or recovery authority is authentic and its validity
+    /// window has passed against a trusted bounded clock.
+    ///
+    /// Not `StaleAuthority`: expiry is about time. Not `Fenced`: expiry does
+    /// not mean anything replaced it. An expired effect grant does not
+    /// prevent read-only receipt recovery under fresh recovery authority.
     AuthorityExpired,
+    /// A trusted bounded clock could not be established, or the remaining
+    /// uncertainty exceeds what the caller declared it would tolerate.
+    ///
+    /// Not `AuthorityExpired`: this is a refusal to judge expiry at all,
+    /// which fails closed rather than guessing.
     ClockUncertain,
+    /// The local authority record is `Fenced`, and the requested action needs
+    /// a record that serves.
+    ///
+    /// Not `StaleAuthority` and not `StaleIncarnation`: fencing is a decided
+    /// state of the record, not a comparison against a newer authority. Fence
+    /// is monotonic; a same-epoch grant never reopens it.
     Fenced,
+    /// The presented authority is older than what the record durably holds:
+    /// a lower owner generation, revision or fence than the installed one.
+    ///
+    /// Not `StaleIncarnation`, which is the case where the numbers match.
     StaleAuthority,
-    Conflict,
-    IdempotencyKeyReuse,
-    EffectKeyReuse,
-    BudgetExceeded,
-    AuditUnavailable,
-    DependencyUnavailable,
-    OutcomeUnknown,
-    RestoreEvidenceRequired,
+    /// The incarnation is in durable rejection membership, at the same owner
+    /// generation and the same numeric fence as the installed one.
+    ///
+    /// This is the variant `StaleAuthority` cannot express, and the reason
+    /// rejection membership is retained at all: a replaced incarnation
+    /// carrying identical numbers is otherwise indistinguishable from the one
+    /// that replaced it.
     StaleIncarnation,
+    /// A compare-and-set precondition did not hold: the record moved under
+    /// the caller between read and write.
+    ///
+    /// Not `StaleAuthority`: the authority may be perfectly current and the
+    /// caller simply lost a race. Retryable after re-reading.
+    Conflict,
+    /// The idempotency key was already spent by a request with a different
+    /// canonical request digest.
+    ///
+    /// The same key with the same request is not an error: it returns the
+    /// original committed result and performs no second effect. Not
+    /// `EffectKeyReuse`, which is about the effect rather than the request.
+    IdempotencyKeyReuse,
+    /// The effect key was already spent by a different effect.
+    ///
+    /// Not `IdempotencyKeyReuse`: the request may be byte-identical and still
+    /// name an effect this key already committed.
+    EffectKeyReuse,
+    /// The actual bytes or cost exceeded the ceiling the grant signed.
+    ///
+    /// Raised before the effect where the size is known in advance, and the
+    /// transaction aborts where it is not. Never reported after a commit.
+    BudgetExceeded,
+    /// The audit record required by policy could not be written in the same
+    /// commit as the effect.
+    ///
+    /// Not `DependencyUnavailable`: this specifically refuses to let the
+    /// effect commit without its audit record. A separate audit transaction
+    /// is not a fallback; it fails admission.
+    AuditUnavailable,
+    /// A store or component the effect needs is unreachable, and it is known
+    /// that no effect was committed.
+    ///
+    /// Not `OutcomeUnknown`: the distinction is whether the caller may retry
+    /// freely. Here it may.
+    DependencyUnavailable,
+    /// The result of the effect is genuinely unknown: a timeout or a lost
+    /// reply where the commit may or may not have happened.
+    ///
+    /// The caller recovers by key and never retries the effect blindly, and
+    /// never reports this as a failure before the effect. Not
+    /// `UncommittedReceipt`, which is a definite negative observation.
+    OutcomeUnknown,
+    /// The authority record cannot be trusted until an owner-qualified
+    /// reconciliation runs: a restored backup, or rejection membership that
+    /// is missing or older than the state it guards.
+    ///
+    /// It is specifically NOT reported as an absent precondition. Absence
+    /// would let a restored store start over and reactivate an incarnation
+    /// that was already rejected.
+    RestoreEvidenceRequired,
+    /// The committed result existed and is no longer retained: the request
+    /// falls outside the documented replay and recovery horizon.
+    ///
+    /// Not `DependencyUnavailable`, which is a store the caller cannot reach,
+    /// and never a silent absence. Unavailability of retained evidence is
+    /// stated, because a caller that reads absence may conclude the effect
+    /// never happened.
     RetainedEvidenceUnavailable,
+    /// The observer looked and found no committed row, or found one not yet
+    /// visible under committed read isolation.
+    ///
+    /// A definite negative observation, unlike `OutcomeUnknown`. A caller
+    /// that fabricates a receipt payload gets this, because the observer
+    /// reads the store rather than the claim.
     UncommittedReceipt,
+    /// The successor authority record does not carry the disposition the
+    /// grant's action produces, per [`LocalAuthorityDispositionV1`].
+    ///
+    /// Not `RelationMismatch`, which compares the grant against the
+    /// expectation. This compares the caller's proposed successor against the
+    /// transition the action defines, and the store recomputes it rather than
+    /// trusting what was handed over.
+    DispositionMismatch,
+    /// The grant's action is not admissible under the authority context the
+    /// grant carries: a preparation context asking for Activate, Write, Fence
+    /// or Release, or an installed context asking for PreparationCleanup.
+    ///
+    /// Not `NotAdmitted`, which is about the adapter's qualification. This is
+    /// about the authority presented, and it is the refusal the two separate
+    /// issuer ports exist to make unconstructible in the first place.
+    ActionNotPermittedByContext,
 }
