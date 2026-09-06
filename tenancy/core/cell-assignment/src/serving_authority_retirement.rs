@@ -35,6 +35,28 @@ pub struct ServingAuthorityRetirementExpectationV1 {
     pub now_unix_seconds: u64,
 }
 
+/// # External arrival: no local producer is required
+///
+/// `SignedServingAuthorityIndependentRetirementV1` has a verifier, a proof
+/// domain and consumers in this crate, and is returned by nothing here. That is
+/// the invocation pattern, not the missing-producer defect, and the payload is
+/// what establishes it: its subject is the PRIOR authority's retirement.
+/// `ServingAuthorityReplacementEvidenceV1` names it beside `prior_instance`,
+/// explicitly qualified against `replacement_instance`, so the state attested
+/// is another party's and the own-write rule does not bite.
+///
+/// "Independent" is also load-bearing: the point of this artifact is that
+/// neither the authority being retired nor the replacement attests it. A local
+/// producer in this crate would defeat that, since the only local parties are
+/// exactly those two.
+///
+/// CONFIDENCE. This rests on the payload's subject, which is the same test that
+/// settled the surviving quorum the other way. It does NOT rest on issuer
+/// symmetry with the install and freeze grant issuers; that symmetry is real
+/// but those two attest this store's own committed control rows, and this one
+/// does not, so the asymmetry is the correct outcome rather than an omission.
+/// What would overturn this: any evidence that the retiring party is the same
+/// control plane that performs the replacement write.
 #[derive(Debug, Eq, PartialEq)]
 pub struct VerifiedServingAuthorityIndependentRetirement(
     SignedServingAuthorityIndependentRetirementV1,
