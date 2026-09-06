@@ -166,6 +166,28 @@ pub trait CellServingAuthorityStore: Send + Sync {
         Result<Option<crate::PublishedWriteAuthorityLeaseV1>, ServingAuthorityStoreError>,
     >;
 
+    /// Reads back the rejection high water for an instance's partition, or
+    /// `None` when none has been recorded.
+    ///
+    /// Every mutation on this store takes a
+    /// [`crate::ServingAuthorityRejectionHighWaterV1`] as a CAS precondition --
+    /// it is a member of all three arms of
+    /// [`crate::ServingAuthorityLocalPreconditionV1`], and installation also
+    /// supplies a `next_rejection_high_water` -- and until now nothing returned
+    /// one. The type was write-only, which made a first `Install` unassemblable
+    /// and left [`ServingAuthorityStoreError::Conflict`]'s stated recovery,
+    /// "retrying after a fresh read may succeed", naming a read that did not
+    /// exist. A stated recovery that cannot be performed is worse than an
+    /// unstated one.
+    fn get_rejection_high_water<'a>(
+        &'a self,
+        authority: &'a crate::ServingAuthorityReadAuthorityV1,
+        instance: &'a crate::ServingAuthorityInstanceV1,
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<Option<crate::ServingAuthorityRejectionHighWaterV1>, ServingAuthorityStoreError>,
+    >;
+
     /// Reads back the UNSIGNED durable installation result.
     ///
     /// This getter cannot return the signed form, because no signed form is
