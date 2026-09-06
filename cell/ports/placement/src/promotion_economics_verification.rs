@@ -353,6 +353,27 @@ pub struct PromotionEconomicsCheckpointLeaseClaimV1 {
 }
 
 /// What the owning module independently expects of a lease claim.
+///
+/// Like [`PromotionEconomicsCheckpointExpectationV1`], this is built by the
+/// step rather than supplied by a caller, so every field needs a source among
+/// the step's own inputs. Both identity-shaped fields have one, and the sources
+/// are different in a way worth stating:
+///
+/// - `expected_worker` is the step's OWN identity, and it comes from the read
+///   authority it already holds:
+///   `authority.invocation().envelope.producer`. The worker is whoever invoked
+///   this control operation, so the invocation's producer is exactly it. No
+///   admission is involved and none should be — a party does not admit itself.
+/// - `expected_revision` is the revision the step is resuming from, taken from
+///   the retained checkpoint it is continuing, never from the lease claim being
+///   checked. An expectation read out of its own subject compares a value
+///   against itself.
+///
+/// The contrast with the checkpoint expectation is the point. There the
+/// identity is a THIRD PARTY's, so it must be admitted by policy the caller
+/// cannot choose; here it is the caller's own, so the authority the caller
+/// already had to present is the correct and sufficient source. Reaching for
+/// an admission here would add a knob that admits nothing.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PromotionEconomicsCheckpointLeaseExpectationV1 {
     pub key: PromotionEconomicsVerificationKeyV1,
