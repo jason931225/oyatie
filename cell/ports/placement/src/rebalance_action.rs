@@ -210,18 +210,30 @@ pub struct SignedRebalanceInvocationIssuanceCommitObservationV1 {
     pub signature: Vec<u8>,
 }
 
+/// A durable issuance record together with an independent observation of its
+/// commit.
+///
+/// This is a CLAIM, not evidence, and the distinction is the whole point: only
+/// [`verify_committed_rebalance_issuance`] turns it into the private-field
+/// [`VerifiedCommittedRebalanceIssuance`], and only that wrapper reaches
+/// [`CellPlacementInvocationIssuer::sign_committed`].
+///
+/// It is produced by [`RebalanceInvocationIssuanceCommitObserver`] and NEVER by
+/// the store that performed the commit. "Claim" here is the evidentiary sense;
+/// it is unrelated to [`RebalanceJobClaimV1`], which is a worker's lease on a
+/// job. The crate already carries both senses.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CommittedRebalanceIssuanceV1 {
+pub struct CommittedRebalanceIssuanceClaimV1 {
     pub issuance: RebalanceInvocationIssuanceV1,
-    pub commit: SignedRebalanceInvocationIssuanceCommitObservationV1,
+    pub observation: SignedRebalanceInvocationIssuanceCommitObservationV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct VerifiedCommittedRebalanceIssuance(CommittedRebalanceIssuanceV1);
+pub struct VerifiedCommittedRebalanceIssuance(CommittedRebalanceIssuanceClaimV1);
 
 impl VerifiedCommittedRebalanceIssuance {
     #[must_use]
-    pub fn claim(&self) -> &CommittedRebalanceIssuanceV1 {
+    pub fn claim(&self) -> &CommittedRebalanceIssuanceClaimV1 {
         &self.0
     }
 }
@@ -245,7 +257,7 @@ pub struct RebalanceInvocationIssuanceCommitExpectationV1 {
 
 pub fn verify_committed_rebalance_issuance(
     _verifier: &dyn CellProofVerifier,
-    _claim: CommittedRebalanceIssuanceV1,
+    _claim: CommittedRebalanceIssuanceClaimV1,
     _expectation: &RebalanceInvocationIssuanceCommitExpectationV1,
 ) -> Result<VerifiedCommittedRebalanceIssuance, PlacementContractError> {
     Err(PlacementContractError::NotImplemented)
@@ -295,18 +307,48 @@ pub struct RebalanceActionPageV1 {
 }
 
 pub trait RebalanceSourceIssuanceStore: Send + Sync {
+    /// Durably commits the invocation issuance and returns the record it now
+    /// holds. It returns NO attestation and NO signature.
+    ///
+    /// A store cannot witness its own write. The signed observation that a
+    /// commit occurred comes from [`RebalanceInvocationIssuanceCommitObserver`],
+    /// which re-reads independently; the two are separate ports so that the same
+    /// component cannot both perform the write and vouch for it.
     fn commit_issuance<'a>(
         &'a self,
         write: &'a RebalanceSourceIssuanceWriteSetV1,
-    ) -> BoxCellFuture<'a, Result<CommittedRebalanceIssuanceV1, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<RebalanceInvocationIssuanceV1, PlacementContractError>>;
+    /// Re-reads one issuance by explicit address, for republication after a lost
+    /// reply. Absence distinguishes "never durably issued" from "issued, reply
+    /// lost". Returns the durable record only, for the same reason
+    /// `commit_issuance` does.
     fn load_issuance<'a>(
         &'a self,
         authority: &'a CellControlReconciliationReadAuthorityV1,
         address: &'a RebalanceIssuanceAddressV1,
-    ) -> BoxCellFuture<'a, Result<Option<CommittedRebalanceIssuanceV1>, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<Option<RebalanceInvocationIssuanceV1>, PlacementContractError>>;
     fn list_actions<'a>(
         &'a self,
         authority: &'a CellControlReconciliationReadAuthorityV1,
         query: &'a RebalanceActionPageQueryV1,
     ) -> BoxCellFuture<'a, Result<RebalanceActionPageV1, PlacementContractError>>;
+}
+
+/// Independently re-reads a committed invocation issuance and signs what it read.
+///
+/// The port accepts an address only. It is not given, and cannot be given, a
+/// caller-supplied record or a caller's claim that a commit occurred: every
+/// field of the emitted observation describes what the observer itself found at
+/// that address, under committed read isolation.
+///
+/// It returns the record it read together with its own attestation rather than
+/// the attestation alone. Handing back only the attestation would put the caller
+/// in charge of pairing it with a record, which reopens a narrower version of
+/// the steering hazard this port exists to close.
+pub trait RebalanceInvocationIssuanceCommitObserver: Send + Sync {
+    fn observe_committed_issuance<'a>(
+        &'a self,
+        authority: &'a CellControlReconciliationReadAuthorityV1,
+        address: &'a RebalanceIssuanceAddressV1,
+    ) -> BoxCellFuture<'a, Result<CommittedRebalanceIssuanceClaimV1, PlacementContractError>>;
 }

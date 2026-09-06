@@ -188,9 +188,9 @@ message SignedRebalanceInvocationIssuanceCommitObservationV1 {
   bytes signature = 3;
 }
 
-message CommittedRebalanceIssuanceV1 {
+message CommittedRebalanceIssuanceClaimV1 {
   RebalanceInvocationIssuanceV1 issuance = 1;
-  SignedRebalanceInvocationIssuanceCommitObservationV1 commit = 2;
+  SignedRebalanceInvocationIssuanceCommitObservationV1 observation = 2;
 }
 
 message RebalanceActionPageQueryV1 {
@@ -248,9 +248,9 @@ message MovementActionClosureCommitExpectationV1 {
   uint64 now_unix_seconds = 6;
 }
 
-message CommittedMovementActionClosureV1 {
+message CommittedMovementActionClosureClaimV1 {
   MovementActionClosureV1 closure = 1;
-  SignedMovementActionClosureCommitObservationV1 commit = 2;
+  SignedMovementActionClosureCommitObservationV1 observation = 2;
 }
 
 message SignedMovementActionClosureV1 {
@@ -289,7 +289,7 @@ message MovementActionRestoreCheckpointV1 {
 
 message RebalanceClosureRestoreCheckpointV1 {
   RebalanceJobAddressV1 source = 1;
-  CommittedMovementActionClosureV1 closure = 2;
+  CommittedMovementActionClosureClaimV1 closure = 2;
   uint64 monotonic_restore_epoch = 3;
 }
 
@@ -366,7 +366,7 @@ message RebalanceObserveResultWriteSetPartsV1 {
 message RebalancePublicationWriteSetPartsV1 {
   SignedReconciliationInvocationV1 authority = 1;
   RebalanceSourcePreconditionV1 precondition = 2;
-  CommittedRebalanceIssuanceV1 committed_issuance = 3;
+  CommittedRebalanceIssuanceClaimV1 committed_issuance = 3;
   SignedPlacementInvocationV1 invocation = 4;
   CellControlAuditRecordV1 audit_outbox = 5;
 }

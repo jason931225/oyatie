@@ -72,22 +72,26 @@ pub struct MovementActionClosureCommitExpectationV1 {
     pub now_unix_seconds: u64,
 }
 
-/// A durable closure record together with the observation that witnesses its
-/// commit. This is a claim, not evidence: only
+/// A durable closure record together with an independent observation of its
+/// commit.
+///
+/// This is a CLAIM, not evidence: only
 /// [`verify_committed_movement_action_closure`] turns it into the private-field
-/// [`VerifiedCommittedMovementActionClosure`].
+/// [`VerifiedCommittedMovementActionClosure`]. It is produced by
+/// [`MovementActionClosureCommitObserver`] and NEVER by the store that performed
+/// the commit.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CommittedMovementActionClosureV1 {
+pub struct CommittedMovementActionClosureClaimV1 {
     pub closure: MovementActionClosureV1,
-    pub commit: SignedMovementActionClosureCommitObservationV1,
+    pub observation: SignedMovementActionClosureCommitObservationV1,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct VerifiedCommittedMovementActionClosure(CommittedMovementActionClosureV1);
+pub struct VerifiedCommittedMovementActionClosure(CommittedMovementActionClosureClaimV1);
 
 impl VerifiedCommittedMovementActionClosure {
     #[must_use]
-    pub fn claim(&self) -> &CommittedMovementActionClosureV1 {
+    pub fn claim(&self) -> &CommittedMovementActionClosureClaimV1 {
         &self.0
     }
 }
@@ -122,7 +126,7 @@ pub struct MovementActionProofExpectationV1 {
 
 pub fn verify_committed_movement_action_closure(
     _verifier: &dyn CellProofVerifier,
-    _claim: CommittedMovementActionClosureV1,
+    _claim: CommittedMovementActionClosureClaimV1,
     _expectation: &MovementActionClosureCommitExpectationV1,
 ) -> Result<VerifiedCommittedMovementActionClosure, PlacementContractError> {
     Err(PlacementContractError::NotImplemented)
@@ -253,7 +257,7 @@ pub struct MovementActionRestoreCheckpointV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceClosureRestoreCheckpointV1 {
     pub source: RebalanceJobAddressV1,
-    pub closure: CommittedMovementActionClosureV1,
+    pub closure: CommittedMovementActionClosureClaimV1,
     pub monotonic_restore_epoch: u64,
 }
 

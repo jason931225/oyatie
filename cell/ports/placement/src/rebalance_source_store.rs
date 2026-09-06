@@ -138,18 +138,45 @@ pub trait RebalanceSourceStore: Send + Sync {
         &'a self,
         write: &'a RebalanceProgressWriteSetV1,
     ) -> BoxCellFuture<'a, Result<RebalanceJobV1, PlacementContractError>>;
+    /// Durably closes the action and returns the closure record it now holds.
+    /// It returns NO attestation and NO signature: a store cannot witness its
+    /// own write. See [`MovementActionClosureCommitObserver`].
     fn close_action<'a>(
         &'a self,
         write: &'a RebalanceClosureWriteSetV1,
-    ) -> BoxCellFuture<'a, Result<CommittedMovementActionClosureV1, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<MovementActionClosureV1, PlacementContractError>>;
+    /// Re-reads one closure by explicit job address and action key. Absence
+    /// distinguishes "never closed" from "closed, reply lost". Returns the
+    /// durable record only.
     fn load_closure<'a>(
         &'a self,
         authority: &'a CellControlReconciliationReadAuthorityV1,
         address: &'a RebalanceJobAddressV1,
         key: &'a PlacementBusinessActionKeyV1,
-    ) -> BoxCellFuture<'a, Result<Option<CommittedMovementActionClosureV1>, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<Option<MovementActionClosureV1>, PlacementContractError>>;
     fn observe_result<'a>(
         &'a self,
         write: &'a RebalanceObserveResultWriteSetV1,
     ) -> BoxCellFuture<'a, Result<RebalanceJobV1, PlacementContractError>>;
+}
+
+/// Independently re-reads a committed movement-action closure and signs what it
+/// read.
+///
+/// The port accepts a lookup only - the same job address and action key
+/// [`RebalanceSourceStore::load_closure`] takes - never a caller-supplied record
+/// and never a caller's claim that a commit occurred. It deliberately does not
+/// take a [`MovementActionClosureAddressV1`]: that address carries `closure_id`,
+/// which is not known until the record has been read, so requiring it would
+/// force the caller to supply part of the answer.
+///
+/// It returns the record it read together with its own attestation, for the same
+/// reason as its issuance-side peer.
+pub trait MovementActionClosureCommitObserver: Send + Sync {
+    fn observe_committed_closure<'a>(
+        &'a self,
+        authority: &'a CellControlReconciliationReadAuthorityV1,
+        address: &'a RebalanceJobAddressV1,
+        key: &'a PlacementBusinessActionKeyV1,
+    ) -> BoxCellFuture<'a, Result<CommittedMovementActionClosureClaimV1, PlacementContractError>>;
 }
