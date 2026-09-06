@@ -134,6 +134,25 @@ pub trait CellServingAuthorityStore: Send + Sync {
         Result<crate::WriteAuthorityLeasePublicationResultV1, ServingAuthorityStoreError>,
     >;
 
+    /// Reads back the UNSIGNED durable lease issuance record, or `None` when
+    /// none is committed for that query.
+    ///
+    /// This returns the record rather than
+    /// [`crate::CommittedWriteAuthorityLeaseIssuanceClaimV1`] because no write
+    /// set writes the claim. Applying the per-record test: the claim's other
+    /// member is a signed commit attestation, and
+    /// `WriteAuthorityLeasePublicationWriteSetPartsV1` takes `committed_issuance`
+    /// as an INPUT while writing `published_issuance`, a
+    /// [`crate::WriteAuthorityLeaseIssuanceRecordV1`]. The attestation is
+    /// consumed by publication, never stored as the record this getter returns.
+    ///
+    /// That matters most exactly where this getter is used. Its purpose is the
+    /// pre-publication window -- finding an issuance that committed but was
+    /// never published -- and in that window no attestation exists at all, so a
+    /// claim-typed getter could only have been satisfied by the store minting
+    /// one. The caller pairs this record with a fresh attestation from
+    /// [`crate::WriteAuthorityLeaseCommitObserver::observe_lease_commit`],
+    /// assembles the claim and verifies it.
     fn load_committed_write_authority_lease_issuance<'a>(
         &'a self,
         authority: &'a crate::ServingAuthorityReadAuthorityV1,
@@ -141,10 +160,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
         lease: &'a crate::ServingAuthorityPublicationLeaseV1,
     ) -> BoxTenancyFuture<
         'a,
-        Result<
-            Option<crate::CommittedWriteAuthorityLeaseIssuanceClaimV1>,
-            ServingAuthorityStoreError,
-        >,
+        Result<Option<crate::WriteAuthorityLeaseIssuanceRecordV1>, ServingAuthorityStoreError>,
     >;
 
     fn get_lease_state<'a>(
