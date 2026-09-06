@@ -8,6 +8,7 @@ pub enum ServingAuthorityProofKindV1 {
     LocalLease,
     LocalLeaseCommit,
     SurvivingQuorum,
+    FencedReplacement,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -44,6 +45,7 @@ pub enum VerifiedServingAuthorityProofRefV1<'a> {
     LocalLease(&'a crate::VerifiedWriteAuthorityLease),
     LocalLeaseCommit(&'a crate::VerifiedCommittedWriteAuthorityLeaseIssuance),
     SurvivingQuorum(&'a crate::VerifiedServingAuthoritySurvivingQuorum),
+    FencedReplacement(&'a crate::VerifiedServingAuthorityReplacement),
 }
 
 pub fn bind_serving_authority_proof_consumption(
