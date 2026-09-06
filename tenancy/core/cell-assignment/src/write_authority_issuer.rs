@@ -110,11 +110,23 @@ pub struct WriteAuthorityLeasePublicationResultV1 {
     pub completed_publication_lease: crate::ServingAuthorityPublicationLeaseV1,
 }
 
+/// Mints the write-authority lease signature.
+///
+/// The input is a private-field verified wrapper, so no signature can be
+/// produced from an unverified or uncommitted issuance. That is where this
+/// port's gating lives.
+///
+/// The output is the raw signed value, NOT a verified wrapper. A signing
+/// adapter lives outside this crate and cannot construct a private-field
+/// wrapper, so returning one would leave self-verification — the signer
+/// checking its own signature against an expectation it built itself — as the
+/// only implementable shape, which gates nothing. The caller mints the wrapper
+/// by passing this value through [`crate::verify_write_authority_lease`].
 pub trait WriteAuthorityLeaseAuthority: Send + Sync {
     fn sign_committed<'a>(
         &'a self,
         issuance: &'a crate::VerifiedCommittedWriteAuthorityLeaseIssuance,
-    ) -> BoxTenancyFuture<'a, Result<crate::VerifiedWriteAuthorityLease, ServingAuthorityStoreError>>;
+    ) -> BoxTenancyFuture<'a, Result<crate::SignedWriteAuthorityLeaseV1, ServingAuthorityStoreError>>;
 }
 
 pub trait TenancyWriteAuthorityLeaseService: Send + Sync {
@@ -163,7 +175,7 @@ impl WriteAuthorityLeaseAuthority for NotImplementedWriteAuthorityLeaseAuthority
     fn sign_committed<'a>(
         &'a self,
         _: &'a crate::VerifiedCommittedWriteAuthorityLeaseIssuance,
-    ) -> BoxTenancyFuture<'a, Result<crate::VerifiedWriteAuthorityLease, ServingAuthorityStoreError>>
+    ) -> BoxTenancyFuture<'a, Result<crate::SignedWriteAuthorityLeaseV1, ServingAuthorityStoreError>>
     {
         Box::pin(async { Err(ServingAuthorityStoreError::NotImplemented) })
     }
