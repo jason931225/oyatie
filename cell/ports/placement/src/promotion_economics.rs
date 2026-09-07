@@ -563,13 +563,19 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     /// anything whether the bytes it still needs will outlive the work still to
     /// do, with `minimum_retention_seconds` as the required margin.
     ///
-    /// RECOVERY: TERMINAL FOR THIS VERIFICATION KEY, and it is the ONE REFUSAL
-    /// IN THIS ENUM WHERE RETRYING IS STRICTLY WORSE THAN NOT RETRYING. Every
-    /// other "come back later" variant — `LeaseHeldByAnotherWorker`,
-    /// `PartitionStepBudgetExhausted`, `CheckpointConflict` — describes a
-    /// condition that clears while you wait. Waiting here consumes the very
-    /// margin that was already short. Spinning does not merely fail to help; it
-    /// destroys the remaining chance of success.
+    /// RECOVERY: TERMINAL FOR THIS VERIFICATION KEY, and it is the one refusal
+    /// in this enum where THE PASSAGE OF TIME ITSELF is the harm.
+    ///
+    /// The distinction against the contention refusals is not that they are
+    /// free to retry — `PartitionStepBudgetExhausted` says plainly that
+    /// retrying adds load to the thing that is saturated. It is that for
+    /// `LeaseHeldByAnotherWorker`, `PartitionStepBudgetExhausted` and
+    /// `CheckpointConflict`, WAITING IS THE REMEDY: the condition clears while
+    /// you wait, and only eager retrying is costly, at the system's expense
+    /// rather than your own chance of success. Here waiting IS the cost. The
+    /// margin that was already short is consumed by the wait, so a caller that
+    /// backs off and returns has strictly less chance than one that acted
+    /// immediately, and one that backs off long enough has none.
     ///
     /// It is NOT terminal for promotion. The forward path is to re-finalize the
     /// affected sources with renewed retention and issue a NEW closure, which
@@ -686,8 +692,15 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     ///
     /// RECOVERY: retry from persisted progress under a fresh acquire. Nothing
     /// is discarded — a lost race means another worker advanced the same key,
-    /// not that the accumulated work is wrong. This is the ONLY variant with
-    /// that recovery, which is why it must not also carry identity mismatches.
+    /// not that the accumulated work is wrong. It shares "resume, do not
+    /// restart" with `LeaseHeldByAnotherWorker`; what is distinctive is that
+    /// this is the only one reached AFTER work began.
+    ///
+    /// That recovery is why this variant must not also carry identity
+    /// mismatches. A changed cell, closure, registry, policy or calculation
+    /// needs the OPPOSITE response — the accumulators must not be inherited at
+    /// all — and one variant cannot direct both "resume from what you have" and
+    /// "discard what you have".
     ///
     /// It does NOT mean the lease was refused up front — that is
     /// `LeaseHeldByAnotherWorker` or `PartitionStepBudgetExhausted`, which are
