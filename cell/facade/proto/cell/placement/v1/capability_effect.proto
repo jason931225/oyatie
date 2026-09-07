@@ -171,6 +171,10 @@ message LocalAuthorityStateV1 {
 
 message LocalAuthorityPreconditionV1 {
   message Absent {
+    // A message field, so absence is already distinguishable on the wire from
+    // an empty record, and no tag changes. Unset means the store looked and
+    // found no membership row at all, which is legal only for a participant
+    // never installed anywhere; it is not a claim that nothing was rejected.
     CapabilityAuthorityRejectionHighWaterV1 rejection_high_water = 1;
   }
 

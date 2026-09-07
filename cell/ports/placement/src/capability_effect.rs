@@ -385,7 +385,21 @@ pub struct LocalAuthorityStateV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LocalAuthorityPreconditionV1 {
     Absent {
-        rejection_high_water: CapabilityAuthorityRejectionHighWaterV1,
+        /// `None` only when the store holds no rejection membership row for
+        /// this scope AT ALL, which is the state of a participant that has
+        /// never been installed anywhere. It is read from
+        /// [`crate::CapabilityLocalEffectStoreV1::get_rejection_high_water`], never
+        /// assumed: `None` asserts that the store looked and found no row,
+        /// which is a different claim from "nothing was rejected".
+        ///
+        /// A store that finds an authority record but no membership row is
+        /// looking at restored or truncated state and returns
+        /// [`CapabilityEffectErrorV1::RestoreEvidenceRequired`] rather than
+        /// letting a caller assemble `None` here and start over.
+        ///
+        /// Without this option a participant's first `Prepare` cannot be
+        /// assembled at all, because there is no row for the read to return.
+        rejection_high_water: Option<CapabilityAuthorityRejectionHighWaterV1>,
     },
     Matches {
         revision: LocalCommitRevisionV1,
@@ -575,7 +589,11 @@ pub enum CapabilityEffectErrorV1 {
     /// about where the record stands, and both are wrong in the same way.
     ///
     /// Not `StaleAuthority`: the authority may be perfectly current and the
-    /// caller simply lost a race. Retryable after re-reading.
+    /// caller simply lost a race. Retryable after re-reading, and the reads
+    /// that recovery names are
+    /// [`crate::CapabilityLocalEffectStoreV1::get_authority_state`] and
+    /// [`crate::CapabilityLocalEffectStoreV1::get_rejection_high_water`]. A stated
+    /// recovery whose read does not exist is worse than an unstated one.
     Conflict,
     /// The idempotency key was already spent by a request with a different
     /// canonical request digest.

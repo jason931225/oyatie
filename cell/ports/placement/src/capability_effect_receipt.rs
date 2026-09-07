@@ -7,10 +7,11 @@
 //! it durably holds.
 
 use crate::{
-    BoxCellFuture, CapabilityEffectErrorV1, CapabilityEffectKeyV1, CapabilityEffectScopeV1,
-    CapabilityPartitionRefV1, CellProofEnvelopeV1, Digest32, LocalCommitRevisionV1,
-    LocalEffectCommitReceiptPayloadV1, LocalEffectCommitRequestV1, ProducerId,
-    SignedLocalEffectCommitReceiptV1, VerifiedCapabilityReceiptRecoveryV1,
+    BoxCellFuture, CapabilityAuthorityRejectionHighWaterV1, CapabilityEffectErrorV1,
+    CapabilityEffectKeyV1, CapabilityEffectScopeV1, CapabilityPartitionRefV1, CellProofEnvelopeV1,
+    Digest32, LocalAuthorityStateV1, LocalCommitRevisionV1, LocalEffectCommitReceiptPayloadV1,
+    LocalEffectCommitRequestV1, ProducerId, SignedLocalEffectCommitReceiptV1,
+    VerifiedCapabilityEffectGrantV1, VerifiedCapabilityReceiptRecoveryV1,
     VerifiedCommittedLocalEffectReceiptV1,
 };
 
@@ -98,6 +99,54 @@ pub struct CommittedLocalEffectReceiptClaimV1 {
 
 pub trait CapabilityLocalEffectStoreV1: Send + Sync {
     type Effect: Send + Sync;
+
+    /// Reads back the durable authority record for one scope, or `None` when
+    /// the participant has none in this partition.
+    ///
+    /// Every mutation on this store takes a
+    /// [`crate::LocalAuthorityPreconditionV1`] as its compare-and-set, and
+    /// `commit_effect` additionally takes a `next_state` built from what that
+    /// read returned -- and until now nothing returned one. The record was
+    /// write-only, which made a participant's first `Prepare` unassemblable
+    /// and left [`CapabilityEffectErrorV1::Conflict`]'s stated recovery,
+    /// "retryable after re-reading", naming a read that did not exist.
+    ///
+    /// The authority is the caller's verified effect grant rather than a new
+    /// read-authority type. A new one would have had no producer, which is the
+    /// defect this wave has found repeatedly on the argument side of a port;
+    /// and the existing [`crate::CellControlReadAuthorityV1`] would put a
+    /// control-plane invocation on a path that must survive a global outage.
+    fn get_authority_state<'a>(
+        &'a self,
+        partition: &'a CapabilityPartitionRefV1,
+        authority: &'a VerifiedCapabilityEffectGrantV1,
+        scope: &'a CapabilityEffectScopeV1,
+    ) -> BoxCellFuture<'a, Result<Option<LocalAuthorityStateV1>, CapabilityEffectErrorV1>>;
+
+    /// Reads back the durable rejection membership record for one scope, or
+    /// `None` when the store holds no membership row for it at all.
+    ///
+    /// This is the row [`CapabilityEffectErrorV1::StaleIncarnation`] depends
+    /// on: without it a replaced incarnation carrying the same generation and
+    /// the same numeric fence as its replacement is indistinguishable from it.
+    /// It is required by both arms of
+    /// [`crate::LocalAuthorityPreconditionV1`] and supplied again as
+    /// `next_rejection_high_water`, so it was required twice per commit and
+    /// readable never.
+    ///
+    /// `None` means the store looked and found no row, which is legal only for
+    /// a participant never installed anywhere. Finding an authority record
+    /// without a membership row is restored or truncated state and returns
+    /// [`CapabilityEffectErrorV1::RestoreEvidenceRequired`].
+    fn get_rejection_high_water<'a>(
+        &'a self,
+        partition: &'a CapabilityPartitionRefV1,
+        authority: &'a VerifiedCapabilityEffectGrantV1,
+        scope: &'a CapabilityEffectScopeV1,
+    ) -> BoxCellFuture<
+        'a,
+        Result<Option<CapabilityAuthorityRejectionHighWaterV1>, CapabilityEffectErrorV1>,
+    >;
 
     /// Commits the capability's own effect, authority comparison, dedup, proof
     /// consumption, drain mutation, audit outbox and receipt payload at one
