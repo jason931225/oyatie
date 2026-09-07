@@ -582,10 +582,6 @@ pub trait PromotionEconomicsCheckpointStore: Send + Sync {
         Result<PromotionEconomicsCheckpointAcquisitionV1, PromotionEconomicsVerificationErrorV1>,
     >;
 
-    /// Durably advances the checkpoint under the lease's revision
-    /// compare-and-set, and returns THE DURABLE RECORD ALONE. It never returns a
-    /// signature, because a signature here would be the store attesting to its
-    /// own write.
     /// Reads the lease currently held for one key WITHOUT acquiring it, so a
     /// worker refused by `acquire` can find out how long to wait.
     ///
@@ -619,6 +615,10 @@ pub trait PromotionEconomicsCheckpointStore: Send + Sync {
         >,
     >;
 
+    /// Durably advances the checkpoint under the lease's revision
+    /// compare-and-set, and returns THE DURABLE RECORD ALONE. It never returns a
+    /// signature, because a signature here would be the store attesting to its
+    /// own write.
     fn commit<'a>(
         &'a self,
         write: PromotionEconomicsCheckpointWriteV1,
