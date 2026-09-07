@@ -119,7 +119,7 @@ pub enum ServingAuthorityRestoreBasisV1 {
 /// party's state arrives from outside and needs none. This type is the first
 /// case, established from the payload rather than inferred:
 ///
-/// - [`ServingAuthorityInstallationWriteSetPartsV1`] carries `instance` and
+/// - [`crate::ServingAuthorityInstallationWriteSetPartsV1`] carries `instance` and
 ///   `next_rejection_high_water`, and its `precondition` carries a
 ///   `rejection_high_water` in every arm. The payload carries `instance` and
 ///   `rejection_high_water_digest`. The attestation therefore asserts a digest
