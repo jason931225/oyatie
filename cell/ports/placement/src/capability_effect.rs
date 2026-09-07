@@ -352,12 +352,26 @@ pub struct CapabilityAuthorityRejectionHighWaterV1 {
 
 /// The durable local authority record.
 ///
-/// Fields are public, matching the peer durable-state records in this crate
-/// and in the binding crate. This type carries no signature and has no
-/// verifier: its integrity comes from the capability's own transaction, not
-/// from a check anyone could run on it. A private field with no mint would
-/// protect nothing and would make the record unwritable by the out-of-crate
-/// adapter that has to write it.
+/// Fields are public, matching [`crate::DrainContributorStateV1`] in this
+/// crate and `InstalledServingAuthorityV1` and
+/// `ServingAuthorityRejectionHighWaterV1` in the binding crate, each of which
+/// is public-field with no validating constructor.
+///
+/// That is the majority shape and not the only one. Of the durable
+/// compare-and-set records across both crates -- counted structurally, as
+/// those carrying both a `revision` and a `record_digest`, because a sweep
+/// keyed on a name prefix would see only one shape -- 48 are public-field and
+/// 12 are private-field paired with a public `rehydrate` and a `*PartsV1`
+/// carrier. So this claim is parity with the named peers, including the direct
+/// counterpart of the rejection high water, and NOT a claim that every peer
+/// looks like this.
+///
+/// This type carries no signature and has no verifier: its integrity comes
+/// from the capability's own transaction, not from a check anyone could run on
+/// it. What constrains a caller is not field privacy but the per-field
+/// obligations on [`LocalEffectCommitRequestV1::next_state`], each with a
+/// named refusal, and the store recomputing every field rather than trusting
+/// what it was handed.
 ///
 /// It deliberately does NOT embed the rejection high water. That is a
 /// separately revisioned durable row, carried beside this one in the same
