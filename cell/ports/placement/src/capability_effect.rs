@@ -458,6 +458,32 @@ pub struct LocalEffectCommitRequestV1<E> {
     /// A Fence records rejection membership and the state mutation in one
     /// commit; an action that rejects nothing still restates the high water it
     /// observed, so that "unchanged" is written down rather than inferred.
+    ///
+    /// It is an ASSERTION on the same terms as `next_state`, and it needs them
+    /// more, not less: this is the row
+    /// [`CapabilityEffectErrorV1::StaleIncarnation`] depends on, so a caller
+    /// able to propose it freely could retire the membership that makes a
+    /// replaced incarnation distinguishable from its replacement, and every
+    /// later comparison would pass. Its fields carry the same obligations:
+    ///
+    /// - `scope` must equal the grant's scope.
+    ///   Refusal: [`CapabilityEffectErrorV1::RelationMismatch`].
+    /// - `owner_generation` must be the owner generation the grant's context
+    ///   carries. It is one of the four values Cell projects and never
+    ///   assigns, so proposing another is proposing authority the owner did
+    ///   not issue.
+    ///   Refusal: [`CapabilityEffectErrorV1::AuthorityContextMismatch`].
+    /// - `rejected_instance_root_digest` and `rejected_instance_count` must be
+    ///   the store's own recomputation over the membership it durably retains
+    ///   after this commit, never a caller's summary of it. A count or root
+    ///   accepted as given is a membership the caller can shrink.
+    ///   Refusal: [`CapabilityEffectErrorV1::RelationMismatch`].
+    /// - `revision` must be the successor of the revision on the high water
+    ///   the precondition carried, or the first revision when that was `None`.
+    ///   Refusal: [`CapabilityEffectErrorV1::Conflict`].
+    /// - `record_digest` must equal the store's own recomputation over the
+    ///   canonical successor record.
+    ///   Refusal: [`CapabilityEffectErrorV1::RelationMismatch`].
     pub next_rejection_high_water: CapabilityAuthorityRejectionHighWaterV1,
     pub effect: E,
     pub idempotency_key_digest: Digest32,
@@ -671,14 +697,21 @@ pub enum CapabilityEffectErrorV1 {
     /// about the authority presented, and it is the refusal the two separate
     /// issuer ports exist to make unconstructible in the first place.
     ActionNotPermittedByContext,
-    /// The proposed successor record's authority context is not the one the
-    /// verified grant carries.
+    /// A proposed successor restates an owner-assigned value that is not the
+    /// one the verified grant carries.
     ///
     /// Cell projects owner generation, revision, fence and incarnation and
-    /// never assigns them, so a caller proposing a successor context that
-    /// differs from the grant's is asking Cell to install authority the owner
-    /// did not issue. There is no disposition at which that is admissible, and
-    /// no reading under which it is a formatting error.
+    /// never assigns them, so a caller proposing different ones is asking Cell
+    /// to install authority the owner did not issue. There is no disposition
+    /// at which that is admissible, and no reading under which it is a
+    /// formatting error.
+    ///
+    /// It covers BOTH successor records, not only the one with a `context`
+    /// member: `LocalAuthorityStateV1::context` in full, and
+    /// `CapabilityAuthorityRejectionHighWaterV1::owner_generation`, which
+    /// carries an owner-assigned value with no context member to hold it.
+    /// Scoping this to the word "context" would have left the membership row
+    /// -- the row `StaleIncarnation` depends on -- with no refusal at all.
     ///
     /// Not `ActionNotPermittedByContext`, which is about the context the GRANT
     /// carries being wrong for the action; here the grant's context may be
