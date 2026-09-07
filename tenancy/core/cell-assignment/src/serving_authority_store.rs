@@ -83,6 +83,21 @@ pub enum ServingAuthorityStoreError {
     /// [`crate::ServingAuthorityRestoreBasisV1`] was supplied where the
     /// contract requires one. Absence of evidence, not incomplete evidence.
     RestoreEvidenceRequired,
+    /// A caller-proposed successor restates a value this store OWNS, and the
+    /// restatement disagrees with what the store derives.
+    ///
+    /// Successor records carry owner-authoritative fields --
+    /// `binding_generation`, `binding_revision`, `binding_record_digest` and
+    /// `write_authority_epoch`, all inside
+    /// [`crate::ServingAuthorityInstanceV1`] -- alongside the fields the caller
+    /// legitimately chooses. The store derives the owned ones itself and MUST
+    /// refuse rather than accept or silently overwrite a disagreeing proposal.
+    ///
+    /// Distinct from [`Self::Conflict`]: a conflict is a precondition failing
+    /// against durable state, and re-reading may resolve it. This is the
+    /// caller's proposal contradicting a value it does not own, and re-reading
+    /// resolves it only if the caller then stops restating the value.
+    ProposedSuccessorMismatch,
     /// The issuance's publication lease is held by another worker whose lease
     /// has NOT expired against the claimant's `now_unix_seconds`.
     ///

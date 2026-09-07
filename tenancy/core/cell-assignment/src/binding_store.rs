@@ -52,6 +52,12 @@ pub enum BindingStoreError {
     SnapshotMembershipMismatch,
     SnapshotPolicyMismatch,
     CorruptRecord,
+    /// A caller-proposed successor restates an owner-authoritative value and
+    /// the restatement disagrees with what the store derives. See
+    /// [`crate::ServingAuthorityStoreError::ProposedSuccessorMismatch`], which
+    /// states the obligation in full; this is the same refusal on the binding
+    /// taxonomy.
+    ProposedSuccessorMismatch,
 }
 
 pub trait TenantBindingStore: Send + Sync {

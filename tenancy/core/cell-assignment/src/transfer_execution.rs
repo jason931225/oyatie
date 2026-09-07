@@ -185,6 +185,11 @@ pub struct IssueTransferExecutionPermitWriteSetPartsV1 {
     pub participant: VerifiedParticipantManifestMember,
     pub issuance: TransferExecutionPermitIssuanceRecordV1,
     pub next_ledger: TransferExecutionLedgerV1,
+    /// Caller-proposed successor. The store MUST derive the fields it owns
+    /// rather than accept the caller's restatement of them, refusing with
+    /// [`crate::BindingStoreError::ProposedSuccessorMismatch`]; the reasoning
+    /// is stated on
+    /// [`crate::ServingAuthorityInstallationWriteSetPartsV1::installed`].
     pub next_item: crate::TransferExecutionItemV1,
     pub idempotency: BindingIdempotencyRecordV1,
     pub audit_outbox: BindingAuditRecordV1,

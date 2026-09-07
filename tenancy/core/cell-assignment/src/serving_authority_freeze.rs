@@ -155,6 +155,11 @@ pub struct ServingAuthorityFreezeWriteSetPartsV1 {
     pub authority: crate::ServingAuthorityPersistenceAuthorityV1,
     pub precondition: crate::ServingAuthorityLocalPreconditionV1,
     pub grant: VerifiedServingAuthorityFreezeGrant,
+    /// Caller-proposed successor. Its `Installed` arm carries an
+    /// [`crate::InstalledServingAuthorityV1`], so it restates the same
+    /// owner-authoritative fields; the obligation and the refusal are those
+    /// stated on
+    /// [`crate::ServingAuthorityInstallationWriteSetPartsV1::installed`].
     pub next_state: ServingAuthorityFrozenStateV1,
     pub next_rejection_high_water: crate::ServingAuthorityRejectionHighWaterV1,
     pub business: ServingAuthorityBusinessIdV1,

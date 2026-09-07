@@ -104,6 +104,29 @@ pub struct ServingAuthorityInstallationWriteSetPartsV1 {
     pub precondition: crate::ServingAuthorityLocalPreconditionV1,
     pub grant: VerifiedServingAuthorityInstallGrant,
     pub restore_basis: crate::ServingAuthorityRestoreBasisV1,
+    /// Caller-proposed successor.
+    ///
+    /// # The caller does not own everything it proposes
+    ///
+    /// This record carries fields the caller legitimately chooses AND fields
+    /// this store owns: `binding_generation`, `binding_revision`,
+    /// `binding_record_digest` and `write_authority_epoch`, all inside
+    /// [`crate::ServingAuthorityInstanceV1`]. The store MUST derive the owned
+    /// ones itself and refuse a proposal that restates them differently, with
+    /// [`crate::ServingAuthorityStoreError::ProposedSuccessorMismatch`].
+    /// Accepting the proposal would let a caller write an authority generation
+    /// it does not own; silently overwriting it would make a public field's
+    /// value meaningless without saying so.
+    ///
+    /// # Why the owning side needs this MORE than a projecting side
+    ///
+    /// The capability lane, which only PROJECTS these values, states this
+    /// obligation and refuses a wrong proposal; this crate, which OWNS them,
+    /// did neither. That asymmetry runs backwards. On a projecting store a
+    /// wrong proposal corrupts a copy, and reconciliation against the owner can
+    /// repair it. On the owning store it corrupts the authoritative value, and
+    /// there is nothing left to repair from. Ownership makes the refusal more
+    /// necessary, not less.
     pub installed: crate::InstalledServingAuthorityV1,
     pub next_rejection_high_water: crate::ServingAuthorityRejectionHighWaterV1,
     pub first_lease_state: crate::WriteAuthorityLeaseStateV1,
