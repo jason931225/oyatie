@@ -470,9 +470,8 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     ///
     /// # When a committed claim belongs in a write set
     ///
-    /// Of the twelve `VerifiedCommitted*` barriers across both crates, five
-    /// bind their claim into a write set and seven do not. The split is
-    /// principled and the rule is this:
+    /// Some of these barriers bind their claim into a write set and some do
+    /// not. The split is principled and the rule is this:
     ///
     /// BIND the claim when the publishing write lands on the SAME store that
     /// holds the committed record. There the store can independently re-check
@@ -497,6 +496,18 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     /// So transfer-execution and control-contribution really are "the same
     /// shape" as a barrier, and still differ here correctly: this one publishes
     /// on the store that committed, and that one hands off to another partition.
+    ///
+    /// NO CENSUS IS STATED HERE, AND THAT IS DELIBERATE. An earlier version of
+    /// this comment said "of the twelve `VerifiedCommitted*` barriers, five
+    /// bind and seven do not". That count came from a sweep keyed on the NAME
+    /// PREFIX `VerifiedCommitted`, which cannot see a barrier of the same shape
+    /// under a different name: re-running it structurally -- a `Verified*`
+    /// newtype over a record plus a signed attestation -- turns up
+    /// [`crate::VerifiedServingAuthorityReplacement`], and disagrees in the
+    /// other direction too. Neither sweep is authoritative alone, so the
+    /// numbers were never load-bearing and are gone. The RULE is what binds;
+    /// apply it per site by asking whether the publishing write lands on the
+    /// store that holds the committed record.
     pub committed_issuance: VerifiedCommittedTransferExecutionPermitIssuance,
     pub permit: VerifiedTransferExecutionPermit,
     pub next_item: crate::TransferExecutionItemV1,
