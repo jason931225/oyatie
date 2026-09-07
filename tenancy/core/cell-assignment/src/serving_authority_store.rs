@@ -16,7 +16,7 @@ use crate::{
 ///
 /// DECLARATION ORDER CARRIES NO MEANING. An earlier version of this header
 /// claimed the variants ran from most specific to least; they did not, and the
-/// residual sat third of fifteen. The claim is dropped rather than the list
+/// residual sat third in the list. The claim is dropped rather than the list
 /// resorted, because specificity here is a partial order and not a total one:
 /// `PageLimitExceeded` and `StaleIncarnation` are not comparable, and
 /// "evaluated first" and "most specific" are different axes that the old
@@ -103,8 +103,8 @@ pub enum ServingAuthorityStoreError {
     /// Evidence the contract requires to remain readable is no longer
     /// retrievable. Durable and non-retryable, unlike [`Self::Unavailable`].
     ///
-    /// NOTE: this variant names no type elsewhere in this crate. Its boundary
-    /// is the weakest of the fourteen and should be re-stated by whoever
+    /// NOTE: this variant names no type elsewhere in this crate. Its is the
+    /// weakest boundary in this enum and should be re-stated by whoever
     /// introduces the retention contract it refers to.
     RetainedEvidenceUnavailable,
 }
