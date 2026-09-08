@@ -13,8 +13,7 @@ use data_ontology_kernel::{
 };
 use foundry_spine::{DefaultValue, PlanError, UpcastTransform, ValueConversion};
 use migration_plan_support::{
-    action, copy, definition, internal, plan, registry, rev1_properties, rev2_properties, typed,
-    untyped,
+    action, copy, definition, plan, registry, rev1_properties, rev2_properties, untyped,
 };
 
 #[test]
