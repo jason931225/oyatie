@@ -112,7 +112,7 @@ impl MovementPermitIssuanceRecordV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MovementPermitCommitAttestationPayloadV1 {
+pub struct MovementPermitCommitObservationV1 {
     pub schema_version: u32,
     pub issuance_revision: MovementPermitIssuanceRevision,
     pub issuance_record_digest: Digest32,
@@ -122,12 +122,15 @@ pub struct MovementPermitCommitAttestationPayloadV1 {
     pub leaf_state_record_digest: Digest32,
     pub context: MovementPermitCommitContextV1,
     pub committed_transaction_digest: Digest32,
+    /// Read out of the durable record.
     pub committed_at_unix_seconds: u64,
+    /// When the observer itself looked.
+    pub observed_at_unix_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignedMovementPermitCommitAttestationV1 {
-    pub payload: MovementPermitCommitAttestationPayloadV1,
+pub struct SignedMovementPermitCommitObservationV1 {
+    pub payload: MovementPermitCommitObservationV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
@@ -136,11 +139,11 @@ pub struct SignedMovementPermitCommitAttestationV1 {
 pub struct CommittedMovementPermitIssuanceClaimV1 {
     pub issuance: MovementPermitIssuanceRecordV1,
     pub context: MovementPermitIssuanceClaimContextV1,
-    pub attestation: SignedMovementPermitCommitAttestationV1,
+    pub observation: SignedMovementPermitCommitObservationV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MovementPermitCommitAttestationExpectationV1 {
+pub struct MovementPermitCommitObservationExpectationV1 {
     pub issuance_revision: MovementPermitIssuanceRevision,
     pub issuance_record_digest: Digest32,
     pub movement_intent_digest: Digest32,
@@ -166,7 +169,7 @@ impl VerifiedCommittedMovementPermitIssuance {
 pub fn verify_committed_movement_permit_issuance(
     _verifier: &dyn CellProofVerifier,
     _claim: CommittedMovementPermitIssuanceClaimV1,
-    _expectation: &MovementPermitCommitAttestationExpectationV1,
+    _expectation: &MovementPermitCommitObservationExpectationV1,
 ) -> Result<VerifiedCommittedMovementPermitIssuance, ProofVerificationError> {
     Err(ProofVerificationError::NotImplemented)
 }
@@ -215,6 +218,64 @@ impl MovementPermitPublicationWriteSetV1 {
     pub fn parts(&self) -> &MovementPermitPublicationWriteSetPartsV1 {
         &self.parts
     }
+}
+
+/// Independently re-reads a committed movement-permit issuance and signs what
+/// it read.
+///
+/// WHY THIS PORT EXISTS. A store that signs an observation of its own write
+/// vouches for itself, and no amount of downstream signature checking recovers
+/// what that destroys. [`crate::MovementBudgetGrantStore::consume_grant`] used
+/// to return a [`CommittedMovementPermitIssuanceClaimV1`] — the durable
+/// issuance record AND a signature over the transaction the same call had just
+/// performed. [`MovementPermitCommitObservationV1`] carries
+/// `committed_transaction_digest` and `committed_at_unix_seconds`, facts only
+/// the committing store holds at the moment it commits, so it could never have
+/// been an external arrival needing no local producer: the committer was the
+/// producer.
+///
+/// The port accepts the lookup [`MovementPermitPublicationStore::load_committed_issuance`]
+/// takes, minus the reconciliation lease and under an ordinary read authority,
+/// and nothing else: never a caller-supplied record, never a caller's claim
+/// that a commit occurred.
+///
+/// It returns the RECORD TOGETHER WITH its observation rather than the
+/// observation alone. Handing back a lone signature would put the caller in
+/// charge of pairing it with a record, which reopens a narrower version of the
+/// same steering hazard. That is the shape
+/// [`crate::PromotionEconomicsCheckpointCommitObserver`] settled on and the one
+/// [`crate::MovementActionResultCommitObserver`], the sibling in this lane,
+/// uses.
+///
+/// `None` means the observer looked and found NO committed issuance at that
+/// digest. It is an outcome, not a failure, and it is the fact that separates
+/// "never durably committed" from "committed, reply lost".
+///
+/// THE PROOF DOMAIN IS NEW.
+/// `CellProofDomainV1::MovementPermitCommitObservation` and its reference arm
+/// are born with this port. The issuance commit signature had NO domain and NO
+/// [`crate::VerifiedCellProofRefV1`] arm at all while the store was its
+/// producer — a signature nothing could spend. It qualifies for an arm under
+/// the rule stated on that enum, because both write sets that carry the
+/// verified value ([`crate::MovementBudgetGrantWriteSetPartsV1`] and
+/// [`MovementPermitPublicationWriteSetPartsV1`]) carry
+/// `proof_consumptions`, so a consumption has somewhere durable to land.
+///
+/// Separate from the store on purpose. Whether the deployed observer is in fact
+/// a different party from the deployed store is A DEPLOYMENT OBLIGATION, NOT A
+/// TYPE-LEVEL REFUSAL — one process may implement both traits. What the types
+/// do is remove the shape in which self-observation was the ONLY implementable
+/// one.
+pub trait MovementPermitIssuanceCommitObserver: Send + Sync {
+    fn observe_committed_issuance<'a>(
+        &'a self,
+        authority: &'a crate::PlacementReadAuthorityV1,
+        authority_partition: &'a MovementBudgetAuthorityPartition,
+        issuance_digest: &'a Digest32,
+    ) -> BoxCellFuture<
+        'a,
+        Result<Option<CommittedMovementPermitIssuanceClaimV1>, PlacementContractError>,
+    >;
 }
 
 pub trait MovementPermitPublicationStore: Send + Sync {

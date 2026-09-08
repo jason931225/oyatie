@@ -113,18 +113,21 @@ pub struct DrainContributorSealIntentV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DrainContributorSealCommitAttestationPayloadV1 {
+pub struct DrainContributorSealCommitObservationV1 {
     pub schema_version: u32,
     pub seal_intent_digest: Digest32,
     pub sealed_state_revision: DrainContributorStateRevision,
     pub sealed_state_record_digest: Digest32,
     pub committed_transaction_digest: Digest32,
+    /// Read out of the durable record.
     pub committed_at_unix_seconds: u64,
+    /// When the observer itself looked.
+    pub observed_at_unix_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignedDrainContributorSealCommitAttestationV1 {
-    pub payload: DrainContributorSealCommitAttestationPayloadV1,
+pub struct SignedDrainContributorSealCommitObservationV1 {
+    pub payload: DrainContributorSealCommitObservationV1,
     pub envelope: CellProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
@@ -133,11 +136,11 @@ pub struct SignedDrainContributorSealCommitAttestationV1 {
 pub struct CommittedDrainContributorSealClaimV1 {
     pub intent: DrainContributorSealIntentV1,
     pub sealed_state: DrainContributorStateV1,
-    pub attestation: SignedDrainContributorSealCommitAttestationV1,
+    pub observation: SignedDrainContributorSealCommitObservationV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DrainContributorSealCommitAttestationExpectationV1 {
+pub struct DrainContributorSealCommitObservationExpectationV1 {
     pub seal_intent_digest: Digest32,
     pub sealed_state_revision: DrainContributorStateRevision,
     pub sealed_state_record_digest: Digest32,
@@ -159,7 +162,7 @@ impl VerifiedCommittedDrainContributorSeal {
 pub fn verify_committed_drain_contributor_seal(
     _verifier: &dyn CellProofVerifier,
     _claim: CommittedDrainContributorSealClaimV1,
-    _expectation: &DrainContributorSealCommitAttestationExpectationV1,
+    _expectation: &DrainContributorSealCommitObservationExpectationV1,
 ) -> Result<VerifiedCommittedDrainContributorSeal, ProofVerificationError> {
     Err(ProofVerificationError::NotImplemented)
 }
@@ -168,7 +171,7 @@ pub fn verify_committed_drain_contributor_seal(
 pub struct DrainContributorSealPayloadV1 {
     pub schema_version: u32,
     pub intent: DrainContributorSealIntentV1,
-    pub commit_attestation: SignedDrainContributorSealCommitAttestationV1,
+    pub commit_observation: SignedDrainContributorSealCommitObservationV1,
     pub seal_digest: Digest32,
 }
 
@@ -187,7 +190,7 @@ pub struct DrainContributorSealExpectationV1 {
     pub contributor_kind: DrainContributorKindV1,
     pub contributor_id: String,
     pub expected_seal_intent_digest: Digest32,
-    pub expected_commit_attestation_digest: Digest32,
+    pub expected_commit_observation_digest: Digest32,
     pub expected_producer: ProducerId,
     pub expected_audience: ProducerId,
     pub now_unix_seconds: u64,
@@ -238,11 +241,80 @@ impl DrainContributorSealWriteSetV1 {
     }
 }
 
+/// Independently re-reads a committed drain-contributor seal and signs what it
+/// read.
+///
+/// WHY THIS PORT EXISTS. A store that signs an observation of its own write
+/// vouches for itself, and no amount of downstream signature checking recovers
+/// what that destroys. [`DrainContributorSealStore::seal`] used to return a
+/// [`CommittedDrainContributorSealClaimV1`] — the durable sealed state AND a
+/// signature over the transaction the same call had just performed. The
+/// payload carries `committed_transaction_digest` and
+/// `committed_at_unix_seconds`, facts only the committing store holds at the
+/// moment it commits, so it could never have been an external arrival needing
+/// no local producer: the committer was the producer.
+///
+/// The port accepts the same lookup [`DrainContributorSealStore::load_committed_seal`]
+/// takes, plus a read authority, and nothing else: never a caller-supplied
+/// record, never a caller's claim that a commit occurred.
+///
+/// It returns the RECORD TOGETHER WITH its observation rather than the
+/// observation alone. Handing back a lone signature would put the caller in
+/// charge of pairing it with a record, which reopens a narrower version of the
+/// same steering hazard. That is the shape
+/// [`crate::PromotionEconomicsCheckpointCommitObserver`] settled on and the one
+/// [`crate::MovementActionResultCommitObserver`] uses.
+///
+/// `None` means the observer looked and found NO committed seal at that key. It
+/// is an outcome, not a failure, and it is the fact that separates "never
+/// durably sealed" from "sealed, reply lost". A `None` that DISAGREES with
+/// [`DrainContributorSealStore::load_committed_seal`] reporting a record is a
+/// REFUSAL, never a quiet fallback to "nothing was committed".
+///
+/// THE PROOF DOMAIN IS NEW, NOT RENAMED. `CellProofDomainV1` tag 27 named a
+/// signed statement the STORE made about its own write. This is a different
+/// producer making a different trust claim, so reusing that tag would let a
+/// signature produced under the old self-attesting semantics validate as an
+/// independent observation. Tag 27 is reserved by number and by name in
+/// `cell/placement/v1/proof.proto` and replaced by
+/// `CELL_PROOF_DOMAIN_V1_DRAIN_CONTRIBUTOR_SEAL_COMMIT_OBSERVATION`, named
+/// rather than numbered so the pointer survives a renumber.
+///
+/// Separate from the store on purpose. Whether the deployed observer is in fact
+/// a different party from the deployed store is A DEPLOYMENT OBLIGATION, NOT A
+/// TYPE-LEVEL REFUSAL — one process may implement both traits. What the types
+/// do is remove the shape in which self-observation was the ONLY implementable
+/// one.
+pub trait DrainContributorSealCommitObserver: Send + Sync {
+    fn observe_committed_seal<'a>(
+        &'a self,
+        authority: &'a crate::PlacementReadAuthorityV1,
+        cell_id: &'a CellId,
+        contributor_id: &'a str,
+        drain_term: DrainTermV1,
+    ) -> BoxCellFuture<
+        'a,
+        Result<Option<CommittedDrainContributorSealClaimV1>, PlacementContractError>,
+    >;
+}
+
 pub trait DrainContributorSealStore: Send + Sync {
+    /// Durably seals the contributor state and returns THE DURABLE ROW ALONE.
+    ///
+    /// It never returns a signature, because a signature here would be the
+    /// store attesting to its own write. The seal intent this write consumed is
+    /// the caller's own input
+    /// ([`DrainContributorSealWriteSetPartsV1::seal_intent`]); the commit
+    /// signature comes from
+    /// [`DrainContributorSealCommitObserver::observe_committed_seal`], which
+    /// re-reads the committed row by the same lookup
+    /// [`DrainContributorSealStore::load_committed_seal`] takes and returns
+    /// [`CommittedDrainContributorSealClaimV1`] — the record together with its
+    /// observation.
     fn seal<'a>(
         &'a self,
         write_set: &'a DrainContributorSealWriteSetV1,
-    ) -> BoxCellFuture<'a, Result<CommittedDrainContributorSealClaimV1, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<DrainContributorStateV1, PlacementContractError>>;
 
     fn load_committed_seal<'a>(
         &'a self,

@@ -84,17 +84,24 @@ message DrainContributorSealIntentV1 {
   Digest32 intent_digest = 12;
 }
 
-message DrainContributorSealCommitAttestationPayloadV1 {
+// What an INDEPENDENT commit observer read for one contributor seal, by
+// re-reading the committed row. Signed under
+// CELL_PROOF_DOMAIN_V1_DRAIN_CONTRIBUTOR_SEAL_COMMIT_OBSERVATION by the
+// observer's own identity, never by the store that performed the seal.
+message DrainContributorSealCommitObservationV1 {
   uint32 schema_version = 1;
   Digest32 seal_intent_digest = 2;
   uint64 sealed_state_revision = 3;
   Digest32 sealed_state_record_digest = 4;
   Digest32 committed_transaction_digest = 5;
+  // Read out of the durable record.
   uint64 committed_at_unix_seconds = 6;
+  // When the observer itself looked.
+  uint64 observed_at_unix_seconds = 7;
 }
 
-message SignedDrainContributorSealCommitAttestationV1 {
-  DrainContributorSealCommitAttestationPayloadV1 payload = 1;
+message SignedDrainContributorSealCommitObservationV1 {
+  DrainContributorSealCommitObservationV1 payload = 1;
   CellProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
@@ -102,7 +109,7 @@ message SignedDrainContributorSealCommitAttestationV1 {
 message DrainContributorSealPayloadV1 {
   uint32 schema_version = 1;
   DrainContributorSealIntentV1 intent = 2;
-  SignedDrainContributorSealCommitAttestationV1 commit_attestation = 3;
+  SignedDrainContributorSealCommitObservationV1 commit_observation = 3;
   Digest32 seal_digest = 4;
 }
 

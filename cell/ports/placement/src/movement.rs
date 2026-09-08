@@ -139,7 +139,7 @@ pub struct CellMovementPermitPayloadV1 {
     pub intent: CellMovementPermitIntentV1,
     pub issuance_revision: crate::MovementPermitIssuanceRevision,
     pub issuance_record_digest: Digest32,
-    pub commit_attestation: crate::SignedMovementPermitCommitAttestationV1,
+    pub commit_observation: crate::SignedMovementPermitCommitObservationV1,
     pub permit_digest: Digest32,
 }
 

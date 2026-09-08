@@ -65,7 +65,7 @@ pub enum CellProofDomainV1 {
     ReconciliationInvocation,
     MovementBudgetSettlementClaim,
     DrainContributorSeal,
-    DrainContributorSealCommitAttestation,
+    DrainContributorSealCommitObservation,
     CellControlRepairAuthority,
     PlacementActor,
     PlacementPolicyDecision,
@@ -81,6 +81,7 @@ pub enum CellProofDomainV1 {
     RebalanceInvocationIssuanceCommit,
     MovementActionClosureCommit,
     MovementActionResultCommit,
+    MovementPermitCommitObservation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -161,9 +162,16 @@ impl CellProofConsumptionV1 {
 /// `RebalanceLeafResultWriteSetPartsV1`,
 /// `MovementActionRejectionWriteSetPartsV1` - has no `proof_consumptions` field,
 /// while all four drain write sets do. That is exactly why
-/// `DrainContributorSealCommitAttestation` has a variant and the structurally
+/// `DrainContributorSealCommitObservation` has a variant and the structurally
 /// identical rebalance commit observations do not: the difference is where the
 /// consumption can be written, not what the proof looks like.
+///
+/// `MovementPermitCommitObservation` has a variant for the same mechanical
+/// reason, and it was missing while the store was its producer: both write sets
+/// that carry `VerifiedCommittedMovementPermitIssuance` -
+/// `MovementBudgetGrantWriteSetPartsV1` and
+/// `MovementPermitPublicationWriteSetPartsV1` - carry `proof_consumptions`, so
+/// the consumption has somewhere durable to land.
 ///
 /// `RebalanceJobWriteSetPartsV1` looks like a counterexample and is not. It does
 /// carry `proof_consumptions`, but it is the JOB-level write, taken under
@@ -203,7 +211,8 @@ pub enum VerifiedCellProofRefV1<'a> {
     ReconciliationInvocation(&'a crate::VerifiedReconciliationInvocation),
     MovementBudgetSettlementClaim(&'a crate::VerifiedMovementBudgetSettlementClaim),
     DrainContributorSeal(&'a crate::VerifiedDrainContributorSeal),
-    DrainContributorSealCommitAttestation(&'a crate::VerifiedCommittedDrainContributorSeal),
+    DrainContributorSealCommitObservation(&'a crate::VerifiedCommittedDrainContributorSeal),
+    MovementPermitCommitObservation(&'a crate::VerifiedCommittedMovementPermitIssuance),
     CellControlRepairAuthority(&'a crate::VerifiedCellControlRepairAuthority),
 }
 
@@ -233,9 +242,10 @@ impl<'a> VerifiedCellProofRefV1<'a> {
             Self::ReconciliationInvocation(proof) => &proof.signed().envelope,
             Self::MovementBudgetSettlementClaim(proof) => &proof.signed().envelope,
             Self::DrainContributorSeal(proof) => &proof.signed().envelope,
-            Self::DrainContributorSealCommitAttestation(proof) => {
-                &proof.claim().attestation.envelope
+            Self::DrainContributorSealCommitObservation(proof) => {
+                &proof.claim().observation.envelope
             }
+            Self::MovementPermitCommitObservation(proof) => &proof.claim().observation.envelope,
             Self::CellControlRepairAuthority(proof) => &proof.signed().envelope,
         }
     }

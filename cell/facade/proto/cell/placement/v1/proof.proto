@@ -64,7 +64,18 @@ enum CellProofDomainV1 {
   CELL_PROOF_DOMAIN_V1_MOVEMENT_BUDGET_SETTLEMENT_CLAIM = 24;
   CELL_PROOF_DOMAIN_V1_DRAIN_CONTRIBUTOR_SEAL = 25;
   CELL_PROOF_DOMAIN_V1_CELL_CONTROL_REPAIR_AUTHORITY = 26;
-  CELL_PROOF_DOMAIN_V1_DRAIN_CONTRIBUTOR_SEAL_COMMIT_ATTESTATION = 27;
+  // Retired, not renamed. Tag 27 named a signed statement the STORE made about
+  // its own write: DrainContributorSealStore::seal returned the commit
+  // signature for the transaction it had just performed. Its replacement is an
+  // independent observer's re-read, which is a different producer and a
+  // different trust claim. Reusing the tag would let a signature produced under
+  // the old self-attesting semantics validate as an independent observation;
+  // reserving it makes that structurally impossible. Replaced by
+  // CELL_PROOF_DOMAIN_V1_DRAIN_CONTRIBUTOR_SEAL_COMMIT_OBSERVATION below. Named
+  // rather than numbered: a name survives a renumber and no compiler checks a
+  // proto comment.
+  reserved 27;
+  reserved "CELL_PROOF_DOMAIN_V1_DRAIN_CONTRIBUTOR_SEAL_COMMIT_ATTESTATION";
   CELL_PROOF_DOMAIN_V1_PLACEMENT_ACTOR = 28;
   CELL_PROOF_DOMAIN_V1_PLACEMENT_POLICY_DECISION = 29;
   reserved 30;
@@ -96,6 +107,12 @@ enum CellProofDomainV1 {
   CELL_PROOF_DOMAIN_V1_MOVEMENT_ACTION_CLOSURE_COMMIT = 41;
   CELL_PROOF_DOMAIN_V1_MOVEMENT_ACTION_RESULT_COMMIT = 42;
   CELL_PROOF_DOMAIN_V1_PROMOTION_ECONOMICS_CHECKPOINT_COMMIT_OBSERVATION = 43;
+  // Replaces reserved tag 27; see the reservation above.
+  CELL_PROOF_DOMAIN_V1_DRAIN_CONTRIBUTOR_SEAL_COMMIT_OBSERVATION = 44;
+  // Born here rather than replacing a tag. The movement-permit issuance commit
+  // signature never had a domain while MovementBudgetGrantStore::consume_grant
+  // was its producer, so there was nothing to retire.
+  CELL_PROOF_DOMAIN_V1_MOVEMENT_PERMIT_COMMIT_OBSERVATION = 45;
 }
 
 message CellProofEnvelopeV1 {

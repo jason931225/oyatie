@@ -7,8 +7,9 @@ use crate::{
     BindingAuditRecordV1, BindingDigest32, BindingIdempotencyRecordV1, BindingOperationKey,
     BindingPersistenceAuthorityV1, BindingProducerId, BindingProofConsumptionV1,
     BindingProofEnvelopeV1, BindingProofVerificationError, BindingProofVerifier,
-    BindingReconciliationLeaseV1, BindingReconciliationPersistenceAuthorityV1, BindingStoreError,
-    BoxTenancyFuture, TenantCellBinding, TenantId, VerifiedRollbackWindowElapsed,
+    BindingReadAuthorityV1, BindingReconciliationLeaseV1,
+    BindingReconciliationPersistenceAuthorityV1, BindingStoreError, BoxTenancyFuture,
+    TenantCellBinding, TenantId, VerifiedRollbackWindowElapsed,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -104,7 +105,7 @@ pub struct SourceReservationReleaseIssuancePreconditionV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SourceReleaseCommitAttestationPayloadV1 {
+pub struct SourceReleaseCommitObservationV1 {
     pub schema_version: u32,
     pub tenant_id: TenantId,
     pub operation: BindingOperationKey,
@@ -116,12 +117,15 @@ pub struct SourceReleaseCommitAttestationPayloadV1 {
     pub rollback_window_elapsed_digest: BindingDigest32,
     pub context: SourceReleaseCommitContextV1,
     pub committed_transaction_digest: BindingDigest32,
+    /// Read out of the durable record.
     pub committed_at_unix_seconds: u64,
+    /// When the observer itself looked.
+    pub observed_at_unix_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignedSourceReleaseCommitAttestationV1 {
-    pub payload: SourceReleaseCommitAttestationPayloadV1,
+pub struct SignedSourceReleaseCommitObservationV1 {
+    pub payload: SourceReleaseCommitObservationV1,
     pub envelope: BindingProofEnvelopeV1,
     pub signature: Vec<u8>,
 }
@@ -132,11 +136,11 @@ pub struct CommittedSourceReservationReleaseIssuanceClaimV1 {
     pub issuance: SourceReservationReleaseIssuanceRecordV1,
     pub rollback_window: VerifiedRollbackWindowElapsed,
     pub context: SourceReleaseClaimContextV1,
-    pub attestation: SignedSourceReleaseCommitAttestationV1,
+    pub observation: SignedSourceReleaseCommitObservationV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SourceReleaseCommitAttestationExpectationV1 {
+pub struct SourceReleaseCommitObservationExpectationV1 {
     pub tenant_id: TenantId,
     pub operation: BindingOperationKey,
     pub successor_binding_generation: crate::BindingGeneration,
@@ -166,7 +170,7 @@ impl VerifiedCommittedSourceReservationReleaseIssuance {
 pub fn verify_committed_source_release_issuance(
     _verifier: &dyn BindingProofVerifier,
     _claim: CommittedSourceReservationReleaseIssuanceClaimV1,
-    _expectation: &SourceReleaseCommitAttestationExpectationV1,
+    _expectation: &SourceReleaseCommitObservationExpectationV1,
 ) -> Result<VerifiedCommittedSourceReservationReleaseIssuance, BindingProofVerificationError> {
     Err(BindingProofVerificationError::NotImplemented)
 }
@@ -207,14 +211,78 @@ impl SourceReleasePublicationWriteSetV1 {
     }
 }
 
+/// Independently re-reads a committed source-reservation release issuance and
+/// signs what it read.
+///
+/// WHY THIS PORT EXISTS. A store that signs an observation of its own write
+/// vouches for itself, and no amount of downstream signature checking recovers
+/// what that destroys. [`MigrationReleaseStore::commit_release_issuance`] used
+/// to return a [`CommittedSourceReservationReleaseIssuanceClaimV1`] — the
+/// durable record AND a signature over the transaction the same call had just
+/// performed. [`SourceReleaseCommitObservationV1`] carries
+/// `committed_transaction_digest` and `committed_at_unix_seconds`, facts only
+/// the committing store holds at the moment it commits, so it could never have
+/// been an external arrival needing no local producer: the committer was the
+/// producer.
+///
+/// The port accepts a read authority and a lookup key only. It is not given,
+/// and cannot be given, a caller-supplied record or a caller's claim that a
+/// commit occurred: every field of the emitted observation describes what the
+/// observer itself read.
+///
+/// It returns the RECORD TOGETHER WITH its observation rather than the
+/// observation alone. Handing back a lone signature would put the caller in
+/// charge of pairing it with a record, which reopens a narrower version of the
+/// same steering hazard. That is the shape
+/// `PromotionEconomicsCheckpointCommitObserver` settled on in the cell crate.
+///
+/// `None` means the observer looked and found NO committed issuance for that
+/// operation. It is an outcome, not a failure, and it is the fact that
+/// separates "never durably committed" from "committed, reply lost". A `None`
+/// that DISAGREES with a store read reporting a record is a REFUSAL, never a
+/// quiet fallback to "nothing was committed".
+///
+/// THE PROOF DOMAIN IS NEW, NOT RENAMED. `BindingProofDomainV1` tag 26 named a
+/// signed statement the STORE made about its own write. This is a different
+/// producer making a different trust claim, so reusing that tag would let a
+/// signature produced under the old self-attesting semantics validate as an
+/// independent observation. Tag 26 is reserved by number and by name in
+/// `tenancy/binding/v1/proof.proto` and replaced by
+/// `BINDING_PROOF_DOMAIN_V1_SOURCE_RELEASE_COMMIT_OBSERVATION`, named rather
+/// than numbered so the pointer survives a renumber.
+///
+/// Separate from the store on purpose. Whether the deployed observer is in fact
+/// a different party from the deployed store is A DEPLOYMENT OBLIGATION, NOT A
+/// TYPE-LEVEL REFUSAL — one process may implement both traits. What the types
+/// do is remove the shape in which self-observation was the ONLY implementable
+/// one; see [`crate::TransferExecutionCommitObserver`], the lane this is
+/// modelled on.
+pub trait SourceReleaseCommitObserver: Send + Sync {
+    fn observe_committed_release_issuance<'a>(
+        &'a self,
+        authority: &'a BindingReadAuthorityV1,
+        operation: &'a BindingOperationKey,
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<Option<CommittedSourceReservationReleaseIssuanceClaimV1>, BindingStoreError>,
+    >;
+}
+
 pub trait MigrationReleaseStore: Send + Sync {
+    /// Durably commits the source-reservation release issuance and returns THE
+    /// DURABLE RECORD ALONE.
+    ///
+    /// It never returns a signature, because a signature here would be the
+    /// store attesting to its own write. The commit signature comes from
+    /// [`SourceReleaseCommitObserver::observe_committed_release_issuance`],
+    /// which re-reads the committed row by lookup key under an ordinary read
+    /// authority and returns
+    /// [`CommittedSourceReservationReleaseIssuanceClaimV1`] — the record
+    /// together with its observation.
     fn commit_release_issuance<'a>(
         &'a self,
         write_set: &'a crate::MigrationReleaseWriteSetV1,
-    ) -> BoxTenancyFuture<
-        'a,
-        Result<CommittedSourceReservationReleaseIssuanceClaimV1, BindingStoreError>,
-    >;
+    ) -> BoxTenancyFuture<'a, Result<SourceReservationReleaseIssuanceRecordV1, BindingStoreError>>;
 
     fn load_committed_release_issuance<'a>(
         &'a self,

@@ -25,7 +25,7 @@ pub enum BindingProofDomainV1 {
     WriteAuthorityLeaseCommitAttestation,
     ReconciliationInvocation,
     RollbackWindowElapsed,
-    SourceReleaseCommitAttestation,
+    SourceReleaseCommitObservation,
     ServingAuthorityInvocation,
     ServingAuthorityControlCommitAttestation,
     ServingAuthorityInstallGrant,

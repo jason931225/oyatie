@@ -30,6 +30,6 @@ message MovementPermitIssuanceRecordV1 {
 
 message CommittedMovementPermitIssuanceClaimV1 {
   MovementPermitIssuanceRecordV1 issuance = 1;
-  SignedMovementPermitCommitAttestationV1 attestation = 2;
+  SignedMovementPermitCommitObservationV1 observation = 2;
   MovementPermitCommitContextV1 context = 3;
 }

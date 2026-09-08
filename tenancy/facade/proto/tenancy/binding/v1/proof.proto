@@ -52,7 +52,18 @@ enum BindingProofDomainV1 {
   BINDING_PROOF_DOMAIN_V1_WRITE_AUTHORITY_LEASE_COMMIT_ATTESTATION = 23;
   BINDING_PROOF_DOMAIN_V1_RECONCILIATION_INVOCATION = 24;
   BINDING_PROOF_DOMAIN_V1_ROLLBACK_WINDOW_ELAPSED = 25;
-  BINDING_PROOF_DOMAIN_V1_SOURCE_RELEASE_COMMIT_ATTESTATION = 26;
+  // Retired, not renamed. Tag 26 named a signed statement the STORE made about
+  // its own write: MigrationReleaseStore::commit_release_issuance returned the
+  // commit signature for the transaction it had just performed. Its replacement
+  // is an independent observer's re-read, which is a different producer and a
+  // different trust claim. Reusing the tag would let a signature produced under
+  // the old self-attesting semantics validate as an independent observation;
+  // reserving it makes that structurally impossible. Replaced by
+  // BINDING_PROOF_DOMAIN_V1_SOURCE_RELEASE_COMMIT_OBSERVATION below. Named
+  // rather than numbered: a name survives a renumber and no compiler checks a
+  // proto comment.
+  reserved 26;
+  reserved "BINDING_PROOF_DOMAIN_V1_SOURCE_RELEASE_COMMIT_ATTESTATION";
   BINDING_PROOF_DOMAIN_V1_SERVING_AUTHORITY_INVOCATION = 27;
   BINDING_PROOF_DOMAIN_V1_SERVING_AUTHORITY_CONTROL_COMMIT_ATTESTATION = 28;
   BINDING_PROOF_DOMAIN_V1_SERVING_AUTHORITY_INSTALL_GRANT = 29;
@@ -65,6 +76,8 @@ enum BindingProofDomainV1 {
   BINDING_PROOF_DOMAIN_V1_CONTROL_CONTRIBUTION_ACKNOWLEDGMENT = 36;
   BINDING_PROOF_DOMAIN_V1_TRANSFER_EXECUTION_COMMIT_OBSERVATION = 37;
   BINDING_PROOF_DOMAIN_V1_SERVING_AUTHORITY_SURVIVING_QUORUM = 38;
+  // Replaces reserved tag 26; see the reservation above.
+  BINDING_PROOF_DOMAIN_V1_SOURCE_RELEASE_COMMIT_OBSERVATION = 39;
 }
 
 message BindingProofEnvelopeV1 {

@@ -228,7 +228,11 @@ message CellMovementPermitIntentV1 {
   Digest32 intent_digest = 30;
 }
 
-message MovementPermitCommitAttestationPayloadV1 {
+// What an INDEPENDENT commit observer read for one movement-permit issuance,
+// by re-reading the committed row. Signed under
+// CELL_PROOF_DOMAIN_V1_MOVEMENT_PERMIT_COMMIT_OBSERVATION by the observer's own
+// identity, never by the store that consumed the grant.
+message MovementPermitCommitObservationV1 {
   uint32 schema_version = 1;
   uint64 issuance_revision = 2;
   Digest32 issuance_record_digest = 3;
@@ -237,8 +241,11 @@ message MovementPermitCommitAttestationPayloadV1 {
   uint64 leaf_state_revision = 6;
   Digest32 leaf_state_record_digest = 7;
   Digest32 committed_transaction_digest = 8;
+  // Read out of the durable record.
   uint64 committed_at_unix_seconds = 9;
   MovementPermitCommitContextV1 context = 10;
+  // When the observer itself looked.
+  uint64 observed_at_unix_seconds = 11;
 }
 
 message ReconciliationMovementPermitCommitContextV1 {
@@ -254,8 +261,8 @@ message MovementPermitCommitContextV1 {
   }
 }
 
-message SignedMovementPermitCommitAttestationV1 {
-  MovementPermitCommitAttestationPayloadV1 payload = 1;
+message SignedMovementPermitCommitObservationV1 {
+  MovementPermitCommitObservationV1 payload = 1;
   CellProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
@@ -265,7 +272,7 @@ message CellMovementPermitPayloadV1 {
   CellMovementPermitIntentV1 intent = 2;
   uint64 issuance_revision = 3;
   Digest32 issuance_record_digest = 4;
-  SignedMovementPermitCommitAttestationV1 commit_attestation = 5;
+  SignedMovementPermitCommitObservationV1 commit_observation = 5;
   Digest32 permit_digest = 6;
 }
 

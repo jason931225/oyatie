@@ -1,10 +1,10 @@
 use crate::{
-    BoxCellFuture, CellProofConsumptionV1, CommittedMovementPermitIssuanceClaimV1,
-    DrainContributorMutationSetV1, MovementBudgetAuthorityPreconditionV1,
-    MovementBudgetAuthorityStateV1, MovementBudgetGrantV1, MovementPermitIssuanceRecordV1,
-    PlacementAuditRecordV1, PlacementContractError, PlacementIdempotencyRecordV1,
-    PlacementOperationPreconditionV1, PlacementOperationV1, PlacementPersistenceAuthorityV1,
-    VerifiedBindingParticipantManifestCommitment, VerifiedMovementBudgetLineage,
+    BoxCellFuture, CellProofConsumptionV1, DrainContributorMutationSetV1,
+    MovementBudgetAuthorityPreconditionV1, MovementBudgetAuthorityStateV1, MovementBudgetGrantV1,
+    MovementPermitIssuanceRecordV1, PlacementAuditRecordV1, PlacementContractError,
+    PlacementIdempotencyRecordV1, PlacementOperationPreconditionV1, PlacementOperationV1,
+    PlacementPersistenceAuthorityV1, VerifiedBindingParticipantManifestCommitment,
+    VerifiedMovementBudgetLineage,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -45,8 +45,19 @@ impl MovementBudgetGrantWriteSetV1 {
 }
 
 pub trait MovementBudgetGrantStore: Send + Sync {
+    /// Durably consumes the movement budget grant and returns THE DURABLE
+    /// RECORD ALONE.
+    ///
+    /// It never returns a signature, because a signature here would be the
+    /// store attesting to its own write. The issuance record this returns is
+    /// the row the write advanced; the commit signature comes from
+    /// [`crate::MovementPermitIssuanceCommitObserver::observe_committed_issuance`],
+    /// which re-reads the committed row by lookup key under an ordinary read
+    /// authority and returns
+    /// [`crate::CommittedMovementPermitIssuanceClaimV1`] — the record together
+    /// with its observation.
     fn consume_grant<'a>(
         &'a self,
         write_set: &'a MovementBudgetGrantWriteSetV1,
-    ) -> BoxCellFuture<'a, Result<CommittedMovementPermitIssuanceClaimV1, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<MovementPermitIssuanceRecordV1, PlacementContractError>>;
 }

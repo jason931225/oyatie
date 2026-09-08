@@ -41,7 +41,11 @@ message SourceReleaseCommitContextV1 {
   }
 }
 
-message SourceReleaseCommitAttestationPayloadV1 {
+// What an INDEPENDENT commit observer read for one source-reservation release
+// issuance, by re-reading the committed row. Signed under
+// BINDING_PROOF_DOMAIN_V1_SOURCE_RELEASE_COMMIT_OBSERVATION by the observer's
+// own identity, never by the store that performed the commit.
+message SourceReleaseCommitObservationV1 {
   uint32 schema_version = 1;
   tenancy.identity.v1.TenantId tenant_id = 2;
   BindingOperationKeyV1 operation = 3;
@@ -53,11 +57,14 @@ message SourceReleaseCommitAttestationPayloadV1 {
   Digest32 rollback_window_elapsed_digest = 9;
   SourceReleaseCommitContextV1 context = 10;
   Digest32 committed_transaction_digest = 11;
+  // Read out of the durable record.
   uint64 committed_at_unix_seconds = 12;
+  // When the observer itself looked.
+  uint64 observed_at_unix_seconds = 13;
 }
 
-message SignedSourceReleaseCommitAttestationV1 {
-  SourceReleaseCommitAttestationPayloadV1 payload = 1;
+message SignedSourceReleaseCommitObservationV1 {
+  SourceReleaseCommitObservationV1 payload = 1;
   BindingProofEnvelopeV1 envelope = 2;
   bytes signature = 3;
 }
