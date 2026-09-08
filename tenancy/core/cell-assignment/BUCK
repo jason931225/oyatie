@@ -1,11 +1,26 @@
+_CARGO_ENV = {"CARGO_MANIFEST_DIR": "tenancy/core/cell-assignment"}
+
 rust_library(
     name = "tenancy-cell-assignment",
     srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
     crate = "tenancy_cell_assignment",
     crate_root = "src/lib.rs",
+    env = _CARGO_ENV,
     visibility = ["PUBLIC"],
     deps = [
         "//cell/ports/placement:cell-placement",
         "//tenancy/core/kernel:tenancy-kernel",
+    ],
+)
+
+rust_test(
+    name = "tenancy-cell-assignment-cas-precondition-reachability",
+    srcs = ["tests/cas_precondition_reachability.rs"],
+    crate = "tenancy_cell_assignment_cas_precondition_reachability",
+    crate_root = "tests/cas_precondition_reachability.rs",
+    env = _CARGO_ENV,
+    visibility = ["PUBLIC"],
+    deps = [
+        ":tenancy-cell-assignment",
     ],
 )
