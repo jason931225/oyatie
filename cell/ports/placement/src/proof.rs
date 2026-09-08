@@ -158,7 +158,7 @@ impl CellProofConsumptionV1 {
 /// mechanical reason is checkable: every write set on that path that carries a
 /// verified value - `RebalancePublicationWriteSetPartsV1`,
 /// `RebalanceSourceIssuanceWriteSetPartsV1`, `RebalanceClosureWriteSetPartsV1`,
-/// `RebalanceObserveResultWriteSetPartsV1`,
+/// `RebalanceLeafResultWriteSetPartsV1`,
 /// `MovementActionRejectionWriteSetPartsV1` - has no `proof_consumptions` field,
 /// while all four drain write sets do. That is exactly why
 /// `DrainContributorSealCommitAttestation` has a variant and the structurally

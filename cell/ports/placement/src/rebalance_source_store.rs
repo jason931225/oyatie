@@ -75,7 +75,7 @@ pub struct RebalanceClosureWriteSetPartsV1 {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct RebalanceObserveResultWriteSetPartsV1 {
+pub struct RebalanceLeafResultWriteSetPartsV1 {
     pub authority: CellControlReconciliationPersistenceAuthorityV1,
     pub precondition: RebalanceSourcePreconditionV1,
     pub action_precondition: RebalanceActionPreconditionV1,
@@ -126,8 +126,8 @@ write_set!(
 );
 write_set!(RebalanceClosureWriteSetV1, RebalanceClosureWriteSetPartsV1);
 write_set!(
-    RebalanceObserveResultWriteSetV1,
-    RebalanceObserveResultWriteSetPartsV1
+    RebalanceLeafResultWriteSetV1,
+    RebalanceLeafResultWriteSetPartsV1
 );
 
 pub trait RebalanceSourceStore: Send + Sync {
@@ -203,9 +203,24 @@ pub trait RebalanceSourceStore: Send + Sync {
         address: &'a RebalanceJobAddressV1,
         key: &'a PlacementBusinessActionKeyV1,
     ) -> BoxCellFuture<'a, Result<Option<MovementActionClosureV1>, PlacementContractError>>;
-    fn observe_result<'a>(
+    /// Durably folds a verified leaf result into the rebalance job and returns
+    /// the advanced job record.
+    ///
+    /// THIS IS A MUTATION, and it was called `observe_result`. Every other
+    /// `observe_*` in this wave is the law's independent observer: it takes a
+    /// lookup key, re-reads, and signs what it found - including
+    /// [`MovementActionClosureCommitObserver::observe_committed_closure`] in
+    /// this same file. This one takes a write set and advances state, so the
+    /// name put a writer in the namespace reserved for the ports that exist to
+    /// check writers. It also defeated a sweep of this crate's own lookup
+    /// surfaces, which matched it on the verb and had to discard it by hand.
+    ///
+    /// The leaf result it folds in has already been through the observer and
+    /// the verifier; `RebalanceLeafResultWriteSetPartsV1` carries it as a
+    /// private-field [`VerifiedMovementActionResult`].
+    fn record_leaf_result<'a>(
         &'a self,
-        write: &'a RebalanceObserveResultWriteSetV1,
+        write: &'a RebalanceLeafResultWriteSetV1,
     ) -> BoxCellFuture<'a, Result<RebalanceJobV1, PlacementContractError>>;
 }
 

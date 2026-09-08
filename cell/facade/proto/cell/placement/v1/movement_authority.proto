@@ -383,7 +383,7 @@ message RebalanceClosureWriteSetPartsV1 {
   CellControlAuditRecordV1 audit_outbox = 7;
 }
 
-message RebalanceObserveResultWriteSetPartsV1 {
+message RebalanceLeafResultWriteSetPartsV1 {
   SignedReconciliationInvocationV1 authority = 1;
   RebalanceSourcePreconditionV1 precondition = 2;
   RebalanceActionPreconditionV1 action_precondition = 3;
