@@ -125,3 +125,27 @@ pub fn verify_reconciliation_invocation(
 ) -> Result<VerifiedReconciliationInvocation, ProofVerificationError> {
     Err(ProofVerificationError::NotImplemented)
 }
+
+impl PlacementReconciliationPersistenceAuthorityV1 {
+    /// Derives the READ authority this write authority subsumes. The ordering
+    /// and the reason it had to be said in types are stated once, on
+    /// [`crate::PlacementPersistenceAuthorityV1::read_authority`]; this is the same rule
+    /// on this axis.
+    pub fn read_authority(
+        &self,
+    ) -> Result<PlacementReconciliationReadAuthorityV1, ProofVerificationError> {
+        Err(ProofVerificationError::NotImplemented)
+    }
+}
+
+impl CellControlReconciliationPersistenceAuthorityV1 {
+    /// Derives the READ authority this write authority subsumes. The ordering
+    /// and the reason it had to be said in types are stated once, on
+    /// [`crate::PlacementPersistenceAuthorityV1::read_authority`]; this is the same rule
+    /// on this axis.
+    pub fn read_authority(
+        &self,
+    ) -> Result<CellControlReconciliationReadAuthorityV1, ProofVerificationError> {
+        Err(ProofVerificationError::NotImplemented)
+    }
+}

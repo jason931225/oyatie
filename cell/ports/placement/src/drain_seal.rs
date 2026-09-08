@@ -221,6 +221,17 @@ pub struct DrainContributorSealWriteSetV1 {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct DrainContributorSealWriteSetPartsV1 {
+    /// Compare-and-set on the contributor state row this write proposes,
+    /// [`DrainContributorStateV1`].
+    ///
+    /// RULED, NOT CLOSED. The question "is this value readable under the
+    /// authority this write takes" has no subject here: this write set carries
+    /// NO `authority` member at all, which is the only write set in either
+    /// crate of which that is true. It is a pre-wave shape and the missing
+    /// authority member — not the precondition — is what would have to change
+    /// first. [`DrainContributorSealStore::load_committed_seal`] reads the
+    /// lane's committed row and likewise demands no authority, so the two are
+    /// consistent with each other and inconsistent with the rest of the wave.
     pub precondition: DrainContributorMutationPreconditionV1,
     pub next_state: DrainContributorStateV1,
     pub seal_intent: DrainContributorSealIntentV1,

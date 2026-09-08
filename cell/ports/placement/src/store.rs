@@ -146,6 +146,17 @@ pub struct CellReservationWriteSetPartsV1 {
     /// [`crate::CellAdmissionTermV1`]. That term is read here and written
     /// nowhere in these crates, so no write set opens it and the first-value
     /// question does not arise.
+    ///
+    /// The AUTHORITY question, which is a different one, is discharged by
+    /// `CellCatalogReader::read_page`: it takes `PlacementReadAuthorityV1`, the
+    /// read twin this write set's `PlacementPersistenceAuthorityV1` subsumes,
+    /// and the term rides on `CellCatalogEntryV1::admission_term` inside the
+    /// returned page. That is three levels of nesting below the returned type,
+    /// so the depth-one read route in the law test cannot see it; the route is
+    /// stated here instead. Written in single backticks deliberately: an
+    /// intra-doc link on a precondition member is read by the law tests as a
+    /// declaration of the ROW this compare-and-set is on, and these are not
+    /// that.
     pub admission_precondition: crate::CellAdmissionTermV1,
     pub drain_mutations: crate::DrainContributorMutationSetV1,
     pub capacity_precondition: CellCapacityPreconditionV1,

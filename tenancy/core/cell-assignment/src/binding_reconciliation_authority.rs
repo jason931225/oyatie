@@ -85,3 +85,15 @@ pub fn verify_binding_reconciliation_invocation(
 ) -> Result<VerifiedBindingReconciliationInvocation, BindingProofVerificationError> {
     Err(BindingProofVerificationError::NotImplemented)
 }
+
+impl BindingReconciliationPersistenceAuthorityV1 {
+    /// Derives the READ authority this write authority subsumes. The ordering
+    /// and the reason it had to be said in types are stated once, on
+    /// [`crate::BindingPersistenceAuthorityV1::read_authority`]; this is the
+    /// same rule on this axis.
+    pub fn read_authority(
+        &self,
+    ) -> Result<BindingReconciliationReadAuthorityV1, BindingProofVerificationError> {
+        Err(BindingProofVerificationError::NotImplemented)
+    }
+}

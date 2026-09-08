@@ -161,6 +161,28 @@ pub trait CellDrainStore: Send + Sync {
         write_set: &'a AppendDrainProofWriteSetV1,
     ) -> BoxCellFuture<'a, Result<CellDrainProofMutationResultV1, crate::PlacementContractError>>;
 
+    /// Reads the drain proof ledger row for one cell and drain term.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO LEDGER ROW: no drain has been
+    /// begun for that term. It is not "the cell does not exist" and not an
+    /// authorization refusal; both of those are on the error channel.
+    ///
+    /// WHY IT EXISTS. [`AppendDrainProofWriteSetPartsV1::expected_ledger_revision`]
+    /// is required by value and this store had NO read at all. The ledger is
+    /// opened by [`CellDrainStore::begin`], whose result
+    /// ([`CellDrainMutationResultV1`]) carries the operation and the cell view
+    /// but not the ledger; every later append could take the revision from the
+    /// previous [`CellDrainProofMutationResultV1`], but the FIRST append after
+    /// a lost reply had no surface to read it from under the
+    /// [`crate::CellControlPersistenceAuthorityV1`] the write holds. This read
+    /// takes the read twin that authority subsumes.
+    fn get_proof_ledger<'a>(
+        &'a self,
+        authority: &'a crate::CellControlReadAuthorityV1,
+        cell_id: &'a crate::CellId,
+        drain_term: crate::DrainTermV1,
+    ) -> BoxCellFuture<'a, Result<Option<DrainProofLedgerV1>, crate::PlacementContractError>>;
+
     fn complete<'a>(
         &'a self,
         write_set: &'a CompleteDrainWriteSetV1,

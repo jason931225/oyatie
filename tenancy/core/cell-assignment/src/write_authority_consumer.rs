@@ -163,6 +163,30 @@ pub struct CapabilityAuthorizedWriteSetV1 {
 #[derive(Debug, Eq, PartialEq)]
 pub struct CapabilityAuthorizedWriteSetPartsV1 {
     pub authority: VerifiedWriteAuthorityToken,
+    /// Compare-and-set on [`CapabilityWriteAuthorityStateV1`], required by
+    /// value.
+    ///
+    /// RULED, NOT CLOSED, AND THE REASON IS THE AXIS. Every other by-value
+    /// precondition in these crates discharges either through a read taken
+    /// under an authority the write's own arm holds — the ordering stated on
+    /// [`crate::BindingPersistenceAuthorityV1::read_authority`] — or through the
+    /// reconciliation subject, an earlier write, or a lease-gated read. NONE of
+    /// those is available here, and not because a surface is missing: the
+    /// authority this write takes is a [`VerifiedWriteAuthorityToken`], a
+    /// capability-local write token that has NO read twin at all, so the
+    /// ordering rule has nothing to range over. The row's only producer is
+    /// [`CapabilityWriteAuthorityStore::apply_transition`], this store's own
+    /// write, and the store declares no read.
+    ///
+    /// Adding one would mean deciding what authority a capability-local READ
+    /// takes, which is a boundary decision this crate has not made: the same
+    /// disposition is durably held on the Cell side as
+    /// `LocalAuthorityStateV1.disposition` under an authority fence, and
+    /// nothing in either crate says which of the two records is authoritative
+    /// or that this store is superseded. That question is recorded here and
+    /// left open rather than answered by inventing a read.
+    ///
+    /// This write set and this store predate the wave.
     pub expected_authority_state: CapabilityWriteAuthorityStateV1,
     pub write_attempt_at_unix_seconds: u64,
     pub local_effect_digest: BindingDigest32,

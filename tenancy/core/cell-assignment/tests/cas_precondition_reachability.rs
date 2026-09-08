@@ -76,14 +76,15 @@
 //! names. Splitting that would need per-arm subjects, which no declaration
 //! here carries.
 //!
-//! THE BLIND SPOT, stated because every key has one. This test sees only the
-//! face of the law where NO VALUE EXISTS YET. It cannot see the other face: a
-//! value that exists but is UNREADABLE under the authority the write itself
-//! takes. `RecordTransferExecutionOutcomeWriteSetPartsV1::item_precondition` is
-//! that shape -- the item row exists, and after this wave inserted a third
-//! writer of it the only read returning it is gated on a reconciliation lease
-//! the ordinary path must not hold. Deciding that requires ordering the
-//! authority types, which this test does not do. It is handled by hand.
+//! THE SCOPE, stated because every key has one. This test sees only the face of
+//! the law where NO VALUE EXISTS YET. The other face -- a value that exists but
+//! is UNREADABLE under the authority the write itself takes -- is LAW C, at the
+//! foot of this file, and it is no longer handled by hand: deciding it requires
+//! ordering the authority types, and that ordering is now stated in the tree at
+//! `BindingPersistenceAuthorityV1::read_authority` and derived from it there.
+//! `RecordTransferExecutionOutcomeWriteSetPartsV1::item_precondition` was the
+//! instance this paragraph used to name; it is one of the ninety obligations
+//! Law C judges.
 //!
 //! It asserts that the offending sets are EMPTY and prints their members. It
 //! asserts no count and no non-zero quantity: a live finding count goes red
@@ -144,6 +145,12 @@ struct Enum {
     /// One entry per variant: the variant's non-optional members, as
     /// `(field name, field type)`.
     variants: Vec<Vec<(String, String)>>,
+    /// One entry per variant, positionally parallel to `variants`: the types of
+    /// a TUPLE arm, which carries no member names. Law A does not read this --
+    /// widening its absence test would change its verdicts -- and Law C needs
+    /// it, because `Request(BindingPersistenceAuthorityV1)` is a tuple arm and
+    /// the authority a write set's arm holds is otherwise invisible.
+    variant_tuples: Vec<Vec<String>>,
 }
 
 #[derive(Default)]
@@ -152,6 +159,16 @@ struct Model {
     enums: BTreeMap<String, Enum>,
     /// `(method name, whole signature)` for every trait method in the wave.
     methods: Vec<(String, String)>,
+    /// Where each of those was declared, positionally parallel to `methods`.
+    method_sites: Vec<(String, usize)>,
+    /// `pub struct Name(Inner);` -- the inner type of every tuple newtype. Law C
+    /// derives the authority pairs from this rather than from a list of names.
+    newtypes: BTreeMap<String, String>,
+    /// For each type with an inherent `impl`, the types its `pub fn`s hand back.
+    /// Law C requires the ordering it relies on to be PERFORMABLE, not merely
+    /// nameable: a persistence authority subsumes a read authority only if it
+    /// declares a method that produces one.
+    inherent_returns: BTreeMap<String, BTreeSet<String>>,
 }
 
 fn strip_crate(text: &str) -> String {
@@ -203,6 +220,18 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
             }
 
             if let Some(name) = declared_tuple(line) {
+                if let Some(open) = line.find('(') {
+                    let inner: String = line[open + 1..]
+                        .trim_start_matches("pub ")
+                        .chars()
+                        .take_while(|character| {
+                            character.is_ascii_alphanumeric() || *character == '_'
+                        })
+                        .collect();
+                    if !inner.is_empty() {
+                        model.newtypes.insert(name.clone(), inner);
+                    }
+                }
                 // A newtype carries no members, but its doc can declare the row
                 // it versions, which is the only route some scalar preconditions
                 // have.
@@ -256,6 +285,7 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
             if let Some(name) = declared(line, "pub enum ", " {") {
                 let doc = take_doc(&mut pending);
                 let mut variants: Vec<Vec<(String, String)>> = Vec::new();
+                let mut variant_tuples: Vec<Vec<String>> = Vec::new();
                 let mut cursor = index + 1;
                 while cursor < lines.len() && lines[cursor] != "}" {
                     let body = lines[cursor];
@@ -265,6 +295,7 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                         && body[4..].starts_with(|character: char| character.is_ascii_uppercase());
                     if is_variant {
                         variants.push(Vec::new());
+                        variant_tuples.push(tuple_arm_types(&body[4..]));
                     } else if let Some(current) = variants.last_mut()
                         && let Some(rest) = body.strip_prefix("        ")
                         && let Some((field_name, field_type)) = member(&format!("    {rest}"))
@@ -273,7 +304,14 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                     }
                     cursor += 1;
                 }
-                model.enums.insert(name, Enum { doc, variants });
+                model.enums.insert(
+                    name,
+                    Enum {
+                        doc,
+                        variants,
+                        variant_tuples,
+                    },
+                );
                 index = cursor;
                 continue;
             }
@@ -296,7 +334,40 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                     .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
                     .collect();
                 model.methods.push((name, signature));
+                model.method_sites.push((display.clone(), index + 1));
                 index = cursor + 1;
+                pending.clear();
+                continue;
+            }
+
+            if let Some(rest) = line.strip_prefix("impl ")
+                && let Some(subject) = rest.strip_suffix(" {")
+            {
+                let subject = subject.trim().to_owned();
+                let mut cursor = index + 1;
+                while cursor < lines.len() && lines[cursor] != "}" {
+                    if lines[cursor].starts_with("    pub fn ") {
+                        let mut signature = String::new();
+                        let mut scan = cursor;
+                        while scan < lines.len() && scan < cursor + 12 {
+                            signature.push_str(lines[scan].trim());
+                            signature.push(' ');
+                            if lines[scan].trim_end().ends_with('{') {
+                                break;
+                            }
+                            scan += 1;
+                        }
+                        if let Some(handed_back) = returned_inner(&signature) {
+                            model
+                                .inherent_returns
+                                .entry(subject.clone())
+                                .or_default()
+                                .insert(handed_back);
+                        }
+                    }
+                    cursor += 1;
+                }
+                index = cursor;
                 pending.clear();
                 continue;
             }
@@ -306,6 +377,23 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
         }
     }
     model
+}
+
+/// The types inside `Variant(A, B)`, or empty for a braced or unit variant.
+fn tuple_arm_types(variant: &str) -> Vec<String> {
+    let Some(open) = variant.find('(') else {
+        return Vec::new();
+    };
+    let Some(close) = variant.rfind(')') else {
+        return Vec::new();
+    };
+    variant[open + 1..close]
+        .split(',')
+        .filter_map(|part| {
+            let bare = unwrap_container(part);
+            (!bare.is_empty()).then_some(bare)
+        })
+        .collect()
 }
 
 /// `pub struct Name(...);` or `pub struct Name;`.
@@ -949,5 +1037,657 @@ fn every_required_precondition_has_a_reachable_first_value() {
          precondition an absent representation -- an `Option` or an enum arm -- say what \
          absence asserts, name the refusal the store raises when the assertion is false, \
          and mirror the optionality on the wire.{violations}"
+    );
+}
+
+// ============================================================================
+// LAW C, executable: a required value must be READABLE under the authority the
+// write itself takes.
+//
+// THE LAW. A compare-and-set precondition required BY VALUE on a write set has
+// no legal value at any execution -- not only the first -- if no surface in
+// these crates yields its row under an authority the write's own arm can hold.
+// The caller must then either invent the value or reach for a second authority
+// nothing says it may hold. This is the OTHER FACE of Law A. Law A asks whether
+// a value ever exists; Law C asks whether the party performing the write can
+// see it.
+//
+// WHY THIS FILE AND NOT A NEW ONE. Law C is the same population as Law A --
+// write-set parts, precondition members, rows -- read with a different
+// question, so it reuses this file's parser, its `resolve` routes and its
+// `can_represent_absence` shape test. A second file would fork the population,
+// and a population that two instruments disagree about is how round 8 lost a
+// wire.
+//
+// THE SUBJECT IS THE (PRECONDITION, AUTHORITY ARM) PAIR, NOT THE PRECONDITION.
+// A write set whose `authority` member is an enum -- `Request(..) |
+// Reconciler(..)` -- takes a different authority on each arm, and the seats
+// found exactly the shape where one arm is served and the other is not. Judging
+// the precondition once, over the union of its arms, hides that. Every arm is
+// an obligation of its own and is printed as its own line.
+//
+// THE FIVE DISCHARGE ROUTES, in the order they are tried, each named in the
+// output so a reader can see which one fired:
+//
+//   (a) READ -- a method that takes no write set, is not a caller-facing
+//       facade, is not gated on a lease, does not return a `Committed*ClaimV1`,
+//       and yields the row under an authority the arm holds.
+//   (b) SUBJECT -- the row is reachable from the reconciliation subject the
+//       arm's reconciler is handed.
+//   (c) OTHER WRITE -- a different write, taken under an authority the arm
+//       holds, yields the row, so an earlier call in the same sequence had it.
+//   (d) LEASE-GATED READ -- as (a) but the read also demands a lease. Accepted,
+//       and reported separately, because a lease is a coordination fact rather
+//       than an authority one, and an arm that can hold the lease can perform
+//       the read.
+//   (e) UNAUTHENTICATED READ -- a read that demands no authority at all.
+//       Accepted, and reported separately: it discharges this law trivially and
+//       is a finding for a different one.
+//   (f) OFF-AXIS ARM -- the arm holds something that is not half of any derived
+//       read/persistence pair, or the write set declares no `authority` member
+//       at all. There is no ordering to measure, so the law has no subject.
+//       Both members this fires on carry a written ruling.
+//   (g) DECLARED ON THE MEMBER -- the member's own doc says the authority
+//       question is discharged and names the surface. The escape for a real
+//       route deeper than route (a) looks; see `declares_its_route`.
+//
+// "AN AUTHORITY THE ARM HOLDS" IS THE ORDERING, AND IT IS DERIVED, NOT LISTED.
+// A read taken under `X...ReadAuthorityV1` is performable by a holder of
+// `X...PersistenceAuthorityV1`, because persistence subsumes read. The pairs are
+// computed from the tree: two tuple newtypes over the SAME inner type whose
+// names agree once `PersistenceAuthorityV1` and `ReadAuthorityV1` are removed,
+// AND where the persistence type declares a method that actually hands back its
+// read twin. The second half is what makes the conjunct load-bearing rather than
+// decorative: delete `BindingPersistenceAuthorityV1::read_authority` and
+// sixty-five obligations go open, which is the correct answer, because without
+// it a writer has no way to perform the read.
+// Typing the seven pairs in as a table would be the name-keyed census this wave
+// keeps being caught by; deriving them means a pair born tomorrow is in scope
+// the day it is declared. The ordering runs ONE WAY: a read authority never
+// discharges a write.
+//
+// THE DEPTH ASYMMETRY IS DELIBERATE, AND IS THIS TEST'S SHARPEST BLIND SPOT.
+// Route (a) uses Law A's own `yields_row`: the returned type IS the row, or the
+// row is a direct member of it. One level. Route (b) walks the subject's type
+// graph TRANSITIVELY. The two are different because the objects are different:
+// a read hands back a record and the caller reads a field of it, while a
+// reconciliation subject is a whole object graph handed over for the reconciler
+// to own, so anything inside it is in hand. The cost is real and is recorded
+// rather than hidden: a value riding three levels down inside a page --
+// `CellCatalogReader::read_page` -> `CellCatalogEntryV1::admission_term` -- is
+// invisible to route (a), and that one is discharged by a sentence at
+// `CellReservationWriteSetPartsV1::admission_precondition` instead.
+//
+// A COMMIT OBSERVATION IS NOT A READ, and route (a) refuses it by SHAPE rather
+// than by the `observe_` name: any method returning a `Committed*ClaimV1` is
+// excluded. The wave's own reason, at
+// `PublishTransferExecutionPermitWriteSetPartsV1::issuance_precondition`, is
+// that a commit observation carries the values AS OF THE COMMIT while the
+// publication compare-and-set is on the row's CURRENT revision and digest.
+// `TransferExecutionStore::load_item` and
+// `MigrationReleaseStore::load_release_issuance` exist BESIDE their lanes'
+// observers for exactly this reason, and a law that let an observer discharge a
+// precondition would have certified both lanes without them.
+//
+// WHAT THIS TEST STILL CANNOT SEE. Whether a read that DEMANDS a persistence
+// authority is right to demand one. The ordering says a writer may read; it
+// does not say a loader may insist on write authority.
+// `ServingAuthorityControlCommitObserver`'s two sibling loaders,
+// `load_installation_issuance` and `load_freeze_intent`, are that shape. Judging
+// them needs a rule about what a read may require, which is a different law.
+//
+// It asserts that the offending set is EMPTY and prints its members. It asserts
+// no count and no non-zero quantity.
+
+/// The Ok type of a signature, with one container layer removed.
+///
+/// Law A's `returned` stops at the outermost name, deliberately: its clause
+/// (iv) turns on the row arriving OUTSIDE an `Option`, so `Option` is the
+/// answer there. Law C asks a different question -- can this party see the
+/// value at all -- and an `Option` read answers it, so here the container is
+/// opened.
+fn returned_inner(signature: &str) -> Option<String> {
+    let after = signature.split("->").nth(1)?;
+    let start = after.find("Result<")? + "Result<".len();
+    let mut depth = 0usize;
+    let mut out = String::new();
+    for character in after[start..].chars() {
+        match character {
+            '<' => depth += 1,
+            '>' if depth == 0 => break,
+            '>' => depth -= 1,
+            ',' if depth == 0 => break,
+            _ => {}
+        }
+        out.push(character);
+    }
+    let bare = unwrap_container(out.trim());
+    (!bare.is_empty()).then_some(bare)
+}
+
+/// A read/persistence authority pair: `persistence -> read`.
+fn authority_pairs(model: &Model) -> BTreeMap<String, String> {
+    const PERSISTENCE: &str = "PersistenceAuthorityV1";
+    const READ: &str = "ReadAuthorityV1";
+    let mut pairs = BTreeMap::new();
+    for (persistence, persistence_inner) in &model.newtypes {
+        let Some(stem) = persistence.strip_suffix(PERSISTENCE) else {
+            continue;
+        };
+        let candidate = format!("{stem}{READ}");
+        let same_invocation = model
+            .newtypes
+            .get(&candidate)
+            .is_some_and(|read_inner| read_inner == persistence_inner);
+        // Nameable is not performable. The ordering counts only when the
+        // persistence authority actually declares a method handing back its read
+        // twin; deleting that accessor must take the pair -- and every
+        // obligation resting on it -- out of scope, or this conjunct is
+        // decoration.
+        let performable = model
+            .inherent_returns
+            .get(persistence)
+            .is_some_and(|handed_back| handed_back.contains(&candidate));
+        if same_invocation && performable {
+            pairs.insert(persistence.clone(), candidate);
+        }
+    }
+    pairs
+}
+
+/// `Option<Vec<Box<T>>>` down to `T`. `unwrap_container` opens one layer, which
+/// is all Law A needs; a subject graph nests them.
+fn fully_unwrapped(ty: &str) -> String {
+    let mut current = strip_crate(ty);
+    loop {
+        let opened = current
+            .strip_prefix("Option<")
+            .or_else(|| current.strip_prefix("Vec<"))
+            .or_else(|| current.strip_prefix("Box<"));
+        match opened {
+            Some(rest) => {
+                let mut inner = rest.to_owned();
+                if inner.ends_with('>') {
+                    inner.pop();
+                }
+                current = strip_crate(&inner);
+            }
+            None => return current,
+        }
+    }
+}
+
+/// Every type transitively reachable from `start`, through struct members and
+/// enum variant members. Used only for the reconciliation subject.
+fn type_closure(start: &str, model: &Model) -> BTreeSet<String> {
+    let mut seen = BTreeSet::new();
+    let mut stack = vec![strip_crate(start)];
+    while let Some(current) = stack.pop() {
+        let bare = fully_unwrapped(&current);
+        if !seen.insert(bare.clone()) {
+            continue;
+        }
+        if let Some(declaration) = model.structs.get(&bare) {
+            for field in &declaration.fields {
+                stack.push(fully_unwrapped(&field.ty));
+            }
+        }
+        if let Some(declaration) = model.enums.get(&bare) {
+            for variant in &declaration.variants {
+                for (_, ty) in variant {
+                    stack.push(fully_unwrapped(ty));
+                }
+            }
+            for types in &declaration.variant_tuples {
+                for ty in types {
+                    stack.push(fully_unwrapped(ty));
+                }
+            }
+        }
+    }
+    seen
+}
+
+/// The reconciliation subjects a holder of each persistence authority is handed.
+///
+/// Derived, not listed: a candidate listing takes the pair's READ authority and
+/// hands back something carrying the subject enum, so the subject a reconciler
+/// owns is whatever it can obtain that way.
+fn subjects_by_authority(
+    model: &Model,
+    pairs: &BTreeMap<String, String>,
+) -> BTreeMap<String, BTreeSet<String>> {
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for (persistence, read) in pairs {
+        for (_, signature) in &model.methods {
+            if parts_taken_by(signature).is_some() || signature.contains("Invocation ") {
+                continue;
+            }
+            if !signature.contains(read.as_str()) {
+                continue;
+            }
+            let Some(returned_type) = returned_inner(signature) else {
+                continue;
+            };
+            for reachable in type_closure(&returned_type, model) {
+                if reachable.ends_with("SubjectV1") && model.enums.contains_key(&reachable) {
+                    out.entry(persistence.clone())
+                        .or_default()
+                        .insert(reachable);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The authority each arm of a write set's `authority` member holds, as
+/// `(arm label, authority type)`.
+fn write_authorities(parts: &str, model: &Model) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let Some(declaration) = model.structs.get(parts) else {
+        return out;
+    };
+    for field in &declaration.fields {
+        if field.name != "authority" {
+            continue;
+        }
+        let bare = unwrap_container(&field.ty);
+        match model.enums.get(&bare) {
+            Some(enumeration) => {
+                let named = enumeration.variants.iter().flat_map(|variant| {
+                    variant
+                        .iter()
+                        .map(|(_, ty)| unwrap_container(ty))
+                        .collect::<Vec<_>>()
+                });
+                let tupled = enumeration.variant_tuples.iter().flat_map(|types| {
+                    types
+                        .iter()
+                        .map(|ty| unwrap_container(ty))
+                        .collect::<Vec<_>>()
+                });
+                for (index, inner) in named.chain(tupled).enumerate() {
+                    if inner.contains("Authority") || inner.contains("Token") {
+                        out.push((format!("`{bare}` arm {index}"), inner));
+                    }
+                }
+            }
+            None => out.push(("(single)".to_owned(), bare)),
+        }
+    }
+    out
+}
+
+fn holds(arm_authority: &str, signature: &str, pairs: &BTreeMap<String, String>) -> Option<String> {
+    if signature.contains(arm_authority) {
+        return Some(format!("the arm's own `{arm_authority}`"));
+    }
+    let read = pairs.get(arm_authority)?;
+    signature
+        .contains(read.as_str())
+        .then(|| format!("`{read}`, the read twin `{arm_authority}` subsumes"))
+}
+
+/// A method that demands no authority of any kind.
+fn takes_no_authority(signature: &str) -> bool {
+    !signature.contains("Authority")
+}
+
+struct Discharge {
+    route: &'static str,
+    why: String,
+}
+
+/// The declared discharge: the member's own doc states that the authority
+/// question is answered and says how.
+///
+/// Keying the DISCHARGE on a wording is legitimate here for the same reason it
+/// is in Law B: the discharge is a marker this crate declares, while the
+/// violation is whatever shape a future author writes. Both tokens must be
+/// present, so it cannot fire on ordinary prose about authorities. It exists
+/// because route (a) is deliberately one level deep and a real route can be
+/// three -- `CellCatalogReader::read_page` hands back a page of entries and the
+/// admission term rides on an entry -- and the honest answer to that is a
+/// sentence naming the route, not a widened depth that would exonerate
+/// everything.
+fn declares_its_route(doc: &str) -> bool {
+    let lowered = doc.to_ascii_lowercase();
+    lowered.contains("authority question") && lowered.contains("discharged by")
+}
+
+fn discharge(
+    row: &str,
+    arm_authority: &str,
+    carrier: &str,
+    member_doc: &str,
+    model: &Model,
+    pairs: &BTreeMap<String, String>,
+    subjects: &BTreeMap<String, BTreeSet<String>>,
+) -> Option<Discharge> {
+    // Law A's `returned` stops at `Option`, deliberately: clause (iv) turns on
+    // the row arriving OUTSIDE one. Law C asks a different question -- can this
+    // party see the value at all -- and an `Option` read answers it, so here the
+    // container is unwrapped before the row test.
+    let candidates: Vec<usize> = (0..model.methods.len())
+        .filter(|index| {
+            returned_inner(&model.methods[*index].1)
+                .is_some_and(|value| yields_row(&value, row, model))
+        })
+        .collect();
+    let site = |index: usize| {
+        let (file, line) = &model.method_sites[index];
+        format!("{}:{}", file, line)
+    };
+    let is_facade = |signature: &str| signature.contains("Invocation ");
+    let observes = |signature: &str| {
+        returned_inner(signature)
+            .is_some_and(|value| value.starts_with("Committed") && value.ends_with("ClaimV1"))
+    };
+
+    // (a) an ordinary read under an authority the arm holds.
+    for index in &candidates {
+        let (name, signature) = &model.methods[*index];
+        if parts_taken_by(signature).is_some()
+            || is_facade(signature)
+            || signature.contains("Lease")
+            || observes(signature)
+        {
+            continue;
+        }
+        if let Some(how) = holds(arm_authority, signature, pairs) {
+            return Some(Discharge {
+                route: "READ",
+                why: format!("`{name}` at {} under {how}", site(*index)),
+            });
+        }
+    }
+    // (b) the reconciliation subject this arm's reconciler is handed.
+    if let Some(owned) = subjects.get(arm_authority) {
+        for subject in owned {
+            if type_closure(subject, model).contains(row) {
+                return Some(Discharge {
+                    route: "SUBJECT",
+                    why: format!("`{subject}` reaches `{row}` by type-graph walk"),
+                });
+            }
+        }
+    }
+    // (c) a different write, under an authority the arm holds, yields the row.
+    for index in &candidates {
+        let (name, signature) = &model.methods[*index];
+        let Some(taken) = parts_taken_by(signature) else {
+            continue;
+        };
+        if taken == carrier || is_facade(signature) {
+            continue;
+        }
+        if write_authorities(&taken, model)
+            .iter()
+            .any(|(_, authority)| authority == arm_authority)
+        {
+            return Some(Discharge {
+                route: "OTHER WRITE",
+                why: format!(
+                    "`{name}` at {} takes `{taken}` under the same authority",
+                    site(*index)
+                ),
+            });
+        }
+    }
+    // (d) a lease-gated read under an authority the arm holds.
+    for index in &candidates {
+        let (name, signature) = &model.methods[*index];
+        if parts_taken_by(signature).is_some()
+            || is_facade(signature)
+            || !signature.contains("Lease")
+        {
+            continue;
+        }
+        if let Some(how) = holds(arm_authority, signature, pairs) {
+            return Some(Discharge {
+                route: "LEASE-GATED READ",
+                why: format!(
+                    "`{name}` at {} under {how}, also gated on a lease",
+                    site(*index)
+                ),
+            });
+        }
+    }
+    // (g) the member states the route itself.
+    if declares_its_route(member_doc) {
+        return Some(Discharge {
+            route: "DECLARED ON THE MEMBER",
+            why: "the member's own doc names the surface and the authority".to_owned(),
+        });
+    }
+    // (f) THE ARM IS OFF THIS AXIS. The law is about an ordering between a
+    // write authority and its read twin. An arm holding something that is not
+    // half of any derived pair -- a capability-local write token, or a write set
+    // that declares no `authority` member at all -- has no ordering to be
+    // measured against, so this law has no subject and must not manufacture one.
+    // It is not a licence: both members this fires on carry a written ruling
+    // saying which question is open and why.
+    if arm_authority == "<none>"
+        || !(pairs.contains_key(arm_authority) || pairs.values().any(|read| read == arm_authority))
+    {
+        return Some(Discharge {
+            route: "OFF-AXIS ARM (ruled on the member)",
+            why: format!("`{arm_authority}` is neither half of a derived read/persistence pair"),
+        });
+    }
+    // (e) a read demanding no authority at all.
+    for index in &candidates {
+        let (name, signature) = &model.methods[*index];
+        if parts_taken_by(signature).is_some()
+            || is_facade(signature)
+            || !takes_no_authority(signature)
+        {
+            continue;
+        }
+        return Some(Discharge {
+            route: "UNAUTHENTICATED READ",
+            why: format!("`{name}` at {} demands no authority", site(*index)),
+        });
+    }
+    None
+}
+
+struct Obligation {
+    write_set: String,
+    field: String,
+    ty: String,
+    file: String,
+    line: usize,
+    arm: String,
+    authority: String,
+    row: String,
+    resolved_by: &'static str,
+}
+
+fn law_c(model: &Model) -> (Vec<Obligation>, usize, BTreeMap<&'static str, usize>) {
+    let sweep = sweep(model);
+    let pairs = authority_pairs(model);
+    let subjects = subjects_by_authority(model, &pairs);
+    let mut open = Vec::new();
+    let mut total = 0usize;
+    let mut routed: BTreeMap<&'static str, usize> = BTreeMap::new();
+
+    let parts: Vec<String> = model
+        .structs
+        .keys()
+        .filter(|name| write_set_parts(name))
+        .cloned()
+        .collect();
+    for write_set in &parts {
+        let authorities = write_authorities(write_set, model);
+        for field in &model.structs[write_set].fields {
+            if !is_precondition_field(&field.name) {
+                continue;
+            }
+            if can_represent_absence(&field.ty, model) {
+                continue;
+            }
+            for resolution in resolve(write_set, field, &sweep.rows, model) {
+                let arms = if authorities.is_empty() {
+                    vec![("(no authority member)".to_owned(), "<none>".to_owned())]
+                } else {
+                    authorities.clone()
+                };
+                for (arm, authority) in arms {
+                    total += 1;
+                    match discharge(
+                        &resolution.row,
+                        &authority,
+                        write_set,
+                        &field.doc,
+                        model,
+                        &pairs,
+                        &subjects,
+                    ) {
+                        Some(found) => *routed.entry(found.route).or_default() += 1,
+                        None => open.push(Obligation {
+                            write_set: write_set.clone(),
+                            field: field.name.clone(),
+                            ty: field.ty.clone(),
+                            file: model.structs[write_set].file.clone(),
+                            line: field.line,
+                            arm,
+                            authority,
+                            row: resolution.row.clone(),
+                            resolved_by: resolution.route,
+                        }),
+                    }
+                }
+            }
+        }
+    }
+    open.sort_by(|left, right| {
+        (&left.write_set, &left.field, &left.arm).cmp(&(&right.write_set, &right.field, &right.arm))
+    });
+    (open, total, routed)
+}
+
+#[test]
+fn law_c_discriminates_before_it_certifies() {
+    let root = repo_root();
+    let model = parse(&wave_source_files(), &root);
+    let pairs = authority_pairs(&model);
+
+    // The ordering is derived from the tree and it is not empty.
+    assert!(
+        pairs.len() >= 5,
+        "only {} read/persistence pairs were derived -- the ordering conjunct \
+         would exonerate almost nothing",
+        pairs.len()
+    );
+    assert_eq!(
+        pairs
+            .get("BindingPersistenceAuthorityV1")
+            .map(String::as_str),
+        Some("BindingReadAuthorityV1"),
+        "the pair the wave's own `load_item` doc turns on must be derived"
+    );
+    // And it runs ONE WAY.
+    assert!(
+        !pairs.contains_key("BindingReadAuthorityV1"),
+        "a read authority must never be treated as subsuming a write authority"
+    );
+
+    // `holds` accepts the arm's own type and its read twin, and refuses a
+    // different family's authority over the same role.
+    assert!(
+        holds(
+            "BindingPersistenceAuthorityV1",
+            "fn get(authority: &'a BindingPersistenceAuthorityV1)",
+            &pairs
+        )
+        .is_some()
+    );
+    assert!(
+        holds(
+            "BindingPersistenceAuthorityV1",
+            "fn get(authority: &'a BindingReadAuthorityV1)",
+            &pairs
+        )
+        .is_some()
+    );
+    assert!(
+        holds(
+            "PlacementReconciliationPersistenceAuthorityV1",
+            "fn get(authority: &'a PlacementReadAuthorityV1)",
+            &pairs
+        )
+        .is_none(),
+        "an ordinary placement read must not discharge a RECONCILIATION write: \
+         the two are newtypes over different signed invocations, and this is the \
+         case `MovementBudgetSettlementWriteSetPartsV1::leaf_authority_precondition` \
+         was the live instance of"
+    );
+
+    // The subject route is derived and reaches what the seats walked by hand.
+    let subjects = subjects_by_authority(&model, &pairs);
+    let binding = subjects
+        .get("BindingReconciliationPersistenceAuthorityV1")
+        .expect("the binding reconciler is handed a subject");
+    assert!(
+        binding.contains("BindingReconciliationSubjectV1"),
+        "the subject a binding reconciler owns must be derived from the listing it can perform"
+    );
+    let reachable = type_closure("BindingReconciliationSubjectV1", &model);
+    assert!(
+        reachable.contains("BindingControlContributionOutboxV1"),
+        "positive control: the outbox IS in the subject the reconciler is handed"
+    );
+    assert!(
+        !reachable.contains("CellBindingIndexSnapshotV1"),
+        "negative control: the cell binding index snapshot is NOT in that subject, \
+         which is what made the annotation at `cell_binding_index_projection.rs` false"
+    );
+
+    let (open, total, _) = law_c(&model);
+    assert!(
+        total > 50,
+        "law C judged only {total} obligations -- it is not reading the wave"
+    );
+    let _ = open;
+}
+
+#[test]
+fn every_by_value_precondition_is_readable_under_its_own_authority() {
+    let root = repo_root();
+    let model = parse(&wave_source_files(), &root);
+    let (open, total, routed) = law_c(&model);
+    let routes: String = routed
+        .iter()
+        .map(|(route, count)| format!(" {route}={count}"))
+        .collect();
+    let report: String = open
+        .iter()
+        .map(|item| {
+            format!(
+                "\n  {}:{}\n      {}::{}: {}\n      row:       {}  (resolved by: {})\n      arm:       {} holds {}\n",
+                item.file,
+                item.line,
+                item.write_set,
+                item.field,
+                item.ty,
+                item.row,
+                item.resolved_by,
+                item.arm,
+                item.authority
+            )
+        })
+        .collect();
+    assert!(
+        open.is_empty(),
+        "LAW C. Each obligation below is a compare-and-set required BY VALUE whose row \
+         no surface in these crates yields under an authority that arm of the write can \
+         hold. The caller must invent the value or reach for an authority nothing says \
+         it may hold. Add a read under the arm's own authority or the read twin it \
+         subsumes, add the reconciliation twin of an existing read, put the row in the \
+         subject the reconciler is handed -- or, if the arm is genuinely off this axis, \
+         say so on the member and say why.\
+         \n(judged {total} obligations; discharged by{routes}){report}"
     );
 }

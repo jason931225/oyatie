@@ -96,8 +96,22 @@ pub trait TransferExecutionStore: Send + Sync {
         operation: &'a crate::BindingOperationKey,
     ) -> BoxTenancyFuture<'a, Result<Option<TransferExecutionLedgerV1>, BindingStoreError>>;
 
-    /// Reads one transfer-execution item row by its issuance address, under the
-    /// SAME ordinary authority the issue, publish and outcome writes take.
+    /// Reads one transfer-execution item row by its issuance address, under
+    /// [`BindingReadAuthorityV1`] -- the read authority a holder of the
+    /// [`crate::BindingPersistenceAuthorityV1`] that `issue_permit`, `publish_permit`
+    /// and `record_outcome` take DERIVES from
+    /// [`crate::BindingPersistenceAuthorityV1::read_authority`].
+    ///
+    /// An earlier version of this sentence said "the SAME ordinary authority the
+    /// issue, publish and outcome writes take", and that was false of the types
+    /// as written: those three take `BindingPersistenceAuthorityV1` and this
+    /// takes `BindingReadAuthorityV1`, two distinct newtypes; and
+    /// [`crate::VerifiedBindingInvocation`] is not `Clone` while both `into_*`
+    /// constructors consume `self`, so one verified invocation minted exactly
+    /// one of the two. Deriving the second silently meant re-verifying the
+    /// caller's own invocation inside the service, which no doc described. The
+    /// premise is true now because the ordering is stated in types; it was not
+    /// true when it was written.
     ///
     /// `None` MEANS THE STORE LOOKED AND FOUND NO ITEM ROW for that address: no
     /// permit has been issued for that effect. `Some` carries the row's current
@@ -118,8 +132,10 @@ pub trait TransferExecutionStore: Send + Sync {
     /// `BindingReconciliationReadAuthorityV1` PLUS a reconciliation lease. The
     /// ordinary outcome path would have had to restate store-derived values the
     /// publish write set forbids it from restating, or take out a lease the same
-    /// doc says that path must not hold. This read is the third option, and it
-    /// adds no new authority.
+    /// doc says that path must not hold. This read is the third option, and the
+    /// authority it adds is one the write's own authority already subsumes --
+    /// which is a weaker and true claim than the "adds no new authority" this
+    /// sentence used to make.
     ///
     /// Second,
     /// [`crate::TenancyMigrationCoordinationService::get_transfer_execution_permit`]

@@ -214,6 +214,14 @@ impl CellControlPersistenceAuthorityV1 {
     pub fn invocation(&self) -> &SignedCellControlInvocationV1 {
         &self.0
     }
+
+    /// Derives the READ authority this write authority subsumes. The ordering
+    /// and the reason it had to be said in types are stated once, on
+    /// [`crate::PlacementPersistenceAuthorityV1::read_authority`]; this is the same rule
+    /// on this axis.
+    pub fn read_authority(&self) -> Result<CellControlReadAuthorityV1, ProofVerificationError> {
+        Err(ProofVerificationError::NotImplemented)
+    }
 }
 
 impl CellControlReadAuthorityV1 {

@@ -239,8 +239,9 @@ impl SourceReleasePublicationWriteSetV1 {
 /// `None` means the observer looked and found NO committed issuance for that
 /// operation. It is an outcome, not a failure, and it is the fact that
 /// separates "never durably committed" from "committed, reply lost". A `None`
-/// that DISAGREES with a store read reporting a record is a REFUSAL, never a
-/// quiet fallback to "nothing was committed".
+/// that DISAGREES with [`MigrationReleaseStore::load_release_issuance`]
+/// reporting a record is a REFUSAL, never a quiet fallback to "nothing was
+/// committed".
 ///
 /// THE PROOF DOMAIN IS NEW, NOT RENAMED. `BindingProofDomainV1` tag 26 named a
 /// signed statement the STORE made about its own write. This is a different
@@ -283,6 +284,37 @@ pub trait MigrationReleaseStore: Send + Sync {
         &'a self,
         write_set: &'a crate::MigrationReleaseWriteSetV1,
     ) -> BoxTenancyFuture<'a, Result<SourceReservationReleaseIssuanceRecordV1, BindingStoreError>>;
+
+    /// Re-reads the source-reservation release issuance row by operation key,
+    /// under the SAME ordinary read authority a
+    /// [`BindingPersistenceAuthorityV1`] holder derives from
+    /// [`BindingPersistenceAuthorityV1::read_authority`].
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO ISSUANCE ROW for that
+    /// operation: no release has been durably committed. That is the fact that
+    /// separates "never durably issued" from "issued, reply lost", and it is
+    /// not an authorization refusal — that is on the error channel.
+    ///
+    /// WHY IT IS NOT THE OBSERVER. `SourceReleasePublicationWriteSetPartsV1::issuance_precondition`
+    /// is required by value, and the `Request` arm holds a
+    /// [`BindingPersistenceAuthorityV1`]. Before this read the only surfaces
+    /// yielding the row were the write's own return — gone after a lost reply —
+    /// and [`MigrationReleaseStore::load_committed_release_issuance`], gated on
+    /// a reconciliation authority AND a reconciliation lease the request path
+    /// must not hold. The commit observer is not a substitute: like the
+    /// transfer lane's, its claim carries the values AS OF THE COMMIT, and the
+    /// publication compare-and-set is on the row's CURRENT revision, status and
+    /// record digest. That is the same reason
+    /// [`crate::TransferExecutionStore::load_item`] was added beside
+    /// [`crate::TransferExecutionCommitObserver`] rather than instead of it.
+    fn load_release_issuance<'a>(
+        &'a self,
+        authority: &'a BindingReadAuthorityV1,
+        operation: &'a BindingOperationKey,
+    ) -> BoxTenancyFuture<
+        'a,
+        Result<Option<SourceReservationReleaseIssuanceRecordV1>, BindingStoreError>,
+    >;
 
     fn load_committed_release_issuance<'a>(
         &'a self,

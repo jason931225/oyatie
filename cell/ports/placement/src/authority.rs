@@ -122,6 +122,36 @@ impl PlacementPersistenceAuthorityV1 {
     pub fn invocation(&self) -> &SignedPlacementInvocationV1 {
         &self.0
     }
+
+    /// Derives the READ authority this write authority subsumes.
+    ///
+    /// THE ORDERING, STATED ONCE. A persistence authority and its read twin are
+    /// two newtypes over the SAME verified invocation. Persistence subsumes
+    /// read: a party authorized to change a row is authorized to look at it.
+    /// The converse never holds, and that is the whole point of the two types —
+    /// a read-authorized invocation still cannot reach a write path by type.
+    ///
+    /// WHY IT HAD TO BE SAID IN TYPES. Sixty-five of the ninety
+    /// precondition/authority obligations in these two crates discharge ONLY
+    /// through this step: a write set requires a compare-and-set value by
+    /// value, and the only surface yielding that value takes the read twin of
+    /// the authority the write itself holds. Without this method the caller's
+    /// options were to re-verify its own invocation a second time to mint the
+    /// other authority — a step no doc in either crate describes — or to invent
+    /// the value. `VerifiedPlacementInvocation` is not `Clone` and both
+    /// `into_*` constructors consume `self`, so one invocation mints exactly
+    /// one authority; that is what made "a read exists" insufficient.
+    ///
+    /// THIS DOES NOT PUT READS BEHIND WRITE AUTHORITY. A read-only caller still
+    /// obtains [`PlacementReadAuthorityV1`] directly from
+    /// [`VerifiedPlacementInvocation::into_read_authority`]. This says only that
+    /// a writer may read, in one direction, and it is not a licence for a read
+    /// surface to DEMAND a persistence authority.
+    pub fn read_authority(
+        &self,
+    ) -> Result<PlacementReadAuthorityV1, PlacementInvocationVerificationError> {
+        Err(PlacementInvocationVerificationError::NotImplemented)
+    }
 }
 
 impl PlacementReadAuthorityV1 {

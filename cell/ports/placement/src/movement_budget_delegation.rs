@@ -70,6 +70,31 @@ pub trait MovementBudgetDelegationStore: Send + Sync {
         scope: &'a MovementBudgetScopeV1,
     ) -> BoxCellFuture<'a, Result<Option<MovementBudgetAuthorityStateV1>, PlacementContractError>>;
 
+    /// The reconciliation-authority twin of
+    /// [`MovementBudgetDelegationStore::get_authority_state`]. `None` asserts
+    /// the same thing.
+    ///
+    /// WHY IT EXISTS. [`crate::MovementBudgetSettlementWriteSetPartsV1::leaf_authority_precondition`]
+    /// is required by value and its write takes a
+    /// [`crate::PlacementReconciliationPersistenceAuthorityV1`]. The ordinary
+    /// [`MovementBudgetDelegationStore::get_authority_state`] takes
+    /// [`PlacementReadAuthorityV1`], which a RECONCILIATION authority does not
+    /// subsume: the two are newtypes over different signed invocations
+    /// ([`crate::SignedPlacementInvocationV1`] and
+    /// [`crate::SignedReconciliationInvocationV1`]), so the persistence-subsumes-read
+    /// ordering stated on [`crate::PlacementPersistenceAuthorityV1::read_authority`]
+    /// does not cross the two families. Nor does the reconciler get the row in
+    /// the subject it is handed: [`crate::CellReconciliationSubjectV1`] does not
+    /// reach [`MovementBudgetAuthorityStateV1`] by any transitive route. This
+    /// twin is the same remedy `TransferExecutionStore::get_ledger_for_reconciliation`
+    /// is for its lane.
+    fn get_authority_state_for_reconciliation<'a>(
+        &'a self,
+        authority: &'a crate::PlacementReconciliationReadAuthorityV1,
+        partition: &'a MovementBudgetAuthorityPartition,
+        scope: &'a MovementBudgetScopeV1,
+    ) -> BoxCellFuture<'a, Result<Option<MovementBudgetAuthorityStateV1>, PlacementContractError>>;
+
     fn get_delegation<'a>(
         &'a self,
         authority: &'a PlacementReadAuthorityV1,
