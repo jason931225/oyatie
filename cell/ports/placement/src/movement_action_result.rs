@@ -78,8 +78,10 @@ pub struct MovementActionClosureCommitExpectationV1 {
 /// This is a CLAIM, not evidence: only
 /// [`verify_committed_movement_action_closure`] turns it into the private-field
 /// [`VerifiedCommittedMovementActionClosure`]. It is produced by
-/// [`MovementActionClosureCommitObserver`] and NEVER by the store that performed
-/// the commit.
+/// [`MovementActionClosureCommitObserver`], and a conforming deployment does not
+/// let the store that performed the commit hold that role. The types state the
+/// separation; they do not enforce it - see [`MovementActionResultAuthority`]
+/// for why, which applies to every verifier on this path.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommittedMovementActionClosureClaimV1 {
     pub closure: MovementActionClosureV1,
@@ -248,10 +250,11 @@ pub struct SignedMovementActionResultCommitObservationV1 {
 /// This is a CLAIM, not evidence: only
 /// [`verify_committed_movement_action_result`] turns it into the private-field
 /// [`VerifiedCommittedMovementActionResult`]. It is produced by
-/// [`MovementActionResultCommitObserver`] and NEVER by the store that performed
-/// the commit - the same rule
-/// [`CommittedMovementActionClosureClaimV1`] states, now obeyed by the result
-/// path as well as the closure path.
+/// [`MovementActionResultCommitObserver`], and a conforming deployment does not
+/// let the store that performed the commit hold that role - the same rule
+/// [`CommittedMovementActionClosureClaimV1`] states, obeyed by the result path
+/// as well as the closure path. It is a deployment obligation either way; see
+/// [`MovementActionResultAuthority`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommittedMovementActionResultClaimV1 {
     pub result: MovementActionResultV1,
@@ -325,9 +328,23 @@ pub trait MovementActionResultCommitObserver: Send + Sync {
 
 /// Mints the published movement-action result signature.
 ///
-/// Its only argument is a private-field verified wrapper, so a signature cannot
-/// be produced from an unverified claim, and in particular cannot be produced by
-/// the storage adapter that performed the write.
+/// Its only argument is a private-field verified wrapper, so the wrapper must
+/// have come from [`verify_committed_movement_action_result`] rather than being
+/// constructed by the caller.
+///
+/// THAT IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL REFUSAL, and an earlier
+/// version of this doc claimed otherwise. The private field refuses DIRECT
+/// construction and nothing else. [`CellProofVerifier`] is a public trait and
+/// every `verify_*` here takes it as `&dyn`, so one out-of-crate component may
+/// implement the verifier and this authority together and mint a wrapper by
+/// handing itself in as the judge of authenticity. Nothing in these types
+/// prevents that.
+///
+/// What keeps the checker separate from the checked is therefore the
+/// DEPLOYMENT: the verifier implementation, the observer and the storage
+/// adapter must be distinct trust domains with distinct signing identities.
+/// These contracts express who is SUPPOSED to hold which role and give a
+/// conforming deployment the shape to enforce; they do not enforce it.
 pub trait MovementActionResultAuthority: Send + Sync {
     fn sign_committed<'a>(
         &'a self,
