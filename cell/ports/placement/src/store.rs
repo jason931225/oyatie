@@ -10,6 +10,16 @@ use crate::{
     SignedReservationCommitPermitV1, TenantId, VerifiedCellCapacityLedgerV1,
 };
 
+/// The durable record of one reservation's external effect.
+///
+/// THIS ROW HAS NO WIRE FORM, deliberately. It is proposed as a successor by
+/// [`CellReservationWriteSetPartsV1`] and there is no `message` for it in
+/// `cell/placement/v1`, so the ownership rule an adapter reads on the wire
+/// cannot reach it: the rule is stated for messages, and this is not one. What
+/// binds it instead is the Rust contract on the write set that carries it,
+/// together with [`crate::PlacementContractError::Conflict`], the same refusal
+/// the wire rule names. A successor row with no message is recorded here rather
+/// than left for a sweep to discover as an unmapped name.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellReservationEffectRecordV1 {
     pub operation: PlacementOperationKey,

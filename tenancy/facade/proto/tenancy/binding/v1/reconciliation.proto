@@ -12,6 +12,18 @@ import "tenancy/binding/v1/source_release_issuance.proto";
 import "tenancy/binding/v1/work_snapshot.proto";
 import "tenancy/identity/v1/identity.proto";
 
+// Messages in this file that a write set names as a proposed successor are
+// governed by the ownership rule stated at the head of
+// tenancy/binding/v1/serving_authority.proto: the store derives every value it
+// owns and refuses a disagreeing proposal, and the scope is every owner-owned
+// or store-derived value a proposal restates -- a field, a nested record or a
+// whole row -- not a list.
+//
+// The refusal an adapter must raise is part of the rule and is restated here so
+// this pointer is not half of it: ServingAuthorityStoreError
+// PROPOSED_SUCCESSOR_MISMATCH on the serving-authority store, and
+// BindingStoreError PROPOSED_SUCCESSOR_MISMATCH on the binding store.
+
 enum BindingReconciliationWorkClassV1 {
   BINDING_RECONCILIATION_WORK_CLASS_V1_UNSPECIFIED = 0;
   BINDING_RECONCILIATION_WORK_CLASS_V1_UNSETTLED_RESERVATION_ATTEMPT = 1;

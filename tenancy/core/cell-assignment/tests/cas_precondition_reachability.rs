@@ -1691,3 +1691,259 @@ fn every_by_value_precondition_is_readable_under_its_own_authority() {
          \n(judged {total} obligations; discharged by{routes}){report}"
     );
 }
+
+// ============================================================================
+// THE WIRE HALF, executable: a proposed successor row's message must not be bare.
+//
+// THE RULE. `cell/placement/v1/movement_authority.proto` and
+// `tenancy/binding/v1/serving_authority.proto` each state, at file scope, that a
+// caller may PROPOSE an advanced row and the store DERIVES every value it owns
+// and REFUSES a disagreeing proposal. Every OTHER file holding a message a write
+// set names as a proposed successor must carry a pointer back to the rule head
+// for its package, and that pointer must restate the refusal, because a pointer
+// that names no refusal is half a rule.
+//
+// WHY IT IS A TEST AND NOT AN INVARIANT. The check this replaces was: the files
+// naming a refusal are exactly the files carrying the pointer, plus the rule
+// head. That is a consistency check over the ALREADY-COVERED set. Adding a
+// zero-comment file changes neither list, so it accepts and does not gate, and
+// two zero-comment files holding successor rows -- `work_snapshot.proto`, whose
+// `BindingWorkSnapshotProgressV1` is proposed as `next`, and
+// `write_authority_consumer.proto`, which declares the transition record itself
+// as `{previous, next}` -- passed it while carrying no comment at all.
+//
+// THE POPULATION IS DERIVED FROM THE RUST, NOT FROM THE PROTO. A sweep over
+// proto files can only ever re-find the files it already knows about. This one
+// starts from the write sets: every record a `*WriteSetPartsV1` carries as a
+// bare member under a name that is `next` or `next_*`, or that a precondition on
+// the SAME write set resolves to -- a compare-and-set is how a write advances a
+// row -- is a proposed successor. Two routes, because either alone is a key: the
+// name route missed `next_capacity` behind a `Verified*` wrapper, and the
+// precondition route misses a row advanced with no compare-and-set.
+//
+// A `Verified*` next-state member IS a successor here, even though Law A
+// excludes it from its row population. The two exclusions answer different
+// questions: Law A asks who can create the row first and a minted wrapper has a
+// verifier for that, while the wire asks who OWNS the values in the message,
+// and the message is the same message either way. `CellCapacityLedgerV1`,
+// proposed as `next_capacity: VerifiedCellCapacityLedgerV1`, is the instance.
+//
+// EVERY ROW MUST MAP TO A MESSAGE OR SAY WHY NOT. An unmapped name is not
+// skipped: it fails, unless the row's own Rust declaration says it has no wire
+// form. `CellReservationEffectRecordV1` is that case and says so.
+
+fn proto_files() -> Vec<PathBuf> {
+    let root = repo_root();
+    let mut out = Vec::new();
+    for relative in [
+        "cell/facade/proto/cell/placement/v1",
+        "tenancy/facade/proto/tenancy/binding/v1",
+    ] {
+        let directory = root.join(relative);
+        let mut entries: Vec<PathBuf> = fs::read_dir(&directory)
+            .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+            .map(|entry| entry.expect("dir entry").path())
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "proto")
+            })
+            .collect();
+        entries.sort();
+        assert!(
+            !entries.is_empty(),
+            "no protos under {} -- the sweep would certify a zero it never looked for",
+            directory.display()
+        );
+        out.extend(entries);
+    }
+    out
+}
+
+/// The rows a write set names as a proposed successor.
+fn proposed_successor_rows(model: &Model) -> BTreeSet<String> {
+    let sweep = sweep(model);
+    let mut out = BTreeSet::new();
+    for (name, declaration) in &model.structs {
+        if !write_set_parts(name) {
+            continue;
+        }
+        for field in &declaration.fields {
+            if is_precondition_field(&field.name) {
+                continue;
+            }
+            let bare = unwrap_container(&field.ty);
+            if bare.ends_with("PreconditionV1") || bare.starts_with("Signed") {
+                continue;
+            }
+            // A minted wrapper on the wire is the record it wraps.
+            let row = bare.strip_prefix("Verified").unwrap_or(&bare).to_owned();
+            if (field.name == "next" || field.name.starts_with("next_"))
+                && (model.structs.contains_key(&row) || model.structs.contains_key(&bare))
+            {
+                out.insert(row);
+            }
+        }
+        for field in &declaration.fields {
+            if !is_precondition_field(&field.name) {
+                continue;
+            }
+            for resolution in resolve(name, field, &sweep.rows, model) {
+                let advanced = declaration.fields.iter().any(|sibling| {
+                    !is_precondition_field(&sibling.name)
+                        && unwrap_container(&sibling.ty) == resolution.row
+                });
+                if advanced {
+                    out.insert(resolution.row);
+                }
+            }
+        }
+    }
+    out
+}
+
+const RULE_HEAD: &str = "OWNERSHIP OF PROPOSED SUCCESSOR ROWS";
+const PROJECTING_HEAD: &str = "THE PROJECTING SIDE OF THE OWNERSHIP RULE";
+const POINTER: &str = "governed by the ownership rule stated at the head of";
+
+#[test]
+fn the_wire_ownership_sweep_discriminates_before_it_certifies() {
+    let root = repo_root();
+    let model = parse(&wave_source_files(), &root);
+    let rows = proposed_successor_rows(&model);
+    assert!(
+        rows.len() > 20,
+        "only {} proposed successor rows were found -- the sweep is not reading the write sets",
+        rows.len()
+    );
+    // Both routes are load-bearing, and each is checked with a case the other
+    // misses.
+    assert!(
+        rows.contains("CellCapacityLedgerV1"),
+        "the name route must see a successor behind a `Verified*` wrapper, which \
+         Law A's row population deliberately excludes"
+    );
+    assert!(
+        rows.contains("BindingWorkSnapshotProgressV1"),
+        "the row proposed as exactly `next` must be in the population -- a `next_*` \
+         glob missed five of these in an earlier sweep"
+    );
+    assert!(
+        rows.contains("CapabilityWriteAuthorityStateV1"),
+        "the row whose own wire message declares the transition as `{{previous, next}}`"
+    );
+    // And a thing that is emphatically not a successor row stays out.
+    assert!(
+        !rows.contains("BindingIdempotencyRecordV1"),
+        "an idempotency record is not a proposed successor"
+    );
+
+    // The rule heads exist and are found by the same text the check keys on.
+    let heads: Vec<PathBuf> = proto_files()
+        .into_iter()
+        .filter(|path| {
+            let text = fs::read_to_string(path).expect("read proto");
+            text.contains(RULE_HEAD)
+        })
+        .collect();
+    assert_eq!(
+        heads.len(),
+        2,
+        "expected exactly two rule heads, one per package, found {heads:?}"
+    );
+}
+
+#[test]
+fn every_proposed_successor_message_carries_the_ownership_rule() {
+    let root = repo_root();
+    let model = parse(&wave_source_files(), &root);
+    let rows = proposed_successor_rows(&model);
+
+    let mut declares: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
+    let mut covered: BTreeMap<PathBuf, bool> = BTreeMap::new();
+    for path in proto_files() {
+        let text = fs::read_to_string(&path).expect("read proto");
+        covered.insert(
+            path.clone(),
+            text.contains(RULE_HEAD) || text.contains(PROJECTING_HEAD) || text.contains(POINTER),
+        );
+        for line in text.lines() {
+            if let Some(rest) = line.strip_prefix("message ") {
+                let name: String = rest
+                    .chars()
+                    .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+                    .collect();
+                declares.entry(name).or_default().push(path.clone());
+            }
+        }
+    }
+
+    let mut unmapped = Vec::new();
+    let mut bare = BTreeMap::new();
+    for row in &rows {
+        // A Rust type with no exact-name twin is the shape a by-name mapping is
+        // blindest to: `TenantCellBinding` is `TenantCellBindingV1` on the wire.
+        // Try the version suffix in both directions before declaring a row
+        // unmapped, and FAIL rather than skip if none of the three resolves.
+        let sites = declares.get(row).or_else(|| {
+            declares
+                .get(&format!("{row}V1"))
+                .or_else(|| row.strip_suffix("V1").and_then(|stem| declares.get(stem)))
+        });
+        let Some(sites) = sites else {
+            // A row with no message must SAY it has no wire form, on its own
+            // declaration. Silence is a finding; a sentence is a contract.
+            let says_so = model.structs.get(row).is_some_and(|declaration| {
+                declaration
+                    .doc
+                    .to_ascii_lowercase()
+                    .contains("no wire form")
+            });
+            if !says_so {
+                unmapped.push(row.clone());
+            }
+            continue;
+        };
+        for site in sites {
+            if !covered[site] {
+                bare.entry(site.clone())
+                    .or_insert_with(Vec::new)
+                    .push(row.clone());
+            }
+        }
+    }
+
+    let unmapped_report: String = unmapped
+        .iter()
+        .map(|row| format!("\n  {row}  -- no `message` in either package"))
+        .collect();
+    assert!(
+        unmapped.is_empty(),
+        "THE WIRE HALF, coverage. Each row below is named as a proposed successor by a \
+         write set and has no `message` in either proto package, so no wire statement can \
+         govern it and this sweep cannot judge it. Add the message, or say on the row's \
+         own declaration that it has NO WIRE FORM and what binds it instead.\
+         {unmapped_report}"
+    );
+
+    let bare_report: String = bare
+        .iter()
+        .map(|(path, rows)| {
+            format!(
+                "\n  {}\n      holds: {}\n",
+                path.strip_prefix(&root).unwrap_or(path).display(),
+                rows.join(", ")
+            )
+        })
+        .collect();
+    assert!(
+        bare.is_empty(),
+        "THE WIRE HALF. Each file below holds a message a write set names as a PROPOSED \
+         SUCCESSOR and carries neither the ownership rule nor a pointer to it. An adapter \
+         author reads this schema to learn who owns each value and would have to resolve \
+         it alone. Add the pointer, and restate the refusal in it: a pointer that names no \
+         refusal is half a rule.\
+         \n(judged {} proposed successor rows over {} proto files){bare_report}",
+        rows.len(),
+        covered.len()
+    );
+}

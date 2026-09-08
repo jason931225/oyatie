@@ -3,11 +3,46 @@ syntax = "proto3";
 package cell.placement.v1;
 
 // The boundary imports Cell proof types and Tenancy identity only. There is
-// deliberately no tenancy/binding import: Tenancy owns binding generation,
-// revision, epoch and incarnation, and Cell carries an immutable projection of
-// them rather than a reverse dependency on their wire package.
+// deliberately no tenancy/binding import: Cell depends on Tenancy's identity
+// package and never on its binding package, so the projection cannot become a
+// reverse dependency.
 import "cell/placement/v1/proof.proto";
 import "tenancy/identity/v1/identity.proto";
+
+// THE PROJECTING SIDE OF THE OWNERSHIP RULE -- THE RULE FOR EVERY OWNER-ASSIGNED
+// VALUE ANY MESSAGE IN THIS FILE CARRIES.
+//
+// tenancy/binding/v1/serving_authority.proto and
+// cell/placement/v1/movement_authority.proto state the OWNING side: the store
+// that owns a row derives every value it owns and refuses a disagreeing
+// proposal. This file is the other half, and the two are pointed at each other,
+// so this statement has to carry the rule rather than gesture at it.
+//
+// THE SCOPE IS EVERY OWNER-ASSIGNED VALUE THAT APPEARS HERE, WHETHER A FIELD, A
+// NESTED RECORD, OR A WHOLE ROW -- AND NOT A LIST. Binding generation, binding
+// revision, write-authority epoch and serving incarnation are EXAMPLES of the
+// shape, NOT its extent: this sentence was for one round scoped by enumerating
+// exactly those four, which is the species the owning side's rule was rewritten
+// to stop being, and a refusal scoped by enumeration leaves everything not
+// enumerated bare.
+//
+// CELL COMPARES AGAINST EVERY SUCH VALUE AND NEVER ALLOCATES OR INCREMENTS ONE.
+// "Immutable projection" alone drops the comparison, which is the half an
+// adapter has to perform. Cell reads the value the owner assigned, checks the
+// value it was handed against it, and refuses on disagreement; it never
+// originates one and never advances one.
+//
+// The refusals an adapter must raise are part of the rule:
+// CapabilityEffectErrorV1 AuthorityContextMismatch for an owner-assigned value
+// that disagrees, and RelationMismatch for a projected record whose identity
+// does not match the scope it was presented under. That enum is NOT on the wire
+// -- it lives at cell/ports/placement capability_effect.rs -- and the names are
+// given here for the same reason the owning side gives its own: so an adapter
+// persisting these messages knows which refusal to raise. The field-by-field
+// statement of which refusal covers which value is on the Rust side at
+// LocalEffectCommitRequestV1::next_state and ::next_rejection_high_water, whose
+// carrier is generic over the capability's native effect type and so has no
+// message here to hang it on.
 
 enum CapabilityEffectActionV1 {
   CAPABILITY_EFFECT_ACTION_V1_UNSPECIFIED = 0;
