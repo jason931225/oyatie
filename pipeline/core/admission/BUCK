@@ -60,6 +60,20 @@ rust_test(
 )
 
 rust_test(
+    name = "pipeline-admission-test-sourced-bin",
+    srcs = ["tests/test_sourced_bin.rs"],
+    crate = "pipeline_admission_test_sourced_bin",
+    crate_root = "tests/test_sourced_bin.rs",
+    env = _CARGO_ENV,
+    visibility = ["PUBLIC"],
+    deps = [
+        ":pipeline-admission",
+        "third-party//:toml",
+        "//pipeline/core/workspace-members-kernel:workspace-members-kernel",
+    ],
+)
+
+rust_test(
     name = "pipeline-admission-dependency-declarations-package",
     srcs = ["tests/dependency_declarations_package.rs"],
     crate = "pipeline_admission_dependency_declarations_package",

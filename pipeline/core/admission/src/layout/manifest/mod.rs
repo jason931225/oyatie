@@ -1,6 +1,7 @@
 //! Cargo identity checks for changed manifests. Provenance: ADR-0719 D-30/D-41.
 
 mod entrypoint;
+mod test_sourced;
 
 pub use entrypoint::{
     cargo_entrypoint, cargo_entrypoints, cargo_manifest_for_crate_path,
@@ -72,13 +73,7 @@ pub fn cargo_manifest_violations(path: &str, contents: &str) -> Vec<String> {
             "{path}: `[lib].path` must be `src/lib.rs`, got `{lib_path}`"
         ));
     }
-    for target in ["bin", "example", "bench", "test"] {
-        if manifest.get(target).is_some() {
-            violations.push(format!(
-                "{path}: explicit `[[{target}]]` targets bypass the canonical face entry point"
-            ));
-        }
-    }
+    test_sourced::explicit_target_violations(path, &manifest, &mut violations);
     let package = manifest.get("package");
     // A facade may root at either `src/main.rs` or `src/lib.rs`, so BOTH
     // discovery switches guard a canonical target for it. Checking only
