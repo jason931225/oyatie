@@ -7,6 +7,13 @@ import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/binding/v1/binding_control_contribution.proto";
 import "tenancy/binding/v1/binding_control_contribution_ack.proto";
 
+// Messages in this file that a write set names as a proposed successor are
+// governed by the ownership rule stated at the head of
+// tenancy/binding/v1/serving_authority.proto: the store derives every value it
+// owns and refuses a disagreeing proposal, and the scope is every owner-owned
+// or store-derived value a proposal restates -- a field, a nested record or a
+// whole row -- not a list.
+
 message BindingControlContributionHandoffPayloadV1 {
   uint32 schema_version = 1;
   CommittedBindingControlContributionClaimV1 committed = 2;

@@ -1,7 +1,8 @@
 //! Deployment qualification of a capability adapter for the effect boundary.
 //!
-//! Acceptance is signed by an admitted qualification authority, never by the
-//! adapter reporting on itself. A Rust type shape is not atomicity evidence;
+//! Acceptance is signed by an admitted qualification authority, and a
+//! conforming deployment does not let the adapter report on itself. These types
+//! state who holds the role; they do not enforce it. A Rust type shape is not atomicity evidence;
 //! only exercised conformance against the exact binary, configuration, schema
 //! and transaction domain is.
 

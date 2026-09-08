@@ -188,8 +188,11 @@ pub trait RebalanceSourceStore: Send + Sync {
         write: &'a RebalanceProgressWriteSetV1,
     ) -> BoxCellFuture<'a, Result<RebalanceJobV1, PlacementContractError>>;
     /// Durably closes the action and returns the closure record it now holds.
-    /// It returns NO attestation and NO signature: a store cannot witness its
-    /// own write. See [`MovementActionClosureCommitObserver`].
+    /// It returns NO attestation and NO signature, which is clause (b) in the
+    /// signature: a store must not witness its own write. The attestation comes
+    /// from [`MovementActionClosureCommitObserver`], a separate port, and
+    /// keeping the two roles in separate components is the deployment's job —
+    /// see [`crate::MovementActionResultAuthority`].
     fn close_action<'a>(
         &'a self,
         write: &'a RebalanceClosureWriteSetV1,

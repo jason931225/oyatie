@@ -7,6 +7,13 @@ import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/binding/v1/write_authority.proto";
 import "tenancy/binding/v1/serving_authority_freeze.proto";
 
+// Messages in this file that a write set names as a proposed successor are
+// governed by the ownership rule stated at the head of
+// tenancy/binding/v1/serving_authority.proto: the store derives every value it
+// owns and refuses a disagreeing proposal, and the scope is every owner-owned
+// or store-derived value a proposal restates -- a field, a nested record or a
+// whole row -- not a list.
+
 message ServingAuthorityUninstalledPreconditionV1 {
   ServingAuthorityInstanceV1 instance = 1;
   // Absent only when the store looked and found no row for this partition and
@@ -74,14 +81,16 @@ message WriteAuthorityLeaseIssuancePreconditionV1 {
   Digest32 record_digest = 4;
 }
 
-message PublishWriteAuthorityLeaseRequestV1 {
-  ServingAuthorityInstanceV1 instance = 1;
-  BindingOperationKeyV1 operation = 2;
-  Digest32 lease_digest = 3;
-  WriteAuthorityLeaseIssuancePreconditionV1 expected_issuance = 4;
-  string idempotency_key = 5;
-  Digest32 canonical_request_digest = 6;
-}
+// PublishWriteAuthorityLeaseRequestV1 was declared here and removed. It had no
+// consumer on either surface: no Rust method took the struct, and no service in
+// any .proto declared a publish RPC. Write-authority lease publication is
+// worker-driven, not RPC-driven - WriteAuthorityLeasePublicationWriteSetPartsV1
+// requires a ServingAuthorityPublicationLeaseV1, the reconciliation store
+// supplies list_pending, get_publication_lease and claim, and the refusal
+// speaks of another worker - so a caller-facing publish request is a shape the
+// control/cell split left behind, not a request the reconciler path will send.
+// Minting a wire message for it put a schema ahead of the read/write authority
+// axis that has still to be designed for that path.
 
 message WriteAuthorityLeasePublicationResultV1 {
   PublishedWriteAuthorityLeaseV1 published = 1;

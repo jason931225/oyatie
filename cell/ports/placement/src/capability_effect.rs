@@ -357,14 +357,23 @@ pub struct CapabilityAuthorityRejectionHighWaterV1 {
 /// `ServingAuthorityRejectionHighWaterV1` in the binding crate, each of which
 /// is public-field with no validating constructor.
 ///
-/// That is the majority shape and not the only one. Of the durable
-/// compare-and-set records across both crates -- counted structurally, as
-/// those carrying both a `revision` and a `record_digest`, because a sweep
-/// keyed on a name prefix would see only one shape -- 48 are public-field and
-/// 12 are private-field paired with a public `rehydrate` and a `*PartsV1`
-/// carrier. So this claim is parity with the named peers, including the direct
-/// counterpart of the rejection high water, and NOT a claim that every peer
-/// looks like this.
+/// THAT IS THE MAJORITY SHAPE AND NOT THE ONLY ONE. A minority of durable
+/// compare-and-set records across both crates are instead private-field, paired
+/// with a public `rehydrate` and a `*PartsV1` carrier. So the decision here is
+/// PARITY WITH THE NAMED PEERS, including the direct counterpart of the
+/// rejection high water, and NOT a claim about every peer.
+///
+/// NO CENSUS IS STATED, AND THAT IS DELIBERATE. This passage used to give two
+/// numbers for those two populations. Three independent readers produced three
+/// different pairs from it, because no document states the population being
+/// counted: whether a borrowed `*PartsRef` projection of a record already
+/// counted is itself a record, and whether the `*PartsV1` carriers belong in
+/// the public column while their records sit in the private one, decide the
+/// arithmetic and neither is written down anywhere. A count stated in prose is
+/// a claim that rots, and the invariant this doc needs -- parity with named
+/// peers, not a property of every peer -- is stated one sentence above and
+/// needs no number. The same removal was applied to the barrier census in
+/// `transfer_execution.rs` for the same reason.
 ///
 /// This type carries no signature and has no verifier: its integrity comes
 /// from the capability's own transaction, not from a check anyone could run on

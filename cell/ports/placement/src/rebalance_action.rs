@@ -218,8 +218,11 @@ pub struct SignedRebalanceInvocationIssuanceCommitObservationV1 {
 /// [`VerifiedCommittedRebalanceIssuance`], and only that wrapper reaches
 /// [`CellPlacementInvocationIssuer::sign_committed`].
 ///
-/// It is produced by [`RebalanceInvocationIssuanceCommitObserver`] and NEVER by
-/// the store that performed the commit. "Claim" here is the evidentiary sense;
+/// It is produced by [`RebalanceInvocationIssuanceCommitObserver`], and a
+/// conforming deployment does not let the store that performed the commit hold
+/// that role. That is a deployment obligation, not a type-level refusal; see
+/// [`crate::MovementActionResultAuthority`], which applies to every verifier on
+/// this path. "Claim" here is the evidentiary sense;
 /// it is unrelated to [`RebalanceJobClaimV1`], which is a worker's lease on a
 /// job. The crate already carries both senses.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -310,10 +313,12 @@ pub trait RebalanceSourceIssuanceStore: Send + Sync {
     /// Durably commits the invocation issuance and returns the record it now
     /// holds. It returns NO attestation and NO signature.
     ///
-    /// A store cannot witness its own write. The signed observation that a
+    /// A store must not witness its own write. The signed observation that a
     /// commit occurred comes from [`RebalanceInvocationIssuanceCommitObserver`],
-    /// which re-reads independently; the two are separate ports so that the same
-    /// component cannot both perform the write and vouch for it.
+    /// which re-reads independently, and the two are separate ports so that a
+    /// deployment CAN hold the write and the vouching apart. Nothing here makes
+    /// it: one out-of-crate type may implement both traits, and this signature
+    /// cannot tell. See [`crate::MovementActionResultAuthority`].
     fn commit_issuance<'a>(
         &'a self,
         write: &'a RebalanceSourceIssuanceWriteSetV1,

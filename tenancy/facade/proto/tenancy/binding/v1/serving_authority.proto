@@ -6,6 +6,40 @@ import "tenancy/binding/v1/proof.proto";
 import "cell/placement/v1/proof.proto";
 import "tenancy/identity/v1/identity.proto";
 
+// ===========================================================================
+// OWNERSHIP OF PROPOSED SUCCESSOR ROWS -- THE RULE FOR EVERY MESSAGE IN THIS
+// PACKAGE THAT A WRITE SET NAMES AS A SUCCESSOR.
+//
+// An adapter author reads this schema to learn who owns each value, and must
+// not resolve that independently. So it is stated here rather than left to the
+// Rust store ports, which is where it used to live alone.
+//
+// A caller may PROPOSE an advanced row in a write set. The store DERIVES every
+// value it owns and REFUSES a disagreeing proposal rather than persisting what
+// it was handed. A proposal is an assertion about where the record stands, not
+// authority to write.
+//
+// THE SCOPE IS EVERY OWNER-OWNED OR STORE-DERIVED VALUE A PROPOSAL RESTATES --
+// WHETHER A FIELD, A NESTED RECORD, OR A WHOLE ROW -- AND NOT A LIST. Revisions,
+// record digests, generations, epochs, fences, roots, counts, states and update
+// instants are EXAMPLES of the shape, NOT its extent. A refusal scoped by
+// enumeration leaves everything not enumerated bare, and this rule was for one
+// round scoped by enumerating four fields of ServingAuthorityInstanceV1 and for
+// another by naming one row.
+//
+// The refusals: ServingAuthorityStoreError PROPOSED_SUCCESSOR_MISMATCH on the
+// serving-authority store, and BindingStoreError PROPOSED_SUCCESSOR_MISMATCH on
+// the binding store, which mirrors it. Neither enum is on the wire; this
+// comment is what tells the adapter that persists these messages which values
+// are not its caller's to choose.
+//
+// The projecting side states its half of the same boundary at file scope in
+// cell/placement/v1/capability_effect.proto: Tenancy owns binding generation,
+// revision, epoch and incarnation, and Cell carries an immutable projection.
+// This is the owning side's half, and it is stated for the whole package rather
+// than for one message so that the asymmetry does not run backwards.
+// ===========================================================================
+
 message TenantControlPartitionRefV1 {
   tenancy.identity.v1.TenantId tenant_id = 1;
   string shard_id = 2;
@@ -36,10 +70,15 @@ message InstalledServingAuthorityV1 {
   Digest32 record_digest = 5;
 }
 
-// Owner-owned. A caller may propose an advanced row in a write set, but the
-// store derives it and refuses a disagreeing proposal
-// (ServingAuthorityStoreError PROPOSED_SUCCESSOR_MISMATCH). This is the row
-// stale-incarnation and rejected-installation are decided against.
+// One instance of the package-level ownership rule stated at the head of this
+// file, kept here for the extra fact it carries and NOT as a boundary: this is
+// the row stale-incarnation and rejected-installation are decided against, so a
+// proposal accepted unchecked could retire the membership that makes a replaced
+// incarnation distinguishable from its replacement, and every later comparison
+// would pass. The rule itself covers every message in this package, including
+// ServingAuthorityInstanceV1 and InstalledServingAuthorityV1 above; this
+// comment was for one round the only ownership statement on the wire, which was
+// the enumeration defect one level up.
 message ServingAuthorityRejectionHighWaterV1 {
   tenancy.identity.v1.TenantId tenant_id = 1;
   CellServingPartitionRefV1 partition = 2;

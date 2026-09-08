@@ -8,6 +8,13 @@ import "tenancy/binding/v1/proof.proto";
 import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/identity/v1/identity.proto";
 
+// Messages in this file that a write set names as a proposed successor are
+// governed by the ownership rule stated at the head of
+// tenancy/binding/v1/serving_authority.proto: the store derives every value it
+// owns and refuses a disagreeing proposal, and the scope is every owner-owned
+// or store-derived value a proposal restates -- a field, a nested record or a
+// whole row -- not a list.
+
 message CellBindingIndexSnapshotRequestV1 {
   string partition = 1;
   cell.placement.v1.CellId cell_id = 2;

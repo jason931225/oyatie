@@ -9,6 +9,13 @@ import "tenancy/binding/v1/serving_authority.proto";
 import "tenancy/binding/v1/serving_authority_installation.proto";
 import "tenancy/binding/v1/write_authority.proto";
 
+// Messages in this file that a write set names as a proposed successor are
+// governed by the ownership rule stated at the head of
+// tenancy/binding/v1/serving_authority.proto: the store derives every value it
+// owns and refuses a disagreeing proposal, and the scope is every owner-owned
+// or store-derived value a proposal restates -- a field, a nested record or a
+// whole row -- not a list.
+
 message ServingAuthorityFreezeIntentV1 {
   TenantControlPartitionRefV1 control_partition = 1;
   ServingAuthorityInstanceV1 instance = 2;

@@ -102,9 +102,18 @@ impl AuthorizedPreparationEffectIssuanceV1 {
 /// establish the current local fence or clock, fails closed.
 pub trait CapabilityInstalledEffectGrantIssuerV1: Send + Sync {
     /// Returns the raw signed grant, never a verified wrapper. The intended
-    /// implementer is an out-of-crate Tenancy adapter, which cannot construct
-    /// a private-field type; and a signer that returned its own evidence
-    /// would be attesting to its own output.
+    /// implementer is an out-of-crate Tenancy adapter, which cannot construct a
+    /// private-field type DIRECTLY, so returning one would leave
+    /// self-verification as the only implementable shape, which gates nothing;
+    /// and a signer that returned its own evidence would be attesting to its
+    /// own output.
+    ///
+    /// The word DIRECTLY is load-bearing and matches the two Tenancy ports
+    /// stating the same clause. An out-of-crate implementer can still obtain a
+    /// private-field wrapper by implementing [`crate::CellProofVerifier`] and
+    /// handing itself to a `verify_*`; the private field refuses direct
+    /// construction and nothing else. See
+    /// [`crate::MovementActionResultAuthority`].
     fn sign_installed<'a>(
         &'a self,
         issuance: &'a AuthorizedInstalledEffectIssuanceV1,

@@ -211,8 +211,11 @@ pub struct PromotionEconomicsCheckpointCommitObservationV1 {
 
 /// Signed under
 /// [`crate::CellProofDomainV1::PromotionEconomicsCheckpointCommitObservation`],
-/// by the observer port's own signing identity — NEVER by the store that
-/// performed the write.
+/// by the observer port's own signing identity, and a conforming deployment
+/// does not let the store that performed the write hold that role. The types
+/// state the separation; they do not enforce it — see
+/// [`crate::MovementActionResultAuthority`] for why, which applies to every
+/// verifier on this path.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignedPromotionEconomicsCheckpointCommitObservationV1 {
     pub payload: PromotionEconomicsCheckpointCommitObservationV1,
@@ -226,8 +229,10 @@ pub struct SignedPromotionEconomicsCheckpointCommitObservationV1 {
 /// This is a CLAIM, not evidence: only
 /// [`verify_promotion_economics_checkpoint`] turns it into the private-field
 /// [`VerifiedPromotionEconomicsCheckpoint`]. It is produced by
-/// [`PromotionEconomicsCheckpointCommitObserver`] and NEVER by the store that
-/// performed the commit.
+/// [`PromotionEconomicsCheckpointCommitObserver`], and a conforming deployment
+/// does not let the store that performed the commit hold that role. It is a
+/// deployment obligation, not a type-level refusal; see
+/// [`crate::MovementActionResultAuthority`].
 ///
 /// The observer returns the record it read together with its own observation,
 /// rather than the observation alone, for the reason the sibling rebalance
@@ -481,8 +486,13 @@ pub fn verify_promotion_economics_checkpoint_lease(
 /// verified next checkpoint.
 ///
 /// Private fields and no public assemble shortcut. Both members are
-/// private-field wrappers that only this module's verifiers mint, so a store
-/// cannot hand itself a write it did not earn.
+/// private-field wrappers this module's verifiers mint, so a store cannot
+/// assemble one by writing the values it wanted.
+///
+/// That is a refusal of DIRECT CONSTRUCTION and not of the role. A component
+/// that implements [`crate::CellProofVerifier`] alongside this store can still
+/// obtain both members by verifying its own claims; a conforming deployment is
+/// what keeps those two apart. See [`crate::MovementActionResultAuthority`].
 #[derive(Debug, Eq, PartialEq)]
 pub struct PromotionEconomicsCheckpointWriteV1 {
     lease: PromotionEconomicsCheckpointLeaseV1,
@@ -541,7 +551,20 @@ pub type PromotionEconomicsCheckpointAcquisitionV1 = (
 /// [`verify_promotion_economics_checkpoint`] or
 /// [`verify_promotion_economics_checkpoint_lease`]. A store that could return a
 /// verified wrapper could fabricate progress nothing checked; a store that
-/// cannot construct its own return type is simply unimplementable.
+/// cannot construct its own return type DIRECTLY is not implementable by
+/// returning one.
+///
+/// CLAUSE (a) IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL REFUSAL, and this
+/// heading used to state it without that caveat while the two Tenancy ports
+/// stating the identical clause carried it. [`crate::CellProofVerifier`] is a
+/// public trait and every `verify_*` here takes it as `&dyn`, so one
+/// out-of-crate component may implement the verifier and this store together
+/// and mint a wrapper by handing itself in as the judge of authenticity. The
+/// private field refuses direct construction and nothing else. What keeps the
+/// checker separate from the checked is the deployment; see
+/// [`crate::MovementActionResultAuthority`], and the two Tenancy statements of
+/// the same clause on `TransferExecutionPermitAuthority` and
+/// `WriteAuthorityLeaseAuthority`.
 ///
 /// (b) ONLY AN INDEPENDENT PORT, RE-READING BY LOOKUP KEY ALONE, SIGNS AN
 /// OBSERVATION OF A WRITE. Neither method returns a signature over its own
@@ -678,10 +701,13 @@ pub enum PromotionEconomicsVerificationStepOutcomeV1 {
 /// domain and checked against an expected producer and audience it cannot
 /// forge. Sealing this struct would add ceremony without adding a gate.
 ///
-/// The closure issuer holds its own ports by value from construction instead,
-/// because A3 requires its selection-relevant registry and policy to be fixed
-/// at admission. That difference is deliberate, not drift: one is a sealed
-/// long-lived issuer, the other a per-call collaborator set.
+/// The closure issuer holds its own ports by value from construction instead.
+/// That difference is deliberate, not drift: one is a long-lived issuer whose
+/// ports outlive any single request, the other a per-call collaborator set.
+/// Note that the issuer holds PORTS only — it no longer holds a registry or a
+/// policy, because selection-relevant values fixed at admission were fixed by
+/// whoever composed it; they are resolved per call through
+/// [`crate::CellPromotionEconomicsPolicySource`].
 pub struct PromotionEconomicsReplayPortsV1<'a> {
     /// Reads bounded pages of retained records from one admitted source.
     pub retained_input_reader: &'a dyn PromotionEconomicsRetainedInputReader,
@@ -689,8 +715,10 @@ pub struct PromotionEconomicsReplayPortsV1<'a> {
     /// signs nothing.
     pub checkpoint_store: &'a dyn PromotionEconomicsCheckpointStore,
     /// Independently re-reads a committed checkpoint by key and signs what it
-    /// found. Required to resume retained progress at all, since the store
-    /// deliberately cannot vouch for its own write.
+    /// found. Required to resume retained progress at all, because clause (b)
+    /// keeps the store out of the vouching role: `commit` returns a bare
+    /// record and signs nothing, so without this port there is no signature to
+    /// verify a resumed checkpoint against.
     pub checkpoint_observer: &'a dyn PromotionEconomicsCheckpointCommitObserver,
     /// Checks the signatures the replay depends on: each admitted source's
     /// finalization, and the observation backing a resumed checkpoint.

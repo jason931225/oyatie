@@ -221,8 +221,11 @@ pub trait CapabilityEffectReceiptCommitObserverV1: Send + Sync {
 }
 
 pub trait CapabilityEffectReceiptPublisherV1: Send + Sync {
-    /// Accepts only a verified committed observation, so a precommit signed
-    /// payload cannot be constructed through this API. Republication of the
+    /// Accepts only a verified committed observation, so this API cannot be
+    /// called with a precommit payload: the argument type has no other
+    /// inhabitant. WHERE THE WRAPPER CAME FROM is a separate question and a
+    /// deployment obligation — see [`crate::MovementActionResultAuthority`].
+    /// Republication of the
     /// same immutable result under fresh recovery authority is allowed;
     /// signatures need not be byte-identical, payload identity must be.
     fn publish<'a>(

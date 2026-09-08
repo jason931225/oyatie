@@ -33,9 +33,29 @@ pub enum BindingStoreError {
     TerminalOperation,
     InvalidEffectBoundaryTransition,
     StaleAuthorityHighWater,
+    /// Every lease-family variant that remains here needs a LEASE, and a lease
+    /// is reachable on this enum: [`crate::CellLocalWriteAuthorityTokenAuthority::issue`]
+    /// and [`crate::CellLocalWriteAuthorityTokenStore::issue`] take a
+    /// [`crate::VerifiedWriteAuthorityLease`] and return `BindingStoreError`.
+    ///
+    /// TWO NEIGHBOURS NEEDED A LEASE ISSUANCE RECORD INSTEAD AND WERE REMOVED.
+    /// `StaleWriteAuthorityLeaseIssuance` and `WriteAuthorityLeaseNotCommitted`
+    /// were left behind when this wave moved every write-authority lease
+    /// issuance surface off `TenantBindingStore` and onto
+    /// [`crate::CellServingAuthorityStore`] and
+    /// [`crate::ServingAuthorityPublicationReconciliationStore`], whose error
+    /// type is [`crate::ServingAuthorityStoreError`] and which already carry
+    /// the successors — `UncommittedIssuance` for the second, `Conflict` and
+    /// `StaleIncarnation` for the first. After the move no surface returning
+    /// `BindingStoreError` takes, returns or preconditions on a lease issuance
+    /// in any form, so the two named a condition nothing here could raise, and
+    /// an error name that asserts something no condition raises tells an
+    /// operator a report exists where none does.
+    ///
+    /// [`crate::BindingContractError`] mirrors the survivors and never mirrored
+    /// those two, so the mirror enum already had the shape this one now
+    /// matches.
     StaleWriteAuthorityLeaseState,
-    StaleWriteAuthorityLeaseIssuance,
-    WriteAuthorityLeaseNotCommitted,
     WriteAuthorityLeaseFrozen,
     WriteAuthorityLeaseExpired,
     TokenValidityExceedsLease,

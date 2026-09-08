@@ -50,16 +50,6 @@ pub struct WriteAuthorityLeaseRenewalResultV1 {
     pub state: WriteAuthorityLeaseStateV1,
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct PublishWriteAuthorityLeaseRequestV1 {
-    pub instance: crate::ServingAuthorityInstanceV1,
-    pub operation: BindingOperationKey,
-    pub lease_digest: BindingDigest32,
-    pub expected_issuance: crate::WriteAuthorityLeaseIssuancePreconditionV1,
-    pub idempotency_key: BindingIdempotencyKey,
-    pub canonical_request_digest: BindingDigest32,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommittedWriteAuthorityLeaseIssuanceQueryV1 {
     pub instance: crate::ServingAuthorityInstanceV1,
