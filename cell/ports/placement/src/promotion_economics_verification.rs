@@ -787,6 +787,20 @@ pub struct PromotionEconomicsReplayPortsV1<'a> {
 /// the cell revision, policy and retention still hold: the completed replay is
 /// not tied to an expiring outer signature. The promotion verifier still checks
 /// its own current signature, expiry and exact economics tuple regardless.
+///
+/// "THE ONLY WAY" IS TRUE OF THE ROUTE AND NOT OF THE JUDGEMENT: the second
+/// half of the first paragraph is A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL
+/// REFUSAL. This is the sole producer of the wrapper, and that part stands. But
+/// "recomputed against its authenticated finalization" is performed by
+/// [`PromotionEconomicsReplayPortsV1::proof_verifier`], a public field of a
+/// public struct the CALLER assembles, holding an unsealed
+/// [`crate::CellProofVerifier`]. An out-of-crate type may implement that trait
+/// and hand itself in as the judge of authenticity, so the recomputation is a
+/// property of the deployed composition. The reasoning is written once at
+/// [`crate::MovementActionResultAuthority`]. The header at
+/// `promotion_economics_source.rs` states the same obligation for the CLOSURE
+/// issuer and says "here"; here is a different file and a different port, so it
+/// does not reach this one.
 pub fn advance_cell_promotion_economics<'a>(
     _ports: &'a PromotionEconomicsReplayPortsV1<'a>,
     _authority: &'a CellControlReadAuthorityV1,

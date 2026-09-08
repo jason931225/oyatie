@@ -25,11 +25,40 @@
 //!    round 9 has `Signed` standing between its negation and its verb, and a
 //!    scan that stopped at the first verb would have missed it again.
 //! 2. SIGNATURE. The minted set is computed from the tree: every type returned
-//!    by a function that takes a `&dyn ...Verifier`. A block is in scope only
-//!    when it is ATTACHED to such a function, to a minted type's declaration,
-//!    to a trait declaring such a method, to a trait whose own doc LINKS such a
-//!    function, or is the `//!` doc of a file that declares one. Scope is never
-//!    inferred from a file's name or from a mention in prose.
+//!    by a function HANDED a `dyn ...Verifier`. A block is in scope only when it
+//!    is ATTACHED to such a function, to a minted type's declaration, to a trait
+//!    declaring such a method, to a trait whose own doc LINKS such a function, to
+//!    a function returning a minted wrapper, to a trait declaring such a method,
+//!    or is the `//!` doc of a file that declares one. Seven arms, not five.
+//!    Scope is never inferred from a file's name or from a mention in prose.
+//!
+//!    WHAT "HANDED" MEANS, AND WHY IT IS NOT `&dyn` ANY MORE. The first draft
+//!    keyed on the literal token `&dyn` anywhere in the signature text. Three
+//!    things were wrong with that and each is now closed, each with the finding
+//!    that closed it:
+//!      * RETURN POSITION COUNTED. `proof_verifier(&self) -> &dyn
+//!        CellProofVerifier` made an `&self` accessor a minting function and its
+//!        file a minting file. The test now reads the PARAMETER LIST only. That
+//!        NARROWS scope, so `promotion_economics_source.rs` staying a minting
+//!        file is asserted below rather than assumed.
+//!      * OWNERSHIP COUNTED AS DIFFERENCE. `Box`, `Arc` and `Rc<dyn ...Verifier>`
+//!        were invisible. An out-of-crate type can pass itself boxed as easily as
+//!        by reference, so the predicate now keys on `dyn ` plus `Verifier` in
+//!        the parameters under any pointer.
+//!      * A VERIFIER REACHED THROUGH A STRUCT WAS INVISIBLE, and that is the one
+//!        that mattered. `advance_cell_promotion_economics` — the wave's flagship
+//!        minter — takes `&PromotionEconomicsReplayPortsV1`, whose fourth PUBLIC
+//!        FIELD is `proof_verifier: &'a dyn CellProofVerifier`. Its own signature
+//!        contains neither token, and the file its wrapper is declared in has
+//!        zero `verify_`, so every route the old key had was closed against it
+//!        while an out-of-crate rogue verifier composed at exit 0. One level of
+//!        struct indirection is now a route, declared as the bound.
+//!
+//!    A fourth, on the other side of the same seam: a wrapper minted INSIDE AN
+//!    ENUM ARM (`...StepOutcomeV1::Complete(Box<VerifiedCellPromotionEconomics>)`)
+//!    left the returned-type test seeing only the enum, so the wrapper's own
+//!    declaration was never in scope. The minted set now also takes what a
+//!    returned enum's variants carry.
 //!
 //!    The trait-link clause is the one the first draft lacked, and a
 //!    perturbation control is what found it: deleting the caveat from
@@ -53,6 +82,19 @@
 //!     -- "no adapter can hold that role" names a role, not a value;
 //! (c) a claim in a doc block attached to a type alias, a constant, or a field,
 //!     since none of those is a minter;
+//! (c2) a verifier reached through TWO levels of struct — a field of a field.
+//!     One level is the declared bound; two would need a closure walk, and the
+//!     tree has no instance of it;
+//! (e) THE OBJECT KEY WIDENS WHAT IS CONDEMNED, not only what is seen, and no
+//!     document said so. `production_claim` accepts an object when it is the
+//!     anaphor `one`/`any`, OR is in the derived minted set, OR merely STARTS
+//!     WITH `Verified`. That last is a name prefix, in a wave whose doctrine is
+//!     that name prefixes are blind where it matters — it is kept because it
+//!     catches a wrapper the structural enum-arm pass still cannot reach, and it
+//!     is declared here because it can condemn a TRUE claim about a
+//!     `Verified*`-named wrapper appearing in a mixed file's `//!` doc. The
+//!     anaphor arm can do the same, so removing the prefix would not close the
+//!     hazard; both are stated rather than either being hidden.
 //! (d) a claim that is TRUE -- some `verify_*` functions in this crate take no
 //!     verifier at all, and an exclusivity claim about the wrappers they mint
 //!     is sound. Conjunct 2 exists to keep those out: caveating a genuinely
@@ -65,7 +107,7 @@
 //! asserts no count and no non-zero quantity: a live finding count goes red
 //! exactly when the burn-down succeeds.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -238,8 +280,144 @@ fn signature_at(lines: &[&str], start: usize) -> String {
     out
 }
 
-fn takes_dyn_verifier(signature: &str) -> bool {
-    signature.contains("&dyn") && signature.contains("Verifier")
+/// The parameter list of a signature: the first `(` to its matching `)`.
+///
+/// Everything the verifier conjunct asks is a question about what a function is
+/// HANDED. Reading the whole signature answered a different one: a `&dyn
+/// ...Verifier` in RETURN position made an accessor a minter --
+/// `promotion_economics_source.rs`'s `proof_verifier(&self) -> &dyn
+/// CellProofVerifier` was classified as one -- and that widening was accidental
+/// rather than designed, so a refactor removing the accessor would have silently
+/// narrowed the law.
+fn parameter_list(signature: &str) -> &str {
+    let Some(open) = signature.find('(') else {
+        return "";
+    };
+    let mut depth = 0usize;
+    for (offset, character) in signature[open..].char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &signature[open + 1..open + offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    &signature[open + 1..]
+}
+
+/// A verifier handed in directly, under any pointer: `&dyn`, `&'a dyn`, and
+/// `Box`/`Arc`/`Rc<dyn ...Verifier>` alike.
+///
+/// The first draft keyed on the literal `&dyn`, which is one of two ways this
+/// tree already hands a verifier over. Ownership does not change the argument:
+/// an out-of-crate type can implement the verifier and pass itself boxed just as
+/// easily as by reference.
+fn hands_over_a_verifier(text: &str) -> bool {
+    text.contains("dyn ") && text.contains("Verifier")
+}
+
+/// A verifier reached through a STRUCT the function is handed.
+///
+/// This is the route that hid the wave's flagship minter.
+/// `advance_cell_promotion_economics` takes
+/// `&PromotionEconomicsReplayPortsV1`, a public struct whose fourth public field
+/// is `proof_verifier: &'a dyn CellProofVerifier`; its own signature contains
+/// neither `dyn` nor `Verifier`, so a lexical test on the signature alone could
+/// never see it, and the file it mints into declares no `verify_` at all. One
+/// level of indirection, declared as the bound: a struct field, not a struct
+/// field of a struct field.
+fn carries_a_verifier(parameters: &str, carriers: &BTreeSet<String>) -> bool {
+    parameters
+        .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .any(|word| carriers.contains(word))
+}
+
+fn takes_dyn_verifier(signature: &str, carriers: &BTreeSet<String>) -> bool {
+    let parameters = parameter_list(signature);
+    hands_over_a_verifier(parameters) || carries_a_verifier(parameters, carriers)
+}
+
+/// For every enum in the wave, the types its variants carry.
+///
+/// A minter that hands its wrapper back inside an enum arm --
+/// `PromotionEconomicsVerificationStepOutcomeV1::Complete(Box<VerifiedCellPromotionEconomics>)`
+/// is the wave's flagship -- returns the ENUM, so a returned-type test alone
+/// never sees the wrapper and the wrapper's own declaration is never in scope.
+/// This is what the `Verified` name prefix in `production_claim` was standing in
+/// for; the prefix stays, because it also catches a wrapper this pass cannot
+/// reach, but the structural route is what a wrapper named otherwise depends on.
+fn enum_payloads(files: &[PathBuf]) -> BTreeMap<String, BTreeSet<String>> {
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for path in files {
+        let text = fs::read_to_string(path).expect("read source");
+        let lines: Vec<&str> = text.lines().collect();
+        let mut index = 0usize;
+        while index < lines.len() {
+            let declared = lines[index]
+                .strip_prefix("pub enum ")
+                .or_else(|| lines[index].strip_prefix("enum "));
+            let Some(rest) = declared else {
+                index += 1;
+                continue;
+            };
+            let name: String = rest
+                .chars()
+                .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .collect();
+            let mut carried = BTreeSet::new();
+            let mut cursor = index + 1;
+            while cursor < lines.len() && lines[cursor] != "}" {
+                for word in lines[cursor]
+                    .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+                {
+                    if word.starts_with(|character: char| character.is_ascii_uppercase()) {
+                        carried.insert(word.to_owned());
+                    }
+                }
+                cursor += 1;
+            }
+            out.entry(name).or_default().extend(carried);
+            index = cursor + 1;
+        }
+    }
+    out
+}
+
+/// Every struct in the wave with a member that is a `dyn ...Verifier`.
+fn verifier_carriers(files: &[PathBuf]) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for path in files {
+        let text = fs::read_to_string(path).expect("read source");
+        let lines: Vec<&str> = text.lines().collect();
+        let mut index = 0usize;
+        while index < lines.len() {
+            let line = lines[index];
+            let declared = line
+                .strip_prefix("pub struct ")
+                .or_else(|| line.strip_prefix("struct "));
+            let Some(rest) = declared else {
+                index += 1;
+                continue;
+            };
+            let name: String = rest
+                .chars()
+                .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .collect();
+            let mut cursor = index + 1;
+            while cursor < lines.len() && lines[cursor] != "}" {
+                if hands_over_a_verifier(lines[cursor]) {
+                    out.insert(name.clone());
+                }
+                cursor += 1;
+            }
+            index = cursor + 1;
+        }
+    }
+    out
 }
 
 fn returned_type(signature: &str) -> Option<String> {
@@ -257,7 +435,10 @@ fn returned_type(signature: &str) -> Option<String> {
 }
 
 struct Wave {
-    /// Every type minted by a function that takes a `&dyn ...Verifier`.
+    /// Structs with a `dyn ...Verifier` member, computed first because the
+    /// signature conjunct needs them.
+    carriers: BTreeSet<String>,
+    /// Every type minted by a function that takes a `dyn ...Verifier`.
     minted: BTreeSet<String>,
     /// The names of those functions.
     minting_fns: BTreeSet<String>,
@@ -266,6 +447,8 @@ struct Wave {
 }
 
 fn scan_wave(files: &[PathBuf]) -> Wave {
+    let carriers = verifier_carriers(files);
+    let payloads = enum_payloads(files);
     let mut minted = BTreeSet::new();
     let mut minting_fns = BTreeSet::new();
     let mut minting_files = BTreeSet::new();
@@ -277,7 +460,7 @@ fn scan_wave(files: &[PathBuf]) -> Wave {
                 continue;
             }
             let signature = signature_at(&lines, index);
-            if !takes_dyn_verifier(&signature) {
+            if !takes_dyn_verifier(&signature, &carriers) {
                 continue;
             }
             minting_files.insert(path.clone());
@@ -292,11 +475,15 @@ fn scan_wave(files: &[PathBuf]) -> Wave {
                 minting_fns.insert(declared);
             }
             if let Some(name) = returned_type(&signature) {
+                if let Some(carried) = payloads.get(&name) {
+                    minted.extend(carried.iter().cloned());
+                }
                 minted.insert(name);
             }
         }
     }
     Wave {
+        carriers,
         minted,
         minting_fns,
         minting_files,
@@ -372,8 +559,10 @@ fn scope_of(
     }
     if item.starts_with("fn ") || item.starts_with("pub fn ") {
         let signature = signature_at(lines, item_index);
-        if takes_dyn_verifier(&signature) {
-            return Some("function taking `&dyn ...Verifier`".to_owned());
+        if takes_dyn_verifier(&signature, &wave.carriers) {
+            return Some(
+                "function handed a `dyn ...Verifier`, directly or through a struct".to_owned(),
+            );
         }
         if returned_type(&signature).is_some_and(|name| wave.minted.contains(&name)) {
             return Some("function returning a minted wrapper".to_owned());
@@ -382,8 +571,12 @@ fn scope_of(
     }
     if item.starts_with("pub trait ") || item.starts_with("trait ") {
         let body = trait_body(lines, item_index);
-        if takes_dyn_verifier(&body) {
-            return Some("trait declaring a method taking `&dyn ...Verifier`".to_owned());
+        if body
+            .lines()
+            .any(|line| takes_dyn_verifier(line, &wave.carriers))
+            || hands_over_a_verifier(&body)
+        {
+            return Some("trait declaring a method handed a `dyn ...Verifier`".to_owned());
         }
         if body_mints(&body, &wave.minted) {
             return Some("trait declaring a method returning a minted wrapper".to_owned());
@@ -551,7 +744,68 @@ fn the_instrument_discriminates_before_it_certifies() {
     // The signature conjunct is derived from the tree, not asserted.
     assert!(
         wave.minted.contains("VerifiedCellPromotionEvidence"),
-        "the minted set must be derived from real `&dyn ...Verifier` signatures"
+        "the minted set must be derived from real `dyn ...Verifier` signatures"
+    );
+
+    // The predicate reads PARAMETERS, not the whole signature: an accessor
+    // handing a verifier BACK is not a minter.
+    assert_eq!(
+        parameter_list("pub fn proof_verifier(&self) -> &dyn CellProofVerifier {"),
+        "&self",
+        "the parameter list must stop at the closing parenthesis"
+    );
+    assert!(
+        !takes_dyn_verifier(
+            "pub fn proof_verifier(&self) -> &dyn CellProofVerifier {",
+            &wave.carriers
+        ),
+        "a `&dyn ...Verifier` in RETURN position must not make an accessor a minter"
+    );
+    // Narrowing must not have cost the file that accessor lives in. Its `admit`
+    // is handed the closure issuer, whose `proof_verifier` is a
+    // `Box<dyn CellProofVerifier>`, so the file stays in scope through the
+    // struct route rather than through the accessor.
+    assert!(
+        wave.minting_files
+            .iter()
+            .any(|path| path.ends_with("promotion_economics_source.rs")),
+        "narrowing to the parameter list must not drop a file that really is handed a verifier"
+    );
+
+    // Ownership is not a difference.
+    assert!(hands_over_a_verifier("issuer: Box<dyn CellProofVerifier>"));
+    assert!(hands_over_a_verifier(
+        "issuer: Arc<dyn BindingProofVerifier>"
+    ));
+    assert!(!hands_over_a_verifier("record: &CellPromotionEconomicsV1"));
+
+    // A verifier reached through one struct is a route, and the struct that
+    // carries it is found in the tree rather than named here.
+    assert!(
+        wave.carriers.contains("PromotionEconomicsReplayPortsV1"),
+        "the ports struct holding a public `dyn CellProofVerifier` field must be \
+         found as a carrier"
+    );
+    assert!(
+        takes_dyn_verifier(
+            "pub fn advance(_ports: &'a PromotionEconomicsReplayPortsV1<'a>, _now: u64,) -> X {",
+            &wave.carriers
+        ),
+        "a verifier arriving as a field of a struct parameter must put the function in scope"
+    );
+    assert!(
+        !takes_dyn_verifier(
+            "pub fn plain(_record: &CellPromotionEconomicsV1) -> X {",
+            &wave.carriers
+        ),
+        "a parameter carrying no verifier must not put a function in scope"
+    );
+
+    // A wrapper minted inside an enum arm reaches the minted set structurally,
+    // so its own declaration is in scope without the name prefix doing the work.
+    assert!(
+        wave.minted.contains("VerifiedCellPromotionEconomics"),
+        "a wrapper handed back inside an enum arm must be in the derived minted set"
     );
 }
 

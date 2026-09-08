@@ -510,6 +510,24 @@ pub struct CellPromotionEconomicsV1 {
 /// every admitted source and every record has been verified. A `Continued`
 /// step, an unverified checkpoint and a decoded record are all inadmissible.
 ///
+/// THE ROUTE IS TYPE-LEVEL; WHAT THE ROUTE CHECKS IS A DEPLOYMENT OBLIGATION,
+/// NOT A TYPE-LEVEL REFUSAL. The private field genuinely refuses DIRECT
+/// construction and nothing more — out of crate that is `E0423`. The stronger
+/// half of the sentence above, "after every admitted source and every record
+/// has been verified", is performed by an implementation the CALLER supplies:
+/// `advance_cell_promotion_economics` takes its collaborators as
+/// [`crate::PromotionEconomicsReplayPortsV1`], a public struct whose
+/// `proof_verifier` member is a public `dyn CellProofVerifier` field, and
+/// [`crate::CellProofVerifier`] is an unsealed public trait. One out-of-crate
+/// type may implement that trait and assemble the ports bundle around itself,
+/// so it decides what "authenticated" means on this path. The barrier holds
+/// when the verifier actually deployed verifies; the type system cannot make
+/// it. This is the same obligation stated once at
+/// [`crate::MovementActionResultAuthority`], and it reaches this wrapper by a
+/// route the sibling statement at `promotion_economics_source.rs` does not
+/// cover: that one says HERE, and here is a different file and a different
+/// port.
+///
 /// Holding one is not authority to mutate anything. It is not transferable to
 /// another promotion proof, and the promotion verifier still checks its own
 /// signature, expiry, readiness and expected revision independently.
