@@ -284,7 +284,20 @@ pub fn verify_owner_release_compatibility(
 ///
 /// A missing or stale replay proof therefore cannot produce a
 /// [`VerifiedCellPromotionEvidence`], and verified economics for one proof
-/// cannot be substituted into another. Economics replay reports its own
+/// cannot be substituted into another. That much this gate does perform: the
+/// digest comparisons above are this crate's own arithmetic and no argument
+/// steers them.
+///
+/// WHAT THE GATE CANNOT ESTABLISH IS A DEPLOYMENT OBLIGATION. The strength of
+/// "the replay actually finished" is the strength of
+/// [`crate::VerifiedCellPromotionEconomics`], and that wrapper is minted behind
+/// a `&dyn` [`CellProofVerifier`] seam, as is this function's own signature
+/// check. One out-of-crate component implementing that verifier can hand itself
+/// in as the judge of authenticity for both, and present a replay this gate
+/// will then find internally consistent. The private fields refuse direct
+/// construction and nothing else; see [`crate::MovementActionResultAuthority`].
+///
+/// Economics replay reports its own
 /// precise refusals through
 /// [`crate::PromotionEconomicsVerificationErrorV1`] before this gate is
 /// reached; here a mismatch is `RelationMismatch` and the existing typed

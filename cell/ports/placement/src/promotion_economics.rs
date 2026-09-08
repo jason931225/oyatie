@@ -267,6 +267,16 @@ pub struct PromotionEconomicsPolicyV1 {
 /// expected producer and audience it cannot forge. That argument only holds if
 /// the EXPECTED identity comes from somewhere the caller cannot choose.
 ///
+/// It also only holds against a SUBSTITUTED OBSERVER, and not against a
+/// composed one. The signature check that makes "signed under its own proof
+/// domain" mean anything runs inside
+/// [`crate::verify_promotion_economics_checkpoint`], which takes its
+/// [`crate::CellProofVerifier`] as `&dyn`. A component supplying both the
+/// observer and that verifier is not caught by it, whatever the expected
+/// identity says. Keeping those two apart is the same deployment obligation
+/// stated at [`crate::MovementActionResultAuthority`], and the section below
+/// makes the corresponding admission about link 3.
+///
 /// A member of [`crate::PromotionEconomicsReplayPortsV1`] would not be such a
 /// place. The bundle is assembled per call, so a caller supplying a dishonest
 /// observer would supply its matching identity in the same breath and the check

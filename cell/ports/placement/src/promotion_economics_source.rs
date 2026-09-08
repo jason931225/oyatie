@@ -22,6 +22,17 @@
 //! the accounting authority remains an attested boundary: no Merkle root over
 //! rows you were given can prove anything about invoices you were not.
 //!
+//! "AUTHENTICATED" IS A DEPLOYMENT OBLIGATION HERE, NOT A TYPE-LEVEL REFUSAL.
+//! The issuer holds its [`CellProofVerifier`] as a port, so the signature check
+//! that makes a finalization authenticated is performed by an implementation
+//! the composition root supplies. A root that wires a source owner's own
+//! verifier makes that clause vacuous while every type in this module still
+//! type-checks, exactly as the caveat on
+//! [`CellPromotionEconomicsPolicySource`] below says of the policy route. What
+//! the contract does establish is narrower and real: no per-call argument on
+//! this path can substitute a registry or a policy. See
+//! [`crate::MovementActionResultAuthority`] for the shared reasoning.
+//!
 //! Everything here is a declaration; every constructor, issuer, verifier and
 //! reader fails closed with a typed `NotImplemented`.
 

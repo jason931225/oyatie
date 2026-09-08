@@ -321,6 +321,14 @@ pub struct PromotionEconomicsCheckpointExpectationV1 {
 /// key, the expected cell, registry and policy identity, and the checkpoint
 /// digest. An unverified checkpoint is never admissible promotion evidence and
 /// can never stand in for completed replay.
+///
+/// WHO MAY REACH THAT MINT IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL
+/// REFUSAL. [`verify_promotion_economics_checkpoint`] takes its
+/// [`CellProofVerifier`] as `&dyn`, so an out-of-crate component implementing
+/// that trait can call the mint with itself as the judge of authenticity and
+/// obtain this wrapper over an observation it signed. The private field refuses
+/// direct construction and nothing else. The store trait below states the same
+/// clause at length; see [`crate::MovementActionResultAuthority`].
 #[derive(Debug, Eq, PartialEq)]
 pub struct VerifiedPromotionEconomicsCheckpoint(PromotionEconomicsVerificationCheckpointV1);
 
@@ -489,10 +497,23 @@ pub fn verify_promotion_economics_checkpoint_lease(
 /// private-field wrappers this module's verifiers mint, so a store cannot
 /// assemble one by writing the values it wanted.
 ///
-/// That is a refusal of DIRECT CONSTRUCTION and not of the role. A component
-/// that implements [`crate::CellProofVerifier`] alongside this store can still
-/// obtain both members by verifying its own claims; a conforming deployment is
-/// what keeps those two apart. See [`crate::MovementActionResultAuthority`].
+/// That is a refusal of DIRECT CONSTRUCTION and not of the role, and the two
+/// members are not refused to the same degree — an earlier version of this
+/// paragraph generalised over both and was wrong about one.
+///
+/// `next` is the guarded member. A component that implements
+/// [`crate::CellProofVerifier`] alongside this store can obtain it by verifying
+/// its own claim; that residual is a deployment obligation, and a conforming
+/// deployment is what keeps the checker and the checked apart. See
+/// [`crate::MovementActionResultAuthority`].
+///
+/// `lease` is not guarded by that trait at all, in either direction.
+/// [`verify_promotion_economics_checkpoint_lease`] takes no
+/// [`CellProofVerifier`] and checks no signature, so implementing the trait is
+/// neither necessary nor sufficient to obtain one: any caller able to build the
+/// public-field [`PromotionEconomicsCheckpointLeaseClaimV1`] can mint a lease,
+/// which is the design and is argued at that type. Exclusivity rests on the
+/// store's revision compare-and-set, never on this wrapper.
 #[derive(Debug, Eq, PartialEq)]
 pub struct PromotionEconomicsCheckpointWriteV1 {
     lease: PromotionEconomicsCheckpointLeaseV1,
@@ -557,9 +578,13 @@ pub type PromotionEconomicsCheckpointAcquisitionV1 = (
 /// CLAUSE (a) IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL REFUSAL, and this
 /// heading used to state it without that caveat while the two Tenancy ports
 /// stating the identical clause carried it. [`crate::CellProofVerifier`] is a
-/// public trait and every `verify_*` here takes it as `&dyn`, so one
-/// out-of-crate component may implement the verifier and this store together
-/// and mint a wrapper by handing itself in as the judge of authenticity. The
+/// public trait and [`verify_promotion_economics_checkpoint`] — the mint for
+/// the wrapper this clause is about — takes it as `&dyn`, so one out-of-crate
+/// component may implement the verifier and this store together and mint that
+/// wrapper by handing itself in as the judge of authenticity. The clause is
+/// scoped to that verifier rather than to every `verify_*` in this module:
+/// [`verify_promotion_economics_checkpoint_lease`] takes no verifier at all,
+/// and a claim quantified over the file would be false of it. The
 /// private field refuses direct construction and nothing else. What keeps the
 /// checker separate from the checked is the deployment; see
 /// [`crate::MovementActionResultAuthority`], and the two Tenancy statements of
@@ -615,13 +640,23 @@ pub trait PromotionEconomicsCheckpointStore: Send + Sync {
     /// value only `acquire`'s SUCCESS channel produced, so a caller that had
     /// been refused was told to wait for something it could not obtain.
     ///
-    /// READING A LEASE IS NOT A STEP TOWARD HOLDING ONE. The claim comes back
-    /// unverified, and it is not the reader's:
+    /// READING A LEASE IS NOT A STEP TOWARD HOLDING ONE, AND NOTHING IN THESE
+    /// SIGNATURES MAKES THAT SO. The claim comes back unverified.
     /// [`verify_promotion_economics_checkpoint_lease`] compares
-    /// `expected_worker` against the caller's own identity, so a foreign lease
-    /// claim cannot be minted into a
-    /// [`PromotionEconomicsCheckpointLeaseV1`] by whoever read it. The read
-    /// answers "how long", never "may I".
+    /// `expected_worker` against
+    /// [`PromotionEconomicsCheckpointLeaseExpectationV1::expected_worker`], a
+    /// PUBLIC FIELD THE CALLER SUPPLIES — the function knows no caller identity
+    /// and cannot learn one — so a reader that names the foreign holder does
+    /// mint a [`PromotionEconomicsCheckpointLeaseV1`] over a claim that is not
+    /// its own. An earlier version of this paragraph said the comparison was
+    /// against the caller's own identity; it is not, and the refusal it
+    /// described was never in the signature.
+    ///
+    /// Minting one gains nothing, which is the actual reason this is safe and
+    /// is argued in full at [`PromotionEconomicsCheckpointLeaseV1`]: a lease
+    /// authenticates nothing and proves no exclusivity, and a commit still
+    /// needs a signed checkpoint attestation and a winning revision
+    /// compare-and-set. The read answers "how long", never "may I".
     ///
     /// The expiry is a SNAPSHOT, not a promise. A holder may renew, so a caller
     /// that wakes at the reported time and is refused again reads again rather

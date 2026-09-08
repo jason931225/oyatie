@@ -2,9 +2,21 @@
 //!
 //! Every wrapper below has a private field and this module holds the sole
 //! constructor, so no `From<Signed>`, deserialization or trait implementation
-//! outside this crate can produce one. A signature alone establishes no role:
-//! each verifier also checks domain, producer, audience, expected identity and
-//! the digests it is given.
+//! outside this crate can DIRECTLY construct one. A signature alone establishes
+//! no role: each verifier also checks domain, producer, audience, expected
+//! identity and the digests it is given.
+//!
+//! THE ROLE CLAIM IN THE HEADING IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL
+//! REFUSAL, and this module doc previously read as though it were the latter
+//! while its three siblings — `capability_effect_issuance`,
+//! `capability_admission` and `capability_effect_receipt` — already carried the
+//! caveat. [`CellProofVerifier`] is a public trait with no seal, and all four
+//! verifiers below take it as `&dyn`, so one out-of-crate component may
+//! implement the verifier and call these functions with itself as the judge of
+//! authenticity, minting every wrapper here. The private field refuses direct
+//! construction and nothing else. What keeps the checker separate from the
+//! checked is the deployment; see [`crate::MovementActionResultAuthority`],
+//! where the reasoning is written once.
 
 use crate::{
     CapabilityAdapterAcceptancePayloadV1, CapabilityEffectErrorV1, CapabilityEffectExpectationV1,
