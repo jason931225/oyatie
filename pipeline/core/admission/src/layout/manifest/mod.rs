@@ -1,6 +1,7 @@
 //! Cargo identity checks for changed manifests. Provenance: ADR-0719 D-30/D-41.
 
 mod entrypoint;
+mod test_sourced;
 
 pub use entrypoint::{
     cargo_entrypoint, cargo_entrypoints, cargo_manifest_for_crate_path,
@@ -24,28 +25,6 @@ pub(super) fn dependency_declarations_package(face: &str, leaf: &str) -> Option<
         ("facade", "reconciler-app") => Some(("dependency-declarations-reconciler-app", true)),
         _ => None,
     }
-}
-
-/// True when every declared `[[bin]]` roots in the integration-test tree.
-///
-/// Conservative by construction: an array with no entries, an entry with no
-/// `path`, or a single non-array value all return false, so the refusal stands
-/// unless every binary is demonstrably test-sourced. A partially test-sourced
-/// manifest is refused with the rest, because the face-bypass this loop guards
-/// is present as soon as one binary is not a fixture.
-fn every_bin_is_test_sourced(declared: &toml::Value) -> bool {
-    let Some(entries) = declared.as_array() else {
-        return false;
-    };
-    if entries.is_empty() {
-        return false;
-    }
-    entries.iter().all(|entry| {
-        entry
-            .get("path")
-            .and_then(toml::Value::as_str)
-            .is_some_and(|path| path.starts_with("tests/"))
-    })
 }
 
 pub fn cargo_manifest_violations(path: &str, contents: &str) -> Vec<String> {
@@ -94,28 +73,7 @@ pub fn cargo_manifest_violations(path: &str, contents: &str) -> Vec<String> {
             "{path}: `[lib].path` must be `src/lib.rs`, got `{lib_path}`"
         ));
     }
-    for target in ["bin", "example", "bench", "test"] {
-        let Some(declared) = manifest.get(target) else {
-            continue;
-        };
-        // A binary whose source lives under `tests/` is a test-support binary,
-        // not a face. The rule this loop enforces is that a face's entry point
-        // is discovered canonically, and a test double impersonating an external
-        // tool is not a face bypassing that — it is a fixture that has to be an
-        // executable because the thing it stands in for is one. Cargo gives a
-        // package exactly one auto-discovered binary, which a facade spends on
-        // its own `src/main.rs`, so a package that also needs a test double has
-        // no way to declare it except explicitly. ADR-0716's `overturn_when`
-        // names `manifest/reindeer` as a domain where cargo execute stays even
-        // after buck2 takes the merge path; this admits what that exception
-        // requires, and nothing broader.
-        if target == "bin" && every_bin_is_test_sourced(declared) {
-            continue;
-        }
-        violations.push(format!(
-            "{path}: explicit `[[{target}]]` targets bypass the canonical face entry point"
-        ));
-    }
+    test_sourced::explicit_target_violations(path, &manifest, &mut violations);
     let package = manifest.get("package");
     // A facade may root at either `src/main.rs` or `src/lib.rs`, so BOTH
     // discovery switches guard a canonical target for it. Checking only
