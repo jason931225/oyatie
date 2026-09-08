@@ -229,12 +229,20 @@ pub trait CellServingAuthorityStore: Send + Sync {
     /// [`crate::ServingAuthorityRejectionHighWaterV1`] as a CAS precondition --
     /// it is a member of all three arms of
     /// [`crate::ServingAuthorityLocalPreconditionV1`], and installation also
-    /// supplies a `next_rejection_high_water` -- and until now nothing returned
-    /// one. The type was write-only, which made a first `Install` unassemblable
-    /// and left [`ServingAuthorityStoreError::Conflict`]'s stated recovery,
+    /// supplies a `next_rejection_high_water` -- and nothing returned one. The
+    /// type was write-only, which left
+    /// [`ServingAuthorityStoreError::Conflict`]'s stated recovery,
     /// "retrying after a fresh read may succeed", naming a read that did not
     /// exist. A stated recovery that cannot be performed is worse than an
     /// unstated one.
+    ///
+    /// READABLE IS NOT THE SAME AS PRESENT, and this method alone did not make
+    /// a first `Install` assemblable. A never-rejected partition has no row for
+    /// this read to return, and
+    /// `ServingAuthorityLocalPreconditionV1::Uninstalled` required the value by
+    /// value. Both halves are needed: this getter, and the `Option` on that
+    /// arm. An earlier version of this comment claimed the gap closed while the
+    /// second half was still missing.
     fn get_rejection_high_water<'a>(
         &'a self,
         authority: &'a crate::ServingAuthorityReadAuthorityV1,

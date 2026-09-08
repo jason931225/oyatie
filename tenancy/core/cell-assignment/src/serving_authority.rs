@@ -91,7 +91,26 @@ pub struct ServingAuthorityRejectionHighWaterV1 {
 pub enum ServingAuthorityLocalPreconditionV1 {
     Uninstalled {
         instance: ServingAuthorityInstanceV1,
-        rejection_high_water: ServingAuthorityRejectionHighWaterV1,
+        /// `None` only when the store holds no rejection high-water row for
+        /// this partition and generation AT ALL, which is the state of an
+        /// instance in a partition where nothing has yet been rejected.
+        ///
+        /// It is read from
+        /// [`crate::CellServingAuthorityStore::get_rejection_high_water`],
+        /// never assumed: `None` asserts that the store LOOKED AND FOUND NO
+        /// ROW, which is a different claim from "nothing was rejected". A
+        /// caller may not substitute the second for the first.
+        ///
+        /// A store that finds an installed authority record but no high-water
+        /// row is looking at restored or truncated state and returns
+        /// [`crate::ServingAuthorityStoreError::RestoreEvidenceRequired`],
+        /// rather than letting a caller assemble `None` here and start over.
+        ///
+        /// Without this option a first `Install` cannot be assembled at all,
+        /// because there is no row for the read to return. The getter added in
+        /// the previous round made the value readable; it did not make it
+        /// present, and this arm required it by value.
+        rejection_high_water: Option<ServingAuthorityRejectionHighWaterV1>,
     },
     Installed {
         authority: Box<InstalledServingAuthorityV1>,
