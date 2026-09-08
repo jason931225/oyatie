@@ -57,3 +57,36 @@ fn invalid_plan_never_touches_the_log() {
     assert_eq!(log.head("ten_test").unwrap(), 2);
     assert_eq!(denials.head("ten_test").unwrap(), 0);
 }
+
+/// A poisoned entry is counted by EVERY run that still owes it.
+///
+/// The count is over distinct ordinals THIS run observed, not over receipts
+/// it appended. Gating on `!receipt.deduplicated` fixes the double count
+/// within one run and breaks the next one: a byte-identical retry from an
+/// earlier run also deduplicates, so a second run reported every diagnostic
+/// field zero while a poisoned entry still blocked the object — a bare count
+/// with no reason in it, which is the failure this module refuses to emit.
+#[test]
+fn a_poison_is_counted_by_each_run_that_still_owes_it() {
+    let (_engine, mut log, mut state) = fixture();
+    // One entry the log holds and this projection never applied, so the next
+    // append lands non-dense and poisons.
+    log.seed(sealed_create(
+        "ent_c",
+        3,
+        1,
+        vec![wire_string("name", "Cyd")],
+    ));
+    let mut denials = MemoryLog::default();
+
+    let first = run_to_fixpoint(&plan(), &authority(), &mut log, &mut denials, &mut state).unwrap();
+    let second =
+        run_to_fixpoint(&plan(), &authority(), &mut log, &mut denials, &mut state).unwrap();
+
+    assert_eq!(first.poisoned, 1, "the run that appended it: {first:?}");
+    assert_eq!(
+        second.poisoned, 1,
+        "and the run that still owes it — a retry deduplicates onto the same \
+         poisoned ordinal, which is a re-observation, not an absence: {second:?}"
+    );
+}

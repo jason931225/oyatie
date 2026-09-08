@@ -14,6 +14,7 @@ use data_ontology_kernel::{
 };
 use foundry_edits::{EditSet, OntologyEdit, WireProperty, WireValue};
 use foundry_records_draft::{RecordsLog, RecordsLogError};
+use std::collections::BTreeSet;
 
 use crate::boundary;
 use crate::state::ProjectionState;
@@ -54,15 +55,17 @@ pub struct MigrationStatus {
     pub pending: u64, // data_class: INTERNAL_ONLY
     /// Submissions a writer gate refused (each is on the denial trail).
     pub refused: u64, // data_class: INTERNAL_ONLY
-    /// Appends the log refused as divergent idempotency-key reuse.
-    pub conflicted: u64,
+    /// Appends the log refused as divergent idempotency-key reuse. An
+    /// ATTEMPT count: there is no receipt to deduplicate against, so a
+    /// re-attempt of the same object in a later pass counts again.
+    pub conflicted: u64, // data_class: INTERNAL_ONLY
     /// Appends the log could not accept at all — an adapter fault, not a
     /// verdict about the submission. Held apart from `conflicted` because
     /// this crate's own law says so: a storage fault reported as a key
     /// conflict is "a cause that did not occur, blame in the wrong place,
     /// and advice against the retry that would work".
     pub unavailable: u64, // data_class: INTERNAL_ONLY
-    /// Entries that appended but poisoned at apply.
+    /// DISTINCT poisoned ordinals this run observed — entries, not attempts.
     pub poisoned: u64, // data_class: INTERNAL_ONLY
     /// `pending == 0` over a full rescan — the plan's value fixpoint.
     pub fixpoint: bool, // data_class: INTERNAL_ONLY
@@ -126,6 +129,7 @@ pub fn run_to_fixpoint(
     plan.validate(&projection.registry_input)?;
     let action_id =
         ActionTypeId::new(plan.action_type.clone()).map_err(|_| PlanError::InvalidActionType)?;
+    let mut seen_poison: BTreeSet<u64> = BTreeSet::new();
     let mut status = MigrationStatus {
         total: 0,
         upcast: 0,
@@ -177,7 +181,7 @@ pub fn run_to_fixpoint(
                     status.upcast += 1;
                     progressed = true;
                 }
-                Ok(ApplyOutcome::Poisoned { .. }) => {
+                Ok(ApplyOutcome::Poisoned { receipt, .. }) => {
                     // NOT progress. A poison stands in the log and advances
                     // the fold, but it never binds the object: `apply_sealed`
                     // leaves `bindings` untouched, so `plan_owes` still owes
@@ -189,7 +193,19 @@ pub fn run_to_fixpoint(
                     // refused to recognise, holding the tenant lock forever.
                     // The module's own law says a pass that makes no progress
                     // stops; a poison is exactly that class.
-                    status.poisoned += 1;
+                    // DISTINCT ORDINALS THIS RUN OBSERVED, not receipts it
+                    // appended. A later pass re-submits the same object under
+                    // the same drift-sensitive key and deduplicates onto the
+                    // ordinal already poisoned; counting that again reports
+                    // two poisoned entries where one exists. But gating on
+                    // `!deduplicated` under-counts the other way: a byte-
+                    // identical retry from an EARLIER run also deduplicates,
+                    // so a second run would report every field zero while a
+                    // poisoned entry still blocks the object — the bare count
+                    // with no reason in it that this module refuses to emit.
+                    if seen_poison.insert(receipt.ordinal) {
+                        status.poisoned += 1;
+                    }
                 }
                 Err(WriteError::Refused(_)) => {
                     status.refused += 1;

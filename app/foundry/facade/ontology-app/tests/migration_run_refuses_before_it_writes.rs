@@ -269,3 +269,27 @@ async fn a_credential_for_an_unserved_tenant_is_refused_and_counted() {
         "the refusal this process made is a refusal it counted"
     );
 }
+
+/// A plan naming an action the registry does not hold is refused HERE.
+///
+/// The behavioural claim behind the `validate` change, at the surface it is
+/// about. Before it, this plan passed validation, reached the writer, and was
+/// refused one object at a time as a bare `refused` count with no reason in
+/// it — while `attest` answered the same plan with pending objects, the
+/// fixpoint claim over an unexecutable plan that module forbids itself.
+#[tokio::test]
+async fn a_plan_naming_an_unregistered_action_is_refused_before_it_writes() {
+    let fixture = Fixture::new("run-unregistered-action");
+    let config = fixture.config();
+    let session = Session::from_state(state_with_two_revisions(&config));
+    let token = Some(fixture.operator_token());
+    write_owing(&session, token, "ent_alpha", "idem_1").await;
+    let actions = action_head(&config);
+    let plan = plan_for("ten_acme").replace("aty_record_write", "aty_never_registered");
+
+    let (status, body) = run(&session, token, &plan).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert!(body.contains("UnknownActionType"), "{body}");
+    assert_eq!(action_head(&config), actions, "and nothing ran: {body}");
+}

@@ -193,12 +193,11 @@ async fn a_default_does_not_overwrite_a_value_the_object_already_holds() {
 
 /// A default's VARIANT is checked against the target's declared type.
 ///
-/// The variant, not the value it carries: `check_transform` compares the
-/// declared scalar against `DefaultValue::scalar_type()`. An untyped target
-/// cannot see this at all — it carries the legacy String contract, so every
-/// non-string default is incompatible and they all refuse alike. `counter` is
-/// declared `Integer` precisely so the arms stop being interchangeable, and a
-/// timestamp default into it must refuse while an integer default is admitted.
+/// `check_transform` compares the declared scalar against
+/// `DefaultValue::scalar_type()`. An untyped target cannot see this — it
+/// carries the legacy String contract, so every non-string default refuses
+/// alike. `counter` is declared `Integer` so the arms stop being
+/// interchangeable.
 #[tokio::test]
 async fn a_default_whose_variant_does_not_match_the_declared_type_is_refused() {
     let fixture = Fixture::new("attest-typed-default-wrong");
@@ -270,12 +269,9 @@ async fn a_transform_carrying_a_field_from_another_kind_is_refused() {
     assert!(!body.contains(r#""fixpoint""#), "{body}");
 }
 
-/// The remaining two arms, pinned the same way and for the same reason.
-///
-/// `Boolean` and `Double` were the last of the five wire defaults whose
-/// variant nothing checked: mapping either onto `Integer` admitted a plan the
-/// registry refuses. Both are held against the Integer-declared target, where
-/// the only correct answer is a type refusal.
+/// The remaining two arms, pinned the same way. `Boolean` and `Double` were
+/// the last wire defaults whose variant nothing checked: mapping either onto
+/// `Integer` admitted a plan the registry refuses.
 #[tokio::test]
 async fn a_boolean_or_double_default_is_refused_by_an_integer_target() {
     let fixture = Fixture::new("attest-typed-default-others");

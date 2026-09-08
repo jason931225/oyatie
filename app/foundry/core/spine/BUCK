@@ -176,7 +176,7 @@ rust_test(
 
 rust_test(
     name = "foundry-spine-migration-plan",
-    srcs = ["tests/migration_plan.rs"],
+    srcs = ["tests/migration_plan.rs", "tests/migration_plan_support/mod.rs"],
     crate = "migration_plan",
     crate_root = "tests/migration_plan.rs",
     visibility = ["PUBLIC"],

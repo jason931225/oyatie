@@ -14,13 +14,10 @@
 //! decision was made when none was.
 
 mod facade_support;
-mod failing_log;
 mod migration_support;
-mod out_of_band;
 
 use axum::http::StatusCode;
 use facade_support::{Fixture, Session, scrape, value_of};
-use failing_log::AlwaysFailingLog;
 use migration_support::{
     action_head, attest, plan_for, run, state_with_two_revisions, upcast_row, write_owing,
     write_settled,
@@ -58,13 +55,13 @@ async fn an_operator_runs_a_plan_to_its_fixpoint() {
     .await;
 
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(
-        body.contains(r#""upcast":1"#) && body.contains(r#""pending":0"#),
-        "one object was owed and one was upcast: {body}"
-    );
-    assert!(
-        body.contains(r#""fixpoint":true"#) && body.contains(r#""total":2"#),
-        "and the fixpoint is over the whole population, not just the owed: {body}"
+    // The EXACT body. A field asserted at the one value it takes in the one
+    // test that reads it is not pinned — a constant equal to that value
+    // survives, which is the defect this suite already had to correct once
+    // for `decision_id`. Every number here is a claim.
+    assert_eq!(
+        body,
+        r#"{"total":2,"upcast":1,"pending":0,"refused":0,"conflicted":0,"unavailable":0,"poisoned":0,"fixpoint":true}"#
     );
     // The attestation is the independent witness: the surface's own report
     // could say anything, but a plan at its fixpoint owes nothing.
@@ -157,105 +154,5 @@ async fn a_second_run_at_the_fixpoint_writes_nothing() {
         action_head(&config),
         settled,
         "and the log did not grow: {again}"
-    );
-}
-
-/// A run that CANNOT finish says so, in every field that carries the news.
-///
-/// This is the state the reported fields exist for, and the only one that
-/// tells an honest report from a flattering constant: at a clean fixpoint
-/// `pending`, `refused`, `conflicted` and `poisoned` are all zero and
-/// `fixpoint` is true, so hardcoding any of them survives every other test in
-/// this file. The store is broken AFTER the object lands, so an object is
-/// genuinely owed and genuinely cannot be written.
-///
-/// It is a 200, not a refusal: the plan was executable and the run did what it
-/// could. The failure is reported in the body, because a migration that
-/// stopped short is a fact about the population, not a bad request.
-#[tokio::test]
-async fn a_run_that_cannot_write_reports_the_work_it_could_not_do() {
-    let fixture = Fixture::new("run-store-outage");
-    let config = fixture.config();
-    let state = std::sync::Arc::new(state_with_two_revisions(&config));
-    let session = Session::from_shared(std::sync::Arc::clone(&state));
-    let token = Some(fixture.operator_token());
-    write_owing(&session, token, "ent_alpha", "idem_1").await;
-    for tenant in state.tenants.values() {
-        tenant.lock().await.action_log = Box::new(AlwaysFailingLog {
-            detail: "the store went away mid-migration",
-        });
-    }
-
-    let (status, body) = run(&session, token, &plan_for("ten_acme")).await;
-
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(
-        body.contains(r#""fixpoint":false"#),
-        "a run that wrote nothing has not reached a fixpoint: {body}"
-    );
-    assert!(
-        body.contains(r#""pending":1"#) && body.contains(r#""unavailable":1"#),
-        "the object is still owed, and the STORE FAULT is named as the reason: {body}"
-    );
-    assert!(
-        body.contains(r#""conflicted":0"#),
-        "a store that could not accept the append is not a caller who reused \
-         an idempotency key — reporting it as one is blame in the wrong place \
-         and advice against the retry that would work: {body}"
-    );
-    assert!(
-        body.contains(r#""upcast":0"#),
-        "and nothing was upcast: {body}"
-    );
-}
-
-/// THE RUN TERMINATES. Not "converges quickly" — terminates at all.
-///
-/// A poison stands in the log and advances the fold, but it never binds the
-/// object, so the plan still owes it, the same drift-sensitive key is
-/// re-derived, and the byte-identical append deduplicates onto the same
-/// poisoned ordinal. Counting that as progress made the loop a fixed point of
-/// its own body: every pass identical, no append, nothing converging. The
-/// handler never returned, and it holds the tenant's lock for the whole run —
-/// so one migration against a projection one entry behind its log wedged
-/// every request for that tenant until the process was restarted.
-///
-/// The state is not exotic. `out_of_band` exists because this repository's own
-/// writer commits before it folds, and says a panic between the two "leaves
-/// this process permanently one behind for its lifetime".
-///
-/// Driven on its own thread with a deadline, because the failure this pins is
-/// non-termination: an `#[tokio::test]` would hang the runtime rather than
-/// fail, and a hang in CI reads as an infrastructure problem rather than as
-/// this defect.
-#[test]
-fn a_run_against_a_lagging_projection_terminates_rather_than_spinning() {
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("a runtime");
-        runtime.block_on(async {
-            let fixture = Fixture::new("run-lagging-projection");
-            let config = fixture.config();
-            let session = Session::from_state(state_with_two_revisions(&config));
-            let token = Some(fixture.operator_token());
-            write_owing(&session, token, "ent_alpha", "idem_1").await;
-            // One entry the durable log holds and this projection never
-            // applied, exactly as a crash between append and fold leaves it.
-            out_of_band::append_for(&config.action_log, "ten_acme", "idem_out_of_band");
-            let _ = tx.send(run(&session, token, &plan_for("ten_acme")).await);
-        });
-    });
-
-    let (status, body) = rx
-        .recv_timeout(std::time::Duration::from_secs(30))
-        .expect("the run must return; a migration that never ends holds the tenant lock forever");
-
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(
-        body.contains(r#""fixpoint":false"#) && body.contains(r#""poisoned":1"#),
-        "it owes what it could not apply, and says the entry was poisoned: {body}"
     );
 }

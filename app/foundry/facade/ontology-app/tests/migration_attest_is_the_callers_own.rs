@@ -248,3 +248,26 @@ async fn a_plan_is_validated_against_the_registry_the_runner_admits_from() {
         "the refusal must come from the runner's own admission input: {body}"
     );
 }
+
+/// Attest refuses a plan naming an unregistered action, rather than
+/// answering it with pending objects.
+///
+/// This module promises an attestation "can never claim a fixpoint over a
+/// plan the runner would refuse to execute". Until `validate` required the
+/// action to EXIST, it did exactly that: the plan passed, and this surface
+/// reported what it owed as though the migration were runnable.
+#[tokio::test]
+async fn a_plan_naming_an_unregistered_action_is_not_attested() {
+    let fixture = Fixture::new("attest-unregistered-action");
+    let session = Session::from_state(state_with_two_revisions(&fixture.config()));
+    let plan = plan_for("ten_acme").replace("aty_record_write", "aty_never_registered");
+
+    let (status, body) = attest(&session, Some(fixture.operator_token()), &plan).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert!(body.contains("UnknownActionType"), "{body}");
+    assert!(
+        !body.contains(r#""pending""#),
+        "and it owes nothing: {body}"
+    );
+}

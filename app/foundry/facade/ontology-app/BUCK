@@ -20,8 +20,7 @@ FACADE_TEST_DEPS = [
 # The two modules every migration suite carries. Named for the same reason the
 # dep set is: four verbatim copies is how a BUCK file reaches its line budget,
 # and a budget spent on duplication buys nothing.
-# The module sets these suites share, named for the same reason the dep set
-# is: duplication is what fills this file's line budget.
+# Shared module sets: duplication is what fills this file's budget.
 FAULT_SRCS = [
     "tests/facade_support/mod.rs",
     "tests/failing_log/mod.rs",
@@ -266,11 +265,22 @@ rust_test(
 )
 
 rust_test(
-    name = "foundry-ontology-app-migration-run",
+    name = "foundry-ontology-app-migration-run-degraded",
     srcs = MIGRATION_SRCS + [
         "tests/failing_log/mod.rs",
-        "tests/migration_run_executes_the_callers_own_plan.rs",
+        "tests/migration_run_reports_what_it_could_not_do.rs",
         "tests/out_of_band/mod.rs",
+    ],
+    crate = "migration_run_reports_what_it_could_not_do",
+    crate_root = "tests/migration_run_reports_what_it_could_not_do.rs",
+    visibility = ["PUBLIC"],
+    deps = MIGRATION_TEST_DEPS,
+)
+
+rust_test(
+    name = "foundry-ontology-app-migration-run",
+    srcs = MIGRATION_SRCS + [
+        "tests/migration_run_executes_the_callers_own_plan.rs",
     ],
     crate = "migration_run_executes_the_callers_own_plan",
     crate_root = "tests/migration_run_executes_the_callers_own_plan.rs",

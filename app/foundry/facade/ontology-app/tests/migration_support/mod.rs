@@ -174,7 +174,7 @@ pub(crate) fn state_with_engine_only_evolved(config: &Config) -> AppState {
 
 /// A durable head, read from the store itself rather than from anything the
 /// process reports about itself. Both logs are named by the `Config` the test
-/// composed, so no shared harness has to grow a accessor for them.
+/// composed, so no shared harness has to grow an accessor for them.
 fn head_of(path: &std::path::Path) -> u64 {
     SqliteRecordsLog::open(path)
         .expect("the log opens")

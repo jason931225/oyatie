@@ -79,6 +79,14 @@ pub enum PlanError {
     InvalidActionType,
     /// No definition registered under `(tenant_id, entity_type)`.
     UnknownEntityType,
+    /// Registered, but against a different entity type: the writer stamps
+    /// the revision from the action's own type, so such a plan mis-stamps
+    /// every upcast it writes.
+    ActionNotBoundToEntityType,
+    /// No definition registered under `(tenant_id, action_type)`. Every
+    /// upcast it would submit is refused one at a time by the writer's own
+    /// gate — a bare count with no reason in it.
+    UnknownActionType,
     /// The registry head is not the plan's `to_revision` — evolve first.
     RegistryHeadMismatch { head: u32 },
     /// `from_revision` must be strictly below `to_revision`.
@@ -112,8 +120,6 @@ impl MigrationPlan {
         }
         let type_id = data_ontology_kernel::EntityTypeId::new(self.entity_type.clone())
             .map_err(|_| PlanError::InvalidEntityType)?;
-        data_ontology_kernel::ActionTypeId::new(self.action_type.clone())
-            .map_err(|_| PlanError::InvalidActionType)?;
         let head = registry
             .entity_type(&self.tenant_id, &type_id)
             .ok_or(PlanError::UnknownEntityType)?;
@@ -121,6 +127,23 @@ impl MigrationPlan {
             return Err(PlanError::RegistryHeadMismatch {
                 head: head.revision,
             });
+        }
+        // After the entity type resolves, so a plan wrong about both hears
+        // the more fundamental refusal. EXISTENCE, not shape: checking the id
+        // parses and stopping let an unregistered action through both
+        // surfaces — `attest` answered it with pending objects, and `run`
+        // refused every object one at a time as a count with no reason in it.
+        let action_id = data_ontology_kernel::ActionTypeId::new(self.action_type.clone())
+            .map_err(|_| PlanError::InvalidActionType)?;
+        let action = registry
+            .action_type(&self.tenant_id, &action_id)
+            .ok_or(PlanError::UnknownActionType)?;
+        // BOUND to this entity type, not merely present: the writer stamps
+        // `schema_revision` from the ACTION's type, so an action bound
+        // elsewhere writes envelopes at another type's head — accepted rather
+        // than poisoned, and silently wrong on every later refold.
+        if action.entity_type != type_id {
+            return Err(PlanError::ActionNotBoundToEntityType);
         }
         let from_definition = registry
             .entity_type_at_revision(&self.tenant_id, &type_id, self.from_revision)

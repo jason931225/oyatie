@@ -5,92 +5,16 @@
 //! unbounded inputs so the runner's idempotency key can never overflow the
 //! envelope cap.
 
-use data_boundary_kernel::{DataClass, PrivacyDataClass};
+mod migration_plan_support;
+
 use data_ontology_kernel::{
-    EntityTypeDefinition, EntityTypeId, EntityTypePropertyDefinition, OntologyEngine, PropertyTier,
-    ScalarType, ValueTypeDeclaration,
+    ActionTypeDefinition, ActionTypeId, AutonomyTier, EntityTypeDefinition, EntityTypeId,
+    OntologyEngine,
 };
-use foundry_spine::{DefaultValue, MigrationPlan, PlanError, UpcastTransform, ValueConversion};
-
-fn internal() -> PrivacyDataClass {
-    PrivacyDataClass::try_from(DataClass::InternalOnly).unwrap()
-}
-
-fn untyped(name: &str, required: bool) -> EntityTypePropertyDefinition {
-    EntityTypePropertyDefinition::new(name, PropertyTier::Scalar, internal(), required).unwrap()
-}
-
-fn typed(name: &str, scalar: ScalarType) -> EntityTypePropertyDefinition {
-    let mut property =
-        EntityTypePropertyDefinition::new(name, PropertyTier::Scalar, internal(), false).unwrap();
-    property.value_type = Some(ValueTypeDeclaration::Scalar(scalar));
-    property
-}
-
-fn rev1_properties() -> Vec<EntityTypePropertyDefinition> {
-    vec![
-        untyped("serial", true),
-        untyped("note", true),
-        typed("score", ScalarType::Integer),
-        typed("flag", ScalarType::Boolean),
-    ]
-}
-
-fn rev2_properties() -> Vec<EntityTypePropertyDefinition> {
-    let mut properties = rev1_properties();
-    properties.push(typed("score_text", ScalarType::String));
-    properties.push(typed("score_copy", ScalarType::Integer));
-    properties.push(typed("flag_rank", ScalarType::Integer));
-    properties.push(untyped("grade", false));
-    properties
-}
-
-fn definition(
-    revision: u32,
-    properties: Vec<EntityTypePropertyDefinition>,
-) -> EntityTypeDefinition {
-    EntityTypeDefinition::new(
-        "ten_test",
-        EntityTypeId::new("ety_reading").unwrap(),
-        "Reading",
-        properties,
-        revision,
-    )
-    .unwrap()
-    .with_primary_key_property("serial")
-}
-
-/// Revision 1 -> revision 2, both retained; head is 2.
-fn registry() -> OntologyEngine {
-    let mut engine = OntologyEngine::default();
-    engine
-        .register_entity_type(definition(1, rev1_properties()))
-        .unwrap();
-    engine
-        .evolve_entity_type(definition(2, rev2_properties()))
-        .unwrap();
-    engine
-}
-
-fn plan(transforms: Vec<UpcastTransform>) -> MigrationPlan {
-    MigrationPlan {
-        tenant_id: "ten_test".into(),
-        entity_type: "ety_reading".into(),
-        from_revision: 1,
-        to_revision: 2,
-        action_type: "aty_upcast_reading_2".into(),
-        audit_event_type: "reading.upcast_to_2".into(),
-        declared_at_epoch_seconds: 1_700_000_000,
-        transforms,
-    }
-}
-
-fn copy(from: &str, to: &str) -> UpcastTransform {
-    UpcastTransform::CopyAs {
-        from: from.into(),
-        to: to.into(),
-    }
-}
+use foundry_spine::{DefaultValue, PlanError, UpcastTransform, ValueConversion};
+use migration_plan_support::{
+    action, copy, definition, plan, registry, rev1_properties, rev2_properties, untyped,
+};
 
 #[test]
 fn total_typed_plan_validates_against_the_named_head() {
@@ -155,6 +79,7 @@ fn skipped_from_revision_is_unretained() {
     engine
         .evolve_entity_type(definition(3, rev2_properties()))
         .unwrap();
+    engine.register_action_type(action()).unwrap();
     let mut skipping = plan(vec![copy("score", "score_copy")]);
     skipping.from_revision = 2;
     skipping.to_revision = 3;
@@ -296,5 +221,70 @@ fn action_type_must_be_a_well_formed_action_id() {
     assert_eq!(
         misnamed.validate(&registry()),
         Err(PlanError::InvalidActionType)
+    );
+}
+
+/// A plan naming an action the registry does not hold is refused HERE, not
+/// one object at a time by the writer.
+///
+/// `validate` checked the id's shape and stopped. A plan naming an
+/// unregistered action therefore passed, `attest` answered with pending
+/// objects for a plan the runner cannot execute — the fixpoint claim that
+/// module says it must never make — and `run` reached the writer, which
+/// refused every object individually and reported a bare count with no
+/// reason in it.
+#[test]
+fn an_action_the_registry_does_not_hold_is_refused() {
+    let mut plan = plan(Vec::new());
+    plan.action_type = "aty_never_registered".into();
+
+    assert_eq!(
+        plan.validate(&registry()),
+        Err(PlanError::UnknownActionType),
+        "the action must exist, not merely parse"
+    );
+}
+
+/// An action bound to a DIFFERENT entity type is refused.
+///
+/// Existence is not enough. The writer stamps `schema_revision` from the
+/// action's own entity type, so a plan migrating `ety_reading` under an
+/// action bound elsewhere writes durable envelopes carrying that other
+/// type's head — accepted rather than poisoned, and silently wrong on every
+/// later refold.
+#[test]
+fn an_action_bound_to_another_entity_type_is_refused() {
+    let mut engine = registry();
+    engine
+        .register_entity_type(
+            EntityTypeDefinition::new(
+                "ten_test",
+                EntityTypeId::new("ety_other").unwrap(),
+                "Other",
+                rev1_properties(),
+                1,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    engine
+        .register_action_type(
+            ActionTypeDefinition::new(
+                "ten_test",
+                ActionTypeId::new("aty_other_write").unwrap(),
+                EntityTypeId::new("ety_other").unwrap(),
+                "ops-console",
+                AutonomyTier::T1Assist,
+                "other.written",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut plan = plan(Vec::new());
+    plan.action_type = "aty_other_write".into();
+
+    assert_eq!(
+        plan.validate(&engine),
+        Err(PlanError::ActionNotBoundToEntityType)
     );
 }

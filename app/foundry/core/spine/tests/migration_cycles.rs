@@ -1,6 +1,7 @@
 use data_boundary_kernel::{DataClass, PrivacyDataClass};
 use data_ontology_kernel::{
-    EntityTypeDefinition, EntityTypeId, EntityTypePropertyDefinition, OntologyEngine, PropertyTier,
+    ActionTypeDefinition, ActionTypeId, AutonomyTier, EntityTypeDefinition, EntityTypeId,
+    EntityTypePropertyDefinition, OntologyEngine, PropertyTier,
 };
 use foundry_spine::{MigrationPlan, PlanError, UpcastTransform};
 
@@ -33,6 +34,22 @@ fn registry() -> OntologyEngine {
             registry.evolve_entity_type(definition).unwrap();
         }
     }
+    // The plan's action, as the seed registers one. `validate` requires it to
+    // EXIST and not merely to parse, so a registry without it is a fixture
+    // less faithful than production rather than a smaller one.
+    registry
+        .register_action_type(
+            ActionTypeDefinition::new(
+                "ten_test",
+                ActionTypeId::new("aty_upcast").unwrap(),
+                EntityTypeId::new("ety_reading").unwrap(),
+                "ops-console",
+                AutonomyTier::T1Assist,
+                "reading.upcast",
+            )
+            .unwrap(),
+        )
+        .unwrap();
     registry
 }
 
