@@ -9,7 +9,9 @@ import "tenancy/binding/v1/serving_authority_freeze.proto";
 
 message ServingAuthorityUninstalledPreconditionV1 {
   ServingAuthorityInstanceV1 instance = 1;
-  ServingAuthorityRejectionHighWaterV1 rejection_high_water = 2;
+  // Absent only when the store looked and found no row for this partition and
+  // generation -- which is a different claim from "nothing was rejected".
+  optional ServingAuthorityRejectionHighWaterV1 rejection_high_water = 2;
 }
 
 message ServingAuthorityInstalledPreconditionV1 {

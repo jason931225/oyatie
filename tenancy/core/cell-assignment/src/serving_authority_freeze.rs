@@ -161,6 +161,9 @@ pub struct ServingAuthorityFreezeWriteSetPartsV1 {
     /// stated on
     /// [`crate::ServingAuthorityInstallationWriteSetPartsV1::installed`].
     pub next_state: ServingAuthorityFrozenStateV1,
+    /// Caller-proposed successor row, owner-owned in its entirety; the
+    /// obligation and the refusal are those stated on
+    /// [`crate::ServingAuthorityInstallationWriteSetPartsV1::next_rejection_high_water`].
     pub next_rejection_high_water: crate::ServingAuthorityRejectionHighWaterV1,
     pub business: ServingAuthorityBusinessIdV1,
     pub result: ServingAuthorityFreezeResultPayloadV1,

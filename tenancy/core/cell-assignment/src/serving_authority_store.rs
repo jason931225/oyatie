@@ -86,12 +86,23 @@ pub enum ServingAuthorityStoreError {
     /// A caller-proposed successor restates a value this store OWNS, and the
     /// restatement disagrees with what the store derives.
     ///
-    /// Successor records carry owner-authoritative fields --
-    /// `binding_generation`, `binding_revision`, `binding_record_digest` and
-    /// `write_authority_epoch`, all inside
-    /// [`crate::ServingAuthorityInstanceV1`] -- alongside the fields the caller
-    /// legitimately chooses. The store derives the owned ones itself and MUST
-    /// refuse rather than accept or silently overwrite a disagreeing proposal.
+    /// SCOPE IS EVERY OWNER-OWNED VALUE A PROPOSAL RESTATES, not a list.
+    /// Wherever a caller-proposed successor carries a value this store derives
+    /// -- whether a field, a nested record, or a whole row -- the store MUST
+    /// derive it itself and refuse a disagreeing proposal rather than accept it
+    /// or silently overwrite it.
+    ///
+    /// Examples, NOT the extent: `binding_generation`, `binding_revision`,
+    /// `binding_record_digest` and `write_authority_epoch` inside
+    /// [`crate::ServingAuthorityInstanceV1`]; and the whole
+    /// [`crate::ServingAuthorityRejectionHighWaterV1`] row proposed as
+    /// `next_rejection_high_water`.
+    ///
+    /// An earlier version of this doc listed only the four instance fields. A
+    /// refusal scoped by enumeration leaves everything not enumerated bare, and
+    /// it left bare the high-water row sitting one line below the field the
+    /// enumeration was written on -- the row `StaleIncarnation` and
+    /// `RejectedInstallation` both depend on.
     ///
     /// Distinct from [`Self::Conflict`]: a conflict is a precondition failing
     /// against durable state, and re-reading may resolve it. This is the

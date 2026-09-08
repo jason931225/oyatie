@@ -128,6 +128,17 @@ pub struct ServingAuthorityInstallationWriteSetPartsV1 {
     /// there is nothing left to repair from. Ownership makes the refusal more
     /// necessary, not less.
     pub installed: crate::InstalledServingAuthorityV1,
+    /// Caller-proposed successor row, and owner-owned in its entirety.
+    ///
+    /// The store derives the advanced high water itself -- its
+    /// `rejected_instance_root_digest`, `rejected_instance_count` and
+    /// `revision` follow from the row it read and the outcome it is writing --
+    /// and MUST refuse a disagreeing proposal with
+    /// [`crate::ServingAuthorityStoreError::ProposedSuccessorMismatch`]. This
+    /// is the row [`crate::ServingAuthorityStoreError::StaleIncarnation`] and
+    /// [`crate::ServingAuthorityStoreError::RejectedInstallation`] are decided
+    /// against, so a caller able to propose it unchecked could readmit an
+    /// instance the partition had already rejected.
     pub next_rejection_high_water: crate::ServingAuthorityRejectionHighWaterV1,
     pub first_lease_state: crate::WriteAuthorityLeaseStateV1,
     pub first_lease_issuance: crate::WriteAuthorityLeaseIssuanceRecordV1,

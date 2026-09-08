@@ -36,6 +36,10 @@ message InstalledServingAuthorityV1 {
   Digest32 record_digest = 5;
 }
 
+// Owner-owned. A caller may propose an advanced row in a write set, but the
+// store derives it and refuses a disagreeing proposal
+// (ServingAuthorityStoreError PROPOSED_SUCCESSOR_MISMATCH). This is the row
+// stale-incarnation and rejected-installation are decided against.
 message ServingAuthorityRejectionHighWaterV1 {
   tenancy.identity.v1.TenantId tenant_id = 1;
   CellServingPartitionRefV1 partition = 2;
