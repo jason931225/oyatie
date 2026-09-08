@@ -53,10 +53,13 @@
 //!     -- "no adapter can hold that role" names a role, not a value;
 //! (c) a claim in a doc block attached to a type alias, a constant, or a field,
 //!     since none of those is a minter;
-//! (d) a claim that is TRUE -- ten `verify_*` functions in this crate take no
+//! (d) a claim that is TRUE -- some `verify_*` functions in this crate take no
 //!     verifier at all, and an exclusivity claim about the wrappers they mint
 //!     is sound. Conjunct 2 exists to keep those out: caveating a genuinely
-//!     type-level refusal would be this same defect inverted.
+//!     type-level refusal would be this same defect inverted. The set is the
+//!     one `takes_dyn_verifier` returns false for, computed below; this doc
+//!     states no tally, because a tally here would be the very species the
+//!     file exists to refuse, written into the file that refuses it.
 //!
 //! It asserts that the offending set is EMPTY and prints its members. It
 //! asserts no count and no non-zero quantity: a live finding count goes red
