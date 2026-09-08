@@ -186,8 +186,7 @@ pub trait CapabilityEffectReceiptCommitObserverV1: Send + Sync {
     /// committed under this key.
     ///
     /// This used to be a bare claim with absence folded into
-    /// `CapabilityEffectErrorV1::UncommittedReceipt`. It was the one observer
-    /// port in fourteen across both crates that did so, and the split ran
+    /// `CapabilityEffectErrorV1::UncommittedReceipt`, and the split ran
     /// through this very file: [`CapabilityLocalEffectStoreV1::recover_receipt`]
     /// reads THE SAME ROW under the IDENTICAL
     /// [`VerifiedCapabilityReceiptRecoveryV1`] and the IDENTICAL

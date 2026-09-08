@@ -161,7 +161,7 @@ impl CellProofConsumptionV1 {
 /// `RebalanceSourceIssuanceWriteSetPartsV1`, `RebalanceClosureWriteSetPartsV1`,
 /// `RebalanceLeafResultWriteSetPartsV1`,
 /// `MovementActionRejectionWriteSetPartsV1` - has no `proof_consumptions` field,
-/// while all four drain write sets do. That is exactly why
+/// while every drain write set does. That is exactly why
 /// `DrainContributorSealCommitObservation` has a variant and the structurally
 /// identical rebalance commit observations do not: the difference is where the
 /// consumption can be written, not what the proof looks like.

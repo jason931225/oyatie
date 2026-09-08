@@ -315,7 +315,7 @@ pub struct CapabilityEffectExpectationV1 {
 /// `Writable`, so `disposition > Writable` would silently merge two different
 /// branches, and `disposition >= Fenced` would read as "terminal" while
 /// `Fenced` is not terminal at all. Whether a record is terminal is stated by
-/// the transition relation above and by the two variants marked terminal,
+/// the transition relation above and by the variants marked terminal,
 /// never by a comparison.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum LocalAuthorityDispositionV1 {
@@ -492,9 +492,8 @@ pub struct LocalEffectCommitRequestV1<E> {
     /// - `scope` must equal the grant's scope.
     ///   Refusal: [`CapabilityEffectErrorV1::RelationMismatch`].
     /// - `owner_generation` must be the owner generation the grant's context
-    ///   carries. It is one of the four values Cell projects and never
-    ///   assigns, so proposing another is proposing authority the owner did
-    ///   not issue.
+    ///   carries. It is a value Cell projects and never assigns, so proposing
+    ///   another is proposing authority the owner did not issue.
     ///   Refusal: [`CapabilityEffectErrorV1::AuthorityContextMismatch`].
     /// - `rejected_instance_root_digest` and `rejected_instance_count` must be
     ///   the store's own recomputation over the membership it durably retains
@@ -743,7 +742,8 @@ pub enum CapabilityEffectErrorV1 {
     /// scoped to the word "context", which left the membership row (the row
     /// `StaleIncarnation` depends on) with no refusal at all, and for another
     /// scoped by a count of two, which would leave a third successor record
-    /// bare the day one is added. This enum grew in three rounds of four.
+    /// bare the day one is added. This enum has grown in successive rounds, which
+    /// is the reason its scope is stated as a principle rather than as a count.
     ///
     /// Not `ActionNotPermittedByContext`, which is about the context the GRANT
     /// carries being wrong for the action; here the grant's context may be

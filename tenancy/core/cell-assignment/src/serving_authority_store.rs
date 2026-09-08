@@ -98,7 +98,7 @@ pub enum ServingAuthorityStoreError {
     /// [`crate::ServingAuthorityRejectionHighWaterV1`] row proposed as
     /// `next_rejection_high_water`.
     ///
-    /// An earlier version of this doc listed only the four instance fields. A
+    /// An earlier version of this doc listed only the instance fields. A
     /// refusal scoped by enumeration leaves everything not enumerated bare, and
     /// it left bare the high-water row sitting one line below the field the
     /// enumeration was written on -- the row `StaleIncarnation` and
@@ -116,8 +116,8 @@ pub enum ServingAuthorityStoreError {
     /// PRECONDITIONS ARE COMPARED FIRST, and this variant is raised only when
     /// every precondition holds and a restated owner-owned value still
     /// disagrees. That order is stated here and at the head of
-    /// `tenancy/binding/v1/serving_authority.proto`, which the fifteen pointer
-    /// files inherit, so the wire and the Rust agree.
+    /// `tenancy/binding/v1/serving_authority.proto`, which every pointer file
+    /// inherits, so the wire and the Rust agree.
     ///
     /// Getting it the other way round tells an operator to stop restating a
     /// value the write set requires BY VALUE -- `next_item`, `installed`,
@@ -256,7 +256,7 @@ pub trait CellServingAuthorityStore: Send + Sync {
     ///
     /// Every mutation on this store takes a
     /// [`crate::ServingAuthorityRejectionHighWaterV1`] as a CAS precondition --
-    /// it is a member of all three arms of
+    /// it is a member of every arm of
     /// [`crate::ServingAuthorityLocalPreconditionV1`], and installation also
     /// supplies a `next_rejection_high_water` -- and nothing returned one. The
     /// type was write-only, which left

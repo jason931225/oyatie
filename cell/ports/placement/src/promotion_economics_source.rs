@@ -550,7 +550,7 @@ pub enum PromotionEconomicsClosureStepOutcomeV1 {
 /// which holds them from construction; the evaluation time is
 /// [`PromotionEconomicsClosureRequestV1::now_unix_seconds`].
 ///
-/// That is the whole reason `issuer` is passed rather than five loose values:
+/// That is the whole reason `issuer` is passed rather than loose values:
 /// there is no parameter on this function through which a registry or a policy
 /// could arrive from anywhere but the policy port. Before the port existed the
 /// same guarantee was claimed for values the issuer had been HANDED at
@@ -569,7 +569,7 @@ fn advance_promotion_economics_closure_step<'a>(
 
 /// The concrete cell-owned closure issuer.
 ///
-/// It holds five ports from CONSTRUCTION and NO SELECTION-RELEVANT VALUES. The
+/// It holds its ports from CONSTRUCTION and NO SELECTION-RELEVANT VALUES. The
 /// registry and the policy are selection-relevant, so a surface that can yield
 /// a private-field verified wrapper must not take either from the party asking
 /// for the wrapper — and it must not take them from that party at construction

@@ -63,7 +63,7 @@ pub enum PlacementContractError {
     /// subsequently vouch for.
     ///
     /// The sibling taxonomies state the same rule, and this one lacked it while
-    /// six write sets under it carried proposed successors:
+    /// write sets under it carried proposed successors:
     /// [`crate::CapabilityEffectErrorV1::Conflict`] covers a proposed successor
     /// revision, and `CapabilityEffectErrorV1::AuthorityContextMismatch`
     /// covers a restated owner-assigned value. Note the split those two draw

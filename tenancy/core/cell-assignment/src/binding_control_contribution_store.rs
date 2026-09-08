@@ -176,7 +176,7 @@ pub trait BindingControlContributionIssuer: Send + Sync {
 /// but a producer. This port is that producer, and it is the fourth instance of
 /// the same shape on this lane.
 ///
-/// The type now occurs at three sites: its own definition, the `attestation`
+/// The type now occurs only at: its own definition, the `attestation`
 /// member of [`crate::CommittedBindingControlContributionClaimV1`], and this
 /// port's return. It is NOT reachable through
 /// [`BindingControlContributionSourceStore::load_committed`], which returns the

@@ -280,7 +280,7 @@ pub trait PromotionEconomicsCheckpointCommitObserver: Send + Sync {
 /// never copied out of the claim: a claim that supplies its own expectation
 /// proves nothing.
 ///
-/// The three identity fields have a source: the observer admission on the
+/// The identity fields have a source: the observer admission on the
 /// policy. Before that admission existed this type could not be populated by
 /// the one caller that must build it — `advance_cell_promotion_economics`
 /// constructs this expectation itself, and no input it held named an observer.
@@ -299,7 +299,7 @@ pub struct PromotionEconomicsCheckpointExpectationV1 {
     pub expected_cell: CellRevisionIdentityV1,
     pub expected_registry_digest: Digest32,
     pub expected_policy_digest: Digest32,
-    /// All three identity fields are populated from
+    /// Every identity field is populated from
     /// [`crate::PromotionEconomicsPolicyV1::checkpoint_observer`], the cell's
     /// admission of the observer, which the verified closure's `policy_digest`
     /// commits. They are never taken from the observation being checked: an
@@ -576,7 +576,7 @@ pub type PromotionEconomicsCheckpointAcquisitionV1 = (
 /// returning one.
 ///
 /// CLAUSE (a) IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL REFUSAL, and this
-/// heading used to state it without that caveat while the two Tenancy ports
+/// heading used to state it without that caveat while the Tenancy ports
 /// stating the identical clause carried it. [`crate::CellProofVerifier`] is a
 /// public trait and [`verify_promotion_economics_checkpoint`] — the mint for
 /// the wrapper this clause is about — takes it as `&dyn`, so one out-of-crate
@@ -710,7 +710,7 @@ pub enum PromotionEconomicsVerificationStepOutcomeV1 {
 ///
 /// # What this is
 ///
-/// A grouping of the four ports a single replay needs, passed together because
+/// A grouping of the ports a single replay needs, passed together because
 /// they are always passed together. Seven loose arguments that must travel in a
 /// fixed relationship were a struct that had not been written yet, and needing
 /// an eighth is what made that visible.
@@ -775,7 +775,7 @@ pub struct PromotionEconomicsReplayPortsV1<'a> {
 /// checked against that closure.
 ///
 /// The collaborator set arrives as [`PromotionEconomicsReplayPortsV1`]. Two of
-/// its four members were absent from this signature before: the checkpoint
+/// its members were absent from this signature before: the checkpoint
 /// observer, without which a resumed checkpoint cannot be turned into verified
 /// progress at all, and the proof verifier, without which "recomputed against
 /// its authenticated finalization" above could not be performed — this function

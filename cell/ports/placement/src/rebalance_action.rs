@@ -29,7 +29,7 @@ pub struct RebalanceJobClaimV1 {
     pub record_digest: Digest32,
 }
 
-/// Compare-and-set on the two rows a rebalance source write advances together:
+/// Compare-and-set on the rows a rebalance source write advances together:
 /// the job row [`crate::RebalanceJobV1`], named by `expected_job_revision` and
 /// `expected_job_digest`, and the worker's lease on it,
 /// [`crate::RebalanceJobClaimV1`], named by `expected_claim`. Both rows are

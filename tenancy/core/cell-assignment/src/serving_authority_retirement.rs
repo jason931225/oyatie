@@ -53,7 +53,7 @@ pub struct ServingAuthorityRetirementExpectationV1 {
 /// CONFIDENCE. This rests on the payload's subject, which is the same test that
 /// settled the surviving quorum the other way. It does NOT rest on issuer
 /// symmetry with the install and freeze grant issuers; that symmetry is real
-/// but those two attest this store's own committed control rows, and this one
+/// but those attest this store's own committed control rows, and this one
 /// does not, so the asymmetry is the correct outcome rather than an omission.
 /// What would overturn this: any evidence that the retiring party is the same
 /// control plane that performs the replacement write.

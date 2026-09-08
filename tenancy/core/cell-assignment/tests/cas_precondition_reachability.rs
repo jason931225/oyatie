@@ -83,8 +83,8 @@
 //! ordering the authority types, and that ordering is now stated in the tree at
 //! `BindingPersistenceAuthorityV1::read_authority` and derived from it there.
 //! `RecordTransferExecutionOutcomeWriteSetPartsV1::item_precondition` was the
-//! instance this paragraph used to name; it is one of the ninety obligations
-//! Law C judges.
+//! instance this paragraph used to name; it is one of the obligations Law C
+//! judges.
 //!
 //! It asserts that the offending sets are EMPTY and prints their members. It
 //! asserts no count and no non-zero quantity: a live finding count goes red
@@ -1098,9 +1098,9 @@ fn every_required_precondition_has_a_reachable_first_value() {
 // names agree once `PersistenceAuthorityV1` and `ReadAuthorityV1` are removed,
 // AND where the persistence type declares a method that actually hands back its
 // read twin. The second half is what makes the conjunct load-bearing rather than
-// decorative: delete `BindingPersistenceAuthorityV1::read_authority` and
-// sixty-five obligations go open, which is the correct answer, because without
-// it a writer has no way to perform the read.
+// decorative: delete `BindingPersistenceAuthorityV1::read_authority` and every
+// obligation resting on that pair goes open, which is the correct answer,
+// because without it a writer has no way to perform the read.
 // Typing the seven pairs in as a table would be the name-keyed census this wave
 // keeps being caught by; deriving them means a pair born tomorrow is in scope
 // the day it is declared. The ordering runs ONE WAY: a read authority never

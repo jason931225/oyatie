@@ -108,7 +108,7 @@ pub trait CapabilityInstalledEffectGrantIssuerV1: Send + Sync {
     /// and a signer that returned its own evidence would be attesting to its
     /// own output.
     ///
-    /// The word DIRECTLY is load-bearing and matches the two Tenancy ports
+    /// The word DIRECTLY is load-bearing and matches the Tenancy ports
     /// stating the same clause. An out-of-crate implementer can still obtain a
     /// private-field wrapper by implementing [`crate::CellProofVerifier`] and
     /// handing itself to a `verify_*`; the private field refuses direct

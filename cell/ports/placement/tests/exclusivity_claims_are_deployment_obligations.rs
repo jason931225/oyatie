@@ -27,10 +27,13 @@
 //! 2. SIGNATURE. The minted set is computed from the tree: every type returned
 //!    by a function HANDED a `dyn ...Verifier`. A block is in scope only when it
 //!    is ATTACHED to such a function, to a minted type's declaration, to a trait
-//!    declaring such a method, to a trait whose own doc LINKS such a function, to
-//!    a function returning a minted wrapper, to a trait declaring such a method,
-//!    or is the `//!` doc of a file that declares one. Seven arms, not five.
-//!    Scope is never inferred from a file's name or from a mention in prose.
+//!    declaring a method HANDED one, to a trait declaring a method RETURNING a
+//!    minted wrapper, to a trait whose own doc LINKS such a function, to a
+//!    function returning a minted wrapper, or is the `//!` doc of a file that
+//!    declares one. Those are the arms `scope_of` implements and no others; the
+//!    trait arms differ in what they key on, and an earlier wording spelled them
+//!    the same, which is how a list can be complete and still unreadable. Scope
+//!    is never inferred from a file's name or from a mention in prose.
 //!
 //!    WHAT "HANDED" MEANS, AND WHY IT IS NOT `&dyn` ANY MORE. The first draft
 //!    keyed on the literal token `&dyn` anywhere in the signature text. Three

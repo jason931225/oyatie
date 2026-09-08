@@ -503,7 +503,7 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     /// it as `next_item` — so `Absent` is not a legal answer here and
     /// `Matches` is required.
     ///
-    /// TWO OF ITS THREE MEMBERS COME FROM THE COMMIT OBSERVATION THE PUBLISHER
+    /// MOST OF ITS MEMBERS COME FROM THE COMMIT OBSERVATION THE PUBLISHER
     /// ALREADY HOLDS: `revision` is
     /// [`TransferExecutionCommitObservationPayloadV1::observed_item_revision`]
     /// and `record_digest` is
@@ -562,7 +562,7 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     /// `TransferExecutionStore::issue_permit`/`publish_permit`,
     /// `MigrationReleaseStore::commit_release_issuance`/`publish_release_permit`,
     /// `CellServingAuthorityStore::renew_write_authority_lease`/`publish_write_authority_lease`,
-    /// and the two cell publication write sets.
+    /// and the cell publication write sets.
     ///
     /// DO NOT BIND it when the signed product crosses a store boundary. The
     /// receiving store does not hold the committed record and cannot condition

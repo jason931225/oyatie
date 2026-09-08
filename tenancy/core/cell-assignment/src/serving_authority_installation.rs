@@ -116,7 +116,7 @@ pub struct ServingAuthorityInstallationWriteSetPartsV1 {
     /// [`crate::ServingAuthorityInstanceV1`] are EXAMPLES, NOT THE EXTENT: this
     /// very record also carries `revision` and `record_digest` of its own,
     /// which an enumeration of those four omitted while the wire's file-scope
-    /// rule covered them. Seven other members across this crate delegate their
+    /// rule covered them. Other members across this crate delegate their
     /// obligation to this doc, so an enumeration here under-scopes all of them.
     /// The store MUST derive the owned values itself and refuse a proposal that
     /// restates them differently, with
