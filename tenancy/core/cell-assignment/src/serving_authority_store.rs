@@ -108,6 +108,24 @@ pub enum ServingAuthorityStoreError {
     /// against durable state, and re-reading may resolve it. This is the
     /// caller's proposal contradicting a value it does not own, and re-reading
     /// resolves it only if the caller then stops restating the value.
+    ///
+    /// THE CHECK ORDER, because both fire on the ordinary stale read and their
+    /// remedies are opposite. A caller that read a row, lost a race and then
+    /// assembled a write set has a stale precondition AND a restated owner-owned
+    /// value that now disagrees -- the same staleness seen twice.
+    /// PRECONDITIONS ARE COMPARED FIRST, and this variant is raised only when
+    /// every precondition holds and a restated owner-owned value still
+    /// disagrees. That order is stated here and at the head of
+    /// `tenancy/binding/v1/serving_authority.proto`, which the fifteen pointer
+    /// files inherit, so the wire and the Rust agree.
+    ///
+    /// Getting it the other way round tells an operator to stop restating a
+    /// value the write set requires BY VALUE -- `next_item`, `installed`,
+    /// `next_lease_state`, `published_issuance` and `next_snapshot` are all
+    /// non-optional members -- which is not a remedy that can be performed, when
+    /// the remedy that could be was re-read and retry. An implementation that
+    /// derives successors only after checking preconditions gets this right by
+    /// construction; that is now written rather than left to construction.
     ProposedSuccessorMismatch,
     /// The issuance's publication lease is held by another worker whose lease
     /// has NOT expired against the claimant's `now_unix_seconds`.

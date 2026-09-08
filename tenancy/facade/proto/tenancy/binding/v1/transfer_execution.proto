@@ -109,8 +109,25 @@ message TransferExecutionLedgerV1 {
   Digest32 record_digest = 13;
 }
 
+// Where one transfer-execution item row stands. The store DERIVES this value; a
+// caller restating it in a proposed successor is subject to the ownership rule
+// pointed at from the head of this file.
 enum TransferExecutionItemDispositionV1 {
   TRANSFER_EXECUTION_ITEM_DISPOSITION_V1_UNSPECIFIED = 0;
+  // NO WRITE IN THIS CONTRACT CAN PRODUCE AN ITEM ROW IN THIS STATE. The only
+  // write carrying an item for a row that need not already exist is
+  // IssueTransferExecutionPermit, whose item precondition has an Absent arm, so
+  // the transition it performs is Absent -> PERMIT_ISSUED. There is no earlier
+  // write to leave a row here.
+  //
+  // Stated because this is the LOWEST non-zero tag -- the value a naive "first
+  // state after unspecified" implementation reaches for -- and an adapter author
+  // reads this schema rather than the Rust. A durable row carrying it is a
+  // BindingStoreError CONFLICT against the item precondition, not a state to
+  // advance from.
+  //
+  // NOT reserved: the tag is in use by this value, and reserving a number a live
+  // value occupies would be a different and false claim.
   TRANSFER_EXECUTION_ITEM_DISPOSITION_V1_PENDING_PERMIT = 1;
   TRANSFER_EXECUTION_ITEM_DISPOSITION_V1_PERMIT_ISSUED = 2;
   TRANSFER_EXECUTION_ITEM_DISPOSITION_V1_OUTCOME_RECORDED = 3;

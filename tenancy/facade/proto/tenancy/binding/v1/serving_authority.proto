@@ -27,6 +27,17 @@ import "tenancy/identity/v1/identity.proto";
 // round scoped by enumerating four fields of ServingAuthorityInstanceV1 and for
 // another by naming one row.
 //
+// THE CHECK ORDER, because both refusals fire on the ordinary stale read and
+// their remedies are opposite. A caller that read a row, lost a race and then
+// assembled a write set has BOTH a stale precondition AND a restated
+// owner-owned value that now disagrees -- the same staleness seen twice.
+// PRECONDITIONS ARE COMPARED FIRST. PROPOSED_SUCCESSOR_MISMATCH is raised only
+// when every precondition holds and a restated owner-owned value still
+// disagrees. Without that order an operator is told to stop restating a value
+// the write set requires BY VALUE -- next_item, installed, next_lease_state,
+// published_issuance and next_snapshot are all non-optional members -- which is
+// not a remedy anyone can perform, when the real remedy was re-read and retry.
+//
 // The refusals: ServingAuthorityStoreError PROPOSED_SUCCESSOR_MISMATCH on the
 // serving-authority store, and BindingStoreError PROPOSED_SUCCESSOR_MISMATCH on
 // the binding store, which mirrors it. Neither enum is on the wire; this

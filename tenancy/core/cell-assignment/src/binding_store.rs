@@ -76,7 +76,9 @@ pub enum BindingStoreError {
     /// the restatement disagrees with what the store derives. See
     /// [`crate::ServingAuthorityStoreError::ProposedSuccessorMismatch`], which
     /// states the obligation in full; this is the same refusal on the binding
-    /// taxonomy.
+    /// taxonomy, and it inherits the check order stated there: preconditions are
+    /// compared first, and this is raised only when they hold and a restated
+    /// owner-owned value still disagrees.
     ProposedSuccessorMismatch,
 }
 
