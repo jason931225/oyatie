@@ -18,6 +18,10 @@ import "tenancy/identity/v1/identity.proto";
 // owns and refuses a disagreeing proposal, and the scope is every owner-owned
 // or store-derived value a proposal restates -- a field, a nested record or a
 // whole row -- not a list.
+// The refusal an adapter must raise is part of the rule and is restated here so
+// this pointer is not half of it: ServingAuthorityStoreError
+// PROPOSED_SUCCESSOR_MISMATCH on the serving-authority store, and
+// BindingStoreError PROPOSED_SUCCESSOR_MISMATCH on the binding store.
 
 message InitialWriteAuthorityBasisV1 {
   Digest32 binding_attempt_digest = 1;

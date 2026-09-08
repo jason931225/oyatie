@@ -21,6 +21,37 @@ import "cell/placement/v1/control_operation.proto";
 import "cell/placement/v1/lifecycle.proto";
 import "tenancy/identity/v1/identity.proto";
 
+// OWNERSHIP OF PROPOSED SUCCESSOR ROWS -- THE RULE FOR EVERY MESSAGE IN THIS
+// FILE THAT A WRITE SET NAMES AS A SUCCESSOR.
+//
+// An adapter author reads this schema to learn who owns each value, and must
+// not resolve that independently. The Rust half of this rule already exists at
+// cell/ports/placement PlacementContractError::Conflict; it was stated there
+// for the owning side and withheld here, on the wire, for the same side --
+// while the PROJECTING side states it at file scope in
+// cell/placement/v1/capability_effect.proto. The owning side needs it MORE: a
+// proposal the store does not recompute corrupts the authoritative value that a
+// later signed observation then vouches for.
+//
+// A caller may PROPOSE an advanced row in a write set. The store DERIVES every
+// value it owns and REFUSES a disagreeing proposal rather than persisting what
+// it was handed. A proposal is an assertion about where the record stands, not
+// authority to write.
+//
+// THE SCOPE IS EVERY OWNER-OWNED OR STORE-DERIVED VALUE A PROPOSAL RESTATES --
+// WHETHER A FIELD, A NESTED RECORD, OR A WHOLE ROW -- AND NOT A LIST. Epochs,
+// revisions, record digests, states, roots, counts and update instants are
+// EXAMPLES of the shape, NOT its extent. A refusal scoped by enumeration leaves
+// everything not enumerated bare.
+//
+// The refusal: PlacementContractError CONFLICT, on the rebalance source store.
+// That enum is not on the wire; the name is given so an adapter author knows
+// which refusal to raise. RebalanceJobClaimV1.epoch is a fence the store owns --
+// claim advances it and returns the advanced record -- and
+// MovementActionClosureCommitObservationV1.claim_epoch_at_commit is later
+// SIGNED OVER it by an independent observer, so a proposed epoch the store does
+// not recompute is a value a signed observation will subsequently vouch for.
+
 message RebalanceJobAddressV1 { string partition = 1; string job_id = 2; }
 
 message RebalanceJobClaimV1 {
