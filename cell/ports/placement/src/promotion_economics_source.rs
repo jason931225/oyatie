@@ -8,7 +8,10 @@
 //! not sit between:
 //!
 //! 1. The cell's own policy selects a [`PromotionEconomicsSourceRegistryV1`]
-//!    naming every source scope required for this cell and window.
+//!    naming every source scope required for this cell and window. That
+//!    selection reaches this contract through
+//!    [`CellPromotionEconomicsPolicySource`], a port, rather than through an
+//!    argument: a registry a caller hands in is a registry a caller chose.
 //! 2. Each admitted source's owner signs a
 //!    [`SignedPromotionEconomicsSourceFinalizationV1`] over a closed, immutable
 //!    snapshot of its own scope.
@@ -114,11 +117,21 @@ pub struct PromotionEconomicsSourceAdmissionV1 {
 /// The complete set of source scopes the cell requires for one cell and
 /// partition.
 ///
-/// Issued under verified cell control policy authority. It is never selected
-/// from promoter input, and passing one to a public entrypoint never makes it
-/// expected: see [`CellPromotionEconomicsClosureIssuerV1`], which holds its
-/// admitted registry from construction so that no per-call argument can
-/// substitute a smaller one.
+/// It is a plain public-field record with no producer and no verifier anywhere
+/// in this crate, so possessing one proves nothing. What is supposed to make a
+/// registry EXPECTED is where it came from:
+/// [`CellPromotionEconomicsPolicySource`] is the only route in this contract by
+/// which one becomes the registry a closure is resolved against, and no public
+/// entrypoint on this path takes one as an argument.
+///
+/// An earlier version of this doc said the registry is "issued under verified
+/// cell control policy authority" while
+/// [`CellPromotionEconomicsClosureIssuerV1::admit`] took the registry from its
+/// own caller and held no port through which any policy authority could be
+/// reached. The issuing authority it named did not exist in the contract. It
+/// exists now, as a port. What that port does NOT do is authenticate the
+/// registry value — no type here can — and the half that stays a deployment
+/// obligation is stated on the port itself.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PromotionEconomicsSourceRegistryV1 {
     pub partition: PlacementPartitionV1,
@@ -230,9 +243,16 @@ pub struct PromotionEconomicsClosureV1 {
 /// A closure every admitted source of which has been covered by an
 /// authenticated finalization.
 ///
-/// Private field, no public constructor, no deserialization path. Only the
-/// checked issuer in this module can produce one, which is why no caller can
-/// make its own registry expected merely by passing it somewhere.
+/// Private field, no public constructor, no deserialization path. The only
+/// producer is the private `advance_promotion_economics_closure_step`, whose
+/// registry and policy come from [`CellPromotionEconomicsPolicySource`] rather
+/// than from anything the caller of closure construction passes.
+///
+/// THAT LAST CLAUSE IS A PROPERTY OF THIS SIGNATURE, NOT OF THE TRUST MODEL.
+/// The private field refuses direct construction. What it does not refuse is a
+/// deployment that composes a dishonest policy source, and no type in this
+/// crate can: see [`CellPromotionEconomicsPolicySource`] for what the port
+/// establishes and what it leaves to the composition root.
 #[derive(Debug, Eq, PartialEq)]
 pub struct VerifiedPromotionEconomicsClosure(PromotionEconomicsClosureV1);
 
@@ -246,8 +266,19 @@ impl VerifiedPromotionEconomicsClosure {
 /// What a caller asks the closure authority to resolve.
 ///
 /// It names the cell, partition, window and the policy generation the caller
-/// believes is current. It cannot name a registry: the registry is the
-/// authority's, held from construction.
+/// believes is current. There is deliberately no member through which it could
+/// name a registry, a policy or a taxonomy: those are resolved for this address
+/// and generation through [`CellPromotionEconomicsPolicySource`], so the
+/// population and the judge of the population do not arrive from the party
+/// whose closure is being resolved.
+///
+/// `expected_policy_generation` is an EXPECTATION, not a selection. It is
+/// compared against the generation the policy source returns, and a
+/// disagreement is
+/// [`PromotionEconomicsVerificationErrorV1::PolicyMismatch`]; a caller naming a
+/// generation cannot thereby obtain a population of its own choosing, because
+/// what that generation names is the policy source's answer and not the
+/// caller's.
 ///
 /// `now_unix_seconds` is carried here rather than passed separately because
 /// [`PromotionEconomicsClosureAuthority::resolve_expected`] is the only public
@@ -265,8 +296,16 @@ pub struct PromotionEconomicsClosureRequestV1 {
 /// The cell-owned issuer port that resolves the expected closure.
 ///
 /// This trait is the ONLY public way to obtain a
-/// [`VerifiedPromotionEconomicsClosure`]. Implementations must resolve their
-/// registry from native cell policy and must not accept one per call.
+/// [`VerifiedPromotionEconomicsClosure`], and neither it nor
+/// [`PromotionEconomicsClosureRequestV1`] has a member through which a caller
+/// could offer a registry or a policy. Implementations resolve both through
+/// [`CellPromotionEconomicsPolicySource`].
+///
+/// The trait is sealed in practice — the only implementer is the in-crate
+/// [`CellPromotionEconomicsClosureIssuerV1`] — and that seal now delegates to a
+/// port rather than to an admission that took its selection-relevant inputs
+/// from its own caller. See the port for what the delegation establishes and
+/// for the part of it that remains a deployment obligation.
 ///
 /// Large registries use the same bounded resumable machinery as input replay:
 /// while closure construction is unfinished, `resolve_expected` returns
@@ -291,6 +330,97 @@ pub trait PromotionEconomicsClosureAuthority: Send + Sync {
     ) -> BoxCellFuture<
         'a,
         Result<PromotionEconomicsClosureStepOutcomeV1, PromotionEconomicsVerificationErrorV1>,
+    >;
+}
+
+/// What the cell's own policy surface is asked to select.
+///
+/// An address and a generation, and nothing else. There is deliberately no
+/// member through which a caller could offer a registry, a policy or a
+/// taxonomy: a selection request that carried the thing being selected would be
+/// the hole this port exists to close.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromotionEconomicsPolicySelectionV1 {
+    pub partition: PlacementPartitionV1,
+    pub cell_id: CellId,
+    pub expected_policy_generation: u64,
+}
+
+/// The registry and the policy that the cell's own policy selects for one
+/// address and generation.
+///
+/// The two arrive TOGETHER from one call, not from two. Splitting them would
+/// let one be current and the other stale, and the check that binds them —
+/// every admission's `cost_taxonomy_digest` against the policy taxonomy's
+/// `definition_digest` — would then be comparing two generations and passing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdmittedPromotionEconomicsPopulationV1 {
+    pub registry: PromotionEconomicsSourceRegistryV1,
+    pub policy: PromotionEconomicsPolicyV1,
+}
+
+/// The cell's own policy surface: the route by which a source registry and an
+/// economics policy become the ones a closure is resolved against.
+///
+/// # Why this port exists
+///
+/// [`PromotionEconomicsSourceRegistryV1`] and
+/// [`crate::PromotionEconomicsPolicyV1`] are the two SELECTION-RELEVANT inputs
+/// on this path. The registry fixes which sources count; the policy fixes the
+/// taxonomy, the thresholds and — through
+/// [`crate::PromotionEconomicsCheckpointObserverAdmissionV1`] — who is admitted
+/// to vouch for a checkpoint. Both are plain public-field structs with no
+/// producer and no verifier, so a party that supplies both supplies the
+/// population and the judge of the population in one breath.
+///
+/// [`CellPromotionEconomicsClosureIssuerV1::admit`] used to take both from its
+/// caller while its doc prescribed resolving the registry "from native cell
+/// policy at `policy.policy_generation`" — where `policy` was the caller's own
+/// argument. That is a doc claiming a property its own signature could not
+/// perform: no implementation of `admit`, however honest, could consult native
+/// cell policy through a signature that contained no route to it, so the gap
+/// could not have closed by implementation. It closes only by putting the route
+/// in the signature, which is what this port is, and it is the same remedy this
+/// module already applied when
+/// [`crate::PromotionEconomicsReplayPortsV1`] gained the proof verifier it had
+/// been documented as using.
+///
+/// # What it establishes, and what it does not
+///
+/// ESTABLISHED BY THE SIGNATURE: no per-call argument on this path can
+/// substitute a registry or a policy. `resolve_expected` takes a
+/// [`PromotionEconomicsClosureRequestV1`], which has no member for either; the
+/// private closure step reaches both only through this port; and this port is
+/// asked only for an address and a generation.
+///
+/// NOT ESTABLISHED, AND STATED RATHER THAN IMPLIED: this port is composed like
+/// every other port here, so WHICH implementation serves native cell policy is
+/// a DEPLOYMENT OBLIGATION. A composition root that wires an implementation the
+/// promoter controls gets a population the promoter chose, and nothing in these
+/// types refuses that. The contract expresses who is supposed to hold the role
+/// and gives a conforming deployment the shape to enforce it; it does not
+/// enforce it. This is the same species of obligation as clause (a) — see
+/// [`crate::MovementActionResultAuthority`] — and it is written down here
+/// because the previous wording of this module presented it as a structural
+/// property three times over.
+///
+/// # Refusals
+///
+/// An implementation refuses rather than answering approximately:
+/// [`PromotionEconomicsVerificationErrorV1::PolicyMismatch`] when no policy is
+/// admitted at the requested generation or the returned pair disagree on
+/// taxonomy; [`PromotionEconomicsVerificationErrorV1::CellMismatch`] when the
+/// selected registry's `partition` or `cell_id` is not the one asked for; and
+/// [`PromotionEconomicsVerificationErrorV1::NotAuthorized`] when `authority`
+/// does not reach this cell's control state.
+pub trait CellPromotionEconomicsPolicySource: Send + Sync {
+    fn resolve_admitted_population<'a>(
+        &'a self,
+        authority: &'a CellControlReadAuthorityV1,
+        selection: &'a PromotionEconomicsPolicySelectionV1,
+    ) -> BoxCellFuture<
+        'a,
+        Result<AdmittedPromotionEconomicsPopulationV1, PromotionEconomicsVerificationErrorV1>,
     >;
 }
 
@@ -362,21 +492,26 @@ pub enum PromotionEconomicsClosureStepOutcomeV1 {
 /// struct, and this step can mint the private-field
 /// [`VerifiedPromotionEconomicsClosure`]. A public function taking the registry
 /// per call would let a caller select a smaller registry and have the result
-/// come back stamped as verified. Making the registry argument come from the
-/// issuer's construction instead gives that check exactly one owner:
-/// [`CellPromotionEconomicsClosureIssuerV1`], the sole caller of this function.
+/// come back stamped as verified.
 ///
 /// Its `SourceClosure` verification key is deliberately keyed on the registry
 /// digest and not on a closure digest, because the closure digest is the
 /// output of this phase and does not exist while the phase is running.
 ///
-/// The registry reader, checkpoint store, proof verifier, admitted registry and
-/// approved policy are all reached through `issuer`, which holds them from
-/// construction; the evaluation time is
-/// [`PromotionEconomicsClosureRequestV1::now_unix_seconds`]. Passing the issuer
-/// rather than those five values separately is not an abbreviation: it is what
-/// makes it impossible to call this step with a registry or policy the issuer
-/// was not admitted for.
+/// The registry and the policy are obtained here, once per resolution, from
+/// [`CellPromotionEconomicsClosureIssuerV1::policy_source`] under `authority`,
+/// with a [`PromotionEconomicsPolicySelectionV1`] built from `request`'s
+/// address and `expected_policy_generation`. The registry reader, checkpoint
+/// store, checkpoint observer and proof verifier are reached through `issuer`,
+/// which holds them from construction; the evaluation time is
+/// [`PromotionEconomicsClosureRequestV1::now_unix_seconds`].
+///
+/// That is the whole reason `issuer` is passed rather than five loose values:
+/// there is no parameter on this function through which a registry or a policy
+/// could arrive from anywhere but the policy port. Before the port existed the
+/// same guarantee was claimed for values the issuer had been HANDED at
+/// construction by the same party that later called it, which guaranteed only
+/// that the party could not change its mind mid-resolution.
 fn advance_promotion_economics_closure_step<'a>(
     _issuer: &'a CellPromotionEconomicsClosureIssuerV1,
     _authority: &'a CellControlReadAuthorityV1,
@@ -390,56 +525,62 @@ fn advance_promotion_economics_closure_step<'a>(
 
 /// The concrete cell-owned closure issuer.
 ///
-/// It holds its registry reader, checkpoint store, proof verifier, admitted
-/// registry and approved policy from CONSTRUCTION. That is the point: the
-/// registry and the policy are selection-relevant, so accepting either as a
-/// per-call argument on a public surface that can yield a private-field
-/// verified wrapper would let the caller choose the answer. Here the only
-/// per-call arguments are the read authority and a request that can name a
-/// cell, window and expected policy generation, none of which can substitute a
-/// different source population.
+/// It holds five ports from CONSTRUCTION and NO SELECTION-RELEVANT VALUES. The
+/// registry and the policy are selection-relevant, so a surface that can yield
+/// a private-field verified wrapper must not take either from the party asking
+/// for the wrapper — and it must not take them from that party at construction
+/// either, which is the correction this type carries. They are resolved instead
+/// through [`CellPromotionEconomicsPolicySource`], and the only per-call
+/// arguments are a read authority and a request naming a cell, a window and an
+/// expected policy generation, none of which can substitute a source
+/// population.
 ///
-/// [`Self::admit`] is where native cell policy selection belongs, and it is a
-/// typed `NotImplemented` stub: no runtime policy authority has been qualified
-/// yet.
+/// Every method here is a typed `NotImplemented` stub; nothing in this crate
+/// resolves policy at runtime yet.
 pub struct CellPromotionEconomicsClosureIssuerV1 {
+    policy_source: Box<dyn CellPromotionEconomicsPolicySource>,
     registry_reader: Box<dyn PromotionEconomicsSourceRegistryReader>,
     checkpoint_store: Box<dyn crate::PromotionEconomicsCheckpointStore>,
     checkpoint_observer: Box<dyn crate::PromotionEconomicsCheckpointCommitObserver>,
     proof_verifier: Box<dyn CellProofVerifier>,
-    registry: PromotionEconomicsSourceRegistryV1,
-    policy: PromotionEconomicsPolicyV1,
 }
 
 impl CellPromotionEconomicsClosureIssuerV1 {
-    /// Admits one issuer for exactly one registry and policy.
+    /// Admits one issuer over the ports it will resolve every closure through.
     ///
-    /// A real implementation resolves the registry from native cell policy at
-    /// `policy.policy_generation` and refuses if the supplied registry is not
-    /// the one that policy selects, if its partition or cell disagrees, or if
-    /// its taxonomy digest disagrees with the policy taxonomy.
+    /// IT TAKES NO REGISTRY AND NO POLICY, and that absence is the contract.
+    /// Two earlier parameters carried both, while this doc prescribed resolving
+    /// the registry "from native cell policy at `policy.policy_generation`" —
+    /// naming the caller's own sixth argument as the anchor. The signature had
+    /// no route to any policy authority, so the check it prescribed could not
+    /// be performed by any implementation of it, honest or otherwise. The route
+    /// is now `policy_source`, and the resolution happens per call in
+    /// `advance_promotion_economics_closure_step` under the caller's verified
+    /// [`CellControlReadAuthorityV1`], which is a value `admit` has no way to
+    /// hold at composition time.
+    ///
+    /// What `admit` still cannot do is authenticate the ports it is handed.
+    /// Choosing an implementation of `policy_source` that really serves native
+    /// cell policy is the composition root's obligation; see the port.
     pub fn admit(
+        _policy_source: Box<dyn CellPromotionEconomicsPolicySource>,
         _registry_reader: Box<dyn PromotionEconomicsSourceRegistryReader>,
         _checkpoint_store: Box<dyn crate::PromotionEconomicsCheckpointStore>,
         _checkpoint_observer: Box<dyn crate::PromotionEconomicsCheckpointCommitObserver>,
         _proof_verifier: Box<dyn CellProofVerifier>,
-        _registry: PromotionEconomicsSourceRegistryV1,
-        _policy: PromotionEconomicsPolicyV1,
     ) -> Result<Self, PromotionEconomicsVerificationErrorV1> {
         Err(PromotionEconomicsVerificationErrorV1::NotImplemented)
     }
 
-    /// The registry this issuer was admitted for. Read-only: there is no
-    /// setter, and no request can replace it.
+    /// The policy source this issuer was admitted with.
+    ///
+    /// There is no `registry()` and no `policy()` accessor, and their removal is
+    /// deliberate rather than tidying: an issuer that could hand back "its"
+    /// registry would be an issuer that had one before a request named a
+    /// generation, which is the shape this type was corrected out of.
     #[must_use]
-    pub fn registry(&self) -> &PromotionEconomicsSourceRegistryV1 {
-        &self.registry
-    }
-
-    /// The policy this issuer was admitted for.
-    #[must_use]
-    pub fn policy(&self) -> &PromotionEconomicsPolicyV1 {
-        &self.policy
+    pub fn policy_source(&self) -> &dyn CellPromotionEconomicsPolicySource {
+        self.policy_source.as_ref()
     }
 
     /// The registry reader this issuer was admitted with.

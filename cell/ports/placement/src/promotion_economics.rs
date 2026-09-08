@@ -281,13 +281,36 @@ pub struct PromotionEconomicsPolicyV1 {
 ///    `closure.policy_digest`.
 /// 2. `closure` is a [`crate::VerifiedPromotionEconomicsClosure`] — a
 ///    private-field wrapper only the closure issuer mints.
-/// 3. The issuer resolves its policy from native cell policy at admission, not
-///    from anything a caller passes.
+/// 3. The issuer resolves its policy through
+///    [`crate::CellPromotionEconomicsPolicySource`], a port, and not from any
+///    value the asking party passes: neither
+///    [`crate::PromotionEconomicsClosureRequestV1`] nor
+///    [`crate::CellPromotionEconomicsClosureIssuerV1::admit`] has a member or a
+///    parameter through which a policy could arrive from that party.
 ///
 /// So substituting an observer identity changes `policy_digest`, which
-/// mismatches a closure the caller cannot forge, and the substitution fails
-/// before any observation is examined. The identity is reachable and it is not
-/// caller-chosen.
+/// mismatches a closure no per-call argument can steer, and the substitution
+/// fails before any observation is examined.
+///
+/// # The half of link 3 that is a DEPLOYMENT OBLIGATION
+///
+/// This chain used to end "the identity is reachable and it is not
+/// caller-chosen", stated as a structural fact, while link 3 was false as
+/// written: for two rounds `admit` took BOTH the registry and the policy from
+/// its caller and held no port through which native cell policy could be
+/// reached, so link 1's comparison compared a caller's value against a caller's
+/// value. Adding the port is what makes link 3 performable at all — a check no
+/// signature can reach cannot be discharged by any implementation of it — and
+/// it is NOT what makes link 3 self-enforcing. `policy_source` is composed like
+/// every other port here, so a deployment that wires an implementation the
+/// promoter controls gets an observer identity the promoter chose, and no type
+/// in this crate refuses that.
+///
+/// WHAT THE TYPES ESTABLISH: no per-call argument substitutes the identity.
+/// WHAT THE DEPLOYMENT MUST ESTABLISH: that the policy source is the cell's
+/// own. Both halves are written down because presenting the second as the first
+/// is the defect this doc carried, and it is the same species as clause (a) —
+/// see [`crate::MovementActionResultAuthority`].
 ///
 /// This mirrors how the module already admits SOURCE identities:
 /// [`crate::PromotionEconomicsSourceAdmissionV1`] carries a producer and an
