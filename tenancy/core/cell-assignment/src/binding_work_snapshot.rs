@@ -73,6 +73,9 @@ pub enum BindingWorkSnapshotPublicationIntentV1 {
     TransferManifest(Box<TransferManifestPublicationIntentV1>),
 }
 
+/// Compare-and-set on the binding work snapshot progress row:
+/// [`BindingWorkSnapshotProgressV1`]. `Absent` asserts the store must find no
+/// progress row, which is the state a first snapshot is in.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BindingWorkSnapshotPreconditionV1 {
     Absent,

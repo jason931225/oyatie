@@ -7,6 +7,13 @@ use crate::{
     PlacementPersistenceAuthorityV1, PlacementReadAuthorityV1,
 };
 
+/// Compare-and-set on the CHILD budget authority row:
+/// [`MovementBudgetAuthorityStateV1`]. `Absent` asserts the store must find no
+/// authority for that partition and scope, which is the state the first
+/// delegation into a scope is in -- the child row is born by this very write,
+/// while the parent row named by
+/// [`MovementBudgetDelegationWriteSetPartsV1::parent_precondition`] must
+/// already exist.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MovementBudgetChildStatePreconditionV1 {
     Absent {

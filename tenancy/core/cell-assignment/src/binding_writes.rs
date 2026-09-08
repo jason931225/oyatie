@@ -12,6 +12,9 @@ use cell_placement::{
     VerifiedCellPlacementDecision, VerifiedReservationCommitPermit,
 };
 
+/// Compare-and-set on the binding row: [`crate::TenantCellBinding`]. `Unbound`
+/// asserts the store must find no binding for the tenant, which is the state a
+/// first bind is in.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BindingWritePrecondition {
     Unbound,
@@ -23,6 +26,9 @@ pub enum BindingWritePrecondition {
     },
 }
 
+/// Compare-and-set on the reservation outcome the same write proposes —
+/// [`cell_placement::SignedBindingOutcomeV1`] — qualified by the attempt it must
+/// belong to, [`crate::BindingReservationAttemptV1`], whose digest it names.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BindingOutcomePreconditionV1 {
     pub query: BindingOutcomeQueryRefV1,

@@ -17,9 +17,20 @@ pub struct BindingCellIndexProjectionWriteSetV1 {
 pub struct BindingCellIndexProjectionWriteSetPartsV1 {
     pub authority: crate::BindingReconciliationPersistenceAuthorityV1,
     pub target: crate::BindingControlContributionTargetV1,
+    /// Compare-and-set on the cell binding index snapshot row this write
+    /// proposes, [`crate::CellBindingIndexSnapshotV1`]. The reconciler receives
+    /// that snapshot's `projection_revision` and `projection_record_digest` in
+    /// the subject it is handed, so both halves are readable under the authority
+    /// this write already holds.
     pub expected_projection_revision: u64,
+    /// Compare-and-set on [`crate::CellBindingIndexSnapshotV1`]; the digest half
+    /// of the pair above.
     pub expected_projection_digest: BindingDigest32,
     pub source_contributions: Vec<crate::VerifiedBindingControlContributionHandoff>,
+    /// Compare-and-set on the per-source contribution checkpoints,
+    /// [`crate::BindingControlContributionCheckpointV1`], advanced by
+    /// `next_source_checkpoints` below. They are carried as a list rather than as
+    /// a single row, so no write set proposes one of them as a bare record.
     pub expected_source_checkpoints: Vec<crate::BindingControlContributionCheckpointV1>,
     pub next_source_checkpoints: Vec<crate::BindingControlContributionCheckpointV1>,
     pub application_intents: Vec<crate::BindingControlContributionApplicationIntentV1>,

@@ -142,10 +142,18 @@ pub struct CellReservationWriteSetV1 {
 pub struct CellReservationWriteSetPartsV1 {
     pub authority: PlacementPersistenceAuthorityV1,
     pub cell_id: CellId,
+    /// Compare-and-set on the cell's admission term,
+    /// [`crate::CellAdmissionTermV1`]. That term is read here and written
+    /// nowhere in these crates, so no write set opens it and the first-value
+    /// question does not arise.
     pub admission_precondition: crate::CellAdmissionTermV1,
     pub drain_mutations: crate::DrainContributorMutationSetV1,
     pub capacity_precondition: CellCapacityPreconditionV1,
     pub next_capacity: VerifiedCellCapacityLedgerV1,
+    /// Compare-and-set on the reservation effect row this write proposes,
+    /// [`crate::CellReservationEffectRecordV1`]. `None` asserts the store must
+    /// find no reservation for this key, which is the state a first reservation
+    /// is in.
     pub expected_revision: Option<u64>,
     pub status: ReservationStatusV1,
     pub operation_precondition: PlacementOperationPreconditionV1,

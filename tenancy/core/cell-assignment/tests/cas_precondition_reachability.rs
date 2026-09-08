@@ -23,7 +23,10 @@
 //!   (ii)  some carrier proposes `R` with no `R`-precondition at all, so that
 //!         write can open the row unconditionally; or
 //!   (iii) some method taking a write set that does NOT propose `R` yields `R`,
-//!         so an earlier, different write created it.
+//!         so an earlier, different write created it; or
+//!   (iv)  some READ -- a method taking no write set -- hands `R` back outside
+//!         `Option`, which is the contract saying the store materialises the row
+//!         rather than waiting for a write to open it.
 //!
 //! If none holds, every carrier's `R`-precondition is named. This is the
 //! criterion the seats actually applied rather than the narrower "its only
@@ -60,10 +63,18 @@
 //!   * a `*Precondition` struct whose own members resolve to exactly one row;
 //!   * a field name whose stem names exactly one row carried on the same write
 //!     set (`expected_outbox_revision` beside `next_outbox`);
-//!   * a single intra-doc link to an in-crate type, on the field or on the
-//!     field's type declaration. This last route is a contract statement --
-//!     "this compare-and-set is on that row" -- and is the only one an author
-//!     writes by hand.
+//!   * intra-doc links to rows, on the field or on the field's type
+//!     declaration. This last route is a contract statement -- "this
+//!     compare-and-set is on that row" -- and is the only one an author writes
+//!     by hand. EVERY linked row is taken as a subject, so a precondition that
+//!     dispatches over several rows resolves to all of them; links to anything
+//!     that is not a row these write sets propose are ignored.
+//!
+//! A second blind spot follows from that last route: absence capability is
+//! judged for the whole precondition TYPE, not per arm, so a dispatching
+//! precondition with one absent arm discharges clause (i) for every row it
+//! names. Splitting that would need per-arm subjects, which no declaration
+//! here carries.
 //!
 //! THE BLIND SPOT, stated because every key has one. This test sees only the
 //! face of the law where NO VALUE EXISTS YET. It cannot see the other face: a
@@ -191,6 +202,20 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                 continue;
             }
 
+            if let Some(name) = declared_tuple(line) {
+                // A newtype carries no members, but its doc can declare the row
+                // it versions, which is the only route some scalar preconditions
+                // have.
+                model.structs.entry(name).or_insert(Struct {
+                    file: display.clone(),
+                    line: index + 1,
+                    doc: take_doc(&mut pending),
+                    fields: Vec::new(),
+                });
+                index += 1;
+                continue;
+            }
+
             if let Some(name) = declared(line, "pub struct ", " {") {
                 let doc = take_doc(&mut pending);
                 let mut fields = Vec::new();
@@ -281,6 +306,20 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
         }
     }
     model
+}
+
+/// `pub struct Name(...);` or `pub struct Name;`.
+fn declared_tuple(line: &str) -> Option<String> {
+    let rest = line.strip_prefix("pub struct ")?;
+    let name: String = rest
+        .chars()
+        .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+        .collect();
+    if name.is_empty() {
+        return None;
+    }
+    let tail = &rest[name.len()..];
+    (tail.starts_with('(') || tail == ";").then_some(name)
 }
 
 fn declared(line: &str, prefix: &str, suffix: &str) -> Option<String> {
@@ -411,23 +450,23 @@ fn resolve(
     field: &Field,
     rows: &BTreeSet<String>,
     model: &Model,
-) -> Option<Resolution> {
+) -> Vec<Resolution> {
     let ty = unwrap_container(&field.ty);
 
     if rows.contains(&ty) {
-        return Some(Resolution {
+        return vec![Resolution {
             row: ty,
             route: "the field's type is the row",
-        });
+        }];
     }
     for suffix in VERSION_SUFFIXES {
         if let Some(stem) = ty.strip_suffix(suffix) {
             let candidate = format!("{stem}V1");
             if rows.contains(&candidate) {
-                return Some(Resolution {
+                return vec![Resolution {
                     row: candidate,
                     route: "scalar newtype naming the row plus a version role",
-                });
+                }];
             }
         }
     }
@@ -437,17 +476,17 @@ fn resolve(
         };
         let exact = format!("{stem}V1");
         if rows.contains(&exact) {
-            return Some(Resolution {
+            return vec![Resolution {
                 row: exact,
                 route: "precondition type named for the row",
-            });
+            }];
         }
         let prefixed: Vec<&String> = rows.iter().filter(|row| row.starts_with(stem)).collect();
         if let [single] = prefixed.as_slice() {
-            return Some(Resolution {
+            return vec![Resolution {
                 row: (*single).clone(),
                 route: "precondition type is the unique prefix of a row's name",
-            });
+            }];
         }
         if let Some(declaration) = model.structs.get(&ty) {
             let mut inner = BTreeSet::new();
@@ -466,10 +505,10 @@ fn resolve(
                 }
             }
             if inner.len() == 1 {
-                return Some(Resolution {
+                return vec![Resolution {
                     row: inner.into_iter().next().expect("one"),
                     route: "precondition struct whose members resolve to one row",
-                });
+                }];
             }
         }
     }
@@ -489,12 +528,18 @@ fn resolve(
             .filter(|candidate| rows.contains(candidate) && candidate.contains(&needle))
             .collect();
         if hits.len() == 1 {
-            return Some(Resolution {
+            return vec![Resolution {
                 row: hits.into_iter().next().expect("one"),
                 route: "field name stems to the one row this write set carries",
-            });
+            }];
         }
     }
+    // Last route: the author states it. EVERY row this block links is taken as a
+    // subject of the compare-and-set, so a precondition that dispatches over
+    // several rows -- a repair target, say -- resolves to all of them, and a
+    // link to a row must not be written here for any other reason. Links to
+    // anything that is not a row these write sets propose are ignored, so
+    // pointing at a verifier or an error variant costs nothing.
     for doc in [
         field.doc.clone(),
         model
@@ -509,19 +554,36 @@ fn resolve(
             })
             .unwrap_or_default(),
     ] {
-        let links = doc_links(&doc);
-        let named: Vec<&String> = links
-            .iter()
-            .filter(|name| model.structs.contains_key(*name) || model.enums.contains_key(*name))
+        let declared: Vec<String> = doc_links(&doc)
+            .into_iter()
+            .filter(|name| model.structs.contains_key(name) || model.enums.contains_key(name))
             .collect();
-        if let [single] = named.as_slice() {
-            return Some(Resolution {
-                row: (*single).clone(),
-                route: "an intra-doc link declaring the row this compare-and-set is on",
-            });
+        // Prefer rows these write sets propose. A subject that is NOT one of
+        // those -- a capacity ledger written through a verified wrapper, an
+        // admission term this wave only reads, an audience policy owned
+        // elsewhere -- still RESOLVES: the member is attributed, and the birth
+        // question simply does not arise for a row no write set here opens.
+        let preferred: Vec<String> = declared
+            .iter()
+            .filter(|name| rows.contains(*name))
+            .cloned()
+            .collect();
+        let chosen = if preferred.is_empty() {
+            declared
+        } else {
+            preferred
+        };
+        if !chosen.is_empty() {
+            return chosen
+                .into_iter()
+                .map(|row| Resolution {
+                    row,
+                    route: "an intra-doc link declaring the row this compare-and-set is on",
+                })
+                .collect();
         }
     }
-    None
+    Vec::new()
 }
 
 fn write_set_parts(name: &str) -> bool {
@@ -617,7 +679,17 @@ fn sweep(model: &Model) -> Sweep {
     for write_set in &parts {
         for field in &model.structs[*write_set].fields {
             let bare = strip_crate(&field.ty);
-            if !model.structs.contains_key(&bare) || bare.ends_with("PreconditionV1") {
+            // A row is something a store DERIVES. A `Signed*` or `Verified*`
+            // member never is: this wave's own law forbids a store signing its
+            // own write, so such a member is always an input the caller carried
+            // in or a value another party minted, and its revision is nobody's
+            // to compare-and-set here. A `*PreconditionV1` member is the
+            // comparison itself, not the row.
+            if !model.structs.contains_key(&bare)
+                || bare.ends_with("PreconditionV1")
+                || bare.starts_with("Signed")
+                || bare.starts_with("Verified")
+            {
                 continue;
             }
             carriers
@@ -642,19 +714,23 @@ fn sweep(model: &Model) -> Sweep {
                 continue;
             }
             preconditions += 1;
-            match resolve(write_set, field, &rows, model) {
-                Some(resolution) => attributed.entry(resolution.row).or_default().push((
-                    (*write_set).clone(),
-                    field.clone(),
-                    resolution.route,
-                )),
-                None => unresolved.push(Unresolved {
+            let resolutions = resolve(write_set, field, &rows, model);
+            if resolutions.is_empty() {
+                unresolved.push(Unresolved {
                     write_set: (*write_set).clone(),
                     field: field.name.clone(),
                     ty: field.ty.clone(),
                     file: model.structs[*write_set].file.clone(),
                     line: field.line,
-                }),
+                });
+                continue;
+            }
+            for resolution in resolutions {
+                attributed.entry(resolution.row).or_default().push((
+                    (*write_set).clone(),
+                    field.clone(),
+                    resolution.route,
+                ));
             }
         }
     }
@@ -696,7 +772,26 @@ fn sweep(model: &Model) -> Sweep {
                 && parts_taken_by(signature).is_some_and(|taken| !carrier_names.contains(&taken))
         });
 
-        if absence || unconditional || foreign {
+        // (iv) a READ hands the row back unconditionally. A method that takes no
+        // write set and returns the row outside `Option` is a contract statement
+        // that the row is always there -- the store materialises it rather than
+        // waiting for a write to open it -- so a required precondition on it has
+        // a value at every call. This is the "its only backing read returns
+        // `Option`" half of the law, read from the other side.
+        // A caller-facing service RPC is excluded, and a perturbation control is
+        // what found that: `TenancyMigrationCoordinationService::
+        // append_participant_receipt` returns the receipt ledger and takes no
+        // write set, so without this it exonerated the very row the wave was
+        // asked to fix. A facade is a mirror of a store write, never an
+        // independent creator, and it is identifiable by the verified invocation
+        // it takes -- which is exactly what makes it caller-facing.
+        let materialised = model.methods.iter().any(|(_, signature)| {
+            parts_taken_by(signature).is_none()
+                && !signature.contains("Invocation")
+                && returned(signature).is_some_and(|value| value == *row)
+        });
+
+        if absence || unconditional || foreign || materialised {
             continue;
         }
         for (write_set, field, route) in on_carriers {

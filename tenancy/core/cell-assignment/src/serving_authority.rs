@@ -87,6 +87,10 @@ pub struct ServingAuthorityRejectionHighWaterV1 {
     pub record_digest: BindingDigest32,
 }
 
+/// Compare-and-set on the installed serving authority row for one partition:
+/// [`InstalledServingAuthorityV1`]. `Uninstalled` asserts the store must find no
+/// installation, which is the state a first install is in, and carries the
+/// rejection high-water so a restore can be judged against it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ServingAuthorityLocalPreconditionV1 {
     Uninstalled {

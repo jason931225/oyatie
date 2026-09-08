@@ -119,6 +119,10 @@ pub fn verify_cell_capacity_ledger(
     Err(CellCapacityLedgerVerificationErrorV1::NotImplemented)
 }
 
+/// Compare-and-set on the cell capacity ledger row:
+/// [`CellCapacityLedgerV1`]. That row is proposed through the private-field
+/// [`crate::VerifiedCellCapacityLedgerV1`] rather than as a bare record, so it
+/// is not a row the write-set population reaches directly.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellCapacityPreconditionV1 {
     pub expected_revision: CellCapacityRevision,

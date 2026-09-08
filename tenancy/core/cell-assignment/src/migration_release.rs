@@ -34,6 +34,10 @@ pub struct MigrationReleaseWriteSetPartsV1 {
     pub authority: BindingPersistenceAuthorityV1,
     pub expected_operation_revision: BindingOperationRevision,
     pub successor_binding: TenantCellBinding,
+    /// Compare-and-set on the projection audience policy,
+    /// [`crate::ProjectionAudiencePolicyV1`], the binding carries. The policy is
+    /// owned outside these write sets -- none of them proposes one -- so this
+    /// pins what the release was computed against rather than opening a row.
     pub expected_projection_audience_policy_digest: BindingDigest32,
     pub target_activation_closure: VerifiedParticipantPhaseClosure,
     pub source_release_closure: VerifiedParticipantPhaseClosure,

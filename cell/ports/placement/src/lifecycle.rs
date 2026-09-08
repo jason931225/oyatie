@@ -20,9 +20,15 @@ pub enum CellReadinessRingV1 {
     Production,
 }
 
+/// The revision of [`CellLifecycleRecordV1`], which is carried inside the cell
+/// resource row: a compare-and-set stated at this type is a compare-and-set on
+/// [`crate::CellResourceV1`].
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CellLifecycleRevision(pub u64);
 
+/// The admission epoch on [`CellLifecycleRecordV1`], which is carried inside
+/// the cell resource row: a compare-and-set stated at this type is a
+/// compare-and-set on [`crate::CellResourceV1`].
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CellAdmissionEpoch(pub u64);
 

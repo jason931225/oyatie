@@ -10,7 +10,11 @@ pub enum RebalanceClaimPreconditionV1 {
 pub struct RebalanceClaimWriteSetPartsV1 {
     pub authority: CellControlReconciliationPersistenceAuthorityV1,
     pub address: RebalanceJobAddressV1,
+    /// Compare-and-set on the rebalance job row, [`crate::RebalanceJobV1`],
+    /// which `create_job` opened before any worker could claim it.
     pub expected_job_revision: u64,
+    /// Compare-and-set on the rebalance job row, [`crate::RebalanceJobV1`]; the
+    /// digest half of the pair above.
     pub expected_job_digest: Digest32,
     pub previous_claim: RebalanceClaimPreconditionV1,
     pub next_claim: RebalanceJobClaimV1,

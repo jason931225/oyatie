@@ -8,6 +8,11 @@ use crate::{
     RebalanceJobV1, VerifiedCellLifecycleTransitionV1,
 };
 
+/// Compare-and-set on whichever row the repair targets, one arm per row:
+/// [`crate::CellResourceV1`] for `Lifecycle`, [`crate::DrainProofLedgerV1`] for
+/// `DrainLedger`, [`crate::RebalanceJobV1`] for `RebalanceJob` and
+/// [`crate::CellControlOperationV1`] for `ControlOperation`. Every arm names a
+/// row an earlier write opened; a repair never opens one.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CellControlRepairTargetPreconditionV1 {
     Lifecycle {

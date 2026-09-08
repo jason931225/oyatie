@@ -29,6 +29,12 @@ pub struct RebalanceJobClaimV1 {
     pub record_digest: Digest32,
 }
 
+/// Compare-and-set on the two rows a rebalance source write advances together:
+/// the job row [`crate::RebalanceJobV1`], named by `expected_job_revision` and
+/// `expected_job_digest`, and the worker's lease on it,
+/// [`crate::RebalanceJobClaimV1`], named by `expected_claim`. Both rows are
+/// opened by earlier writes -- `create_job` and `claim` -- so both members are
+/// required by value here.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceSourcePreconditionV1 {
     pub address: RebalanceJobAddressV1,
@@ -128,6 +134,10 @@ pub struct RebalanceSelectedActionV1 {
     pub record_digest: Digest32,
 }
 
+/// Compare-and-set on one selected action row:
+/// [`crate::RebalanceSelectedActionV1`], named by `expected_revision`,
+/// `expected_state` and `expected_record_digest`. The row is opened by
+/// `RebalanceSourceIssuanceWriteSetPartsV1`, so the value is required here.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceActionPreconditionV1 {
     pub key: PlacementBusinessActionKeyV1,
