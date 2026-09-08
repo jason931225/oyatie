@@ -9,9 +9,27 @@ license = "Apache-2.0"
 [dependencies]
 dependency-declarations-generation = { path = "../../ports/generation" }
 dependency-declarations-reconcile = { path = "../../core/reconcile" }
+rustix = { workspace = true, features = ["process"] }
 
 [lib]
 doctest = false
+
+# Both binaries are test doubles, not faces. Cargo grants a package one
+# auto-discovered binary and this package spends none on a face, but a harness
+# and a fixture provider are two executables, and `src/bin/` is refused. Rooting
+# both in `tests/` is the only remaining way to declare them, and it is the
+# shape the manifest grammar admits: the integration test reaches them through
+# `CARGO_BIN_EXE_*`, and Buck already builds the provider from this same source.
+
+[[bin]]
+name = "reindeer_candidate_head_qualification"
+path = "tests/harness/reindeer_candidate_head_qualification.rs"
+test = false
+
+[[bin]]
+name = "reindeer_qualification_fixture_provider"
+path = "tests/fixtures/reindeer_fixture.rs"
+test = false
 
 [lints]
 workspace = true

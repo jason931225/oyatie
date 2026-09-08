@@ -1826,6 +1826,7 @@ version = "0.1.0"
 dependencies = [
  "dependency-declarations-generation",
  "dependency-declarations-reconcile",
+ "rustix",
 ]
 
 [[package]]
