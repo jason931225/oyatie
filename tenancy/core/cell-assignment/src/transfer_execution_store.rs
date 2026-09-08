@@ -109,15 +109,25 @@ pub trait TransferExecutionCommitObserver: Send + Sync {
 
 /// Mints the transfer-execution permit signature.
 ///
-/// The input is a private-field verified wrapper, so no signature can be
-/// produced from an unverified or precommit claim. That is where this port's
-/// gating lives.
+/// The input is a private-field verified wrapper, so the caller must have gone
+/// through [`crate::verify_transfer_execution_permit`] to obtain one.
+///
+/// THAT IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL REFUSAL, and this doc
+/// previously claimed the stronger thing. The private field refuses DIRECT
+/// construction and nothing more: `verify_transfer_execution_permit` takes its verifier as
+/// `&dyn BindingProofVerifier`, a public single-method trait, so an
+/// out-of-crate type can implement that trait and this port together and mint
+/// the wrapper by passing ITSELF as the verifier. The barrier holds when the
+/// verifier actually deployed verifies; the type system cannot make it.
 ///
 /// The output is the raw signed value, NOT a verified wrapper. A signing
 /// adapter lives outside this crate and cannot construct a private-field
-/// wrapper, so returning one would leave self-verification — the signer
-/// checking its own signature against an expectation it built itself — as the
-/// only implementable shape, which gates nothing. The caller mints the wrapper
+/// wrapper DIRECTLY, so returning one would leave self-verification — the
+/// signer checking its own signature against an expectation it built itself —
+/// as the only implementable shape, which gates nothing. That reasoning is
+/// unaffected by the correction above, and is its sharpest instance:
+/// self-verification is exactly the route the deployment obligation must
+/// exclude. The caller mints the wrapper
 /// by passing this value through
 /// [`crate::verify_transfer_execution_permit`].
 pub trait TransferExecutionPermitAuthority: Send + Sync {
