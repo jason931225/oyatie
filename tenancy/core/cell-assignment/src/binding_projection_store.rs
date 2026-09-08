@@ -45,6 +45,10 @@ pub struct BindingProjectionSnapshotV1 {
     pub record_digest: BindingDigest32,
 }
 
+/// Compare-and-set on the binding row this projection is installed for:
+/// [`crate::TenantCellBinding`]. It is not a precondition on the snapshot row —
+/// that is
+/// [`BindingProjectionInstallWriteSetPartsV1::expected_snapshot_revision`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProjectionInstallPreconditionV1 {
     Unmapped,
@@ -63,7 +67,30 @@ pub struct BindingProjectionInstallWriteSetV1 {
 #[derive(Debug, Eq, PartialEq)]
 pub struct BindingProjectionInstallWriteSetPartsV1 {
     pub drain_mutations: cell_placement::DrainContributorMutationSetV1,
-    pub expected_snapshot_revision: u64,
+    /// Compare-and-set on the projection snapshot row for this audience and
+    /// partition — [`BindingProjectionSnapshotV1`] — and the only site where
+    /// that row may legitimately not exist yet.
+    ///
+    /// `None` ASSERTS THAT THE STORE MUST FIND NO SNAPSHOT ROW for this
+    /// audience and partition. `install` is the only write in either crate
+    /// carrying a [`BindingProjectionSnapshotV1`] as a next-state member, so the
+    /// row is born by the first install and before it there is nothing to
+    /// compare against. `Some(revision)` asserts a row exists at exactly that
+    /// revision, read through
+    /// [`BindingProjectionLocalStore::current_snapshot`].
+    ///
+    /// THE STORE MUST REFUSE RATHER THAN PROCEED WHEN THE ASSERTION IS FALSE:
+    /// [`crate::BindingStoreError::Conflict`] both when `None` was claimed and
+    /// a row exists, and when `Some` was claimed and the row is absent or at a
+    /// different revision. Zero is not the absent value; a caller that means
+    /// "no snapshot" says so.
+    ///
+    /// This member is NOT the sibling `precondition` below. That one is a
+    /// compare-and-set on the BINDING row, whose generation, write-authority
+    /// epoch and record digest it names, and it has had an `Unmapped` arm since
+    /// the seed commit. The snapshot row had no absent representation on either
+    /// side of the contract until this change.
+    pub expected_snapshot_revision: Option<u64>,
     pub precondition: ProjectionInstallPreconditionV1,
     pub projection: VerifiedBindingProjection,
     pub next_snapshot: BindingProjectionSnapshotV1,
@@ -119,9 +146,18 @@ pub trait BindingProjectionLocalStore: Send + Sync {
         now_unix_seconds: u64,
     ) -> BoxTenancyFuture<'a, Result<Option<LocalBindingRouteV1>, BindingStoreError>>;
 
+    /// Reads the installed projection snapshot for one audience and partition.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO SNAPSHOT ROW. It is not an
+    /// error and not an unknown: it is the exact fact a first
+    /// [`BindingProjectionLocalStore::install`] needs, and it is the value
+    /// [`BindingProjectionInstallWriteSetPartsV1::expected_snapshot_revision`]
+    /// must carry at that first install. The read previously could not express
+    /// absence at all, so the one state a first install is in had no
+    /// representation on either side of the contract.
     fn current_snapshot<'a>(
         &'a self,
         audience: &'a ProjectionAudienceId,
         partition: &'a ProjectionPartitionKey,
-    ) -> BoxTenancyFuture<'a, Result<BindingProjectionSnapshotV1, BindingStoreError>>;
+    ) -> BoxTenancyFuture<'a, Result<Option<BindingProjectionSnapshotV1>, BindingStoreError>>;
 }

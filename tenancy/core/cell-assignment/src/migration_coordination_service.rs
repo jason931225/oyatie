@@ -30,7 +30,13 @@ pub struct PutParticipantManifestRequestV1 {
 pub struct AppendParticipantReceiptRequestV1 {
     pub operation: BindingOperationKey,
     pub expected_operation_revision: BindingOperationRevision,
-    pub expected_ledger_revision: crate::ParticipantReceiptLedgerRevision,
+    /// Mirrors
+    /// [`crate::AppendParticipantReceiptWriteSetPartsV1::expected_ledger_revision`],
+    /// where what `None` asserts and the refusal it earns are stated. `None` is
+    /// the value a first append for an operation and phase carries; the sibling
+    /// [`CloseParticipantPhaseRequestV1`] keeps a required value because it
+    /// closes against a ledger an append already created.
+    pub expected_ledger_revision: Option<crate::ParticipantReceiptLedgerRevision>,
     pub receipt: VerifiedParticipantReceipt,
     pub idempotency_key: BindingIdempotencyKey,
     pub canonical_request_digest: BindingDigest32,
@@ -175,7 +181,12 @@ pub struct IssueSourceFenceDirectiveRequestV1 {
     pub operation: BindingOperationKey,
     pub expected_operation_revision: BindingOperationRevision,
     pub migration_fence_claim_digest: BindingDigest32,
-    pub expected_ledger_revision: SourceFenceDirectiveLedgerRevision,
+    /// Mirrors
+    /// [`crate::SourceFenceDirectiveIssueWriteSetPartsV1::expected_ledger_revision`],
+    /// where what `None` asserts and the refusal it earns are stated. `None` is
+    /// the value a first issue for an operation carries, since that write is the
+    /// only one in either crate that opens the row.
+    pub expected_ledger_revision: Option<SourceFenceDirectiveLedgerRevision>,
     pub participant: crate::VerifiedParticipantManifestMember,
     pub requested_validity_seconds: u64,
     pub idempotency_key: BindingIdempotencyKey,

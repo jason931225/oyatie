@@ -53,7 +53,17 @@ message PutParticipantManifestResultV1 {
 
 message AppendParticipantReceiptRequestV1 {
   BindingOperationKeyV1 operation = 1;
-  uint64 expected_ledger_revision = 2;
+  // Absent asserts the store must find NO participant receipt ledger row for
+  // this operation and phase: append_receipt is the only write in either crate
+  // that carries the ledger as a next-state member, so the row is born by this
+  // write and the first append has no revision to state. Present asserts a row
+  // exists at exactly this revision. Either assertion being false is a refusal
+  // (BindingStoreError CONFLICT), never a clean first write.
+  //
+  // Explicit presence, matching Option in the Rust twin. The sibling
+  // CloseParticipantPhaseRequestV1 keeps a required value, because a phase
+  // closes against a ledger an append already created.
+  optional uint64 expected_ledger_revision = 2;
   SignedParticipantReceiptV1 receipt = 3;
   string idempotency_key = 4;
   Digest32 canonical_request_digest = 5;
@@ -126,7 +136,15 @@ message IssueSourceFenceDirectiveRequestV1 {
   BindingOperationKeyV1 operation = 1;
   uint64 expected_operation_revision = 2;
   Digest32 migration_fence_claim_digest = 3;
-  uint64 expected_ledger_revision = 4;
+  // Absent asserts the store must find NO source-fence-directive ledger row for
+  // this operation: issue_source_fence_directive is the only write in either
+  // crate that carries the ledger as a next-state member, so the row is born by
+  // this write and the first issue has no revision to state. Present asserts a
+  // row exists at exactly this revision. Either assertion being false is a
+  // refusal (BindingStoreError CONFLICT), never a clean first write.
+  //
+  // Explicit presence, matching Option in the Rust twin.
+  optional uint64 expected_ledger_revision = 4;
   ParticipantManifestMemberV1 participant = 5;
   uint64 requested_validity_seconds = 6;
   string idempotency_key = 7;

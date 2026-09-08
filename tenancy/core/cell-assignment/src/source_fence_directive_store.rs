@@ -37,7 +37,33 @@ pub struct SourceFenceDirectiveIssueWriteSetPartsV1 {
     pub operation: BindingOperationV1,
     pub migration_fence_claim: MigrationFenceClaimV1,
     pub source_authority_freeze: crate::VerifiedServingAuthorityFreezeResult,
-    pub expected_ledger_revision: SourceFenceDirectiveLedgerRevision,
+    /// Compare-and-set on the source-fence-directive ledger row for this
+    /// operation, and the only site where that row may legitimately not exist
+    /// yet.
+    ///
+    /// `None` ASSERTS THAT THE STORE MUST FIND NO LEDGER ROW FOR THIS
+    /// OPERATION. `issue_source_fence_directive` is the only write in either
+    /// crate that carries a [`SourceFenceDirectiveLedgerV1`] as a next-state
+    /// member, so the row is born by this very write and before it there is
+    /// nothing to compare against. `Some(revision)` asserts a row exists at
+    /// exactly that revision, read through
+    /// [`SourceFenceDirectiveStore::get_source_fence_directive_ledger`].
+    ///
+    /// THE STORE MUST REFUSE RATHER THAN PROCEED WHEN THE ASSERTION IS FALSE:
+    /// [`crate::BindingStoreError::Conflict`] both when `None` was claimed and
+    /// a row exists, and when `Some` was claimed and the row is absent or at a
+    /// different revision. A missing row must not launder into a clean first
+    /// write.
+    ///
+    /// PRE-WAVE DEBT, CLOSED HERE, and closed by the same reasoning the wave
+    /// already applied one file over at
+    /// [`crate::IssueTransferExecutionPermitWriteSetPartsV1::expected_ledger_revision`].
+    /// The crate already treats "no source fence directive ledger exists" as a
+    /// legitimate state —
+    /// [`crate::BindingMigrationWriteFenceWriteSetPartsV1`] takes the ledger as
+    /// `Option` evidence — while the write that would create one demanded a
+    /// revision for it by value.
+    pub expected_ledger_revision: Option<SourceFenceDirectiveLedgerRevision>,
     pub participant: VerifiedParticipantManifestMember,
     pub directive: VerifiedSourceFenceDirective,
     pub next_ledger: SourceFenceDirectiveLedgerV1,
@@ -72,6 +98,14 @@ pub trait SourceFenceDirectiveStore: Send + Sync {
         write_set: &'a SourceFenceDirectiveIssueWriteSetV1,
     ) -> BoxTenancyFuture<'a, Result<SourceFenceDirectiveIssueResultV1, BindingStoreError>>;
 
+    /// Reads the source-fence-directive ledger row for one operation.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO LEDGER ROW for this
+    /// operation. It is not an error and not an unknown: it is the exact fact a
+    /// first [`SourceFenceDirectiveStore::issue_source_fence_directive`] needs,
+    /// and it is the value
+    /// [`SourceFenceDirectiveIssueWriteSetPartsV1::expected_ledger_revision`]
+    /// must carry at that first write.
     fn get_source_fence_directive_ledger<'a>(
         &'a self,
         authority: &'a BindingReadAuthorityV1,

@@ -67,7 +67,29 @@ pub struct AppendParticipantReceiptWriteSetPartsV1 {
     pub authority: BindingPersistenceAuthorityV1,
     pub expected_operation_revision: BindingOperationRevision,
     pub operation: BindingOperationV1,
-    pub expected_ledger_revision: ParticipantReceiptLedgerRevision,
+    /// Compare-and-set on the participant receipt ledger row for this
+    /// operation, and the only site where that row may legitimately not exist
+    /// yet.
+    ///
+    /// `None` ASSERTS THAT THE STORE MUST FIND NO RECEIPT LEDGER ROW FOR THIS
+    /// OPERATION. `append_receipt` is the only write in either crate carrying a
+    /// [`ParticipantReceiptLedgerV1`] as a next-state member — `put_manifest`
+    /// returns a manifest and a cell commitment and no ledger — so the row is
+    /// born by the first append. `Some(revision)` asserts a row exists at
+    /// exactly that revision, read through
+    /// [`ParticipantManifestStore::get_ledger`].
+    ///
+    /// THE STORE MUST REFUSE RATHER THAN PROCEED WHEN THE ASSERTION IS FALSE:
+    /// [`crate::BindingStoreError::Conflict`] both when `None` was claimed and
+    /// a row exists, and when `Some` was claimed and the row is absent or at a
+    /// different revision.
+    ///
+    /// The sibling
+    /// [`CloseParticipantPhaseWriteSetPartsV1::expected_ledger_revision`] keeps
+    /// a required value, and the asymmetry is the point: a phase closes against
+    /// a ledger an append already created, so `None` there would assert
+    /// something that cannot be true.
+    pub expected_ledger_revision: Option<ParticipantReceiptLedgerRevision>,
     pub receipt: VerifiedParticipantReceipt,
     pub work_precondition: ParticipantReceiptWorkPreconditionV1,
     pub next_work_item: ParticipantReceiptWorkItemV1,
@@ -100,6 +122,11 @@ pub struct CloseParticipantPhaseWriteSetPartsV1 {
     pub authority: BindingPersistenceAuthorityV1,
     pub expected_operation_revision: BindingOperationRevision,
     pub operation: BindingOperationV1,
+    /// Required by value, unlike the same member on
+    /// [`AppendParticipantReceiptWriteSetPartsV1`]: a phase closes against a
+    /// receipt ledger an append already created, so the row necessarily exists
+    /// by the time this write runs and `None` would assert something that
+    /// cannot be true.
     pub expected_ledger_revision: ParticipantReceiptLedgerRevision,
     pub closure: VerifiedParticipantPhaseClosure,
     pub idempotency: BindingIdempotencyRecordV1,
@@ -143,6 +170,13 @@ pub trait ParticipantManifestStore: Send + Sync {
         write_set: &'a CloseParticipantPhaseWriteSetV1,
     ) -> BoxTenancyFuture<'a, Result<SignedParticipantPhaseClosureV1, BindingStoreError>>;
 
+    /// Reads the participant receipt ledger row for one operation and phase.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO RECEIPT LEDGER ROW. It is not
+    /// an error and not an unknown: it is the exact fact a first
+    /// [`ParticipantManifestStore::append_receipt`] needs, and it is the value
+    /// [`AppendParticipantReceiptWriteSetPartsV1::expected_ledger_revision`]
+    /// must carry at that first append.
     fn get_ledger<'a>(
         &'a self,
         authority: &'a BindingReadAuthorityV1,
