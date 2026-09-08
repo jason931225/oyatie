@@ -43,11 +43,18 @@ pub trait TransferExecutionStore: Send + Sync {
         Result<Option<TransferExecutionPermitIssuanceRecordV1>, BindingStoreError>,
     >;
 
-    /// Publishes the signed permit for an already-committed issuance. The write
-    /// set can only be assembled from a verified commit observation, so this is
-    /// the sole path on which a signature is minted. Republishing the same
-    /// immutable issuance is permitted; byte-identical signatures are not
-    /// required.
+    /// Publishes the signed permit for an already-committed issuance.
+    ///
+    /// This store MINTS NOTHING. It receives the already-signed permit as a
+    /// write-set input and persists it; the signature is minted by
+    /// [`TransferExecutionPermitAuthority::sign_committed`], the neighbouring
+    /// port in this file. What this method is the sole path for is
+    /// PUBLICATION -- the durable write that makes a minted permit readable --
+    /// and the write set can only be assembled from a verified commit
+    /// observation.
+    ///
+    /// Republishing the same immutable issuance is permitted; byte-identical
+    /// signatures are not required.
     fn publish_permit<'a>(
         &'a self,
         write_set: &'a PublishTransferExecutionPermitWriteSetV1,
