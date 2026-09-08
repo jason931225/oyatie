@@ -300,7 +300,7 @@ pub fn verify_committed_movement_action_result(
 /// `None` means the observer looked and found NOTHING at that key. It is an
 /// outcome, not a failure: the observer read under committed read isolation with
 /// authority, and there was no committed row. That is precisely the fact
-/// `[`MovementActionResultStore::get_result`]` exists to establish - it is what separates
+/// [`MovementActionResultStore::get_result`] exists to establish - it is what separates
 /// "never durably committed" from "committed, reply lost" - so an observer that
 /// could not say it would be unable to do its one job.
 ///
@@ -310,7 +310,7 @@ pub fn verify_committed_movement_action_result(
 /// An observer already runs under authority, so for it the conflation destroys
 /// exactly the distinction it is here to draw.
 ///
-/// A `None` that DISAGREES with `[`MovementActionResultStore::get_result`]` reporting a record is a
+/// A `None` that DISAGREES with [`MovementActionResultStore::get_result`] reporting a record is a
 /// REFUSAL, never a quiet fallback to "nothing was committed". The caller must
 /// not proceed as if the write never happened on the strength of a store report
 /// the observer could not corroborate.

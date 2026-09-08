@@ -734,12 +734,16 @@ pub enum CapabilityEffectErrorV1 {
     /// at which that is admissible, and no reading under which it is a
     /// formatting error.
     ///
-    /// It covers BOTH successor records, not only the one with a `context`
-    /// member: `LocalAuthorityStateV1::context` in full, and
-    /// `CapabilityAuthorityRejectionHighWaterV1::owner_generation`, which
-    /// carries an owner-assigned value with no context member to hold it.
-    /// Scoping this to the word "context" would have left the membership row
-    /// -- the row `StaleIncarnation` depends on -- with no refusal at all.
+    /// THE SCOPE IS EVERY OWNER-ASSIGNED VALUE A PROPOSED SUCCESSOR RESTATES,
+    /// on every successor record, and not a list of records. `LocalAuthority
+    /// StateV1::context` in full and
+    /// `CapabilityAuthorityRejectionHighWaterV1::owner_generation` -- which
+    /// carries an owner-assigned value with no context member to hold it -- are
+    /// EXAMPLES of the shape, NOT its extent. This variant was for one round
+    /// scoped to the word "context", which left the membership row (the row
+    /// `StaleIncarnation` depends on) with no refusal at all, and for another
+    /// scoped by a count of two, which would leave a third successor record
+    /// bare the day one is added. This enum grew in three rounds of four.
     ///
     /// Not `ActionNotPermittedByContext`, which is about the context the GRANT
     /// carries being wrong for the action; here the grant's context may be

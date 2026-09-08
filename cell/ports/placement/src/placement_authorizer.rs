@@ -118,7 +118,12 @@ pub struct PlacementAuthorizationTrustV1 {
 
 /// Every way placement authorization refuses.
 ///
-/// Five surfaces return this type and they do not all reach every variant:
+/// The surfaces that return this type do not all reach every variant, and no
+/// count is stated here. The population a count would range over is not
+/// defined — one named item may declare two methods — and three readers
+/// deriving it produced three numbers, which is the same defect for which the
+/// obligation census one lane over was DELETED rather than corrected. What
+/// matters is the division of labour, and that is stated:
 /// [`verify_placement_actor`] judges one actor attestation against
 /// [`PlacementAuthorizationTrustV1`]; [`verify_placement_policy_decision`]
 /// judges one already-obtained decision against an expected request and the

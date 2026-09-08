@@ -364,7 +364,7 @@ pub trait RebalanceSourceIssuanceStore: Send + Sync {
 /// `None` means the observer looked and found NOTHING at that key. It is an
 /// outcome, not a failure: the observer read under committed read isolation with
 /// authority, and there was no committed row. That is precisely the fact
-/// `[`RebalanceSourceIssuanceStore::load_issuance`]` exists to establish - it is what separates
+/// [`RebalanceSourceIssuanceStore::load_issuance`] exists to establish - it is what separates
 /// "never durably committed" from "committed, reply lost" - so an observer that
 /// could not say it would be unable to do its one job.
 ///
@@ -374,7 +374,7 @@ pub trait RebalanceSourceIssuanceStore: Send + Sync {
 /// An observer already runs under authority, so for it the conflation destroys
 /// exactly the distinction it is here to draw.
 ///
-/// A `None` that DISAGREES with `[`RebalanceSourceIssuanceStore::load_issuance`]` reporting a record is a
+/// A `None` that DISAGREES with [`RebalanceSourceIssuanceStore::load_issuance`] reporting a record is a
 /// REFUSAL, never a quiet fallback to "nothing was committed". The caller must
 /// not proceed as if the write never happened on the strength of a store report
 /// the observer could not corroborate.

@@ -109,10 +109,17 @@ pub struct ServingAuthorityInstallationWriteSetPartsV1 {
     /// # The caller does not own everything it proposes
     ///
     /// This record carries fields the caller legitimately chooses AND fields
-    /// this store owns: `binding_generation`, `binding_revision`,
-    /// `binding_record_digest` and `write_authority_epoch`, all inside
-    /// [`crate::ServingAuthorityInstanceV1`]. The store MUST derive the owned
-    /// ones itself and refuse a proposal that restates them differently, with
+    /// this store owns. THE SCOPE IS EVERY OWNER-OWNED OR STORE-DERIVED VALUE
+    /// THE PROPOSAL RESTATES -- a field, a nested record or a whole row -- and
+    /// not a list. `binding_generation`, `binding_revision`,
+    /// `binding_record_digest` and `write_authority_epoch` inside
+    /// [`crate::ServingAuthorityInstanceV1`] are EXAMPLES, NOT THE EXTENT: this
+    /// very record also carries `revision` and `record_digest` of its own,
+    /// which an enumeration of those four omitted while the wire's file-scope
+    /// rule covered them. Seven other members across this crate delegate their
+    /// obligation to this doc, so an enumeration here under-scopes all of them.
+    /// The store MUST derive the owned values itself and refuse a proposal that
+    /// restates them differently, with
     /// [`crate::ServingAuthorityStoreError::ProposedSuccessorMismatch`].
     /// Accepting the proposal would let a caller write an authority generation
     /// it does not own; silently overwriting it would make a public field's

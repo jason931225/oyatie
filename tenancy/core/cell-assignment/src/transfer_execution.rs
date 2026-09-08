@@ -512,8 +512,17 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     /// THE THIRD IS SUPPLIED BY DERIVATION, AND THIS IS WHERE THAT IS STATED.
     /// `disposition` is `TransferExecutionItemDispositionV1::PermitIssued`,
     /// which is what a committed issuance means: `issue_permit` is the only
-    /// write that leaves `PendingPermit`, and the publication whose
-    /// precondition this is runs against exactly that issuance. The publisher
+    /// write that carries a `next_item` for an item that did not exist — its
+    /// own `item_precondition` may be `Absent` — so the transition it performs
+    /// is `Absent -> PermitIssued`, and the publication whose precondition this
+    /// is runs against exactly that issuance. An earlier version of this
+    /// sentence justified the derivation by "`issue_permit` is the only write
+    /// that leaves `PendingPermit`", a transition NO WRITE SET IN EITHER CRATE
+    /// CAN PERFORM: the item is born at `PermitIssued` and nothing produces
+    /// `PendingPermit`. A derivation resting on an unreachable pre-state gives
+    /// a future implementer no way to check it against the tree, and this is
+    /// the one precondition member in the wave a caller may derive rather than
+    /// read. The publisher
     /// therefore does not need to read the item row, and that matters: the only
     /// read that returns a [`crate::TransferExecutionItemV1`] is
     /// [`crate::TransferExecutionStore::read_item_page_for_reconciliation`], gated on
@@ -529,6 +538,14 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     /// restatement of those. `disposition` is different in kind — it is fixed
     /// by which write the caller is performing, not by what the store computed
     /// — which is why it can be derived and they cannot.
+    ///
+    /// THE REFUSAL, NAMED IN BOTH DIRECTIONS, because a derivation whose
+    /// disagreement has no stated consequence is half a contract. The store
+    /// MUST refuse with [`crate::BindingStoreError::Conflict`] when the item is
+    /// absent, when it stands at another revision or record digest, and when
+    /// its disposition is not `PermitIssued` — which is what a republication
+    /// arriving after `record_outcome` looks like, and refusing it is correct
+    /// rather than a state to be repaired.
     pub item_precondition: crate::TransferExecutionItemPreconditionV1,
     /// The verified commit, bound in ALONGSIDE the signed permit.
     ///
@@ -540,8 +557,9 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     /// BIND the claim when the publishing write lands on the SAME store that
     /// holds the committed record. There the store can independently re-check
     /// that the signature it is persisting was minted from the commit it names,
-    /// instead of trusting the signer's derivation. All five bound cases are
-    /// exactly this: `TransferExecutionStore::issue_permit`/`publish_permit`,
+    /// instead of trusting the signer's derivation. The bound cases are
+    /// exactly this and no others:
+    /// `TransferExecutionStore::issue_permit`/`publish_permit`,
     /// `MigrationReleaseStore::commit_release_issuance`/`publish_release_permit`,
     /// `CellServingAuthorityStore::renew_write_authority_lease`/`publish_write_authority_lease`,
     /// and the two cell publication write sets.

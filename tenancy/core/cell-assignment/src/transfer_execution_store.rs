@@ -12,11 +12,15 @@ use crate::{
 pub trait TransferExecutionStore: Send + Sync {
     /// Durably records an unsigned transfer-execution permit issuance.
     ///
-    /// The returned record never carries a signature: a signed permit is only
-    /// reachable through [`TransferExecutionCommitObserver`],
+    /// The returned record never carries a signature. A signed permit is
+    /// PRODUCED only along one path — [`TransferExecutionCommitObserver`],
     /// [`crate::verify_committed_transfer_execution_permit_issuance`],
-    /// [`TransferExecutionPermitAuthority::sign_committed`] and
-    /// [`TransferExecutionStore::publish_permit`].
+    /// [`TransferExecutionPermitAuthority::sign_committed`], then
+    /// [`TransferExecutionStore::publish_permit`] — and this enumeration is of
+    /// production, not of reachability. Once published the permit is a durable
+    /// field of the item row and is READ BACK by
+    /// [`TransferExecutionStore::load_item`]; an earlier version of this
+    /// sentence said "only reachable" and was falsified by that row.
     fn issue_permit<'a>(
         &'a self,
         write_set: &'a IssueTransferExecutionPermitWriteSetV1,
@@ -92,6 +96,49 @@ pub trait TransferExecutionStore: Send + Sync {
         operation: &'a crate::BindingOperationKey,
     ) -> BoxTenancyFuture<'a, Result<Option<TransferExecutionLedgerV1>, BindingStoreError>>;
 
+    /// Reads one transfer-execution item row by its issuance address, under the
+    /// SAME ordinary authority the issue, publish and outcome writes take.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO ITEM ROW for that address: no
+    /// permit has been issued for that effect. `Some` carries the row's current
+    /// `disposition`, `revision`, `record_digest` and its published `permit`.
+    ///
+    /// TWO THINGS WERE UNREACHABLE WITHOUT THIS READ, and both were reported
+    /// independently.
+    ///
+    /// First, `record_outcome` requires
+    /// [`crate::RecordTransferExecutionOutcomeWriteSetPartsV1::item_precondition`]
+    /// by value, and after this wave inserted `publish_permit` as a THIRD
+    /// writer of the item row, the commit observation the publisher holds
+    /// carries pre-publication values. No write on this store returns the item —
+    /// `issue_permit` returns the issuance record, `publish_permit` the signed
+    /// permit, `record_outcome` the ledger — so the only carrier of the item's
+    /// current revision and record digest was
+    /// [`TransferExecutionStore::read_item_page_for_reconciliation`], gated on
+    /// `BindingReconciliationReadAuthorityV1` PLUS a reconciliation lease. The
+    /// ordinary outcome path would have had to restate store-derived values the
+    /// publish write set forbids it from restating, or take out a lease the same
+    /// doc says that path must not hold. This read is the third option, and it
+    /// adds no new authority.
+    ///
+    /// Second,
+    /// [`crate::TenancyMigrationCoordinationService::get_transfer_execution_permit`]
+    /// promises three distinguishable states, the third being "issuance
+    /// present, permit present — published". The signed permit is durable on
+    /// this row, but every other surface that yields one is a write or a mint,
+    /// so over the declared store that third state could only have been reached
+    /// by re-minting a signature on a read. It is now an ordinary read.
+    ///
+    /// This does not weaken the enumeration on
+    /// [`TransferExecutionStore::issue_permit`]: that names how a permit is
+    /// PRODUCED, and this method only reads back what publication durably made
+    /// readable.
+    fn load_item<'a>(
+        &'a self,
+        authority: &'a BindingReadAuthorityV1,
+        address: &'a crate::TransferExecutionPermitIssuanceAddressV1,
+    ) -> BoxTenancyFuture<'a, Result<Option<crate::TransferExecutionItemV1>, BindingStoreError>>;
+
     fn apply_repair<'a>(
         &'a self,
         write_set: &'a TransferExecutionRepairWriteSetV1,
@@ -125,11 +172,21 @@ pub trait TransferExecutionCommitObserver: Send + Sync {
 /// Mints the transfer-execution permit signature.
 ///
 /// The input is a private-field verified wrapper, so the caller must have gone
-/// through [`crate::verify_transfer_execution_permit`] to obtain one.
+/// through
+/// [`crate::verify_committed_transfer_execution_permit_issuance`] to obtain
+/// one. That, and not `verify_transfer_execution_permit`, is this port's
+/// minter: the INPUT is a
+/// [`crate::VerifiedCommittedTransferExecutionPermitIssuance`], while
+/// `verify_transfer_execution_permit` mints from this port's OUTPUT after
+/// publication and is named correctly in the closing paragraph below. An
+/// earlier version of this paragraph reasoned about the wrong one; the
+/// conclusion survived, because both verifiers arrive as
+/// `&dyn BindingProofVerifier`, but the citation did not — and it RESOLVES, so
+/// no rustdoc gate could have seen it.
 ///
 /// THAT IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL REFUSAL, and this doc
 /// previously claimed the stronger thing. The private field refuses DIRECT
-/// construction and nothing more: `verify_transfer_execution_permit` takes its verifier as
+/// construction and nothing more: both verifiers take their verifier as
 /// `&dyn BindingProofVerifier`, a public single-method trait, so an
 /// out-of-crate type can implement that trait and this port together and mint
 /// the wrapper by passing ITSELF as the verifier. The barrier holds when the

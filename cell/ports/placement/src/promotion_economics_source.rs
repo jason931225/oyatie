@@ -465,6 +465,39 @@ pub struct PromotionEconomicsSourceRegistryPageV1 {
     pub canonical_bytes: u64,
 }
 
+/// Reads the admitted source scopes and their finalizations, one page at a
+/// time, for the registry the closure step is judging coverage against.
+///
+/// # This port carries selection-relevant content, and the caveat written for
+/// its neighbour does not reach it
+///
+/// [`CellPromotionEconomicsPolicySource`] moved the registry's IDENTITY behind
+/// a port so no caller can choose it. The registry's CONTENTS — the admitted
+/// scopes, which are what "exact coverage" is judged against — arrive through
+/// THIS port instead, and a reader that omits an expensive admitted source
+/// yields a closure that is complete by construction. That is the
+/// caller-chooses-its-own-population hole arriving one port over, and the
+/// caveat at `CellPromotionEconomicsPolicySource` is scoped to `policy_source`
+/// alone.
+///
+/// # What binds this reader to the policy-resolved registry
+///
+/// The check is performable rather than aspirational, and it is stated here
+/// rather than left to be inferred:
+/// [`PromotionEconomicsSourceRegistryV1`] carries
+/// `ordered_admission_root_digest` and `admission_count`, and
+/// the private `advance_promotion_economics_closure_step` MUST verify that the
+/// members this reader returns hash into that root and count against that
+/// count, refusing otherwise. Without that check the module header's "exact
+/// coverage and no missing, additional or duplicated source" names a property
+/// nothing makes checkable.
+///
+/// [`PromotionEconomicsSourceRegistryPageV1::registry_digest`] is the reader's
+/// own echo of the digest it was asked for and establishes nothing on its own;
+/// it is the root and the count that bind.
+///
+/// Honestly composing this reader is a DEPLOYMENT OBLIGATION of the same kind
+/// stated at [`crate::MovementActionResultAuthority`].
 pub trait PromotionEconomicsSourceRegistryReader: Send + Sync {
     fn read_page<'a>(
         &'a self,
