@@ -1,11 +1,26 @@
+_CARGO_ENV = {"CARGO_MANIFEST_DIR": "cell/ports/placement"}
+
 rust_library(
     name = "cell-placement",
     srcs = glob(["src/**/*.rs"]),
     crate = "cell_placement",
     crate_root = "src/lib.rs",
+    env = _CARGO_ENV,
     visibility = ["PUBLIC"],
     deps = [
         "//cell/ports/location:cell-location",
         "//tenancy/core/kernel:tenancy-kernel",
+    ],
+)
+
+rust_test(
+    name = "cell-placement-exclusivity-claims-are-deployment-obligations",
+    srcs = ["tests/exclusivity_claims_are_deployment_obligations.rs"],
+    crate = "cell_placement_exclusivity_claims_are_deployment_obligations",
+    crate_root = "tests/exclusivity_claims_are_deployment_obligations.rs",
+    env = _CARGO_ENV,
+    visibility = ["PUBLIC"],
+    deps = [
+        ":cell-placement",
     ],
 )
