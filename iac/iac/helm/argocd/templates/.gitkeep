@@ -1,4 +1,0 @@
-# Templates rendered via the upstream argo-cd dependency chart
-# (declared in Chart.yaml at wire time). This directory exists
-# so the chart structure is complete and the discipline gate
-# has a stable path to scan.
