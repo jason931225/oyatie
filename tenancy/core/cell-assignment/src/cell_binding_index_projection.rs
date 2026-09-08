@@ -18,10 +18,34 @@ pub struct BindingCellIndexProjectionWriteSetPartsV1 {
     pub authority: crate::BindingReconciliationPersistenceAuthorityV1,
     pub target: crate::BindingControlContributionTargetV1,
     /// Compare-and-set on the cell binding index snapshot row this write
-    /// proposes, [`crate::CellBindingIndexSnapshotV1`]. The reconciler receives
-    /// that snapshot's `projection_revision` and `projection_record_digest` in
-    /// the subject it is handed, so both halves are readable under the authority
-    /// this write already holds.
+    /// proposes, [`crate::CellBindingIndexSnapshotV1`].
+    ///
+    /// Every other name below is in single backticks deliberately: an intra-doc
+    /// link on a precondition member is read by the law tests as a declaration
+    /// of the ROW this compare-and-set is on, so linking a store, an authority
+    /// or a sibling write set here would attribute the compare-and-set to them.
+    ///
+    /// The value is read from `TenantBindingCellIndexStore::acquire_snapshot`,
+    /// which takes `BindingReconciliationReadAuthorityV1` -- the read authority
+    /// a holder of the `BindingReconciliationPersistenceAuthorityV1` this write
+    /// set carries derives from
+    /// `BindingReconciliationPersistenceAuthorityV1::read_authority`.
+    ///
+    /// AN EARLIER VERSION OF THIS SENTENCE SAID THE RECONCILER RECEIVES BOTH
+    /// HALVES "IN THE SUBJECT IT IS HANDED", AND THAT IS FALSE. The subject for
+    /// this work class is
+    /// `BindingReconciliationSubjectV1::ControlContributionProjection`, whose
+    /// whole content is the source-side `BindingControlContributionOutboxV1`;
+    /// the `revision` and `record_digest` on that outbox are the OUTBOX row's,
+    /// guarded by
+    /// `BindingControlContributionDeliveryWriteSetPartsV1::expected_outbox_revision`,
+    /// and a reconciler following the old sentence would have read one row's
+    /// version into a compare-and-set on another. Both halves are `u64` and
+    /// `BindingDigest32` on both rows, so nothing would have refused the
+    /// mistake. A type-graph walk from that subject reaches neither the snapshot
+    /// row nor either field name, and `tests/cas_precondition_reachability.rs`
+    /// asserts that non-reachability as a standing control beside the positive
+    /// one for the outbox.
     pub expected_projection_revision: u64,
     /// Compare-and-set on [`crate::CellBindingIndexSnapshotV1`]; the digest half
     /// of the pair above.

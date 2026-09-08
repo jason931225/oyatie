@@ -11,7 +11,14 @@ pub struct RebalanceClaimWriteSetPartsV1 {
     pub authority: CellControlReconciliationPersistenceAuthorityV1,
     pub address: RebalanceJobAddressV1,
     /// Compare-and-set on the rebalance job row, [`crate::RebalanceJobV1`],
-    /// which `create_job` opened before any worker could claim it.
+    /// which [`crate::RebalanceJobStore::apply`] opened -- through its
+    /// [`crate::RebalanceJobPreconditionV1::Absent`] arm -- before any worker
+    /// could claim it. An earlier version of this sentence named create_job --
+    /// written here without backticks, because a name that resolves to nothing
+    /// must not be dressed as a citation -- and no function, field or RPC of
+    /// that name exists. The caller-facing name is
+    /// [`crate::CellControlService::create_rebalance_job`] and the store method
+    /// is `apply`.
     pub expected_job_revision: u64,
     /// Compare-and-set on the rebalance job row, [`crate::RebalanceJobV1`]; the
     /// digest half of the pair above.

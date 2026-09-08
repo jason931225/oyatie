@@ -33,8 +33,17 @@ pub struct RebalanceJobClaimV1 {
 /// the job row [`crate::RebalanceJobV1`], named by `expected_job_revision` and
 /// `expected_job_digest`, and the worker's lease on it,
 /// [`crate::RebalanceJobClaimV1`], named by `expected_claim`. Both rows are
-/// opened by earlier writes -- `create_job` and `claim` -- so both members are
-/// required by value here.
+/// opened by earlier writes -- [`crate::RebalanceJobStore::apply`], whose
+/// [`crate::RebalanceJobPreconditionV1::Absent`] arm opens the job, and
+/// [`crate::RebalanceSourceStore::claim`], whose
+/// [`crate::RebalanceClaimPreconditionV1::Absent`] arm opens the claim -- so
+/// both members are required by value here. An earlier version of this sentence
+/// named create_job — written here without backticks, because a name that resolves to nothing must not be dressed as a citation — and that is nothing: no function, field or RPC of that name
+/// exists in either crate or either proto package. The caller-facing name is
+/// [`crate::CellControlService::create_rebalance_job`] and the store method it
+/// delegates to is `apply`. The verdict was right and the reason was
+/// uncheckable, which is worse than no reason: single-backtick prose is not an
+/// intra-doc link, so no rustdoc gate could see it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceSourcePreconditionV1 {
     pub address: RebalanceJobAddressV1,
