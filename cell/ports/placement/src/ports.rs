@@ -33,6 +33,22 @@ pub enum PlacementContractError {
     ProofAlreadyApplied,
     AuthorizationScopeMismatch,
     Conflict,
+    /// A live rebalance job claim is held by a different worker, so
+    /// [`crate::RebalanceSourceStore::claim`] refused rather than stealing it.
+    ///
+    /// Distinct from `Conflict`, which is a compare-and-set that lost a race
+    /// and is retryable at once. This one says the surface is legitimately
+    /// occupied and retrying immediately will be refused again for the same
+    /// reason.
+    ///
+    /// DELIBERATELY CARRIES NO PAYLOAD. The caller needs the holder and the
+    /// expiry, and both are obtained from
+    /// [`crate::RebalanceSourceStore::read_claim`]. An expiry embedded here
+    /// would be a snapshot that the holder's renewal can invalidate before the
+    /// caller acts on it, and naming a value this enum cannot carry is the
+    /// failure the read exists to prevent: a recovery must only prescribe what
+    /// a caller can actually perform.
+    JobClaimHeldByAnotherWorker,
     TerminalOperation,
     ForwardRecoveryRequired,
 }

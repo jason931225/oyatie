@@ -416,6 +416,7 @@ message RebalanceClaimWriteSetPartsV1 {
   Digest32 expected_job_digest = 4;
   RebalanceClaimPreconditionV1 previous_claim = 5;
   RebalanceJobClaimV1 next_claim = 6;
+  uint64 now_unix_seconds = 8;
   CellControlAuditRecordV1 audit_outbox = 7;
 }
 
