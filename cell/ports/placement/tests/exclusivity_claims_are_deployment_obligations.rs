@@ -27,9 +27,18 @@
 //! 2. SIGNATURE. The minted set is computed from the tree: every type returned
 //!    by a function that takes a `&dyn ...Verifier`. A block is in scope only
 //!    when it is ATTACHED to such a function, to a minted type's declaration,
-//!    to a trait declaring such a method, or is the `//!` doc of a file that
-//!    declares one. Scope is never inferred from a file's name or from a
-//!    mention in prose.
+//!    to a trait declaring such a method, to a trait whose own doc LINKS such a
+//!    function, or is the `//!` doc of a file that declares one. Scope is never
+//!    inferred from a file's name or from a mention in prose.
+//!
+//!    The trait-link clause is the one the first draft lacked, and a
+//!    perturbation control is what found it: deleting the caveat from
+//!    `PromotionEconomicsCheckpointStore` -- a port that mints nothing itself
+//!    and states clause (a) anyway -- left the sweep silent. A trait is the only
+//!    item kind that HAS implementers, and clause (a) is a claim about what an
+//!    implementer can do, so a port whose doc names the verifier its caller goes
+//!    through is squarely in scope. A type alias linking the same verifier is
+//!    not: it has no implementer for the claim to be about.
 //! 3. DISCHARGE. The block states the obligation, in the wording the wave
 //!    already settled on: `deployment obligation`, or a reference to
 //!    `MovementActionResultAuthority`, where that reasoning is written once.
@@ -247,12 +256,15 @@ fn returned_type(signature: &str) -> Option<String> {
 struct Wave {
     /// Every type minted by a function that takes a `&dyn ...Verifier`.
     minted: BTreeSet<String>,
+    /// The names of those functions.
+    minting_fns: BTreeSet<String>,
     /// Files declaring at least one such function.
     minting_files: BTreeSet<PathBuf>,
 }
 
 fn scan_wave(files: &[PathBuf]) -> Wave {
     let mut minted = BTreeSet::new();
+    let mut minting_fns = BTreeSet::new();
     let mut minting_files = BTreeSet::new();
     for path in files {
         let text = fs::read_to_string(path).expect("read source");
@@ -266,6 +278,16 @@ fn scan_wave(files: &[PathBuf]) -> Wave {
                 continue;
             }
             minting_files.insert(path.clone());
+            let declared: String = line
+                .trim_start()
+                .trim_start_matches("pub ")
+                .trim_start_matches("fn ")
+                .chars()
+                .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .collect();
+            if !declared.is_empty() {
+                minting_fns.insert(declared);
+            }
             if let Some(name) = returned_type(&signature) {
                 minted.insert(name);
             }
@@ -273,6 +295,7 @@ fn scan_wave(files: &[PathBuf]) -> Wave {
     }
     Wave {
         minted,
+        minting_fns,
         minting_files,
     }
 }
@@ -323,6 +346,7 @@ fn scope_of(
     item: &str,
     item_index: usize,
     lines: &[&str],
+    text: &str,
     wave: &Wave,
 ) -> Option<String> {
     if marker == "//!" {
@@ -361,9 +385,44 @@ fn scope_of(
         if body_mints(&body, &wave.minted) {
             return Some("trait declaring a method returning a minted wrapper".to_owned());
         }
+        // A trait is the only item kind that HAS implementers, and clause (a) is a
+        // claim about what an implementer can do. So a port that mints nothing
+        // itself is still in scope when its own doc links the minter its caller
+        // goes through: an out-of-crate type may implement both this trait and
+        // that verifier. This is the shape at
+        // `PromotionEconomicsCheckpointStore`, which returns only public records
+        // and still states the clause.
+        if doc_links(text)
+            .iter()
+            .any(|target| wave.minting_fns.contains(target) || wave.minted.contains(target))
+        {
+            return Some("trait whose doc links a `&dyn ...Verifier` minter".to_owned());
+        }
         return None;
     }
     None
+}
+
+/// Intra-doc link targets in a block, reduced to the final path segment.
+fn doc_links(doc: &str) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    let mut rest = doc;
+    while let Some(position) = rest.find("[`") {
+        rest = &rest[position + 2..];
+        let Some(end) = rest.find("`]") else { break };
+        let target = &rest[..end];
+        rest = &rest[end + 2..];
+        if let Some(head) = target.rsplit("::").find(|part| *part != "crate") {
+            let name: String = head
+                .chars()
+                .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .collect();
+            if !name.is_empty() {
+                out.insert(name);
+            }
+        }
+    }
+    out
 }
 
 struct Finding {
@@ -418,7 +477,8 @@ fn sweep() -> (Vec<Finding>, usize, usize) {
             let Some((item_index, item)) = attached_item(&lines, index) else {
                 continue;
             };
-            let Some(scope) = scope_of(path, marker, &item, item_index, &lines, &wave) else {
+            let Some(scope) = scope_of(path, marker, &item, item_index, &lines, &body, &wave)
+            else {
                 continue;
             };
             in_scope += 1;
