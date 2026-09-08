@@ -85,7 +85,17 @@ message SealTransferAuthorizationSetRequestV1 {
 
 message IssueTransferExecutionPermitRequestV1 {
   BindingOperationKeyV1 operation = 1;
-  uint64 expected_ledger_revision = 2;
+  // Absent asserts the store must find NO transfer-execution ledger row for
+  // this operation: the row is born by this write, so the first permit for an
+  // operation has no revision to state. Present asserts a row exists at exactly
+  // this revision. Either assertion being false is a refusal (BindingStoreError
+  // CONFLICT), never a clean first write.
+  //
+  // Explicit presence, matching Option in the Rust twin. The sibling requests
+  // RecordTransferExecutionOutcomeRequestV1 and
+  // PublishTransferExecutionPermitRequestV1 keep a required value, because both
+  // act on an operation whose ledger row an issuance already created.
+  optional uint64 expected_ledger_revision = 2;
   SignedResidencyTransferAuthorizationV1 authorization = 3;
   SignedResidencyTransferAuthorizationSetV1 authorization_set = 4;
   ParticipantManifestMemberV1 participant = 5;

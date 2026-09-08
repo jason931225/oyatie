@@ -669,8 +669,20 @@ pub enum CapabilityEffectErrorV1 {
     /// reply where the commit may or may not have happened.
     ///
     /// The caller recovers by key and never retries the effect blindly, and
-    /// never reports this as a failure before the effect. Not
-    /// `UncommittedReceipt`, which is a definite negative observation.
+    /// never reports this as a failure before the effect.
+    ///
+    /// THE DEFINITE NEGATIVE IS NOT IN THIS ENUM. "The observer looked and
+    /// found no committed row" is `None` from
+    /// [`crate::CapabilityEffectReceiptCommitObserverV1::observe_committed`]
+    /// and `None` from
+    /// [`crate::CapabilityLocalEffectStoreV1::recover_receipt`], because an
+    /// observer signs what it read and there was nothing to sign. This variant
+    /// is the case where NOTHING WAS LEARNED — the two must stay separable,
+    /// and a caller that treats this one as an absence has concluded something
+    /// no read established.
+    ///
+    /// Absence is also not `RetainedEvidenceUnavailable`, which says the result
+    /// existed and its evidence is gone.
     OutcomeUnknown,
     /// The authority record cannot be trusted until an owner-qualified
     /// reconciliation runs: a restored backup, or rejection membership that
@@ -688,13 +700,6 @@ pub enum CapabilityEffectErrorV1 {
     /// stated, because a caller that reads absence may conclude the effect
     /// never happened.
     RetainedEvidenceUnavailable,
-    /// The observer looked and found no committed row, or found one not yet
-    /// visible under committed read isolation.
-    ///
-    /// A definite negative observation, unlike `OutcomeUnknown`. A caller
-    /// that fabricates a receipt payload gets this, because the observer
-    /// reads the store rather than the claim.
-    UncommittedReceipt,
     /// The successor authority record does not carry the disposition the
     /// grant's action produces, per [`LocalAuthorityDispositionV1`].
     ///

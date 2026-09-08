@@ -177,7 +177,33 @@ pub struct IssueTransferExecutionPermitWriteSetPartsV1 {
     pub authority: BindingPersistenceAuthorityV1,
     pub expected_operation_revision: BindingOperationRevision,
     pub operation: BindingOperationV1,
-    pub expected_ledger_revision: TransferExecutionLedgerRevision,
+    /// Compare-and-set on the transfer-execution ledger row, and the ONLY
+    /// ledger CAS site where the row may legitimately not exist yet.
+    ///
+    /// `None` ASSERTS THAT THE STORE MUST FIND NO LEDGER ROW FOR THIS
+    /// OPERATION. It is the claim a first `issue_permit` makes: the ledger row
+    /// is born by this very write, so before it there is nothing to compare
+    /// against. `Some(revision)` asserts a row exists at exactly that revision,
+    /// read through [`crate::TransferExecutionStore::get_ledger`].
+    ///
+    /// THE STORE MUST REFUSE RATHER THAN PROCEED WHEN THE ASSERTION IS FALSE:
+    /// [`crate::BindingStoreError::Conflict`] both when `None` was claimed and
+    /// a row exists, and when `Some` was claimed and the row is absent or at a
+    /// different revision. A missing row must not launder into a clean first
+    /// write; that is the shape where two workers each believe they are opening
+    /// the ledger and each overwrites the other's opening.
+    ///
+    /// PRE-WAVE DEBT, CLOSED HERE. The field was a bare
+    /// `TransferExecutionLedgerRevision` with no absent representation and no
+    /// documented first-write value, while the only read backing it returned
+    /// `Option` and said nothing about what `None` meant, so at the first
+    /// permit for an operation no legal value existed. Its sibling
+    /// [`crate::TransferExecutionItemPreconditionV1`] one line below has had an
+    /// `Absent` arm since the seed commit, and the wave-born
+    /// [`crate::ClaimServingAuthorityPublicationWriteSetPartsV1::expected_lease_epoch`]
+    /// is the same `Option` with the same two-part doc. This is that shape
+    /// applied to the field the barrier rebuild passed over.
+    pub expected_ledger_revision: Option<TransferExecutionLedgerRevision>,
     pub item_precondition: crate::TransferExecutionItemPreconditionV1,
     pub movement_permit: VerifiedCellMovementPermit,
     pub authorization: VerifiedResidencyTransferAuthorization,
@@ -220,6 +246,14 @@ pub struct RecordTransferExecutionOutcomeWriteSetPartsV1 {
     pub authority: BindingPersistenceAuthorityV1,
     pub expected_operation_revision: BindingOperationRevision,
     pub operation: BindingOperationV1,
+    /// Required by value, unlike the same field on
+    /// [`IssueTransferExecutionPermitWriteSetPartsV1`], and the asymmetry is
+    /// the point rather than an oversight: an outcome is recorded against an
+    /// item that a permit issuance created, so the ledger row necessarily
+    /// exists by the time this write runs and `None` would assert something
+    /// that cannot be true. The same holds for
+    /// [`crate::TransferExecutionRepairWriteSetPartsV1`], which repairs a row
+    /// it must already have read.
     pub expected_ledger_revision: TransferExecutionLedgerRevision,
     pub item_precondition: crate::TransferExecutionItemPreconditionV1,
     pub outcome: VerifiedTransferExecutionOutcome,
@@ -465,6 +499,36 @@ pub struct PublishTransferExecutionPermitWriteSetPartsV1 {
     pub expected_operation_revision: BindingOperationRevision,
     pub operation: BindingOperationV1,
     pub issuance_precondition: TransferExecutionPermitIssuancePreconditionV1,
+    /// At publication the item row necessarily exists — `issue_permit` created
+    /// it as `next_item` — so `Absent` is not a legal answer here and
+    /// `Matches` is required.
+    ///
+    /// TWO OF ITS THREE MEMBERS COME FROM THE COMMIT OBSERVATION THE PUBLISHER
+    /// ALREADY HOLDS: `revision` is
+    /// [`TransferExecutionCommitObservationPayloadV1::observed_item_revision`]
+    /// and `record_digest` is
+    /// `TransferExecutionCommitObservationPayloadV1::observed_item_record_digest`.
+    ///
+    /// THE THIRD IS SUPPLIED BY DERIVATION, AND THIS IS WHERE THAT IS STATED.
+    /// `disposition` is `TransferExecutionItemDispositionV1::PermitIssued`,
+    /// which is what a committed issuance means: `issue_permit` is the only
+    /// write that leaves `PendingPermit`, and the publication whose
+    /// precondition this is runs against exactly that issuance. The publisher
+    /// therefore does not need to read the item row, and that matters: the only
+    /// read that returns a [`crate::TransferExecutionItemV1`] is
+    /// [`crate::TransferExecutionStore::read_item_page_for_reconciliation`], gated on
+    /// `BindingReconciliationReadAuthorityV1` plus a reconciliation lease,
+    /// while the publish path holds `BindingReadAuthorityV1`. Leaving the
+    /// derivation unstated would have put a reconciliation invocation and a
+    /// reconciliation lease on the ordinary publication path to obtain one
+    /// member of one precondition.
+    ///
+    /// The derivation is legitimate here and would NOT be for the other two
+    /// members: `revision` and `record_digest` are store-derived, and
+    /// `next_item` a few lines down forbids a caller relying on its own
+    /// restatement of those. `disposition` is different in kind — it is fixed
+    /// by which write the caller is performing, not by what the store computed
+    /// — which is why it can be derived and they cannot.
     pub item_precondition: crate::TransferExecutionItemPreconditionV1,
     /// The verified commit, bound in ALONGSIDE the signed permit.
     ///

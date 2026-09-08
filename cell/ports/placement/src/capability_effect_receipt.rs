@@ -175,12 +175,49 @@ pub trait CapabilityEffectReceiptCommitObserverV1: Send + Sync {
     /// Independently rereads by explicit partition and query and signs what it
     /// actually found. It accepts a lookup, never a caller's claimed commit
     /// transaction or receipt.
+    ///
+    /// `None` MEANS THE OBSERVER LOOKED AND FOUND NO COMMITTED ROW, or found
+    /// one not yet visible under committed read isolation. That is a definite
+    /// negative observation and a normal answer, not a refusal: an observer
+    /// signs what it read, and where there is nothing to read there is nothing
+    /// to sign. It is emphatically not
+    /// [`CapabilityEffectErrorV1::OutcomeUnknown`], which says the caller
+    /// learned nothing at all; here the caller learned that no receipt is
+    /// committed under this key.
+    ///
+    /// This used to be a bare claim with absence folded into
+    /// `CapabilityEffectErrorV1::UncommittedReceipt`. It was the one observer
+    /// port in fourteen across both crates that did so, and the split ran
+    /// through this very file: [`CapabilityLocalEffectStoreV1::recover_receipt`]
+    /// reads THE SAME ROW under the IDENTICAL
+    /// [`VerifiedCapabilityReceiptRecoveryV1`] and the IDENTICAL
+    /// [`CapabilityReceiptQueryV1`] and answers `None`. Same authority, same
+    /// key, same row, two answers, and neither doc acknowledged the other. The
+    /// rule this wave states in absolute terms elsewhere — absence is a normal,
+    /// expressible answer and must not be folded into an error — now holds here
+    /// as well, alongside the sibling observers that already obeyed it:
+    /// [`crate::PromotionEconomicsCheckpointCommitObserver::observe_committed_checkpoint`],
+    /// [`crate::MovementActionResultCommitObserver::observe_committed_result`],
+    /// [`crate::MovementActionClosureCommitObserver::observe_committed_closure`]
+    /// and
+    /// [`crate::RebalanceInvocationIssuanceCommitObserver::observe_committed_issuance`].
+    /// `UncommittedReceipt` is gone rather than left as a variant nothing can
+    /// raise.
+    ///
+    /// RETENTION LOSS IS STILL AN ERROR, and it is
+    /// [`CapabilityEffectErrorV1::RetainedEvidenceUnavailable`]: "the result
+    /// existed and its evidence is gone" is a different claim from "nothing was
+    /// committed", and a caller that reads the second where the first is true
+    /// concludes the effect never happened.
     fn observe_committed<'a>(
         &'a self,
         partition: &'a CapabilityPartitionRefV1,
         authority: &'a VerifiedCapabilityReceiptRecoveryV1,
         query: &'a CapabilityReceiptQueryV1,
-    ) -> BoxCellFuture<'a, Result<CommittedLocalEffectReceiptClaimV1, CapabilityEffectErrorV1>>;
+    ) -> BoxCellFuture<
+        'a,
+        Result<Option<CommittedLocalEffectReceiptClaimV1>, CapabilityEffectErrorV1>,
+    >;
 }
 
 pub trait CapabilityEffectReceiptPublisherV1: Send + Sync {

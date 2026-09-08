@@ -65,12 +65,27 @@ pub trait TransferExecutionStore: Send + Sync {
         write_set: &'a RecordTransferExecutionOutcomeWriteSetV1,
     ) -> BoxTenancyFuture<'a, Result<TransferExecutionLedgerV1, BindingStoreError>>;
 
+    /// Reads the transfer-execution ledger row for one operation.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO LEDGER ROW: no permit has
+    /// ever been issued for this operation. That is a normal answer and the
+    /// exact fact a first `issue_permit` needs, because
+    /// [`crate::IssueTransferExecutionPermitWriteSetPartsV1::expected_ledger_revision`]
+    /// is `None` in precisely that case and `Some(ledger.revision)` otherwise.
+    /// Until both docs existed, that required precondition had no legal value
+    /// at a first write and the only read that could supply it said nothing
+    /// about what absence asserted.
+    ///
+    /// `None` is not "the operation does not exist" and not an authorization
+    /// refusal; both of those are on the error channel.
     fn get_ledger<'a>(
         &'a self,
         authority: &'a BindingReadAuthorityV1,
         operation: &'a crate::BindingOperationKey,
     ) -> BoxTenancyFuture<'a, Result<Option<TransferExecutionLedgerV1>, BindingStoreError>>;
 
+    /// The reconciliation-authority twin of
+    /// [`TransferExecutionStore::get_ledger`]. `None` asserts the same thing.
     fn get_ledger_for_reconciliation<'a>(
         &'a self,
         authority: &'a BindingReconciliationReadAuthorityV1,

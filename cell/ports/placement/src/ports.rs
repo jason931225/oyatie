@@ -32,6 +32,54 @@ pub enum PlacementContractError {
     VerificationFailed,
     ProofAlreadyApplied,
     AuthorizationScopeMismatch,
+    /// A compare-and-set precondition did not hold: the record moved under the
+    /// caller between read and write.
+    ///
+    /// IT ALSO COVERS EVERY STORE-DERIVED VALUE A PROPOSAL RESTATES, and the
+    /// scope of that is a principle rather than a list.
+    ///
+    /// Write sets under this taxonomy carry the successor rows they expect the
+    /// store to end up holding — `next_job`, `next_claim`, `next_action`,
+    /// `next_ledger`, `next_state`, `next_resource`, `next_capacity` and any
+    /// successor a later write set adds. Those rows are ASSERTIONS, not
+    /// authority to write. The store MUST DERIVE every value it owns —
+    /// revisions, record digests, epochs, fences, roots, counts, states and
+    /// update instants — and refuse a proposal that disagrees, rather than
+    /// persisting what it was handed.
+    ///
+    /// THE SCOPE IS EVERY OWNER-OWNED OR STORE-DERIVED VALUE A PROPOSAL
+    /// RESTATES, WHETHER A FIELD, A NESTED RECORD OR A WHOLE ROW, AND NOT THE
+    /// EXAMPLES ABOVE. A refusal scoped by enumeration leaves everything not
+    /// enumerated bare, which is the defect the sibling taxonomies were
+    /// rescoped out of; the field names here are illustrations of the shape and
+    /// carry no boundary.
+    ///
+    /// Why it matters where it is least obvious:
+    /// [`crate::RebalanceJobClaimV1::epoch`] is a fence this store owns —
+    /// `claim` advances it and returns the advanced record — and
+    /// [`crate::MovementActionClosureCommitObservationV1::claim_epoch_at_commit`]
+    /// is later SIGNED OVER it by an independent observer. A proposed epoch the
+    /// store does not recompute is a value a signed observation will
+    /// subsequently vouch for.
+    ///
+    /// The sibling taxonomies state the same rule, and this one lacked it while
+    /// six write sets under it carried proposed successors:
+    /// [`crate::CapabilityEffectErrorV1::Conflict`] covers a proposed successor
+    /// revision, and `CapabilityEffectErrorV1::AuthorityContextMismatch`
+    /// covers a restated owner-assigned value. Note the split those two draw
+    /// and that it applies here as well: a value the OWNER assigns is not the
+    /// same defect as a value the STORE derives, and only the second is
+    /// retryable.
+    ///
+    /// RECOVERY: re-read, rebuild the successor from what came back, retry. The
+    /// reads that recovery names exist —
+    /// [`crate::RebalanceSourceStore::read_claim`],
+    /// [`crate::RebalanceSourceStore::get_evaluation`],
+    /// [`crate::RebalanceSourceStore::load_closure`] and
+    /// [`crate::RebalanceSourceIssuanceStore::load_issuance`]. Distinct from
+    /// `JobClaimHeldByAnotherWorker`, which is not a lost race but a surface
+    /// legitimately occupied, and where retrying at once is refused again for
+    /// the same reason.
     Conflict,
     /// A live rebalance job claim is held by a different worker, so
     /// [`crate::RebalanceSourceStore::claim`] refused rather than stealing it.

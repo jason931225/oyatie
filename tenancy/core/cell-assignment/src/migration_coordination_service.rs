@@ -73,7 +73,20 @@ pub struct SealTransferAuthorizationSetRequestV1 {
 pub struct IssueTransferExecutionPermitRequestV1 {
     pub operation: BindingOperationKey,
     pub expected_operation_revision: BindingOperationRevision,
-    pub expected_ledger_revision: TransferExecutionLedgerRevision,
+    /// `None` asserts that no ledger row exists yet — the first permit for this
+    /// operation. It mirrors
+    /// [`crate::IssueTransferExecutionPermitWriteSetPartsV1::expected_ledger_revision`],
+    /// which states the obligation and the refusal in full, and it is `Option`
+    /// here for the same reason: a caller opening the ledger has no revision to
+    /// state, and a required field with no legal value forces a caller to
+    /// invent one.
+    ///
+    /// The other two caller-facing ledger preconditions —
+    /// [`PublishTransferExecutionPermitRequestV1::expected_ledger_revision`]
+    /// and [`RecordTransferExecutionOutcomeRequestV1::expected_ledger_revision`]
+    /// — stay required by value, because both act on an operation whose ledger
+    /// row an issuance already created.
+    pub expected_ledger_revision: Option<TransferExecutionLedgerRevision>,
     pub authorization: VerifiedResidencyTransferAuthorization,
     pub authorization_set: VerifiedResidencyTransferAuthorizationSet,
     pub participant: crate::VerifiedParticipantManifestMember,
