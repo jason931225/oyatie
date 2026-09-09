@@ -35,12 +35,32 @@ message DrainContributorStateV1 {
   Digest32 record_digest = 10;
 }
 
+// Compare-and-set on the contributor state row, DrainContributorStateV1.
+//
+// The absent arm is not optional decoration: DRAIN_CONTRIBUTOR_MUTATION_KIND_V1
+// _CREATE opens the row, and at that mutation there is no prior revision and no
+// prior record digest to pin. An adapter reading only the present arm would
+// have to invent both to perform the first write. The refusal when an arm's
+// assertion is false is PlacementContractError CONFLICT on the store that owns
+// the row.
 message DrainContributorMutationPreconditionV1 {
-  CellId cell_id = 1;
-  string contributor_id = 2;
-  DrainContributorStateDispositionV1 expected_disposition = 3;
-  uint64 expected_revision = 4;
-  Digest32 expected_record_digest = 5;
+  message Absent {
+    CellId cell_id = 1;
+    string contributor_id = 2;
+  }
+
+  message Present {
+    CellId cell_id = 1;
+    string contributor_id = 2;
+    DrainContributorStateDispositionV1 expected_disposition = 3;
+    uint64 expected_revision = 4;
+    Digest32 expected_record_digest = 5;
+  }
+
+  oneof arm {
+    Absent absent = 1;
+    Present present = 2;
+  }
 }
 
 enum DrainContributorMutationKindV1 {

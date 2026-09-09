@@ -768,6 +768,15 @@ fn resolve(
     Vec::new()
 }
 
+/// A caller-assembled write or mutation set: one private member `parts` whose
+/// type is this file's own `*PartsV1` population.
+fn is_assembled_set(name: &str, model: &Model) -> bool {
+    model.structs.get(name).is_some_and(|declaration| {
+        matches!(declaration.fields.as_slice(), [only]
+            if only.name == "parts" && write_set_parts(&unwrap_container(&only.ty)))
+    })
+}
+
 fn write_set_parts(name: &str) -> bool {
     ["WriteSetPartsV1", "MutationSetPartsV1", "MutationPartsV1"]
         .iter()
@@ -949,8 +958,21 @@ fn sweep(model: &Model) -> Sweep {
             // question: any read returning any struct with a digest field
             // answers it. `CellReservationWriteSetPartsV1::capacity_precondition`
             // was a real open obligation masked by exactly this.
+            // AND AN ASSEMBLED WRITE SET IS NOT A ROW EITHER. A type whose only
+            // member is a private `parts: *PartsV1` is the caller-assembled
+            // container this file's own population is built from -- an INPUT a
+            // write set carries in, never a record a store derives. Admitting
+            // one lets route 3, "the precondition type is the unique prefix of
+            // a row's name", attribute
+            // `DrainContributorMutationPreconditionV1` to
+            // `DrainContributorMutationSetV1`, which is the set of mutations
+            // rather than the row any of them advances, and it fires BEFORE the
+            // intra-doc link on the member that names the real row. The rule is
+            // structural rather than a name suffix: `TransferEffectSetV1` and
+            // `ParticipantManifestMemberSetV1` are two-member records and stay.
             if !model.structs.contains_key(&bare)
                 || model.structs[&bare].fields.is_empty()
+                || is_assembled_set(&bare, model)
                 || bare.ends_with("PreconditionV1")
                 || bare.starts_with("Signed")
                 || bare.starts_with("Verified")
@@ -1358,7 +1380,10 @@ fn every_required_precondition_has_a_reachable_first_value() {
 //   (f) OFF-AXIS ARM -- the arm holds something that is not half of any derived
 //       read/persistence pair, or the write set declares no `authority` member
 //       at all. There is no ordering to measure, so the law has no subject.
-//       Both members this fires on carry a written ruling.
+//       A member this fires on MUST carry a written ruling naming the question
+//       that is open and why. That is the obligation, not a census: the count
+//       of such members has changed twice in this wave, and a sentence stating
+//       it was false both times.
 //   (g) DECLARED ON THE MEMBER -- the member's own doc says the authority
 //       question is discharged, names the surface, AND every name it cites
 //       resolves in the tree. The escape for a real route deeper than route
@@ -1851,7 +1876,7 @@ fn discharge(
     // half of any derived pair -- a capability-local write token, or a write set
     // that declares no `authority` member at all -- has no ordering to be
     // measured against, so this law has no subject and must not manufacture one.
-    // It is not a licence: both members this fires on carry a written ruling
+    // It is not a licence: a member this fires on must carry a written ruling
     // saying which question is open and why.
     if arm_authority == "<none>"
         || !(pairs.contains_key(arm_authority) || pairs.values().any(|read| read == arm_authority))

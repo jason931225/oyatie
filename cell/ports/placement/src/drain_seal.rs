@@ -27,13 +27,41 @@ pub struct DrainContributorStateV1 {
     pub record_digest: Digest32,
 }
 
+/// Compare-and-set on the contributor state row, [`DrainContributorStateV1`].
+///
+/// IT HAS AN ABSENT ARM BECAUSE THE ROW HAS A FIRST WRITE.
+/// [`DrainContributorMutationKindV1::Create`] opens the contributor row, and at
+/// that mutation there is no prior revision and no prior record digest to pin.
+/// The shape used to be a struct requiring both by value, so the only ways to
+/// perform the opening write were to invent a revision or to let a missing row
+/// launder into a clean first write — which is the shape where two contributors
+/// each believe they are opening the ledger and each overwrites the other.
+///
+/// The mutation kind is not a substitute for this arm. A kind is a statement
+/// about what the caller INTENDS; the precondition is what the store COMPARES,
+/// and only the second is what a compare-and-set refuses on.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DrainContributorMutationPreconditionV1 {
-    pub cell_id: CellId,
-    pub contributor_id: String,
-    pub expected_disposition: DrainContributorStateDispositionV1,
-    pub expected_revision: DrainContributorStateRevision,
-    pub expected_record_digest: Digest32,
+pub enum DrainContributorMutationPreconditionV1 {
+    /// The store must find NO contributor row for this cell and contributor.
+    /// This is the state a first mutation is in, and it is the only arm a
+    /// [`DrainContributorMutationKindV1::Create`] mutation may carry.
+    ///
+    /// The refusal when the assertion is false — a row IS present — is
+    /// `PlacementContractError CONFLICT` on the store that owns the row, which
+    /// is the refusal the ownership rule head names for this package.
+    Absent {
+        cell_id: CellId,
+        contributor_id: String,
+    },
+    /// The store must find a contributor row in exactly this disposition, at
+    /// exactly this revision and record digest.
+    Present {
+        cell_id: CellId,
+        contributor_id: String,
+        expected_disposition: DrainContributorStateDispositionV1,
+        expected_revision: DrainContributorStateRevision,
+        expected_record_digest: Digest32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -224,14 +252,21 @@ pub struct DrainContributorSealWriteSetPartsV1 {
     /// Compare-and-set on the contributor state row this write proposes,
     /// [`DrainContributorStateV1`].
     ///
-    /// RULED, NOT CLOSED. The question "is this value readable under the
-    /// authority this write takes" has no subject here: this write set carries
-    /// NO `authority` member at all, which is the only write set in either
-    /// crate of which that is true. It is a pre-wave shape and the missing
-    /// authority member — not the precondition — is what would have to change
-    /// first. [`DrainContributorSealStore::load_committed_seal`] reads the
-    /// lane's committed row and likewise demands no authority, so the two are
-    /// consistent with each other and inconsistent with the rest of the wave.
+    /// THE AUTHORITY QUESTION IS STILL OPEN ON THIS LANE, and it is now open
+    /// where it can be seen rather than discharged by a trivial route. This
+    /// write set carries no `authority` member — a shape it shares with several
+    /// others in both crates rather than uniquely — and
+    /// [`DrainContributorSealStore::load_committed_seal`] likewise demands
+    /// none, so the two are consistent with each other and inconsistent with
+    /// the rest of the wave. The missing authority member, not the
+    /// precondition, is what would have to change first, and it is one decision
+    /// for the whole lane.
+    ///
+    /// What is no longer open is the FIRST-VALUE question:
+    /// [`DrainContributorMutationPreconditionV1`] carries an
+    /// [`DrainContributorMutationPreconditionV1::Absent`] arm, so an opening
+    /// mutation asserts the row is not there instead of pinning a revision
+    /// nobody can supply.
     pub precondition: DrainContributorMutationPreconditionV1,
     pub next_state: DrainContributorStateV1,
     pub seal_intent: DrainContributorSealIntentV1,
@@ -327,6 +362,34 @@ pub trait DrainContributorSealStore: Send + Sync {
         write_set: &'a DrainContributorSealWriteSetV1,
     ) -> BoxCellFuture<'a, Result<DrainContributorStateV1, PlacementContractError>>;
 
+    /// Writes the verified commit observation back onto the contributor seal
+    /// row, so that [`DrainContributorSealStore::load_committed_seal`] has a
+    /// durable source for the signature it returns.
+    ///
+    /// It returns THE DURABLE ROW ALONE, for the same reason
+    /// [`DrainContributorSealStore::seal`] does: the signature it stores was
+    /// minted by
+    /// [`DrainContributorSealCommitObserver::observe_committed_seal`] before
+    /// this call and arrives inside
+    /// [`DrainContributorSealPublicationWriteSetPartsV1::committed_seal`], so
+    /// this write echoes back a caller-supplied value rather than attesting to
+    /// its own commit.
+    fn publish_seal<'a>(
+        &'a self,
+        write_set: &'a DrainContributorSealPublicationWriteSetV1,
+    ) -> BoxCellFuture<'a, Result<DrainContributorStateV1, PlacementContractError>>;
+
+    /// Reads the committed contributor seal row.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO COMMITTED SEAL for that cell,
+    /// contributor and drain term.
+    ///
+    /// THE OBSERVATION IT RETURNS IS SERVICEABLE.
+    /// [`CommittedDrainContributorSealClaimV1::observation`] is written by
+    /// [`DrainContributorSealStore::publish_seal`], which carries it in
+    /// verified form. Without that write this getter promised a value no write
+    /// here could store, and the only implementation left would have minted the
+    /// signature on the read.
     fn load_committed_seal<'a>(
         &'a self,
         cell_id: &'a CellId,
@@ -336,6 +399,73 @@ pub trait DrainContributorSealStore: Send + Sync {
         'a,
         Result<Option<CommittedDrainContributorSealClaimV1>, PlacementContractError>,
     >;
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct DrainContributorSealPublicationWriteSetV1 {
+    parts: DrainContributorSealPublicationWriteSetPartsV1,
+}
+
+/// Writes the independent commit observation back onto the row the loader
+/// reads.
+///
+/// WHY IT EXISTS. [`DrainContributorSealStore::load_committed_seal`] returns
+/// [`CommittedDrainContributorSealClaimV1`], whose third member is a
+/// [`SignedDrainContributorSealCommitObservationV1`]. Before this write set no
+/// write on this store carried that value, so the getter promised a signature
+/// nothing durable could put there and the only way to service it was to mint
+/// the signature ON THE READ — which is the self-attestation the observer
+/// barrier exists to close, reopened at the getter. The two sibling lanes got
+/// their write-back path when production moved to an observer
+/// ([`crate::MovementPermitPublicationWriteSetPartsV1::committed_issuance`]
+/// and `SourceReleasePublicationWriteSetPartsV1::committed_issuance`); this
+/// lane got the observer and not the path.
+///
+/// THE OBSERVATION IS ALREADY PERSISTED SOMEWHERE ELSE, AND THAT IS NOT THIS.
+/// It rides inside [`SignedDrainContributorSealV1`] in
+/// [`crate::AppendDrainProofWriteSetPartsV1::contributor_seal`], which is a
+/// different store trait ([`crate::CellDrainStore`]) writing a different row
+/// (the drain proof ledger). Read per-record — which is the scope this wave's
+/// law is stated at — a value on the proof ledger does not service a getter on
+/// the contributor seal row.
+#[derive(Debug, Eq, PartialEq)]
+pub struct DrainContributorSealPublicationWriteSetPartsV1 {
+    /// Compare-and-set on the contributor state row this write advances,
+    /// [`DrainContributorStateV1`].
+    ///
+    /// OPEN, for the same reason and in the same words as
+    /// [`DrainContributorSealWriteSetPartsV1::precondition`]: this write set
+    /// carries no `authority` member, so the question "is this value readable
+    /// under the authority this write takes" has no subject. The authority
+    /// question on this lane is one decision, taken once, for the seal write,
+    /// the publication write and
+    /// [`DrainContributorSealStore::load_committed_seal`] together; splitting
+    /// it here would put half the lane on an axis the other half is not on.
+    pub precondition: DrainContributorMutationPreconditionV1,
+    /// The observation the loader hands back, made durable on the row it is
+    /// read from. Private-field: only
+    /// [`verify_committed_drain_contributor_seal`] mints one, so a caller
+    /// cannot restate a signature it did not have verified.
+    pub committed_seal: VerifiedCommittedDrainContributorSeal,
+    /// The signed seal the authority produced from that observation, which is
+    /// what downstream proof consumption spends.
+    pub seal: VerifiedDrainContributorSeal,
+    pub published_state: DrainContributorStateV1,
+    pub local_idempotency_digest: Digest32,
+    pub local_audit_record_digest: Digest32,
+}
+
+impl DrainContributorSealPublicationWriteSetV1 {
+    pub fn assemble(
+        _parts: DrainContributorSealPublicationWriteSetPartsV1,
+    ) -> Result<Self, crate::PlacementContractError> {
+        Err(crate::PlacementContractError::NotImplemented)
+    }
+
+    #[must_use]
+    pub fn parts(&self) -> &DrainContributorSealPublicationWriteSetPartsV1 {
+        &self.parts
+    }
 }
 
 pub trait DrainContributorSealAuthority: Send + Sync {
