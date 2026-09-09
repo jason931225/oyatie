@@ -85,6 +85,28 @@ pub struct WriteAuthorityLeaseCommitAttestationExpectationV1 {
 /// the durable issuance plus this attestation, then passes it through
 /// `verify_committed_write_authority_lease_issuance`. No new proof domain is
 /// required; the existing one was always intended for this.
+///
+/// WHY THIS ONE RETURNS A LONE SIGNATURE WHEN ITS SIBLINGS RETURN THE RECORD
+/// WITH IT. `DrainContributorSealCommitObserver`,
+/// `MovementPermitIssuanceCommitObserver` and `SourceReleaseCommitObserver`
+/// each hand back a `Committed*ClaimV1`, because handing back a lone signature
+/// puts the caller in charge of pairing it with a record. Here the pairing is
+/// not the caller's to get wrong: every record the claim carries is pinned BY
+/// DIGEST inside the payload this attestation signs over —
+/// `issuance_revision`, `issuance_record_digest`, `lease_state_revision`,
+/// `lease_state_record_digest`, `binding_record_digest` and
+/// `publication_lease_digest` — so a caller pairing it with a different record
+/// is refused by `verify_committed_write_authority_lease_issuance` rather than
+/// believed. The siblings' claims have no such internal binding, which is why
+/// the shapes differ.
+///
+/// AND THE CLAIM COULD NOT BE BUILT HERE ANYWAY.
+/// [`CommittedWriteAuthorityLeaseIssuanceClaimV1`] carries five members drawn
+/// from four different rows, and this observer is used in the PRE-PUBLICATION
+/// window, where the reasoning at
+/// `CellServingAuthorityStore::load_committed_write_authority_lease_issuance`
+/// applies: a claim-typed observer would have to re-read all four and would
+/// duplicate that loader.
 pub trait WriteAuthorityLeaseCommitObserver: Send + Sync {
     fn observe_lease_commit<'a>(
         &'a self,

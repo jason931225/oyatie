@@ -60,6 +60,18 @@ pub struct CellLocalWriteAuthorityIdempotencyRecordV1 {
     pub immutable_result_digest: BindingDigest32,
 }
 
+/// The audit outbox row for one cell-local write-authority token issue.
+///
+/// THIS ROW HAS NO WIRE FORM, deliberately, and it is recorded here rather than
+/// left for a sweep to discover as an unmapped name. It carries a
+/// `record_digest` the store derives, so it is a proposed successor by the same
+/// rule `CellReservationEffectRecordV1` is, and there is no `message` for it in
+/// `tenancy/binding/v1`. The lane it belongs to is cell-local by construction —
+/// the token never leaves the cell that issued it — so no adapter reads this
+/// row off a schema. What binds it instead is the Rust contract on
+/// [`CellLocalWriteAuthorityTokenIssueWriteSetPartsV1`] that carries it,
+/// together with [`crate::BindingStoreError::ProposedSuccessorMismatch`], the
+/// refusal the Tenancy rule head names for a disagreeing proposal.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellLocalWriteAuthorityAuditRecordV1 {
     pub audit_event_id: String,

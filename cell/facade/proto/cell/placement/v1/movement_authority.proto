@@ -26,7 +26,8 @@ import "tenancy/identity/v1/identity.proto";
 //
 // An adapter author reads this schema to learn who owns each value, and must
 // not resolve that independently. The Rust half of this rule already exists at
-// cell/ports/placement PlacementContractError::Conflict; it was stated there
+// cell/ports/placement PlacementContractError::ProposedSuccessorMismatch; it
+// was stated there
 // for the owning side and withheld here, on the wire, for the same side --
 // while the PROJECTING side states it at file scope in
 // cell/placement/v1/capability_effect.proto. The owning side needs it MORE: a
@@ -44,9 +45,24 @@ import "tenancy/identity/v1/identity.proto";
 // EXAMPLES of the shape, NOT its extent. A refusal scoped by enumeration leaves
 // everything not enumerated bare.
 //
-// The refusal: PlacementContractError CONFLICT, on the rebalance source store.
-// That enum is not on the wire; the name is given so an adapter author knows
-// which refusal to raise. RebalanceJobClaimV1.epoch is a fence the store owns --
+// The refusal: PlacementContractError PROPOSED_SUCCESSOR_MISMATCH, on the store
+// that owns the row. That enum is not on the wire; the name is given so an
+// adapter author knows which refusal to raise.
+//
+// THE CHECK ORDER IS PART OF THE RULE, because a second refusal fires on the
+// same event with the opposite remedy. A caller that read a row, lost a race
+// and then assembled a write set has BOTH a stale precondition and a restated
+// store-derived value that now disagrees -- the same staleness seen twice.
+// PRECONDITIONS ARE COMPARED FIRST: PlacementContractError CONFLICT is the
+// refusal for a precondition that did not hold, and its remedy is to re-read
+// and retry; PROPOSED_SUCCESSOR_MISMATCH is raised only when every precondition
+// holds and a restated store-derived value still disagrees, and ITS remedy is
+// to stop restating the value. Raising them the other way round tells an
+// operator to stop restating a value the write set requires BY VALUE, which is
+// not a remedy that can be performed. The same order is stated at
+// cell/ports/placement PlacementContractError::ProposedSuccessorMismatch, and
+// it is the order tenancy/binding/v1/serving_authority.proto states for the
+// other package, so an operator crossing the boundary learns it once. RebalanceJobClaimV1.epoch is a fence the store owns --
 // claim advances it and returns the advanced record -- and
 // MovementActionClosureCommitObservationV1.claim_epoch_at_commit is later
 // SIGNED OVER it by an independent observer, so a proposed epoch the store does

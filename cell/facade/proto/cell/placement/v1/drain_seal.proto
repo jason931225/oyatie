@@ -13,8 +13,32 @@ import "cell/placement/v1/proof.proto";
 // whole row -- not a list.
 //
 // The refusal an adapter must raise is part of the rule and is restated here so
-// this pointer is not half of it: PlacementContractError CONFLICT on the store
-// that owns the row.
+// this pointer is not half of it: PlacementContractError
+// PROPOSED_SUCCESSOR_MISMATCH on the store that owns the row, with
+// PlacementContractError CONFLICT for an ordinary stale precondition. Both fire
+// on the same lost race and their remedies are opposite, so the check order is
+// part of the rule too: preconditions are compared FIRST, and
+// PROPOSED_SUCCESSOR_MISMATCH is raised only when every precondition holds and
+// a restated store-derived value still disagrees.
+//
+// DrainContributorStateV1 IS AN EXCEPTION TO THAT ONE REFUSAL NAME, and the
+// exception is stated rather than left to be inferred. Cell states the
+// contributor vocabulary (DrainContributorKindV1) and owns the shape of the
+// row; each CONTRIBUTOR writes its own contributor row, in its own store, under
+// its own error taxonomy. Six Tenancy write sets carry
+// DrainContributorStateMutationV1 or DrainContributorMutationSetV1 --
+// BindingControlPartitionMutationPartsV1, BindingProjectionInstallWriteSetPartsV1
+// and the four capability write sets -- and every store that applies them
+// returns BindingStoreError, never PlacementContractError. For a disagreeing
+// proposal on that path the refusal is BindingStoreError
+// PROPOSED_SUCCESSOR_MISMATCH, with BindingStoreError CONFLICT for an ordinary
+// stale read, in the check order stated at the head of
+// tenancy/binding/v1/serving_authority.proto.
+//
+// Which refusal applies is decided by WHICH STORE APPLIES THE MUTATION, not by
+// which package declares the message. An adapter reading only the sentence
+// above would look for a PlacementContractError variant on a Tenancy store and
+// find that it cannot be returned there at all.
 
 enum DrainContributorStateDispositionV1 {
   DRAIN_CONTRIBUTOR_STATE_DISPOSITION_V1_UNSPECIFIED = 0;
@@ -41,8 +65,9 @@ message DrainContributorStateV1 {
 // _CREATE opens the row, and at that mutation there is no prior revision and no
 // prior record digest to pin. An adapter reading only the present arm would
 // have to invent both to perform the first write. The refusal when an arm's
-// assertion is false is PlacementContractError CONFLICT on the store that owns
-// the row.
+// assertion is false is PlacementContractError CONFLICT -- a PRECONDITION that
+// did not hold, checked before any proposal is compared, so it is CONFLICT and
+// not PROPOSED_SUCCESSOR_MISMATCH.
 message DrainContributorMutationPreconditionV1 {
   message Absent {
     CellId cell_id = 1;

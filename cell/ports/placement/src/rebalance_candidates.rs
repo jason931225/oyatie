@@ -122,9 +122,17 @@ pub struct RebalanceCandidateRequirementsRequestV1 {
 }
 
 pub trait RebalanceCandidateRequirementsReader: Send + Sync {
+    /// Reads the requirements for one rebalance candidate.
+    ///
+    /// `None` MEANS THE READER LOOKED AND FOUND NO REQUIREMENTS for that
+    /// candidate in that snapshot. It is an outcome, not a failure, and it is
+    /// deliberately not [`PlacementContractError::NotFoundOrNotAuthorized`]:
+    /// that variant conflates absence with an authorization refusal, which is
+    /// right at an unauthenticated edge and wrong for a method that already
+    /// runs under an explicit [`PlacementReadAuthorityV1`].
     fn read_requirements<'a>(
         &'a self,
         authority: &'a PlacementReadAuthorityV1,
         request: &'a RebalanceCandidateRequirementsRequestV1,
-    ) -> BoxCellFuture<'a, Result<RebalanceCandidateRequirementsV1, PlacementContractError>>;
+    ) -> BoxCellFuture<'a, Result<Option<RebalanceCandidateRequirementsV1>, PlacementContractError>>;
 }

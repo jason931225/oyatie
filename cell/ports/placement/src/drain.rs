@@ -3,12 +3,35 @@ use crate::{
     ImmutableEvidenceRefV1, ProducerId, ProofVerificationError,
 };
 
+/// Who contributes state to a cell drain.
+///
+/// THIS ENUM IS THE DIVISION OF LABOUR, and it is the only place the division
+/// was ever written down. Cell states the vocabulary and owns the shape of
+/// [`crate::DrainContributorStateV1`]; each contributor writes ITS OWN
+/// contributor row, in its own store, under its own error taxonomy. That is the
+/// same division `capability_effect.rs` states in terms for the capability
+/// boundary, and it was legible here only from the arm names.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum DrainContributorKindV1 {
+    /// Tenancy's bindings. The contributor is the `tenancy-cell-assignment`
+    /// crate, and its rows are proposed by six Tenancy write sets carrying
+    /// [`crate::DrainContributorStateMutationV1`] or
+    /// [`crate::DrainContributorMutationSetV1`]. Every store that applies one
+    /// returns `BindingStoreError`, so the refusal for a disagreeing proposal
+    /// on this arm is `BindingStoreError PROPOSED_SUCCESSOR_MISMATCH` and NOT
+    /// the [`crate::PlacementContractError`] the cell-side ownership rule head
+    /// names — a Tenancy store cannot return that type at all. This is the one
+    /// arm whose refusal is not the cell package's, and it is stated on both
+    /// sides: see the head of `cell/placement/v1/drain_seal.proto`.
     TenancyBindings,
+    /// Cell's own reservations, proposed by
+    /// [`crate::CellReservationWriteSetPartsV1::drain_mutations`].
     CellReservations,
+    /// Cell's own placement operations.
     CellOperations,
+    /// The capability plane's local write-authority state.
     CapabilityState,
+    /// The routing projections a binding installs.
     RoutingProjections,
 }
 

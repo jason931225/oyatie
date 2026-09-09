@@ -35,8 +35,31 @@ pub enum PlacementContractError {
     /// A compare-and-set precondition did not hold: the record moved under the
     /// caller between read and write.
     ///
-    /// IT ALSO COVERS EVERY STORE-DERIVED VALUE A PROPOSAL RESTATES, and the
-    /// scope of that is a principle rather than a list.
+    /// IT NO LONGER ALSO COVERS A DISAGREEING PROPOSAL. That is
+    /// [`Self::ProposedSuccessorMismatch`], and the split is why: this variant
+    /// carries no payload, so an operator receiving it from a cell store had
+    /// two situations with OPPOSITE remedies and no way to tell them apart —
+    /// re-read and retry for a lost race, stop restating the value for a
+    /// proposal that contradicts what the store owns — and the single recovery
+    /// this block prescribed was correct for exactly one of them. Tenancy has
+    /// had two names since `ServingAuthorityStoreError::ProposedSuccessorMismatch`
+    /// was split out; the cell package had one, so no check order could be
+    /// stated here because there was nothing to order.
+    ///
+    /// RECOVERY: re-read, rebuild the successor from what came back, retry. The
+    /// reads that recovery names exist —
+    /// [`crate::RebalanceSourceStore::read_claim`],
+    /// [`crate::RebalanceSourceStore::get_evaluation`],
+    /// [`crate::RebalanceSourceStore::load_closure`] and
+    /// [`crate::RebalanceSourceIssuanceStore::load_issuance`]. Distinct from
+    /// `JobClaimHeldByAnotherWorker`, which is not a lost race but a surface
+    /// legitimately occupied, and where retrying at once is refused again for
+    /// the same reason.
+    Conflict,
+    /// The caller's proposal restated a value it does not own, and the value it
+    /// restated disagrees with what the store derived.
+    ///
+    /// THE SCOPE IS A PRINCIPLE RATHER THAN A LIST.
     ///
     /// Write sets under this taxonomy carry the successor rows they expect the
     /// store to end up holding — `next_job`, `next_claim`, `next_action`,
@@ -62,25 +85,50 @@ pub enum PlacementContractError {
     /// store does not recompute is a value a signed observation will
     /// subsequently vouch for.
     ///
-    /// The sibling taxonomies state the same rule, and this one lacked it while
-    /// write sets under it carried proposed successors:
-    /// [`crate::CapabilityEffectErrorV1::Conflict`] covers a proposed successor
-    /// revision, and `CapabilityEffectErrorV1::AuthorityContextMismatch`
-    /// covers a restated owner-assigned value. Note the split those two draw
-    /// and that it applies here as well: a value the OWNER assigns is not the
-    /// same defect as a value the STORE derives, and only the second is
-    /// retryable.
+    /// ITS SCOPE IS A VALUE THE STORE DERIVES, NOT A VALUE ANOTHER OWNER
+    /// ASSIGNS, and the difference is that only the first has a remedy the
+    /// caller can perform. [`crate::CapabilityEffectErrorV1::Conflict`] covers
+    /// a proposed successor revision and
+    /// `CapabilityEffectErrorV1::AuthorityContextMismatch` covers a restated
+    /// owner-assigned value; those are two names because that lane has both
+    /// situations. This package has one, and one only: no cell write set
+    /// proposes a value another domain owns as a successor. The two
+    /// cross-domain members on this side —
+    /// `MovementBudgetGrantWriteSetPartsV1::participant_manifest` and
+    /// `CellReservationWriteSetPartsV1::tenancy_release_proof_consumptions` —
+    /// are inputs a verifier minted, not successors. A second name here would
+    /// have no situation to name; if a cell write set ever proposes an
+    /// owner-assigned value, it needs one, because "stop restating it" is not a
+    /// remedy the caller can perform when the value belongs to somebody else.
     ///
-    /// RECOVERY: re-read, rebuild the successor from what came back, retry. The
-    /// reads that recovery names exist —
-    /// [`crate::RebalanceSourceStore::read_claim`],
-    /// [`crate::RebalanceSourceStore::get_evaluation`],
-    /// [`crate::RebalanceSourceStore::load_closure`] and
-    /// [`crate::RebalanceSourceIssuanceStore::load_issuance`]. Distinct from
-    /// `JobClaimHeldByAnotherWorker`, which is not a lost race but a surface
-    /// legitimately occupied, and where retrying at once is refused again for
-    /// the same reason.
-    Conflict,
+    /// Distinct from [`Self::Conflict`]: a conflict is a precondition failing
+    /// against durable state, and re-reading may resolve it. This is the
+    /// caller's proposal contradicting a value it does not own, and re-reading
+    /// resolves it only if the caller then STOPS RESTATING THE VALUE.
+    ///
+    /// THE CHECK ORDER, because both fire on the ordinary stale read and their
+    /// remedies are opposite. A caller that read a row, lost a race and then
+    /// assembled a write set has a stale precondition AND a restated
+    /// store-derived value that now disagrees — the same staleness seen twice.
+    /// PRECONDITIONS ARE COMPARED FIRST, and this variant is raised only when
+    /// every precondition holds and a restated store-derived value still
+    /// disagrees. That order is stated here and at the head of
+    /// `cell/placement/v1/movement_authority.proto`, which every pointer file
+    /// in this package inherits, so the wire and the Rust agree. It is the same
+    /// order `ServingAuthorityStoreError::ProposedSuccessorMismatch` states for
+    /// the Tenancy package, deliberately, so an operator crossing the boundary
+    /// does not have to learn a second one.
+    ///
+    /// Getting it the other way round tells an operator to stop restating a
+    /// value the write set requires BY VALUE — `next_capacity`, `next_state`,
+    /// `next_ledger`, `next_resource` and `published_issuance` are all
+    /// non-optional members — which is not a remedy that can be performed, when
+    /// the remedy that could be was re-read and retry.
+    ///
+    /// RECOVERY: stop restating the value. Read the row, take what the store
+    /// derived, and rebuild the successor around it rather than around what the
+    /// caller computed.
+    ProposedSuccessorMismatch,
     /// A live rebalance job claim is held by a different worker, so
     /// [`crate::RebalanceSourceStore::claim`] refused rather than stealing it.
     ///

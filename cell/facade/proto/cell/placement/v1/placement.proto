@@ -10,6 +10,28 @@ import "cell/placement/v1/proof.proto";
 import "cell/placement/v1/topology.proto";
 import "tenancy/identity/v1/identity.proto";
 
+// Messages in this file that a write set names as a proposed successor are
+// governed by the ownership rule stated at the head of
+// cell/placement/v1/movement_authority.proto: the store derives every value it
+// owns and refuses a disagreeing proposal, and the scope is every owner-owned
+// or store-derived value a proposal restates -- a field, a nested record or a
+// whole row -- not a list.
+//
+// The refusal an adapter must raise is part of the rule and is restated here so
+// this pointer is not half of it: PlacementContractError
+// PROPOSED_SUCCESSOR_MISMATCH on the store that owns the row, with
+// PlacementContractError CONFLICT for an ordinary stale precondition. Both fire
+// on the same lost race and their remedies are opposite, so the check order is
+// part of the rule too: preconditions are compared FIRST, and
+// PROPOSED_SUCCESSOR_MISMATCH is raised only when every precondition holds and
+// a restated store-derived value still disagrees.
+//
+// PlacementSearchPlanV1 is proposed as
+// PlacementOperationWriteSetPartsV1.search_plan and read back by
+// PlacementOperationStore::get_search_plan, so it is a row the store both
+// derives and hands out. `plan_digest` and the two ordered root digests on it
+// are the store's, never the proposer's.
+
 message PlacementSearchCursorV1 {
   uint64 next_partition_ordinal = 1;
   uint64 next_window_ordinal = 2;

@@ -15,8 +15,13 @@ import "cell/placement/v1/rebalance.proto";
 // whole row -- not a list.
 //
 // The refusal an adapter must raise is part of the rule and is restated here so
-// this pointer is not half of it: PlacementContractError CONFLICT on the store
-// that owns the row.
+// this pointer is not half of it: PlacementContractError
+// PROPOSED_SUCCESSOR_MISMATCH on the store that owns the row, with
+// PlacementContractError CONFLICT for an ordinary stale precondition. Both fire
+// on the same lost race and their remedies are opposite, so the check order is
+// part of the rule too: preconditions are compared FIRST, and
+// PROPOSED_SUCCESSOR_MISMATCH is raised only when every precondition holds and
+// a restated store-derived value still disagrees.
 
 enum CellControlReconciliationWorkClassV1 {
   CELL_CONTROL_RECONCILIATION_WORK_CLASS_V1_UNSPECIFIED = 0;

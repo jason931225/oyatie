@@ -47,8 +47,11 @@ pub enum DrainContributorMutationPreconditionV1 {
     /// [`DrainContributorMutationKindV1::Create`] mutation may carry.
     ///
     /// The refusal when the assertion is false — a row IS present — is
-    /// `PlacementContractError CONFLICT` on the store that owns the row, which
-    /// is the refusal the ownership rule head names for this package.
+    /// [`crate::PlacementContractError::Conflict`]: a precondition that did not
+    /// hold. It is deliberately NOT
+    /// [`crate::PlacementContractError::ProposedSuccessorMismatch`], which the
+    /// ownership rule head names for a disagreeing PROPOSAL and which is raised
+    /// only after every precondition holds.
     Absent {
         cell_id: CellId,
         contributor_id: String,

@@ -324,10 +324,25 @@ pub fn verify_release_compatibility_member(
 }
 
 pub trait ReleaseCompatibilityReader: Send + Sync {
+    /// Reads one member of a release compatibility set by ordinal.
+    ///
+    /// `None` MEANS THE READER LOOKED AND FOUND NO MEMBER at that ordinal —
+    /// an ordinal past the end of the set. Absence is representable here
+    /// because it is an outcome a legitimate caller reaches, and because the
+    /// alternative was
+    /// [`crate::PlacementContractError::NotFoundOrNotAuthorized`], which
+    /// conflates absence with an authorization refusal on purpose. That
+    /// conflation is right at an unauthenticated edge and wrong here: this
+    /// method already runs under an explicit
+    /// [`PlacementReadAuthorityV1`], so for it the conflation destroys exactly
+    /// the distinction it is there to draw.
     fn read_member<'a>(
         &'a self,
         authority: &'a PlacementReadAuthorityV1,
         set: &'a ReleaseCompatibilitySetV1,
         ordinal: u64,
-    ) -> BoxCellFuture<'a, Result<ReleaseCompatibilityMemberV1, crate::PlacementContractError>>;
+    ) -> BoxCellFuture<
+        'a,
+        Result<Option<ReleaseCompatibilityMemberV1>, crate::PlacementContractError>,
+    >;
 }

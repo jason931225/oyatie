@@ -2250,6 +2250,43 @@ fn proto_files() -> Vec<PathBuf> {
     out
 }
 
+/// Does this row carry a version OF ITSELF -- a `revision`, a `record_digest`,
+/// or a digest named for the row?
+///
+/// That is what makes a row one a store VERSIONS, and it is the third route
+/// into the successor population because the first two are both name-keyed on
+/// the CARRYING MEMBER and a member does not have to be called `next_`
+/// anything. `MovementBudgetSettlementWriteSetPartsV1::settlement` sits on the
+/// same struct as `next_leaf_authority_state` and is one word away from the
+/// spelling the name route looks for; `PlacementOperationWriteSetPartsV1::
+/// search_plan` is the same shape. Both rows are written by a store and read
+/// back from it, both carry values the store derives, and neither had an
+/// ownership statement on either side of the boundary.
+///
+/// IT MUST NOT SWALLOW THE INPUTS A WRITE SET CARRIES IN. An idempotency
+/// record, a proof consumption and an audit envelope all carry digests, and
+/// none of them is a row a store advances -- the caller builds them and the
+/// store stores them. The discriminator is WHOSE version the digest is: a
+/// `request_digest` or an `envelope_digest` versions something else, while a
+/// `record_digest` or a `plan_digest` on a plan versions the row itself. A
+/// wider key keyed on any version role at all was tried and pulled in eight
+/// such inputs, including the `BindingIdempotencyRecordV1` this file's own
+/// discriminating test names as the thing that must stay out.
+fn versions_itself(row: &str, model: &Model) -> bool {
+    let Some(declaration) = model.structs.get(row) else {
+        return false;
+    };
+    let lowered_row = row.to_ascii_lowercase();
+    declaration.fields.iter().any(|member| {
+        member.name == "revision"
+            || member.name == "record_digest"
+            || member
+                .name
+                .strip_suffix("_digest")
+                .is_some_and(|stem| !stem.is_empty() && lowered_row.contains(stem))
+    })
+}
+
 /// The rows a write set names as a proposed successor.
 fn proposed_successor_rows(model: &Model) -> BTreeSet<String> {
     let sweep = sweep(model);
@@ -2268,7 +2305,9 @@ fn proposed_successor_rows(model: &Model) -> BTreeSet<String> {
             }
             // A minted wrapper on the wire is the record it wraps.
             let row = bare.strip_prefix("Verified").unwrap_or(&bare).to_owned();
-            if (field.name == "next" || field.name.starts_with("next_"))
+            if (field.name == "next"
+                || field.name.starts_with("next_")
+                || versions_itself(&row, model))
                 && (model.structs.contains_key(&row) || model.structs.contains_key(&bare))
             {
                 out.insert(row);
@@ -2324,8 +2363,27 @@ fn the_wire_ownership_sweep_discriminates_before_it_certifies() {
     );
     // And a thing that is emphatically not a successor row stays out.
     assert!(
+        rows.contains("MovementBudgetSettlementV1") && rows.contains("PlacementSearchPlanV1"),
+        "a row a store VERSIONS is a proposed successor however the carrying member is \
+         spelled: `settlement` and `search_plan` are one word from `next_*` and were \
+         invisible to both name routes"
+    );
+    // And the inputs a write set carries in stay out. Each of these carries a
+    // digest and none of them is a row a store advances.
+    assert!(
         !rows.contains("BindingIdempotencyRecordV1"),
         "an idempotency record is not a proposed successor"
+    );
+    assert!(
+        !rows.contains("PlacementIdempotencyRecordV1")
+            && !rows.contains("TenancyReleaseProofConsumptionV1"),
+        "a `request_digest` or an `envelope_digest` versions something else; only a \
+         version OF THE ROW makes it a successor"
+    );
+    assert!(
+        versions_itself("MovementBudgetSettlementV1", &model)
+            && !versions_itself("PlacementIdempotencyRecordV1", &model),
+        "the discriminator is whose version the digest is"
     );
 
     // The rule heads exist and are found by the same text the check keys on.

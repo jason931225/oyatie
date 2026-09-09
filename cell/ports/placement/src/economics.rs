@@ -239,9 +239,20 @@ pub trait CommercialSnapshotResolver: Send + Sync {
         request: &'a CommercialSnapshotPageRequestV1,
     ) -> BoxCellFuture<'a, Result<CommercialSnapshotPageV1, crate::PlacementContractError>>;
 
+    /// Reads the canonical commercial source record the request names.
+    ///
+    /// `None` MEANS THE RESOLVER LOOKED AND FOUND NO RECORD for that request.
+    /// It is an outcome, not a failure, and it is deliberately not
+    /// [`crate::PlacementContractError::NotFoundOrNotAuthorized`]: that variant
+    /// conflates absence with an authorization refusal, which is right at an
+    /// unauthenticated edge and wrong for a method that already runs under an
+    /// explicit [`PlacementReadAuthorityV1`].
     fn read_source_record<'a>(
         &'a self,
         authority: &'a PlacementReadAuthorityV1,
         request: &'a CommercialSourceRecordReadRequestV1,
-    ) -> BoxCellFuture<'a, Result<CanonicalCommercialSourceRecordV1, crate::PlacementContractError>>;
+    ) -> BoxCellFuture<
+        'a,
+        Result<Option<CanonicalCommercialSourceRecordV1>, crate::PlacementContractError>,
+    >;
 }
