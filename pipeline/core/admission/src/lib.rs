@@ -38,7 +38,7 @@ pub use layout::{
     layout_violations, owner_core_regression_violations, proto_package_violations,
     workspace_draft_dependency_violations, workspace_membership_violations,
 };
-pub use line_budget::file_budget_violations;
+pub use line_budget::{comment_run_violations, file_budget_violations};
 pub use live_postgres::{
     BACKBONE_LIVE_POSTGRES_PATH_PREFIXES, COMPUTE_LIFECYCLE_LIVE_POSTGRES_PATH_PREFIXES,
     LIVE_POSTGRES_SELECTOR_PATH_PREFIXES, hits_backbone_postgres_path,

@@ -48,6 +48,18 @@ rust_test(
 )
 
 rust_test(
+    name = "pipeline-admission-comment-run",
+    srcs = ["tests/comment_run.rs"],
+    crate = "pipeline_admission_comment_run",
+    crate_root = "tests/comment_run.rs",
+    env = _CARGO_ENV,
+    visibility = ["PUBLIC"],
+    deps = [
+        ":pipeline-admission",
+    ],
+)
+
+rust_test(
     name = "pipeline-admission-commit-signing-workflow",
     srcs = ["tests/commit_signing_workflow.rs"],
     crate = "pipeline_admission_commit_signing_workflow",
