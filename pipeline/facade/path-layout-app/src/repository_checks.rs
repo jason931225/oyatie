@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use pipeline_admission::{
     ALLOWED_ROOT_DIRS, APP_PRODUCT_DIRS, BUILD_ROOT_DIRS, CARGO_CONFIG_PATHS,
-    cargo_config_violations, file_budget_violations, is_capability_root,
+    cargo_config_violations, comment_run_violations, file_budget_violations, is_capability_root,
 };
 use pipeline_repository_draft::{RepositoryEntryKind, RepositoryRead};
 
@@ -87,6 +87,12 @@ pub(super) fn repository_cargo_config_violations(
     Ok(violations)
 }
 
+/// Budgets charged against the content of every changed live path. Both are
+/// path-keyed, so both are judged at a rename's source.
+type TouchedContentRule = fn(&str, &[u8]) -> Vec<String>;
+const TOUCHED_CONTENT_RULES: [TouchedContentRule; 2] =
+    [file_budget_violations, comment_run_violations];
+
 pub(super) fn live_candidate_violations(
     repository: &impl RepositoryRead,
     head: &str,
@@ -98,18 +104,20 @@ pub(super) fn live_candidate_violations(
         match repository.entry_kind(head, path)? {
             Some(kind) if regular_blob(Some(kind)) => {
                 let contents = repository.blob_bytes(head, path)?;
-                // Relocating a file that ALREADY broke the budget charges its
+                // Relocating a file that ALREADY broke a budget charges its
                 // debt to whoever moved it, which is why the exception exists.
-                // But the budget is path-keyed, so the exemption must be
+                // But both budgets are path-keyed, so the exemption must be
                 // judged at the SOURCE: grading the same bytes where they came
                 // from is the difference between forgiving pre-existing debt
                 // and laundering oversized content out of an exempt path into
                 // a budgeted one, which no longer costs anybody anything.
-                let already_owed = exact_rename_sources
-                    .get(path)
-                    .is_some_and(|source| !file_budget_violations(source, &contents).is_empty());
-                if !already_owed {
-                    violations.extend(file_budget_violations(path, &contents));
+                for rule in TOUCHED_CONTENT_RULES {
+                    let already_owed = exact_rename_sources
+                        .get(path)
+                        .is_some_and(|source| !rule(source, &contents).is_empty());
+                    if !already_owed {
+                        violations.extend(rule(path, &contents));
+                    }
                 }
             }
             Some(kind) => violations.push(format!(

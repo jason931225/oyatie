@@ -3,6 +3,7 @@
 use crate::layout::{APP_PRODUCT_DIRS, is_capability_root};
 
 const MAX_LINES: usize = 300;
+const MAX_COMMENT_RUN: usize = 20;
 const OWNER_LAW: &[&str] = &["ADR.md", "PRD.md", "SPEC.md", "PLAN.md"];
 
 /// Count physical newline characters exactly as `wc -l`; the closed exempt
@@ -18,6 +19,117 @@ pub fn file_budget_violations(path: &str, contents: &[u8]) -> Vec<String> {
         vec![format!(
             "{path}: {lines} physical lines exceeds the repository {MAX_LINES}-line file budget"
         )]
+    }
+}
+
+/// Refuse a contiguous run of comment-only lines longer than
+/// `MAX_COMMENT_RUN` in a Rust source. A blank line bridges a run instead of
+/// breaking it, so a blob cannot be split into two passing halves by adding
+/// whitespace; only real code ends a run. Line comments, both doc spellings
+/// and block-comment bodies all count, and the exempt set is the same closed,
+/// path-derived one the file budget uses: as with that budget, it cannot be
+/// expanded by file contents, so no comment can switch this rule off. The
+/// remedy for a refusal is to move the argument into the commit message,
+/// where it is addressed to a reader who asked for it.
+pub fn comment_run_violations(path: &str, contents: &[u8]) -> Vec<String> {
+    if exempt(path) || !path.ends_with(".rs") {
+        return Vec::new();
+    }
+    let text = String::from_utf8_lossy(contents);
+    let mut violations = Vec::new();
+    let mut scanner = CommentScanner::default();
+    let mut run: Option<CommentRun> = None;
+    for (index, line) in text.lines().enumerate() {
+        match scanner.classify(line.trim()) {
+            LineKind::Comment => {
+                run.get_or_insert(CommentRun {
+                    start: index + 1,
+                    lines: 0,
+                })
+                .lines += 1;
+            }
+            LineKind::Blank => {}
+            LineKind::Code => report(&mut violations, path, run.take()),
+        }
+    }
+    report(&mut violations, path, run.take());
+    violations
+}
+
+struct CommentRun {
+    start: usize,
+    lines: usize,
+}
+
+fn report(violations: &mut Vec<String>, path: &str, run: Option<CommentRun>) {
+    if let Some(run) = run
+        && run.lines > MAX_COMMENT_RUN
+    {
+        let (start, lines) = (run.start, run.lines);
+        violations.push(format!(
+            "{path}:{start}: {lines} consecutive comment lines exceed the \
+             {MAX_COMMENT_RUN}-line comment-run ceiling; move the explanation \
+             into the commit message"
+        ));
+    }
+}
+
+enum LineKind {
+    Comment,
+    Blank,
+    Code,
+}
+
+/// Block-comment nesting carried across lines; Rust nests `/* /* */ */`, so a
+/// depth is the only reading that closes the right block.
+#[derive(Default)]
+struct CommentScanner {
+    depth: usize,
+}
+
+impl CommentScanner {
+    fn classify(&mut self, line: &str) -> LineKind {
+        if self.depth == 0 {
+            if line.is_empty() {
+                return LineKind::Blank;
+            }
+            if line.starts_with("//") {
+                return LineKind::Comment;
+            }
+            if !line.starts_with("/*") {
+                return LineKind::Code;
+            }
+        }
+        let tail = self.advance(line);
+        if self.depth == 0 && !tail.trim().is_empty() {
+            LineKind::Code
+        } else {
+            LineKind::Comment
+        }
+    }
+
+    /// Walk `line`, tracking block-comment depth, and return whatever follows
+    /// the outermost close when the block ends on this line.
+    fn advance<'line>(&mut self, line: &'line str) -> &'line str {
+        let bytes = line.as_bytes();
+        let mut index = 0;
+        while index + 1 < bytes.len() {
+            match (bytes[index], bytes[index + 1]) {
+                (b'/', b'*') => {
+                    self.depth += 1;
+                    index += 2;
+                }
+                (b'*', b'/') => {
+                    self.depth = self.depth.saturating_sub(1);
+                    index += 2;
+                    if self.depth == 0 {
+                        return &line[index..];
+                    }
+                }
+                _ => index += 1,
+            }
+        }
+        ""
     }
 }
 

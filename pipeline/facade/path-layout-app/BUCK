@@ -38,6 +38,25 @@ rust_test(
 )
 
 rust_test(
+    name = "pipeline-path-layout-app-comment-run-budget",
+    srcs = [
+        "tests/comment_run_budget.rs",
+        "tests/support/mod.rs",
+    ],
+    crate = "pipeline_path_layout_app_comment_run_budget",
+    crate_root = "tests/comment_run_budget.rs",
+    env = _PATH_LAYOUT_APP_TEST_ENV,
+    resources = _PATH_LAYOUT_APP_TEST_RESOURCES,
+    visibility = ["PUBLIC"],
+    deps = [
+        ":pipeline-path-layout-app",
+        "//pipeline/core/admission:pipeline-admission",
+        "//pipeline/ports/draft/repository:pipeline-repository-draft",
+        "//pipeline/adapters/draft/repository-git:pipeline-repository-git-draft",
+    ],
+)
+
+rust_test(
     name = "pipeline-path-layout-app-execution-toolchain-transition",
     srcs = [
         "tests/execution_toolchain_transition.rs",
