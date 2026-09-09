@@ -1066,8 +1066,14 @@ fn every_required_precondition_has_a_reachable_first_value() {
 // the precondition once, over the union of its arms, hides that. Every arm is
 // an obligation of its own and is printed as its own line.
 //
-// THE FIVE DISCHARGE ROUTES, in the order they are tried, each named in the
-// output so a reader can see which one fired:
+// THE DISCHARGE ROUTES, each named in the output so a reader can see which one
+// fired. `fn discharge` tries them READ, SUBJECT, OTHER WRITE, LEASE-GATED
+// READ, DECLARED, OFF-AXIS, UNAUTHENTICATED, and first match wins, so the
+// order is load-bearing; the letters below are labels for reference, NOT the
+// try order. This heading once said FIVE above seven routes and claimed the
+// list gave the try order, which it did not -- the last three were reversed.
+// It states no count now: the routes are the arms of `fn discharge` and a
+// tally here would be the census this file's own sweep exists to delete.
 //
 //   (a) READ -- a method that takes no write set, is not a caller-facing
 //       facade, is not gated on a lease, does not return a `Committed*ClaimV1`,
