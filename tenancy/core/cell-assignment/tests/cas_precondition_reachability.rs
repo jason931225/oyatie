@@ -37,7 +37,7 @@
 //!
 //! "CAN REPRESENT ABSENCE" IS A SHAPE, NOT A NAME. `Option<_>`, or an enum with
 //! a variant that asserts no version of the row -- no non-optional member whose
-//! name or type carries a revision, digest, epoch, generation or ordinal. That
+//! name or type carries any role in `VERSION_ROLES`. That
 //! admits `Absent`, `Unbound`, `Unmapped` and `Uninstalled { rejection_high_water:
 //! Option<_> }` without ever listing those names, and refuses an enum all of
 //! whose arms assert a version.
@@ -940,36 +940,12 @@ fn sweep(model: &Model) -> Sweep {
             // to compare-and-set here. A `*PreconditionV1` member is the
             // comparison itself, not the row.
             //
-            // AND A ROW HAS MEMBERS. A tuple newtype or a unit struct carries no
-            // values a store could own, so it can be neither the subject of a
-            // compare-and-set nor the thing a revision and a record digest are
-            // OF. Admitting one is not a harmless widening: `resolve`'s first
-            // route is `rows.contains(&ty)` and EARLY-RETURNS, so a bare content
-            // digest in this set silently becomes the answer for every
-            // precondition whose declared type is that digest, and route 4
-            // reaches it a second way whenever a precondition's real row is
-            // outside the population and its `*_record_digest` member is the
-            // only one that resolves. In both cases the intra-doc-link route --
-            // the only one an author writes by hand, and the one two repairs in
-            // this wave used to correct a false subject -- never runs. Thirteen
-            // members across ten write sets resolved to `Digest32` or
-            // `BindingDigest32` this way, and Law C then asked whether a digest
-            // was readable rather than whether the row was, which is a vacuous
-            // question: any read returning any struct with a digest field
-            // answers it. `CellReservationWriteSetPartsV1::capacity_precondition`
-            // was a real open obligation masked by exactly this.
-            // AND AN ASSEMBLED WRITE SET IS NOT A ROW EITHER. A type whose only
-            // member is a private `parts: *PartsV1` is the caller-assembled
-            // container this file's own population is built from -- an INPUT a
-            // write set carries in, never a record a store derives. Admitting
-            // one lets route 3, "the precondition type is the unique prefix of
-            // a row's name", attribute
-            // `DrainContributorMutationPreconditionV1` to
-            // `DrainContributorMutationSetV1`, which is the set of mutations
-            // rather than the row any of them advances, and it fires BEFORE the
-            // intra-doc link on the member that names the real row. The rule is
-            // structural rather than a name suffix: `TransferEffectSetV1` and
-            // `ParticipantManifestMemberSetV1` are two-member records and stay.
+            // A ROW HAS MEMBERS, and is not an assembled write set. A tuple
+            // newtype, a unit struct or a `parts`-only container owns no values
+            // a store could derive, so none can be the subject of a
+            // compare-and-set. `resolve`'s early routes fire before the
+            // intra-doc link an author writes by hand, so anything wrongly here
+            // silently becomes an answer.
             if !model.structs.contains_key(&bare)
                 || model.structs[&bare].fields.is_empty()
                 || is_assembled_set(&bare, model)
@@ -1175,16 +1151,9 @@ fn the_instrument_discriminates_before_it_certifies() {
         "the row population must contain the rows the seats reasoned about"
     );
 
-    // A ROW HAS MEMBERS, and the two that did not are the ones that mattered.
-    // Before this exclusion, thirteen precondition members across ten write
-    // sets resolved to a bare content digest -- `resolve`'s first route early-
-    // returns on `rows.contains(&ty)`, and its fourth reaches the same place
-    // whenever a precondition's real row is outside the population -- so Law C
-    // asked whether a digest was readable, which any read returning any struct
-    // with a digest field answers. Perturbation control: put `Digest32` back in
-    // and `CellReservationWriteSetPartsV1::capacity_precondition` resolves to
-    // it instead of to `CellCapacityLedgerV1`, and Law C closes on a reader of
-    // release compatibility members.
+    // A ROW HAS MEMBERS. Put `Digest32` back in and
+    // `CellReservationWriteSetPartsV1::capacity_precondition` resolves to it
+    // rather than to `CellCapacityLedgerV1`, and Law C closes vacuously.
     assert!(
         !sweep.rows.contains("Digest32") && !sweep.rows.contains("BindingDigest32"),
         "a bare content digest is not a row: it has no members for a store to own, \
@@ -1203,12 +1172,8 @@ fn the_instrument_discriminates_before_it_certifies() {
         "every row must be a struct the parser saw members on"
     );
 
-    // A FACADE IS EXCLUDED BY WHAT IT IS HANDED. The predicate this replaces
-    // keyed on `"Invocation "` with a trailing space, against a signature
-    // reconstructed by trimming each line and joining with a space, so
-    // `invocation: VerifiedCellControlInvocation,` never matched it. It fired
-    // on none of the wave's caller-facing RPCs, and `CellControlService::get`
-    // was discharging Law C obligations as an UNAUTHENTICATED READ.
+    // A FACADE IS EXCLUDED BY WHAT IT IS HANDED, not by what its whole
+    // signature spells.
     let facades = model
         .methods
         .iter()
@@ -1350,10 +1315,10 @@ fn every_required_precondition_has_a_reachable_first_value() {
 // fired. `fn discharge` tries them READ, SUBJECT, OTHER WRITE, LEASE-GATED
 // READ, DECLARED, OFF-AXIS, UNAUTHENTICATED, and first match wins, so the
 // order is load-bearing; the letters below are labels for reference, NOT the
-// try order. This heading once said FIVE above seven routes and claimed the
-// list gave the try order, which it did not -- the last three were reversed.
-// It states no count now: the routes are the arms of `fn discharge` and a
-// tally here would be the census this file's own sweep exists to delete.
+// try order. This heading once stated a count that did not match the list
+// below it, and claimed the list gave the try order, which it did not. It
+// states no count now: the routes are the arms of `fn discharge` and a tally
+// here would be the census this file's own sweep exists to delete.
 //
 //   (a) READ -- a method that takes no write set, is not a caller-facing
 //       facade, is not gated on a lease, does not return a `Committed*ClaimV1`,
@@ -1403,9 +1368,9 @@ fn every_required_precondition_has_a_reachable_first_value() {
 // decorative: delete `BindingPersistenceAuthorityV1::read_authority` and every
 // obligation resting on that pair goes open, which is the correct answer,
 // because without it a writer has no way to perform the read.
-// Typing the seven pairs in as a table would be the name-keyed census this wave
-// keeps being caught by; deriving them means a pair born tomorrow is in scope
-// the day it is declared. The ordering runs ONE WAY: a read authority never
+// Typing the pairs in as a table would be the name-keyed census this wave keeps
+// being caught by; deriving them means a pair born tomorrow is in scope the day
+// it is declared, and this comment does not have to say how many there are. The ordering runs ONE WAY: a read authority never
 // discharges a write.
 //
 // THE DEPTH ASYMMETRY IS DELIBERATE, AND IS THIS TEST'S SHARPEST BLIND SPOT.
@@ -1438,8 +1403,8 @@ fn every_required_precondition_has_a_reachable_first_value() {
 // WHAT THIS TEST STILL CANNOT SEE. Whether a read that DEMANDS a persistence
 // authority is right to demand one. The ordering says a writer may read; it
 // does not say a loader may insist on write authority.
-// `ServingAuthorityControlCommitObserver`'s two sibling loaders,
-// `load_installation_issuance` and `load_freeze_intent`, are that shape. Judging
+// `ServingAuthorityControlCommitObserver`'s sibling loaders
+// `load_installation_issuance` and `load_freeze_intent` are that shape. Judging
 // them needs a rule about what a read may require, which is a different law.
 //
 // It asserts that the offending set is EMPTY and prints its members. It asserts
@@ -2198,7 +2163,7 @@ fn every_by_value_precondition_is_readable_under_its_own_authority() {
 // naming a refusal are exactly the files carrying the pointer, plus the rule
 // head. That is a consistency check over the ALREADY-COVERED set. Adding a
 // zero-comment file changes neither list, so it accepts and does not gate, and
-// two zero-comment files holding successor rows -- `work_snapshot.proto`, whose
+// zero-comment files holding successor rows -- `work_snapshot.proto`, whose
 // `BindingWorkSnapshotProgressV1` is proposed as `next`, and
 // `write_authority_consumer.proto`, which declares the transition record itself
 // as `{previous, next}` -- passed it while carrying no comment at all.

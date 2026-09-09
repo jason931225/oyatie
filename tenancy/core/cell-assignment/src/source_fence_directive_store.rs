@@ -42,11 +42,9 @@ pub struct SourceFenceDirectiveIssueWriteSetPartsV1 {
     /// yet.
     ///
     /// `None` ASSERTS THAT THE STORE MUST FIND NO LEDGER ROW FOR THIS
-    /// OPERATION. `issue_source_fence_directive` is the only write in either
-    /// crate that carries a [`SourceFenceDirectiveLedgerV1`] as a next-state
-    /// member, so the row is born by this very write and before it there is
-    /// nothing to compare against. `Some(revision)` asserts a row exists at
-    /// exactly that revision, read through
+    /// OPERATION: the row is born by this write, so before it there is nothing
+    /// to compare against. `Some(revision)` asserts a row exists at exactly
+    /// that revision, read through
     /// [`SourceFenceDirectiveStore::get_source_fence_directive_ledger`].
     ///
     /// THE STORE MUST REFUSE RATHER THAN PROCEED WHEN THE ASSERTION IS FALSE:

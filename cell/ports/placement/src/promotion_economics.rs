@@ -210,7 +210,7 @@ pub struct PromotionCostTaxonomyV1 {
 /// slower to verify, not permanently ineligible for promotion. Total input
 /// counts recorded elsewhere are completeness commitments, not size caps.
 ///
-/// NO DELIBERATE CEILING ON ESTATE SIZE EXISTS, but two refusals are
+/// NO DELIBERATE CEILING ON ESTATE SIZE EXISTS, but two refusals named here are
 /// size-related and the distinction between them matters:
 /// `ArithmeticOverflow` is a representability failure — a value that will not
 /// fit in its output type — and cannot be reached by a well-formed estate of
@@ -553,8 +553,8 @@ pub enum PromotionEconomicsVerificationErrorV1 {
     /// reached its exact source, snapshot and ordinal and found nothing there.
     ///
     /// This is READER-LEVEL ABSENCE of a specific record, and it is the
-    /// narrowest of the four refusals in this enum that mention something
-    /// missing. The other three are about sets, not records:
+    /// narrowest of the refusals in this enum that mention something missing.
+    /// The others are about sets, not records:
     /// `IncompleteInputSet` is the declared population failing its own
     /// accounting — a count, root or byte total that does not reconcile after
     /// the complete stream, or a page that ended early.

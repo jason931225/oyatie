@@ -101,11 +101,11 @@ pub struct WriteAuthorityLeaseCommitAttestationExpectationV1 {
 /// the shapes differ.
 ///
 /// AND THE CLAIM COULD NOT BE BUILT HERE ANYWAY.
-/// [`CommittedWriteAuthorityLeaseIssuanceClaimV1`] carries five members drawn
-/// from four different rows, and this observer is used in the PRE-PUBLICATION
+/// [`CommittedWriteAuthorityLeaseIssuanceClaimV1`] draws its members from
+/// several different rows, and this observer is used in the PRE-PUBLICATION
 /// window, where the reasoning at
 /// `CellServingAuthorityStore::load_committed_write_authority_lease_issuance`
-/// applies: a claim-typed observer would have to re-read all four and would
+/// applies: a claim-typed observer would have to re-read them all and would
 /// duplicate that loader.
 pub trait WriteAuthorityLeaseCommitObserver: Send + Sync {
     fn observe_lease_commit<'a>(

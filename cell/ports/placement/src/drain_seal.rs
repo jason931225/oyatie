@@ -418,8 +418,8 @@ pub struct DrainContributorSealPublicationWriteSetV1 {
 /// write on this store carried that value, so the getter promised a signature
 /// nothing durable could put there and the only way to service it was to mint
 /// the signature ON THE READ — which is the self-attestation the observer
-/// barrier exists to close, reopened at the getter. The two sibling lanes got
-/// their write-back path when production moved to an observer
+/// barrier exists to close, reopened at the getter. The sibling lanes got their
+/// write-back path when production moved to an observer
 /// ([`crate::MovementPermitPublicationWriteSetPartsV1::committed_issuance`]
 /// and `SourceReleasePublicationWriteSetPartsV1::committed_issuance`); this
 /// lane got the observer and not the path.

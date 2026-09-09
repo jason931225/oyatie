@@ -203,21 +203,16 @@ pub trait ServingAuthorityControlHandoffStore: Send + Sync {
 /// [`crate::ServingAuthorityBusinessIdV1`], which is how the existing domain
 /// was already designed.
 ///
-/// WHY THESE RETURN A LONE SIGNATURE WHEN THE THREE COMMIT OBSERVERS BORN
-/// BESIDE THEM RETURN THE RECORD WITH IT. Handing back a lone signature
-/// normally puts the caller in charge of pairing it with a record, which
-/// reopens a narrower version of the hazard the barrier exists to close. It
-/// does not here, for two reasons that are properties of this attestation
-/// rather than of the caller. The payload pins the row it attests BY DIGEST —
-/// `committed_binding_digest`, `committed_issuance_revision` and
-/// `committed_issuance_digest` — so a caller pairing it with a different row is
-/// refused by the verifier rather than believed. And ONE attestation type
-/// serves TWO claim types
-/// ([`crate::CommittedServingAuthorityInstallationClaimV1`] and
-/// [`crate::CommittedServingAuthorityFreezeClaimV1`]), so a claim-typed
-/// observer would have to choose the claim shape for the caller off
-/// [`crate::ServingAuthorityBusinessIdV1`] and re-read the row the caller's own
-/// loader already returned.
+/// WHY THESE RETURN A LONE SIGNATURE WHERE THE COMMIT OBSERVERS BORN BESIDE
+/// THEM RETURN THE RECORD WITH IT. A lone signature normally puts the caller in
+/// charge of pairing it with a record. It does not here: the payload pins the
+/// row it attests BY DIGEST — `committed_binding_digest`,
+/// `committed_issuance_revision` and `committed_issuance_digest` — so a caller
+/// pairing it with a different row is refused by the verifier rather than
+/// believed. One attestation type also serves both
+/// [`crate::CommittedServingAuthorityInstallationClaimV1`] and
+/// [`crate::CommittedServingAuthorityFreezeClaimV1`], so a claim-typed observer
+/// would have to pick the claim shape for the caller.
 pub trait ServingAuthorityControlCommitObserver: Send + Sync {
     fn observe_installation_commit<'a>(
         &'a self,

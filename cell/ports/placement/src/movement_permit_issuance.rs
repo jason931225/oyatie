@@ -253,13 +253,11 @@ impl MovementPermitPublicationWriteSetV1 {
 ///
 /// THE PROOF DOMAIN IS NEW.
 /// `CellProofDomainV1::MovementPermitCommitObservation` and its reference arm
-/// are born with this port. The issuance commit signature had NO domain and NO
-/// [`crate::VerifiedCellProofRefV1`] arm at all while the store was its
-/// producer — a signature nothing could spend. It qualifies for an arm under
-/// the rule stated on that enum, because both write sets that carry the
-/// verified value ([`crate::MovementBudgetGrantWriteSetPartsV1`] and
-/// [`MovementPermitPublicationWriteSetPartsV1`]) carry
-/// `proof_consumptions`, so a consumption has somewhere durable to land.
+/// are born with this port. It qualifies for an arm under the rule stated on
+/// [`crate::VerifiedCellProofRefV1`]: the write set that carries the verified
+/// value, [`MovementPermitPublicationWriteSetPartsV1`], carries
+/// `proof_consumptions`, so a consumption has somewhere durable to land in the
+/// same transaction.
 ///
 /// Separate from the store on purpose. Whether the deployed observer is in fact
 /// a different party from the deployed store is A DEPLOYMENT OBLIGATION, NOT A

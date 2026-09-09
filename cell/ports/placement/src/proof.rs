@@ -155,38 +155,19 @@ impl CellProofConsumptionV1 {
 /// a consumption with nowhere durable to land records nothing. Read evidence
 /// needs no variant at all: nothing is spent by reading.
 ///
-/// The rebalance-source movement path deliberately has NO variant here, and the
-/// mechanical reason is checkable: every write set on that path that carries a
-/// verified value - `RebalancePublicationWriteSetPartsV1`,
-/// `RebalanceSourceIssuanceWriteSetPartsV1`, `RebalanceClosureWriteSetPartsV1`,
-/// `RebalanceLeafResultWriteSetPartsV1`,
-/// `MovementActionRejectionWriteSetPartsV1` - has no `proof_consumptions` field,
-/// while every drain write set does. That is exactly why
-/// `DrainContributorSealCommitObservation` has a variant and the structurally
-/// identical rebalance commit observations do not: the difference is where the
-/// consumption can be written, not what the proof looks like.
+/// THE TEST FOR A VARIANT is a place to land, in the SAME durable transaction:
+/// the verified value must reach a write set that carries
+/// `proof_consumptions`, whether directly or inside a value minted from it. A
+/// `proof_consumptions` field on a write set in a different transaction is not
+/// a destination -- `RebalanceJobWriteSetPartsV1` has the field and is the
+/// JOB-level write under `CellControlPersistenceAuthorityV1`, so it does not
+/// qualify the issuance or closure paths.
 ///
-/// `MovementPermitCommitObservation` has a variant for the same mechanical
-/// reason, and it was missing while the store was its producer: both write sets
-/// that carry `VerifiedCommittedMovementPermitIssuance` -
-/// `MovementBudgetGrantWriteSetPartsV1` and
-/// `MovementPermitPublicationWriteSetPartsV1` - carry `proof_consumptions`, so
-/// the consumption has somewhere durable to land.
-///
-/// `RebalanceJobWriteSetPartsV1` looks like a counterexample and is not. It does
-/// carry `proof_consumptions`, but it is the JOB-level write, taken under
-/// `CellControlPersistenceAuthorityV1` in a different transaction from any
-/// issuance or closure, and it carries none of this path's verified values. A
-/// consumption has to land in the same durable transaction as the thing it
-/// guards, so that slot is not a destination for a proof spent on the issuance
-/// or closure paths.
-///
-/// Replay on that path is refused by state instead: `RebalanceSourcePreconditionV1`
-/// pins the job revision, digest and claim, and `RebalanceActionPreconditionV1`
-/// pins the action's state, revision and record digest, so a second issuance from
-/// one authorization fails the compare-and-set. `PlacementAuthorizationError::RequestMismatch`
-/// separately binds a policy decision to one business action key. Adding a
-/// variant here would not refuse anything those do not already refuse.
+/// The rebalance-source movement path has no variant because no write set it
+/// reaches carries `proof_consumptions` at all. Replay there is refused by
+/// state instead: `RebalanceSourcePreconditionV1` and
+/// `RebalanceActionPreconditionV1` pin the revisions, digests and states a
+/// second issuance would have to restate.
 #[derive(Clone, Copy, Debug)]
 pub enum VerifiedCellProofRefV1<'a> {
     PlacementInvocation(&'a crate::VerifiedPlacementInvocation),

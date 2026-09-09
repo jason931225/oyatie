@@ -8,10 +8,10 @@
 //!
 //! THE ROLE CLAIM IN THE HEADING IS A DEPLOYMENT OBLIGATION, NOT A TYPE-LEVEL
 //! REFUSAL, and this module doc previously read as though it were the latter
-//! while its three siblings — `capability_effect_issuance`,
-//! `capability_admission` and `capability_effect_receipt` — already carried the
-//! caveat. [`CellProofVerifier`] is a public trait with no seal, and all four
-//! verifiers below take it as `&dyn`, so one out-of-crate component may
+//! while its siblings `capability_effect_issuance`, `capability_admission` and
+//! `capability_effect_receipt` already carried the caveat.
+//! [`CellProofVerifier`] is a public trait with no seal, and every verifier in
+//! this file takes it as `&dyn`, so one out-of-crate component may
 //! implement the verifier and call these functions with itself as the judge of
 //! authenticity, minting every wrapper here. The private field refuses direct
 //! construction and nothing else. What keeps the checker separate from the

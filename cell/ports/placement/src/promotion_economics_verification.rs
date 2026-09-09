@@ -610,8 +610,8 @@ pub type PromotionEconomicsCheckpointAcquisitionV1 = (
 /// authenticated retained checkpoint reads, and durable acknowledgement before
 /// the caller is told to continue.
 ///
-/// Each of the two refusals that discipline carries has its own variant, so a
-/// caller can tell them apart and apply the opposite recoveries they need:
+/// Each refusal that discipline carries has its own variant, so a caller can
+/// tell them apart and apply the opposite recoveries they need:
 /// `acquire` refuses a key already leased by a live foreign worker with
 /// [`crate::PromotionEconomicsVerificationErrorV1::LeaseHeldByAnotherWorker`],
 /// and refuses a spent partition budget with

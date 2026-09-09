@@ -14,14 +14,13 @@ use crate::{
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum DrainContributorKindV1 {
     /// Tenancy's bindings. The contributor is the `tenancy-cell-assignment`
-    /// crate, and its rows are proposed by six Tenancy write sets carrying
+    /// crate, whose write sets carry
     /// [`crate::DrainContributorStateMutationV1`] or
     /// [`crate::DrainContributorMutationSetV1`]. Every store that applies one
     /// returns `BindingStoreError`, so the refusal for a disagreeing proposal
     /// on this arm is `BindingStoreError PROPOSED_SUCCESSOR_MISMATCH` and NOT
     /// the [`crate::PlacementContractError`] the cell-side ownership rule head
-    /// names — a Tenancy store cannot return that type at all. This is the one
-    /// arm whose refusal is not the cell package's, and it is stated on both
+    /// names — a Tenancy store cannot return that type at all. Stated on both
     /// sides: see the head of `cell/placement/v1/drain_seal.proto`.
     TenancyBindings,
     /// Cell's own reservations, proposed by

@@ -25,11 +25,10 @@ import "cell/placement/v1/proof.proto";
 // exception is stated rather than left to be inferred. Cell states the
 // contributor vocabulary (DrainContributorKindV1) and owns the shape of the
 // row; each CONTRIBUTOR writes its own contributor row, in its own store, under
-// its own error taxonomy. Six Tenancy write sets carry
-// DrainContributorStateMutationV1 or DrainContributorMutationSetV1 --
-// BindingControlPartitionMutationPartsV1, BindingProjectionInstallWriteSetPartsV1
-// and the four capability write sets -- and every store that applies them
-// returns BindingStoreError, never PlacementContractError. For a disagreeing
+// its own error taxonomy. Tenancy write sets carry
+// DrainContributorStateMutationV1 or DrainContributorMutationSetV1, and every
+// store that applies one returns BindingStoreError, never
+// PlacementContractError. For a disagreeing
 // proposal on that path the refusal is BindingStoreError
 // PROPOSED_SUCCESSOR_MISMATCH, with BindingStoreError CONFLICT for an ordinary
 // stale read, in the check order stated at the head of
