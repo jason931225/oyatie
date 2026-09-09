@@ -290,6 +290,67 @@ pub trait MovementPermitPublicationStore: Send + Sync {
         Result<Option<CommittedMovementPermitIssuanceClaimV1>, PlacementContractError>,
     >;
 
+    /// Re-reads the movement permit issuance row by issuance digest, under the
+    /// ordinary read authority a [`crate::PlacementPersistenceAuthorityV1`]
+    /// holder derives from
+    /// [`crate::PlacementPersistenceAuthorityV1::read_authority`].
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO ISSUANCE ROW for that
+    /// digest: no permit has been durably issued. It separates "never durably
+    /// issued" from "issued, reply lost", and it is not an authorization
+    /// refusal — that is on the error channel.
+    ///
+    /// WHY IT EXISTS. [`MovementPermitPublicationWriteSetPartsV1::issuance_precondition`]
+    /// is required BY VALUE and pins a revision, a status and a record digest
+    /// with no arm asserting absence. Before this read, the `Request` arm's
+    /// only surfaces yielding the row were
+    /// [`crate::MovementBudgetGrantStore::consume_grant`] and
+    /// [`MovementPermitPublicationStore::publish`] — both WRITES, whose returns
+    /// are gone after a lost reply — and
+    /// [`MovementPermitPublicationStore::load_committed_issuance`], gated on a
+    /// reconciliation authority AND a reconciliation lease the request path
+    /// must not hold. [`MovementPermitIssuanceCommitObserver`] is not a
+    /// substitute: its claim carries the values AS OF THE COMMIT, and this
+    /// compare-and-set is on the row's CURRENT revision, status and record
+    /// digest. That is the same reasoning, and the same remedy, as
+    /// `MigrationReleaseStore::load_release_issuance` in the source-release
+    /// lane and `TransferExecutionStore::load_item` in the transfer lane.
+    fn load_issuance<'a>(
+        &'a self,
+        authority: &'a crate::PlacementReadAuthorityV1,
+        authority_partition: &'a MovementBudgetAuthorityPartition,
+        issuance_digest: &'a Digest32,
+    ) -> BoxCellFuture<'a, Result<Option<MovementPermitIssuanceRecordV1>, PlacementContractError>>;
+
+    /// The reconciliation-authority twin of
+    /// [`MovementPermitPublicationStore::load_issuance`]. `None` asserts the
+    /// same thing.
+    ///
+    /// WHY IT EXISTS. `MovementPermitPublicationAuthorityV1` has a `Reconciler`
+    /// arm holding [`PlacementReconciliationPersistenceAuthorityV1`], and that
+    /// arm carries the same by-value `issuance_precondition`. The ordinary
+    /// [`MovementPermitPublicationStore::load_issuance`] takes
+    /// [`crate::PlacementReadAuthorityV1`], which a RECONCILIATION authority
+    /// does not subsume: the two are newtypes over different signed invocations
+    /// ([`crate::SignedPlacementInvocationV1`] and
+    /// [`crate::SignedReconciliationInvocationV1`]), so the
+    /// persistence-subsumes-read ordering does not cross the two families.
+    /// This twin is the same remedy
+    /// [`crate::MovementBudgetDelegationStore::get_authority_state_for_reconciliation`]
+    /// is for its lane.
+    ///
+    /// IT IS NOT [`MovementPermitPublicationStore::load_committed_issuance`].
+    /// That loader is gated on a reconciliation LEASE as well as an authority,
+    /// and it hands back a commit observation whose values are AS OF THE
+    /// COMMIT. This one demands no lease and hands back the row's current
+    /// state, which is what the compare-and-set compares.
+    fn load_issuance_for_reconciliation<'a>(
+        &'a self,
+        authority: &'a crate::PlacementReconciliationReadAuthorityV1,
+        authority_partition: &'a MovementBudgetAuthorityPartition,
+        issuance_digest: &'a Digest32,
+    ) -> BoxCellFuture<'a, Result<Option<MovementPermitIssuanceRecordV1>, PlacementContractError>>;
+
     fn publish<'a>(
         &'a self,
         write_set: &'a MovementPermitPublicationWriteSetV1,

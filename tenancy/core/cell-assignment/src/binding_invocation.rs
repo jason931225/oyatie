@@ -83,8 +83,16 @@ impl BindingPersistenceAuthorityV1 {
     /// its read twin are two newtypes over the SAME verified invocation.
     /// Persistence subsumes read: a party authorized to change a row is
     /// authorized to look at it. The converse never holds, and that is the
-    /// whole point of the two types — a read-authorized invocation still cannot
-    /// reach a write path by type.
+    /// whole point of the two types — a read AUTHORITY still cannot reach a
+    /// write path by type, because [`BindingReadAuthorityV1`] declares no
+    /// method handing back a persistence authority.
+    ///
+    /// THE SEPARATION IS BETWEEN THE AUTHORITY VALUES AND NOT BETWEEN
+    /// INVOCATIONS. This sentence used to say "a read-authorized invocation",
+    /// which is a different and false claim: one verified invocation mints
+    /// EITHER authority, through `into_*` constructors gated on nothing, so
+    /// nothing about the invocation refuses a write. What the two types refuse
+    /// is a holder of the read value becoming a writer.
     ///
     /// WHY IT HAD TO BE SAID IN TYPES. Most precondition/authority obligations in
     /// these two crates discharge ONLY through this step: a write set requires a compare-and-set value by

@@ -82,7 +82,22 @@
 //! (a) an exclusivity claim with no negation-or-exclusivity token in the window
 //!     -- "the sole route is X" phrased as "X is the route";
 //! (b) a claim whose production object is neither a minted type nor `one`/`any`
-//!     -- "no adapter can hold that role" names a role, not a value;
+//!     -- "no adapter can hold that role" names a role, not a value. That is
+//!     right for THIS law, whose subject is a value a foreign verifier vouches
+//!     into existence. It is wrong where the role IS a declared type, and the
+//!     one live instance of that -- "a read-authorized invocation cannot reach
+//!     a write path by type" -- is LAW D at the foot of this file rather than a
+//!     widening here;
+//! (b2) the SCOPE conjunct is one hop: a wrapper reachable only by calling an
+//!     inherent method on a minted wrapper is not in the minted set. Closing
+//!     that with a transitive closure over inherent returns was tried and
+//!     REJECTED: it condemned two true statements
+//!     (`PlacementPersistenceAuthorityV1::read_authority` and its binding twin
+//!     saying "one invocation mints exactly one authority", which is a fact
+//!     about `Clone` and `self`-consuming constructors) and found nothing that
+//!     was false. The one undischarged claim in the transitive population is
+//!     the LAW D site, and its object conjunct blocks it here regardless of
+//!     scope, so the widening would have cost two inverted defects for nothing;
 //! (c) a claim in a doc block attached to a type alias, a constant, or a field,
 //!     since none of those is a minter;
 //! (c2) a verifier reached through TWO levels of struct — a field of a field.
@@ -201,6 +216,11 @@ const PRODUCTION_STEMS: &[&str] = &[
     "implement",
     "return",
     "inhabit",
+    // Obtainment is production for this law's purposes: "cannot reach a
+    // verified value" and "cannot mint one" make the same claim about the same
+    // composition. Added with LAW D below, which needs the verb; on its own it
+    // changed no verdict here, because the object conjunct still decides.
+    "reach",
 ];
 
 const INFLECTIONS: &[&str] = &["", "s", "d", "e", "es", "ed", "ing", "ted", "ting"];
@@ -838,5 +858,320 @@ fn no_exclusivity_claim_outruns_its_signature() {
          obligation in the block, or narrow the claim to direct construction -- do NOT \
          caveat a refusal that is genuinely type-level.\
          \n(read {blocks_read} doc blocks, {in_scope} in scope){report}"
+    );
+}
+
+// ============================================================================
+// LAW D, executable: an INVOCATION is not a separation.
+//
+// THE LAW. A doc block may not claim that a read-authorized INVOCATION cannot
+// reach a write path by type, in a wave where one verified invocation type
+// mints BOTH authorities through unconditional conversions. The separation the
+// two authority newtypes make is real and is between the AUTHORITY VALUES: a
+// `*ReadAuthorityV1` has no method producing its persistence twin, so a holder
+// of one cannot become a writer. It is not between INVOCATIONS: an invocation
+// is one type whatever `action` its signed payload names, and
+// `into_persistence_authority` and `into_read_authority` are both available on
+// it, gated on nothing.
+//
+// WHY THIS FILE AND NOT A NEW ONE. Same population as LAW B -- every doc block
+// in both crates -- read with a different question, and it reuses this file's
+// `words`, `is_negation` and window constants. A second file would fork the
+// population, and this file's own doc already says why that is how a wire gets
+// lost.
+//
+// WHY LAW B CANNOT SEE IT, on all three of its conjuncts at once. The verb:
+// `PRODUCTION_STEMS` had no "reach" until this law needed one. The object:
+// "write path" is a role, which is LAW B's declared blind spot (b) -- and the
+// blind spot is right for LAW B, because a role is not a value a verifier
+// vouches into existence. The scope: `ServingAuthorityPersistenceAuthorityV1`
+// is minted by `into_persistence_authority`, which is handed no verifier, so it
+// is not in LAW B's one-hop minted set at all. Three misses, one site.
+//
+// THE STRUCTURAL HALF IS DERIVED, NOT ASSERTED. `invocations_that_widen` reads
+// every `impl Verified*Invocation` block in the wave and keeps the types whose
+// own `pub fn`s hand back BOTH a `*PersistenceAuthorityV1` and a
+// `*ReadAuthorityV1`. If a future author gates one conversion -- a type
+// parameter, an action proof, a second verification -- that invocation leaves
+// the set and a claim about it stops being condemned, which is the correct
+// answer. The law has a subject only while the tree makes the claim false.
+//
+// THE FIX IS A REWORDING, NOT A CAVEAT. Stamping a deployment obligation on
+// this sentence would be wrong twice over: the separation between the two
+// AUTHORITY types is genuinely type-level, and LAW B's own doc says caveating a
+// genuinely type-level refusal is that law's defect inverted. Say "a read
+// AUTHORITY cannot reach a write path by type" -- true, and checked by the
+// negative control below -- or gate the conversion.
+//
+// It asserts that the offending set is EMPTY and prints its members. It asserts
+// no count and no non-zero quantity.
+
+/// Verbs of obtainment. A claim that something cannot REACH a value is the same
+/// claim as that it cannot mint one.
+const REACHING_STEMS: &[&str] = &[
+    "reach", "obtain", "become", "widen", "escalat", "acquir", "convert", "mint", "produce",
+];
+
+/// Objects that name a WRITE ROLE which this wave declares as a type.
+///
+/// LAW B's blind spot (b) -- "names a role, not a value" -- is right for LAW B
+/// and wrong here. This wave gives every write role a newtype, one
+/// `*PersistenceAuthorityV1` per signed invocation family, so "a write path" is
+/// a claim about who can hold a declared value.
+const WRITE_ROLE_OBJECTS: &[&[&str]] = &[
+    &["write", "path"],
+    &["write", "authority"],
+    &["persistence", "authority"],
+    &["write", "side"],
+];
+
+/// How far back from the negation the claim's SUBJECT is looked for.
+const NEGATION_TO_SUBJECT_WINDOW: usize = 5;
+
+fn is_reaching(word: &str) -> bool {
+    let lowered = word.to_ascii_lowercase();
+    REACHING_STEMS.iter().any(|stem| {
+        INFLECTIONS.iter().any(|inflection| {
+            lowered.len() == stem.len() + inflection.len()
+                && lowered.starts_with(stem)
+                && lowered.ends_with(inflection)
+        })
+    })
+}
+
+/// The grammatical conjunct: a subject that is an INVOCATION, a negation, a
+/// verb of obtainment within the window, and a write-role object after it.
+fn invocation_widening_claim(text: &str) -> Option<String> {
+    let tokens = words(text);
+    for (index, token) in tokens.iter().enumerate() {
+        if !is_negation(token) {
+            continue;
+        }
+        let subject_start = index.saturating_sub(NEGATION_TO_SUBJECT_WINDOW);
+        if !tokens[subject_start..index]
+            .iter()
+            .any(|word| word.eq_ignore_ascii_case("invocation"))
+        {
+            continue;
+        }
+        let verb_limit = (index + 1 + NEGATION_TO_VERB_WINDOW).min(tokens.len());
+        for verb_index in (index + 1)..verb_limit {
+            if !is_reaching(&tokens[verb_index]) {
+                continue;
+            }
+            let object_limit = (verb_index + 1 + VERB_TO_OBJECT_WINDOW).min(tokens.len());
+            for object_index in (verb_index + 1)..object_limit {
+                let Some(role) = WRITE_ROLE_OBJECTS.iter().find(|role| {
+                    tokens.len() >= object_index + role.len()
+                        && role
+                            .iter()
+                            .zip(&tokens[object_index..])
+                            .all(|(expected, actual)| actual.eq_ignore_ascii_case(expected))
+                }) else {
+                    continue;
+                };
+                return Some(format!(
+                    "`{}` .. `{}` .. `{}`  in: \"{}\"",
+                    tokens[index],
+                    tokens[verb_index],
+                    role.join(" "),
+                    tokens[subject_start..object_limit].join(" ")
+                ));
+            }
+        }
+    }
+    None
+}
+
+/// Every `Verified*Invocation` in the wave whose own `pub fn`s hand back BOTH a
+/// persistence authority and a read authority, with the methods that do it.
+fn invocations_that_widen(files: &[PathBuf]) -> BTreeMap<String, Vec<String>> {
+    let mut out = BTreeMap::new();
+    for path in files {
+        let text = fs::read_to_string(path).expect("read source");
+        let lines: Vec<&str> = text.lines().collect();
+        let mut index = 0usize;
+        while index < lines.len() {
+            let Some(rest) = lines[index].strip_prefix("impl ") else {
+                index += 1;
+                continue;
+            };
+            let subject: String = rest
+                .chars()
+                .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .collect();
+            if !(subject.starts_with("Verified") && subject.ends_with("Invocation")) {
+                index += 1;
+                continue;
+            }
+            let mut persistence = Vec::new();
+            let mut read = Vec::new();
+            let mut cursor = index + 1;
+            while cursor < lines.len() && lines[cursor] != "}" {
+                if lines[cursor].starts_with("    pub fn ") {
+                    let name: String = lines[cursor]["    pub fn ".len()..]
+                        .chars()
+                        .take_while(|character| {
+                            character.is_ascii_alphanumeric() || *character == '_'
+                        })
+                        .collect();
+                    let signature = signature_at(&lines, cursor);
+                    if let Some(handed_back) = returned_type(&signature) {
+                        if handed_back.ends_with("PersistenceAuthorityV1") {
+                            persistence.push(name);
+                        } else if handed_back.ends_with("ReadAuthorityV1") {
+                            read.push(name);
+                        }
+                    }
+                }
+                cursor += 1;
+            }
+            if !persistence.is_empty() && !read.is_empty() {
+                let mut both = persistence;
+                both.extend(read);
+                out.insert(subject, both);
+            }
+            index = cursor + 1;
+        }
+    }
+    out
+}
+
+fn law_d_sweep() -> (Vec<Finding>, BTreeMap<String, Vec<String>>) {
+    let files = wave_source_files();
+    let widening = invocations_that_widen(&files);
+    let root = repo_root();
+    let mut findings = Vec::new();
+    if widening.is_empty() {
+        return (findings, widening);
+    }
+    for path in &files {
+        let text = fs::read_to_string(path).expect("read source");
+        let lines: Vec<&str> = text.lines().collect();
+        let mut index = 0usize;
+        while index < lines.len() {
+            let trimmed = lines[index].trim_start();
+            let marker = if trimmed.starts_with("//!") {
+                "//!"
+            } else if trimmed.starts_with("///") {
+                "///"
+            } else {
+                index += 1;
+                continue;
+            };
+            let start = index;
+            let mut body = String::new();
+            while index < lines.len() {
+                let line = lines[index].trim_start();
+                let Some(rest) = line.strip_prefix(marker) else {
+                    break;
+                };
+                if marker == "///" && line.starts_with("////") {
+                    break;
+                }
+                body.push_str(rest.trim_start());
+                body.push('\n');
+                index += 1;
+            }
+            let Some(claim) = invocation_widening_claim(&body) else {
+                continue;
+            };
+            let item = attached_item(&lines, index)
+                .map(|(_, item)| item)
+                .unwrap_or_default();
+            findings.push(Finding {
+                file: path
+                    .strip_prefix(&root)
+                    .unwrap_or(path)
+                    .display()
+                    .to_string(),
+                line: start + 1,
+                scope: widening.keys().cloned().collect::<Vec<_>>().join(", "),
+                item: item.chars().take(72).collect(),
+                claim,
+            });
+        }
+    }
+    findings.sort_by(|left, right| (&left.file, left.line).cmp(&(&right.file, right.line)));
+    (findings, widening)
+}
+
+#[test]
+fn law_d_discriminates_before_it_certifies() {
+    let widening = invocations_that_widen(&wave_source_files());
+    assert!(
+        widening.len() >= 5,
+        "only {} invocation types were found minting both authorities -- the law would \
+         have almost no subject, and a subject-less law exonerates by silence",
+        widening.len()
+    );
+    assert!(
+        widening.contains_key("VerifiedServingAuthorityInvocation"),
+        "the invocation the false claim is written about must be derived from the tree"
+    );
+
+    // The claim the tree carried, and the rewording that makes it true. These
+    // two sentences differ in ONE WORD, and the law must split them.
+    assert!(
+        invocation_widening_claim(
+            "Distinct from ServingAuthorityReadAuthorityV1 so that a read-authorized \
+             invocation cannot reach a write path by type"
+        )
+        .is_some(),
+        "positive control: the claim about an INVOCATION is what the types do not make"
+    );
+    assert!(
+        invocation_widening_claim(
+            "the converse never holds, and that is the whole point of the two types -- a \
+             read authority cannot reach a write path by type"
+        )
+        .is_none(),
+        "negative control: the claim about an AUTHORITY VALUE is true, and condemning it \
+         would be LAW B's defect inverted"
+    );
+    // The verb and the object are both load-bearing.
+    assert!(
+        invocation_widening_claim("an invocation cannot be used for a write path").is_none(),
+        "a negation with no verb of obtainment is not this claim"
+    );
+    assert!(
+        invocation_widening_claim("an invocation cannot reach a caller-facing facade").is_none(),
+        "a verb of obtainment with no write-role object is not this claim"
+    );
+    assert!(
+        invocation_widening_claim("no adapter can obtain a write authority").is_none(),
+        "a claim whose subject is not an invocation belongs to a different law"
+    );
+    assert!(is_reaching("reaches") && is_reaching("obtained") && !is_reaching("read"));
+}
+
+#[test]
+fn no_invocation_is_described_as_a_write_barrier() {
+    let (findings, widening) = law_d_sweep();
+    let derived: String = widening
+        .iter()
+        .map(|(invocation, methods)| format!("\n  {invocation}: {}", methods.join(", ")))
+        .collect();
+    let report: String = findings
+        .iter()
+        .map(|finding| {
+            format!(
+                "\n  {}:{}\n      item:  {}\n      claim: {}\n",
+                finding.file, finding.line, finding.item, finding.claim
+            )
+        })
+        .collect();
+    assert!(
+        findings.is_empty(),
+        "LAW D. Each doc block below says a read-authorized INVOCATION cannot reach a \
+         write path BY TYPE. The invocation types below each mint BOTH authorities \
+         through conversions gated on nothing, so an invocation whose payload names a \
+         read action converts to write authority at exit 0 and the sentence is false of \
+         the type system. What IS type-level is the separation between the two AUTHORITY \
+         VALUES: say \"a read AUTHORITY cannot reach a write path by type\", or gate the \
+         conversion on the action. Do NOT caveat it as a deployment obligation -- the \
+         separation between the authority types is real, and caveating a genuine \
+         type-level refusal is LAW B's defect inverted.\
+         \n(invocations minting both authorities:{derived}){report}"
     );
 }

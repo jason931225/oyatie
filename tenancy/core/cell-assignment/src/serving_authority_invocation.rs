@@ -44,10 +44,28 @@ pub struct ServingAuthorityInvocationExpectationV1 {
 pub struct VerifiedServingAuthorityInvocation(SignedServingAuthorityInvocationV1);
 
 /// Write authority for the serving-authority store, minted from a verified
-/// invocation. Distinct from [`ServingAuthorityReadAuthorityV1`] so that a
-/// read-authorized invocation cannot reach a write path by type, rather than
-/// by a per-call-site check of the invocation's
-/// [`ServingAuthorityActionV1`].
+/// invocation. Distinct from [`ServingAuthorityReadAuthorityV1`] so that a read
+/// AUTHORITY cannot reach a write path by type: that newtype declares no method
+/// handing back this one, so a holder of the read value cannot become a writer.
+///
+/// WHAT THIS DOES NOT DO, stated because the sentence above used to say it did.
+/// It does not stand in place of a per-call-site check of the invocation's
+/// [`ServingAuthorityActionV1`]. [`VerifiedServingAuthorityInvocation`] is ONE
+/// type whatever action its signed payload names, and both
+/// [`VerifiedServingAuthorityInvocation::into_persistence_authority`] and
+/// [`VerifiedServingAuthorityInvocation::into_read_authority`] are available on
+/// it unconditionally, so an invocation carrying
+/// [`ServingAuthorityActionV1::Read`] converts to this write authority and the
+/// compiler raises nothing. The earlier wording asserted that the type
+/// separation made the action check unnecessary; the types make no such
+/// separation, and asserting one that does not exist is worse than stating the
+/// obligation, because it tells an implementer the check is already done.
+///
+/// THE OBLIGATION THAT REMAINS. Which [`ServingAuthorityActionV1`] each of the
+/// two conversions may be performed for is a rule NO SURFACE IN THESE CRATES
+/// STATES, and until it is stated an adapter minting this authority must check
+/// the action at the call site. That is a deployment obligation on every
+/// composition root, not a property of any signature here.
 #[derive(Debug, Eq, PartialEq)]
 pub struct ServingAuthorityPersistenceAuthorityV1(SignedServingAuthorityInvocationV1);
 

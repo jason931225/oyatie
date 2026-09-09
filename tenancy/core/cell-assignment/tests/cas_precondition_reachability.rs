@@ -101,6 +101,29 @@ fn repo_root() -> PathBuf {
         .expect("repo root")
 }
 
+/// The instrumented face of both laws, off by default and on under
+/// `CAS_REACHABILITY_DUMP=1`.
+///
+/// WHY IT IS IN THE TEST AND NOT IN A REVIEWER'S SCRATCH COPY. Both laws report
+/// only their OPEN set and a per-route tally, so a discharged obligation
+/// produces no output at all and an operator asking "why was this member
+/// exonerated" has to patch the file to find out. Three separate seats did patch
+/// it, and one of them got five findings out of the patch -- including the one
+/// this dump's own row line would have shown at a glance, a compare-and-set on a
+/// cell capacity ledger resolving to a bare content digest and then being
+/// discharged by a reader of release compatibility members. An instrument whose
+/// exonerations are invisible is an instrument whose blind spots can only be
+/// found by rebuilding it.
+///
+/// Run it with `--nocapture`, which is what makes a passing test print:
+/// `CAS_REACHABILITY_DUMP=1 cargo test -p tenancy-cell-assignment --test
+/// cas_precondition_reachability -- --nocapture --test-threads=1`.
+fn dump(line: &std::fmt::Arguments<'_>) {
+    if std::env::var_os("CAS_REACHABILITY_DUMP").is_some() {
+        println!("  {line}");
+    }
+}
+
 fn wave_source_files() -> Vec<PathBuf> {
     let root = repo_root();
     let mut out = Vec::new();
@@ -169,6 +192,11 @@ struct Model {
     /// nameable: a persistence authority subsumes a read authority only if it
     /// declares a method that produces one.
     inherent_returns: BTreeMap<String, BTreeSet<String>>,
+    /// Every name a doc comment in the wave can cite and have it mean
+    /// something: type, trait, trait method, struct member, enum variant.
+    /// Route (g) of Law C is a sentence, and a sentence that names a surface
+    /// that does not exist is not a route.
+    citable: BTreeSet<String>,
 }
 
 fn strip_crate(text: &str) -> String {
@@ -235,6 +263,7 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                 // A newtype carries no members, but its doc can declare the row
                 // it versions, which is the only route some scalar preconditions
                 // have.
+                model.citable.insert(name.clone());
                 model.structs.entry(name).or_insert(Struct {
                     file: display.clone(),
                     line: index + 1,
@@ -269,6 +298,10 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                     }
                     cursor += 1;
                 }
+                model
+                    .citable
+                    .extend(fields.iter().map(|field| field.name.clone()));
+                model.citable.insert(name.clone());
                 model.structs.insert(
                     name,
                     Struct {
@@ -279,6 +312,15 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                     },
                 );
                 index = cursor;
+                continue;
+            }
+
+            if let Some(name) = declared(line, "pub trait ", ": Send + Sync {")
+                .or_else(|| declared(line, "pub trait ", " {"))
+            {
+                model.citable.insert(name);
+                pending.clear();
+                index += 1;
                 continue;
             }
 
@@ -296,14 +338,24 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                     if is_variant {
                         variants.push(Vec::new());
                         variant_tuples.push(tuple_arm_types(&body[4..]));
+                        model.citable.insert(
+                            body[4..]
+                                .chars()
+                                .take_while(|character| {
+                                    character.is_ascii_alphanumeric() || *character == '_'
+                                })
+                                .collect(),
+                        );
                     } else if let Some(current) = variants.last_mut()
                         && let Some(rest) = body.strip_prefix("        ")
                         && let Some((field_name, field_type)) = member(&format!("    {rest}"))
                     {
+                        model.citable.insert(field_name.clone());
                         current.push((field_name, field_type));
                     }
                     cursor += 1;
                 }
+                model.citable.insert(name.clone());
                 model.enums.insert(
                     name,
                     Enum {
@@ -333,6 +385,7 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                     .chars()
                     .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
                     .collect();
+                model.citable.insert(name.clone());
                 model.methods.push((name, signature));
                 model.method_sites.push((display.clone(), index + 1));
                 index = cursor + 1;
@@ -347,6 +400,14 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                 let mut cursor = index + 1;
                 while cursor < lines.len() && lines[cursor] != "}" {
                     if lines[cursor].starts_with("    pub fn ") {
+                        model.citable.insert(
+                            lines[cursor]["    pub fn ".len()..]
+                                .chars()
+                                .take_while(|character| {
+                                    character.is_ascii_alphanumeric() || *character == '_'
+                                })
+                                .collect(),
+                        );
                         let mut signature = String::new();
                         let mut scan = cursor;
                         while scan < lines.len() && scan < cursor + 12 {
@@ -370,6 +431,24 @@ fn parse(files: &[PathBuf], root: &Path) -> Model {
                 index = cursor;
                 pending.clear();
                 continue;
+            }
+
+            // Free functions, type aliases and constants at column zero: not
+            // part of any population this file sweeps, but citable, and a
+            // citation check that cannot see them would report a live name as
+            // dead.
+            for prefix in ["pub fn ", "pub type ", "pub const ", "pub static "] {
+                if let Some(rest) = line.strip_prefix(prefix) {
+                    let name: String = rest
+                        .chars()
+                        .take_while(|character| {
+                            character.is_ascii_alphanumeric() || *character == '_'
+                        })
+                        .collect();
+                    if !name.is_empty() {
+                        model.citable.insert(name);
+                    }
+                }
             }
 
             pending.clear();
@@ -642,9 +721,24 @@ fn resolve(
             })
             .unwrap_or_default(),
     ] {
+        // A minted wrapper linked here is the record it wraps. The wire half
+        // already reads `Verified*` that way ("a minted wrapper on the wire is
+        // the record it wraps"), and without the same reading a block that
+        // names both -- "the row is [`CellCapacityLedgerV1`], proposed through
+        // [`crate::VerifiedCellCapacityLedgerV1`]" -- resolves to TWO subjects
+        // and Law C judges the wrapper as if it were a row, which no read
+        // hands back and no write set proposes bare.
         let declared: Vec<String> = doc_links(&doc)
             .into_iter()
+            .map(|name| {
+                name.strip_prefix("Verified")
+                    .or_else(|| name.strip_prefix("Signed"))
+                    .filter(|stem| model.structs.contains_key(*stem))
+                    .map_or(name.clone(), str::to_owned)
+            })
             .filter(|name| model.structs.contains_key(name) || model.enums.contains_key(name))
+            .collect::<BTreeSet<String>>()
+            .into_iter()
             .collect();
         // Prefer rows these write sets propose. A subject that is NOT one of
         // those -- a capacity ledger written through a verified wrapper, an
@@ -699,6 +793,69 @@ fn parts_taken_by(signature: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// The parameter list of a signature: the first `(` to its matching `)`.
+///
+/// Both laws ask whether a method is HANDED something, and both used to ask it
+/// of the whole signature text, which answers a different question: a return
+/// type is not a parameter, and `RebalanceSourceIssuanceStore::load_issuance`
+/// -> `Option<RebalanceInvocationIssuanceV1>` was read as caller-facing purely
+/// because the substring `Invocation` appears in what it hands BACK.
+fn parameter_list(signature: &str) -> &str {
+    let Some(open) = signature.find('(') else {
+        return "";
+    };
+    let mut depth = 0usize;
+    for (offset, character) in signature[open..].char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &signature[open + 1..open + offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    &signature[open + 1..]
+}
+
+/// A caller-facing service RPC, identified by the verified invocation it takes.
+///
+/// A facade is a mirror of a store write, never an independent creator or an
+/// independent read, so both laws exclude it: Law A's clause (iv) must not let
+/// `TenancyMigrationCoordinationService::append_participant_receipt` exonerate
+/// the row the wave was asked to fix, and Law C's routes (a), (c), (d) and (e)
+/// must not let an RPC stand in for a store surface a write's own authority can
+/// reach.
+///
+/// IT USED TO BE TWO PREDICATES AND ONE OF THEM WAS DEAD. Law C keyed on the
+/// literal `"Invocation "` -- with a trailing space -- against a signature this
+/// file reconstructs by trimming each line and joining with a space, so a
+/// parameter written `invocation: VerifiedCellControlInvocation,` yields
+/// `Invocation,` and never matches. It fired on ZERO of the fifty-nine methods
+/// in the wave that take a verified invocation: every route that claimed to
+/// exclude a facade excluded nothing, and `CellControlService::get` -- an RPC
+/// taking `VerifiedCellControlInvocation` -- was discharging obligations as an
+/// UNAUTHENTICATED READ. A predicate that never fires is worse than an absent
+/// one, because the doc beside it reads as a closed hole.
+fn is_facade(signature: &str) -> bool {
+    parameter_list(signature).contains("Invocation")
+}
+
+/// A read that demands a lease, judged on what it is HANDED.
+///
+/// The token used to be matched against the whole signature, where a ROW TYPE
+/// can carry it: `CellServingAuthorityStore::get_lease_state` demands no lease
+/// at all and was pushed out of route (a) and into route (d) by the name of the
+/// value it returns, then reported with a "also gated on a lease" reason that
+/// was false of it. Which route judges a read decides which exclusions apply to
+/// it, so a lexical accident here silently moves a read between two different
+/// standards.
+fn demands_a_lease(signature: &str) -> bool {
+    parameter_list(signature).contains("Lease")
 }
 
 fn returned(signature: &str) -> Option<String> {
@@ -773,7 +930,27 @@ fn sweep(model: &Model) -> Sweep {
             // in or a value another party minted, and its revision is nobody's
             // to compare-and-set here. A `*PreconditionV1` member is the
             // comparison itself, not the row.
+            //
+            // AND A ROW HAS MEMBERS. A tuple newtype or a unit struct carries no
+            // values a store could own, so it can be neither the subject of a
+            // compare-and-set nor the thing a revision and a record digest are
+            // OF. Admitting one is not a harmless widening: `resolve`'s first
+            // route is `rows.contains(&ty)` and EARLY-RETURNS, so a bare content
+            // digest in this set silently becomes the answer for every
+            // precondition whose declared type is that digest, and route 4
+            // reaches it a second way whenever a precondition's real row is
+            // outside the population and its `*_record_digest` member is the
+            // only one that resolves. In both cases the intra-doc-link route --
+            // the only one an author writes by hand, and the one two repairs in
+            // this wave used to correct a false subject -- never runs. Thirteen
+            // members across ten write sets resolved to `Digest32` or
+            // `BindingDigest32` this way, and Law C then asked whether a digest
+            // was readable rather than whether the row was, which is a vacuous
+            // question: any read returning any struct with a digest field
+            // answers it. `CellReservationWriteSetPartsV1::capacity_precondition`
+            // was a real open obligation masked by exactly this.
             if !model.structs.contains_key(&bare)
+                || model.structs[&bare].fields.is_empty()
                 || bare.ends_with("PreconditionV1")
                 || bare.starts_with("Signed")
                 || bare.starts_with("Verified")
@@ -804,6 +981,10 @@ fn sweep(model: &Model) -> Sweep {
             preconditions += 1;
             let resolutions = resolve(write_set, field, &rows, model);
             if resolutions.is_empty() {
+                dump(&format_args!(
+                    "{write_set}::{}: {} -> UNRESOLVED",
+                    field.name, field.ty
+                ));
                 unresolved.push(Unresolved {
                     write_set: (*write_set).clone(),
                     field: field.name.clone(),
@@ -814,6 +995,14 @@ fn sweep(model: &Model) -> Sweep {
                 continue;
             }
             for resolution in resolutions {
+                dump(&format_args!(
+                    "{write_set}::{}: {} -> row {} (resolved by: {}; absence: {})",
+                    field.name,
+                    field.ty,
+                    resolution.row,
+                    resolution.route,
+                    can_represent_absence(&field.ty, model)
+                ));
                 attributed.entry(resolution.row).or_default().push((
                     (*write_set).clone(),
                     field.clone(),
@@ -875,7 +1064,7 @@ fn sweep(model: &Model) -> Sweep {
         // it takes -- which is exactly what makes it caller-facing.
         let materialised = model.methods.iter().any(|(_, signature)| {
             parts_taken_by(signature).is_none()
-                && !signature.contains("Invocation")
+                && !is_facade(signature)
                 && returned(signature).is_some_and(|value| value == *row)
         });
 
@@ -962,6 +1151,75 @@ fn the_instrument_discriminates_before_it_certifies() {
         sweep.rows.contains("TransferExecutionLedgerV1")
             && sweep.rows.contains("SourceFenceDirectiveLedgerV1"),
         "the row population must contain the rows the seats reasoned about"
+    );
+
+    // A ROW HAS MEMBERS, and the two that did not are the ones that mattered.
+    // Before this exclusion, thirteen precondition members across ten write
+    // sets resolved to a bare content digest -- `resolve`'s first route early-
+    // returns on `rows.contains(&ty)`, and its fourth reaches the same place
+    // whenever a precondition's real row is outside the population -- so Law C
+    // asked whether a digest was readable, which any read returning any struct
+    // with a digest field answers. Perturbation control: put `Digest32` back in
+    // and `CellReservationWriteSetPartsV1::capacity_precondition` resolves to
+    // it instead of to `CellCapacityLedgerV1`, and Law C closes on a reader of
+    // release compatibility members.
+    assert!(
+        !sweep.rows.contains("Digest32") && !sweep.rows.contains("BindingDigest32"),
+        "a bare content digest is not a row: it has no members for a store to own, \
+         and admitting it pre-empts every later resolution route"
+    );
+    assert!(
+        !sweep.rows.contains("PlacementPersistenceAuthorityV1"),
+        "an authority newtype is not a row either, and it reached the population by \
+         the same route"
+    );
+    assert!(
+        sweep.rows.iter().all(|row| model
+            .structs
+            .get(row)
+            .is_some_and(|declaration| !declaration.fields.is_empty())),
+        "every row must be a struct the parser saw members on"
+    );
+
+    // A FACADE IS EXCLUDED BY WHAT IT IS HANDED. The predicate this replaces
+    // keyed on `"Invocation "` with a trailing space, against a signature
+    // reconstructed by trimming each line and joining with a space, so
+    // `invocation: VerifiedCellControlInvocation,` never matched it. It fired
+    // on none of the wave's caller-facing RPCs, and `CellControlService::get`
+    // was discharging Law C obligations as an UNAUTHENTICATED READ.
+    let facades = model
+        .methods
+        .iter()
+        .filter(|(_, signature)| is_facade(signature))
+        .count();
+    assert!(
+        facades > 20,
+        "only {facades} caller-facing RPCs were recognised -- the facade exclusion is \
+         not firing, and every route that claims to exclude one excludes nothing"
+    );
+    assert!(
+        is_facade(
+            "fn get<'a>( &'a self, invocation: VerifiedCellControlInvocation, cell_id: &'a CellId, ) -> X;"
+        ),
+        "a verified invocation followed by a comma is still a verified invocation"
+    );
+    assert!(
+        !is_facade(
+            "fn load_issuance<'a>( &'a self, authority: &'a CellControlReconciliationReadAuthorityV1, ) -> BoxCellFuture<'a, Result<Option<RebalanceInvocationIssuanceV1>, E>>;"
+        ),
+        "a read whose RETURN type merely spells `Invocation` is not caller-facing"
+    );
+    assert!(
+        demands_a_lease("fn f(lease: &'a CellReconciliationLeaseV1) -> X;"),
+        "a lease in the parameter list is a lease"
+    );
+    assert!(
+        !demands_a_lease(
+            "fn get_lease_state<'a>( &'a self, authority: &'a X, ) -> Result<Option<WriteAuthorityLeaseStateV1>, E>;"
+        ),
+        "a read that merely HANDS BACK a lease state demands no lease, and judging it \
+         by the whole signature moved it out of the route that excludes commit \
+         observations and into the route that did not"
     );
 }
 
@@ -1077,15 +1335,23 @@ fn every_required_precondition_has_a_reachable_first_value() {
 //
 //   (a) READ -- a method that takes no write set, is not a caller-facing
 //       facade, is not gated on a lease, does not return a `Committed*ClaimV1`,
-//       and yields the row under an authority the arm holds.
+//       and yields the row under an authority the arm holds. "Facade" and
+//       "gated on a lease" are both read off the PARAMETER LIST: judging them
+//       on the whole signature answered a different question, and both
+//       predicates were wrong for it -- one matched nothing at all, the other
+//       matched a read by the name of the value it returns.
 //   (b) SUBJECT -- the row is reachable from the reconciliation subject the
 //       arm's reconciler is handed.
 //   (c) OTHER WRITE -- a different write, taken under an authority the arm
 //       holds, yields the row, so an earlier call in the same sequence had it.
-//   (d) LEASE-GATED READ -- as (a) but the read also demands a lease. Accepted,
-//       and reported separately, because a lease is a coordination fact rather
-//       than an authority one, and an arm that can hold the lease can perform
-//       the read.
+//   (d) LEASE-GATED READ -- as (a) but the read also demands a lease, judged on
+//       what the read is HANDED. Accepted, and reported separately, because a
+//       lease is a coordination fact rather than an authority one, and an arm
+//       that can hold the lease can perform the read. It carries route (a)'s
+//       commit-observation exclusion, because the reason for that exclusion --
+//       an observation carries the values AS OF THE COMMIT -- does not become
+//       false when a read also demands a lease. Without both halves the lease
+//       token alone decided which of two standards judged a read.
 //   (e) UNAUTHENTICATED READ -- a read that demands no authority at all.
 //       Accepted, and reported separately: it discharges this law trivially and
 //       is a finding for a different one.
@@ -1094,8 +1360,13 @@ fn every_required_precondition_has_a_reachable_first_value() {
 //       at all. There is no ordering to measure, so the law has no subject.
 //       Both members this fires on carry a written ruling.
 //   (g) DECLARED ON THE MEMBER -- the member's own doc says the authority
-//       question is discharged and names the surface. The escape for a real
-//       route deeper than route (a) looks; see `declares_its_route`.
+//       question is discharged, names the surface, AND every name it cites
+//       resolves in the tree. The escape for a real route deeper than route
+//       (a) looks; see `declares_its_route` and `dead_citations`. It is the
+//       only route in this law that is not structural, so it is the only one
+//       whose subject a future author can get wrong by typing, and an
+//       unresolvable citation is reported as its own failure rather than
+//       falling through to a weaker route.
 //
 // "AN AUTHORITY THE ARM HOLDS" IS THE ORDERING, AND IT IS DERIVED, NOT LISTED.
 // A read taken under `X...ReadAuthorityV1` is performable by a holder of
@@ -1120,9 +1391,13 @@ fn every_required_precondition_has_a_reachable_first_value() {
 // reconciliation subject is a whole object graph handed over for the reconciler
 // to own, so anything inside it is in hand. The cost is real and is recorded
 // rather than hidden: a value riding three levels down inside a page --
-// `CellCatalogReader::read_page` -> `CellCatalogEntryV1::admission_term` -- is
-// invisible to route (a), and that one is discharged by a sentence at
-// `CellReservationWriteSetPartsV1::admission_precondition` instead.
+// `CellCatalogReader::read_page` -> `CellCatalogCandidateV1::admission_term` --
+// is invisible to route (a), and that one is discharged by a sentence at
+// `CellReservationWriteSetPartsV1::admission_precondition` instead. Route (g)
+// is that sentence, and `dead_citations` is what keeps it a route rather than
+// a wording: this very paragraph named a `CellCatalogEntryV1` that has never
+// existed in either crate, in the same words the member did, and the check
+// that resolves route (g)'s citations is what corrected both.
 //
 // A COMMIT OBSERVATION IS NOT A READ, and route (a) refuses it by SHAPE rather
 // than by the `observe_` name: any method returning a `Committed*ClaimV1` is
@@ -1266,7 +1541,7 @@ fn subjects_by_authority(
     let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for (persistence, read) in pairs {
         for (_, signature) in &model.methods {
-            if parts_taken_by(signature).is_some() || signature.contains("Invocation ") {
+            if parts_taken_by(signature).is_some() || is_facade(signature) {
                 continue;
             }
             if !signature.contains(read.as_str()) {
@@ -1362,6 +1637,96 @@ fn declares_its_route(doc: &str) -> bool {
     lowered.contains("authority question") && lowered.contains("discharged by")
 }
 
+/// Rust's own names, which a doc may cite and this tree does not declare.
+const PRELUDE: &[&str] = &[
+    "Option",
+    "Some",
+    "None",
+    "Result",
+    "Ok",
+    "Err",
+    "Vec",
+    "Box",
+    "Arc",
+    "Rc",
+    "String",
+    "str",
+    "bool",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "i32",
+    "i64",
+    "usize",
+    "Self",
+    "Send",
+    "Sync",
+    "Clone",
+    "Copy",
+    "Debug",
+    "Eq",
+    "PartialEq",
+    "Ord",
+    "PartialOrd",
+    "Hash",
+    "Default",
+    "From",
+    "TryFrom",
+    "Iterator",
+    "dyn",
+    "impl",
+    "crate",
+    "self",
+];
+
+/// Every backticked name in a doc block, single and intra-doc alike, split on
+/// `::` so `A::b` is TWO citations.
+///
+/// Splitting is the whole point. The citation sweep that ran over this wave
+/// resolved a path on its last segment, so `CellCatalogEntryV1::admission_term`
+/// passed on `admission_term` while the type it names existed nowhere.
+fn cited_names(doc: &str) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    let mut rest = doc;
+    while let Some(open) = rest.find('`') {
+        rest = &rest[open + 1..];
+        let Some(close) = rest.find('`') else { break };
+        let token = &rest[..close];
+        rest = &rest[close + 1..];
+        if token.is_empty() {
+            continue;
+        }
+        // A citation is a path of identifiers and nothing else. Anything
+        // carrying a generic, a call, an operator, a glob or whitespace is
+        // prose or a type expression, and this check does not adjudicate prose.
+        let is_path = token.split("::").all(|segment| {
+            !segment.is_empty()
+                && segment.starts_with(|character: char| {
+                    character.is_ascii_alphabetic() || character == '_'
+                })
+                && segment
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric() || character == '_')
+        });
+        if !is_path {
+            continue;
+        }
+        for segment in token.split("::") {
+            out.insert(segment.to_owned());
+        }
+    }
+    out
+}
+
+/// The names a doc block cites that resolve to nothing in the wave.
+fn dead_citations(doc: &str, model: &Model) -> Vec<String> {
+    cited_names(doc)
+        .into_iter()
+        .filter(|name| !PRELUDE.contains(&name.as_str()) && !model.citable.contains(name))
+        .collect()
+}
+
 fn discharge(
     row: &str,
     arm_authority: &str,
@@ -1385,7 +1750,6 @@ fn discharge(
         let (file, line) = &model.method_sites[index];
         format!("{}:{}", file, line)
     };
-    let is_facade = |signature: &str| signature.contains("Invocation ");
     let observes = |signature: &str| {
         returned_inner(signature)
             .is_some_and(|value| value.starts_with("Committed") && value.ends_with("ClaimV1"))
@@ -1396,7 +1760,7 @@ fn discharge(
         let (name, signature) = &model.methods[*index];
         if parts_taken_by(signature).is_some()
             || is_facade(signature)
-            || signature.contains("Lease")
+            || demands_a_lease(signature)
             || observes(signature)
         {
             continue;
@@ -1442,11 +1806,23 @@ fn discharge(
         }
     }
     // (d) a lease-gated read under an authority the arm holds.
+    //
+    // THE COMMIT-OBSERVATION EXCLUSION IS HERE TOO, and its absence was a hole
+    // rather than a decision. Route (a) refuses a `Committed*ClaimV1` by shape
+    // and argues at length why -- an observation carries the values AS OF THE
+    // COMMIT while the compare-and-set is on the row's CURRENT revision -- and
+    // that argument does not become false when the read also demands a lease.
+    // Without the exclusion here, the lexical lease key alone decided which of
+    // two routes judged a read, so a commit observation that happened to be
+    // lease-gated discharged an obligation route (a) would have refused.
+    // `MovementPermitPublicationStore::load_committed_issuance` was the live
+    // instance.
     for index in &candidates {
         let (name, signature) = &model.methods[*index];
         if parts_taken_by(signature).is_some()
             || is_facade(signature)
-            || !signature.contains("Lease")
+            || observes(signature)
+            || !demands_a_lease(signature)
         {
             continue;
         }
@@ -1460,8 +1836,11 @@ fn discharge(
             });
         }
     }
-    // (g) the member states the route itself.
-    if declares_its_route(member_doc) {
+    // (g) the member states the route itself, AND every surface it names
+    // resolves. An unresolvable citation does not discharge: it is reported by
+    // `law_c` as its own failure, so the obligation neither closes on a dead
+    // sentence nor falls silently through to a weaker route below.
+    if declares_its_route(member_doc) && dead_citations(member_doc, model).is_empty() {
         return Some(Discharge {
             route: "DECLARED ON THE MEMBER",
             why: "the member's own doc names the surface and the authority".to_owned(),
@@ -1511,13 +1890,21 @@ struct Obligation {
     resolved_by: &'static str,
 }
 
-fn law_c(model: &Model) -> (Vec<Obligation>, usize, BTreeMap<&'static str, usize>) {
+fn law_c(
+    model: &Model,
+) -> (
+    Vec<Obligation>,
+    usize,
+    BTreeMap<&'static str, usize>,
+    Vec<String>,
+) {
     let sweep = sweep(model);
     let pairs = authority_pairs(model);
     let subjects = subjects_by_authority(model, &pairs);
     let mut open = Vec::new();
     let mut total = 0usize;
     let mut routed: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut dead: Vec<String> = Vec::new();
 
     let parts: Vec<String> = model
         .structs
@@ -1534,6 +1921,18 @@ fn law_c(model: &Model) -> (Vec<Obligation>, usize, BTreeMap<&'static str, usize
             if can_represent_absence(&field.ty, model) {
                 continue;
             }
+            if declares_its_route(&field.doc) {
+                let unresolved = dead_citations(&field.doc, model);
+                if !unresolved.is_empty() {
+                    dead.push(format!(
+                        "\n  {}:{}\n      {write_set}::{}\n      names nothing: {}\n",
+                        model.structs[write_set].file,
+                        field.line,
+                        field.name,
+                        unresolved.join(", ")
+                    ));
+                }
+            }
             for resolution in resolve(write_set, field, &sweep.rows, model) {
                 let arms = if authorities.is_empty() {
                     vec![("(no authority member)".to_owned(), "<none>".to_owned())]
@@ -1542,7 +1941,7 @@ fn law_c(model: &Model) -> (Vec<Obligation>, usize, BTreeMap<&'static str, usize
                 };
                 for (arm, authority) in arms {
                     total += 1;
-                    match discharge(
+                    let found = discharge(
                         &resolution.row,
                         &authority,
                         write_set,
@@ -1550,7 +1949,19 @@ fn law_c(model: &Model) -> (Vec<Obligation>, usize, BTreeMap<&'static str, usize
                         model,
                         &pairs,
                         &subjects,
-                    ) {
+                    );
+                    dump(&format_args!(
+                        "{write_set}::{}: {}\n      row:  {}  (resolved by: {})\n      arm:  {arm} holds {authority}\n      {}",
+                        field.name,
+                        field.ty,
+                        resolution.row,
+                        resolution.route,
+                        match &found {
+                            Some(discharged) => format!("{}: {}", discharged.route, discharged.why),
+                            None => "OPEN".to_owned(),
+                        }
+                    ));
+                    match found {
                         Some(found) => *routed.entry(found.route).or_default() += 1,
                         None => open.push(Obligation {
                             write_set: write_set.clone(),
@@ -1571,7 +1982,7 @@ fn law_c(model: &Model) -> (Vec<Obligation>, usize, BTreeMap<&'static str, usize
     open.sort_by(|left, right| {
         (&left.write_set, &left.field, &left.arm).cmp(&(&right.write_set, &right.field, &right.arm))
     });
-    (open, total, routed)
+    (open, total, routed, dead)
 }
 
 #[test]
@@ -1651,19 +2062,68 @@ fn law_c_discriminates_before_it_certifies() {
          which is what made the annotation at `cell_binding_index_projection.rs` false"
     );
 
-    let (open, total, _) = law_c(&model);
+    // ROUTE (g) IS A SENTENCE, so the check on it is that the sentence names
+    // things. `cited_names` splits a path on `::` and resolves BOTH segments:
+    // the citation sweep this wave ran resolved a path on its last segment, so
+    // `CellCatalogEntryV1::admission_term` passed on `admission_term` while the
+    // type existed nowhere, and Law C's one live route-(g) discharge rested on
+    // it for the whole wave.
+    assert!(
+        dead_citations("`CellCatalogEntryV1::admission_term`", &model)
+            == vec!["CellCatalogEntryV1".to_owned()],
+        "a path must be resolved segment by segment, not on its last segment"
+    );
+    assert!(
+        dead_citations(
+            "discharged by `CellCatalogReader::read_page`: it takes \
+             `PlacementReadAuthorityV1` and the term rides on \
+             `CellCatalogCandidateV1::admission_term`",
+            &model
+        )
+        .is_empty(),
+        "the corrected citation must resolve: trait, method, authority newtype, \
+         struct and member alike"
+    );
+    assert!(
+        dead_citations(
+            "`None` is `Option::None`, and `Vec<u8>` is not a citation",
+            &model
+        )
+        .is_empty(),
+        "Rust's own names and non-path prose must not be reported as dead"
+    );
+    assert!(
+        !declares_its_route("the authority is checked at each call site"),
+        "ordinary prose about authority must not close an obligation"
+    );
+
+    let (open, total, dead) = {
+        let (open, total, _, dead) = law_c(&model);
+        (open, total, dead)
+    };
     assert!(
         total > 50,
         "law C judged only {total} obligations -- it is not reading the wave"
     );
-    let _ = open;
+    let _ = (open, dead);
 }
 
 #[test]
 fn every_by_value_precondition_is_readable_under_its_own_authority() {
     let root = repo_root();
     let model = parse(&wave_source_files(), &root);
-    let (open, total, routed) = law_c(&model);
+    let (open, total, routed, dead) = law_c(&model);
+    assert!(
+        dead.is_empty(),
+        "LAW C, route (g). Each member below closes its authority obligation with a \
+         SENTENCE -- the only route in this law that is not structural -- and that \
+         sentence names a surface that resolves to nothing in either crate. A route \
+         nobody can follow is not a route: an implementer looking for the named type \
+         does not find it and is back to inventing the value or reaching for an \
+         authority nothing says it may hold. Correct the name, or replace the sentence \
+         with a structural route.{}",
+        dead.concat()
+    );
     let routes: String = routed
         .iter()
         .map(|(route, count)| format!(" {route}={count}"))

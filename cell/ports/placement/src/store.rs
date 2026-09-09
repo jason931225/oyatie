@@ -160,13 +160,26 @@ pub struct CellReservationWriteSetPartsV1 {
     /// The AUTHORITY question, which is a different one, is discharged by
     /// `CellCatalogReader::read_page`: it takes `PlacementReadAuthorityV1`, the
     /// read twin this write set's `PlacementPersistenceAuthorityV1` subsumes,
-    /// and the term rides on `CellCatalogEntryV1::admission_term` inside the
-    /// returned page. That is three levels of nesting below the returned type,
-    /// so the depth-one read route in the law test cannot see it; the route is
-    /// stated here instead. Written in single backticks deliberately: an
-    /// intra-doc link on a precondition member is read by the law tests as a
-    /// declaration of the ROW this compare-and-set is on, and these are not
-    /// that.
+    /// and the term rides on `CellCatalogCandidateV1::admission_term`, inside
+    /// the `CellCatalogPageV1::candidates` of the returned page. That is three
+    /// levels of nesting below the returned type, so the depth-one read route
+    /// in the law test cannot see it; the route is stated here instead. Written
+    /// in single backticks deliberately: an intra-doc link on a precondition
+    /// member is read by the law tests as a declaration of the ROW this
+    /// compare-and-set is on, and these are not that.
+    ///
+    /// WHAT THE ROUTE COSTS, stated because a route that is only nameable is
+    /// half a route. `read_page` is keyed by partition, snapshot and page
+    /// token, never by a single `CellId`, so obtaining one cell's term means
+    /// paging a partition-wide catalog until that cell appears. And the term
+    /// that comes back rides on a `CellCatalogSnapshotV1` carrying its own
+    /// `observed_at_unix_seconds` and `expires_at_unix_seconds`, so it is the
+    /// term AS OF THE SNAPSHOT while the store evaluates this compare-and-set
+    /// against current state. That gap is a liveness cost and not a safety one:
+    /// a term that has moved since the snapshot makes the store REFUSE, which
+    /// is the outcome this compare-and-set exists to produce, and the remedy is
+    /// a fresher snapshot rather than a wider authority. A caller must not read
+    /// the snapshot's expiry as a promise that the term still holds.
     pub admission_precondition: crate::CellAdmissionTermV1,
     pub drain_mutations: crate::DrainContributorMutationSetV1,
     pub capacity_precondition: CellCapacityPreconditionV1,
@@ -318,4 +331,37 @@ pub trait CellReservationStore: Send + Sync {
         authority: &'a PlacementReadAuthorityV1,
         reservation: &'a ReservationRefV1,
     ) -> BoxCellFuture<'a, Result<Option<ReservationStatusV1>, PlacementContractError>>;
+
+    /// Reads the cell capacity ledger row for one cell.
+    ///
+    /// `None` MEANS THE STORE LOOKED AND FOUND NO LEDGER ROW for that cell. It
+    /// is not an authorization refusal and not "the cell does not exist"; both
+    /// of those are on the error channel.
+    ///
+    /// WHY IT EXISTS. [`CellReservationWriteSetPartsV1::capacity_precondition`]
+    /// is required BY VALUE — [`CellCapacityPreconditionV1`] pins a revision
+    /// and a record digest and has no arm asserting the row is absent — and
+    /// until this method existed no surface in these crates handed
+    /// [`crate::CellCapacityLedgerV1`] back under an authority the write's own
+    /// [`PlacementPersistenceAuthorityV1`] can hold. Everything that yielded
+    /// the row was in the wrong family or at the wrong depth: `CellResourceStore`
+    /// and `CellDrainStore` return it inside a [`crate::CellViewV1`] under
+    /// [`crate::CellControlReadAuthorityV1`], a newtype over a DIFFERENT signed
+    /// invocation; [`CellReservationMutationResultV1::capacity`] is this
+    /// write's own return and is gone after a lost reply; and
+    /// [`crate::CellCatalogCandidateV1::capacity`] rides three levels down a
+    /// partition-wide catalog page whose values are AS OF A SNAPSHOT. This is
+    /// the same gap [`crate::CellDrainStore::get_proof_ledger`] was added to
+    /// close on the drain proof ledger, closed the same way: a depth-one read
+    /// taking the read twin the write authority subsumes.
+    ///
+    /// IT ADDS NO AUTHORITY. [`PlacementReadAuthorityV1`] is derivable from
+    /// [`PlacementPersistenceAuthorityV1::read_authority`], so a caller able to
+    /// perform the write is already able to perform this read, and a read-only
+    /// caller reaches it directly. Nothing here lets a reader write.
+    fn get_capacity_ledger<'a>(
+        &'a self,
+        authority: &'a PlacementReadAuthorityV1,
+        cell_id: &'a CellId,
+    ) -> BoxCellFuture<'a, Result<Option<crate::CellCapacityLedgerV1>, PlacementContractError>>;
 }
