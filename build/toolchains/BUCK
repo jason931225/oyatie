@@ -6,9 +6,9 @@ load("@prelude//toolchains:remote_test_execution.bzl", "remote_test_execution_to
 load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 
 # The compiler is a hash-pinned download, not a PATH lookup, so it is a real input to
-# every rustc action and no action shells out to rustup. The version is not configured
-# here or in rust.bzl: it is read from rust-toolchain.toml via the `<file:>` include in
-# .buckconfig, so there is one statement of it and this follows by construction.
+# every rustc action and no rustc action shells out to rustup. The channel comes from
+# rust-toolchain.toml via the `<file:>` include in .buckconfig; rust.bzl pins a sha256 per
+# channel and fails analysis when the channel it reads has no entry.
 rust_distribution(
     name = "rust_distribution",
     visibility = ["PUBLIC"],
