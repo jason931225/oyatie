@@ -14,6 +14,7 @@ mod dependency;
 mod inner;
 mod manifest;
 mod payload;
+mod port_implementation;
 mod proto;
 mod root_meta;
 mod test_fixture;
@@ -28,6 +29,7 @@ pub use manifest::{
     cargo_entrypoint, cargo_entrypoints, cargo_manifest_for_crate_path,
     cargo_manifest_for_entrypoint, cargo_manifest_violations,
 };
+pub use port_implementation::{ChangedSource, port_implementation_violations};
 pub use proto::proto_package_violations;
 pub use workspace::{WORKSPACE_EXCLUDES, WORKSPACE_MEMBER_GLOBS, workspace_membership_violations};
 
