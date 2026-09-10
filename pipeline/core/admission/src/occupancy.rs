@@ -2,21 +2,15 @@
 //! path-sets. Inputs are NUL-delimited git name-status records, not prompts
 //! or newline-delimited API projections.
 //!
-//! Occupancy governs what a lane *authored*. A path the repository has
-//! declared structurally mergeable is not authored content: `.gitattributes`
-//! assigns it one of this repository's own merge drivers, which is a standing
-//! statement that independent lanes are expected to edit it concurrently.
+//! Occupancy governs what a lane *authored*. A path `.gitattributes` gives a
+//! lane-concurrent merge attribute is exempt: that attribute is a standing
+//! statement that independent lanes are expected to edit the path at the same
+//! time, whether its content is generated or hand-written.
 //!
-//! That is a declaration of intent, not a guarantee. Driver registration is
-//! per-clone — an actor without the git config gets an ordinary conflict — and
-//! the lockfile driver itself "exits 1 on same-package version divergence".
-//! What the exemption buys is that such a case fails at MERGE, loudly, instead
-//! of refusing both lanes at spawn. `Cargo.lock` carries such a driver
-//! precisely because "package sections can be added, removed, or
-//! version-replaced by independent branches". Counting those paths as
-//! occupancy made the declaration unreachable: every lane that births or
-//! renames a crate rewrites the lockfile, so every structural lane refused
-//! every other, and the driver written to combine them never ran.
+//! That is a declaration of intent, not a guarantee. What the exemption buys
+//! is that two lanes on such a path meet at MERGE, loudly, instead of both
+//! being refused at spawn — where the refusal is symmetric, carries no
+//! ordering, and bars the merge queue, so neither lane can act on it.
 //!
 //! Disjointness over authored paths is unchanged, and deliberately so.
 //! ADR-0719 D-41 holds that a same-path dual write is an assignment rename
@@ -24,10 +18,20 @@
 
 use std::collections::BTreeSet;
 
-/// Drivers this repository wrote to reconcile concurrent lanes on one file.
-/// An allowlist, not a pattern: see `declared_mergeable`.
-const STRUCTURAL_MERGE_DRIVERS: &[&str] =
-    &["union", "cargo-lock", "fixup-ledger", "friction-ledger"];
+/// Merge attributes by which this repository declares a path open to
+/// concurrent lanes. An allowlist, not a pattern: see `declared_mergeable`.
+///
+/// Only `union` names a driver git implements. The rest name no binary in this
+/// tree, so git falls back to its ordinary three-way text merge, which makes
+/// the exemption -- not a structural merge -- the whole live effect of listing
+/// one. Do not read a name here as evidence that a driver runs.
+const LANE_CONCURRENT_MERGE_ATTRIBUTES: &[&str] = &[
+    "union",
+    "cargo-lock",
+    "fixup-ledger",
+    "friction-ledger",
+    "concurrent-lanes",
+];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OccupiedSet {
@@ -80,12 +84,13 @@ pub fn declared_mergeable(gitattributes: &str) -> Result<BTreeSet<String>, Occup
         let Some(driver) = fields.find_map(|attribute| attribute.strip_prefix("merge=")) else {
             continue;
         };
-        if !STRUCTURAL_MERGE_DRIVERS.contains(&driver) {
+        if !LANE_CONCURRENT_MERGE_ATTRIBUTES.contains(&driver) {
             // `merge=` alone proves nothing. Git's own `merge=binary` means
-            // "take ours and declare a conflict" — the opposite of combining —
-            // and `merge=text` is just the ordinary three-way merge. Only a
-            // driver this repository wrote to reconcile concurrent lanes earns
-            // the exemption, so an unknown value leaves the path authored.
+            // "take ours and declare a conflict", the opposite of combining.
+            // `merge=text` is git's default merge spelled out, written to
+            // defeat binary detection; it says nothing about lanes. Only a
+            // listed value is that declaration, so an unknown one leaves the
+            // path authored.
             continue;
         }
         if pattern.contains(['*', '?', '[']) || pattern.starts_with('/') {
