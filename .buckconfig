@@ -1,3 +1,9 @@
+# rust-toolchain.toml is valid buckconfig syntax, so including it here makes
+# `[toolchain] channel` readable via read_root_config. build/toolchains/rust.bzl derives
+# the pinned Rust version from it rather than restating it, keeping rust-toolchain.toml
+# the single statement of the toolchain version.
+<file:rust-toolchain.toml>
+
 [cells]
   root = .
   prelude = prelude
