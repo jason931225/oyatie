@@ -1,17 +1,10 @@
-//! Fail-closed expansion failures.
-//!
-//! Every variant denies. An expansion that cannot complete is never reported
-//! as "no grant found" — the caller cannot distinguish an absent grant from an
-//! unread one, so both must refuse.
-
 use std::fmt;
 
 use policy_cedar_domain::rebac::RebacTupleStoreError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpansionError {
-    /// No rewrite is configured for this object type and relation. Deny by
-    /// omission: an unconfigured relation grants nothing.
+    /// No rewrite is configured for this object type and relation.
     UndefinedRelation {
         object_type: String,
         relation: String,
@@ -27,9 +20,7 @@ pub enum ExpansionError {
     /// store that is not terminating its pagination.
     PageBudgetExceeded { limit: usize },
     /// A relation reaches itself through the subtracted side of a
-    /// `Difference`. Least-fixed-point re-entry is sound only for monotone
-    /// operators, so such a model grants exactly what its author wrote it to
-    /// exclude. Refused when the model is built, never at decision time.
+    /// `Difference`. Refused when the model is built, never at decision time.
     NonStratified {
         object_type: String,
         relation: String,

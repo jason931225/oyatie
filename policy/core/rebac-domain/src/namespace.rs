@@ -13,10 +13,24 @@ use crate::error::ExpansionError;
 use crate::stratify::assert_stratified;
 use crate::{NamespaceCompileError, compile::check_references};
 
-/// `(object_type, relation)` → the rewrite that defines it.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct RelationKey {
+    pub(crate) object_type: String,
+    pub(crate) relation: String,
+}
+
+impl RelationKey {
+    pub(crate) fn new(object_type: impl Into<String>, relation: &RebacRelation) -> Self {
+        Self {
+            object_type: object_type.into(),
+            relation: relation.as_str().to_owned(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NamespaceConfig {
-    relations: BTreeMap<(String, String), UsersetRewrite>,
+    relations: BTreeMap<RelationKey, UsersetRewrite>,
 }
 
 impl NamespaceConfig {
@@ -39,7 +53,7 @@ impl NamespaceConfig {
         let mut relations = BTreeMap::new();
         let mut duplicates = BTreeSet::new();
         for (object_type, relation, rewrite) in definitions {
-            match relations.entry((object_type, relation.as_str().to_owned())) {
+            match relations.entry(RelationKey::new(object_type, &relation)) {
                 Entry::Vacant(entry) => {
                     entry.insert(rewrite);
                 }
@@ -48,10 +62,10 @@ impl NamespaceConfig {
                 }
             }
         }
-        if let Some((object_type, relation)) = duplicates.into_iter().next() {
+        if let Some(key) = duplicates.into_iter().next() {
             return Err(NamespaceCompileError::DuplicateRelation {
-                object_type,
-                relation,
+                object_type: key.object_type,
+                relation: key.relation,
             });
         }
         check_references(&relations)?;
@@ -76,23 +90,23 @@ impl NamespaceConfig {
         rewrite: UsersetRewrite,
     ) -> Self {
         self.relations
-            .insert((object_type.into(), relation.as_str().to_owned()), rewrite);
+            .insert(RelationKey::new(object_type, relation), rewrite);
         self
     }
 
     /// The rewrite for `object_type#relation`, or [`ExpansionError::UndefinedRelation`].
     ///
     /// # Errors
-    /// When no rewrite is defined. An unconfigured relation is a denial, not a
-    /// direct-tuple fallback: falling back would make a typo in the config
-    /// grant exactly the direct access the config meant to constrain.
+    /// An unconfigured relation is a denial, not a direct-tuple fallback:
+    /// falling back would make a typo in the config grant exactly the direct
+    /// access the config meant to constrain.
     pub fn rewrite(
         &self,
         object_type: &str,
         relation: &RebacRelation,
     ) -> Result<&UsersetRewrite, ExpansionError> {
         self.relations
-            .get(&(object_type.to_owned(), relation.as_str().to_owned()))
+            .get(&RelationKey::new(object_type, relation))
             .ok_or_else(|| ExpansionError::UndefinedRelation {
                 object_type: object_type.to_owned(),
                 relation: relation.as_str().to_owned(),
@@ -114,7 +128,7 @@ impl NamespaceConfig {
     #[must_use]
     pub fn is_defined(&self, object_type: &str, relation: &RebacRelation) -> bool {
         self.relations
-            .contains_key(&(object_type.to_owned(), relation.as_str().to_owned()))
+            .contains_key(&RelationKey::new(object_type, relation))
     }
 
     #[must_use]
@@ -128,8 +142,7 @@ impl NamespaceConfig {
     }
 }
 
-/// A [`NamespaceConfig`] that has passed stratification. The only model an
-/// [`crate::Expander`] will evaluate.
+/// A [`NamespaceConfig`] that has passed stratification.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValidatedNamespace(NamespaceConfig);
 

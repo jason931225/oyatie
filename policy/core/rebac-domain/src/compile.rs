@@ -3,11 +3,19 @@ use std::collections::BTreeMap;
 use policy_cedar_domain::rebac::UsersetRewrite;
 
 use crate::NamespaceCompileError;
+use crate::namespace::RelationKey;
 
 pub(crate) fn check_references(
-    relations: &BTreeMap<(String, String), UsersetRewrite>,
+    relations: &BTreeMap<RelationKey, UsersetRewrite>,
 ) -> Result<(), NamespaceCompileError> {
-    for ((object_type, relation), rewrite) in relations {
+    for (
+        RelationKey {
+            object_type,
+            relation,
+        },
+        rewrite,
+    ) in relations
+    {
         let mut pending = vec![rewrite];
         while let Some(node) = pending.pop() {
             let referenced = match node {
@@ -38,12 +46,12 @@ pub(crate) fn check_references(
                 }
             };
             if let Some(referenced) = referenced {
-                let key = (object_type.clone(), referenced.as_str().to_owned());
+                let key = RelationKey::new(object_type.clone(), referenced);
                 if !relations.contains_key(&key) {
                     return Err(NamespaceCompileError::UnknownRelationReference {
                         object_type: object_type.clone(),
                         relation: relation.clone(),
-                        referenced_relation: key.1,
+                        referenced_relation: key.relation,
                     });
                 }
             }

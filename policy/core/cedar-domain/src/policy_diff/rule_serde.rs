@@ -5,8 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::policy::PolicyRuleInput;
 
-// ── Serde support for PolicyRuleInput ─────────────────────────────────────────
-
 impl Serialize for PolicyRuleInput {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
@@ -87,5 +85,3 @@ impl<'de> Deserialize<'de> for PolicyRuleInput {
         deserializer.deserialize_struct("PolicyRuleInput", FIELDS, PolicyRuleInputVisitor)
     }
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────

@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -12,7 +11,6 @@ use policy_cedar_domain::authz_engine::{
 use policy_cedar_domain::*;
 use serde_json::json;
 
-/// P1 PRRT_kwDOSbSl2s6CnhW0 / PRRT_kwDOSbSl2s6CnqTH:
 /// `PolicyEffect`, `AuthzDecision`, `AuthzRequest`, and `EvalLogFilter` must
 /// round-trip through JSON without compile or runtime errors.
 #[test]
@@ -43,7 +41,6 @@ fn authz_engine_types_serialize_and_deserialize_via_serde_json() {
     assert_eq!(roundtrip.limit, 100);
 }
 
-/// P1 PRRT_kwDOSbSl2s6CnpDv:
 /// `PrincipalType` wire values must match Cedar PascalCase entity names, not
 /// snake_case. A payload carrying `"User"` must deserialize correctly, and
 /// the serialized form must equal `"User"` (not `"user"`).
@@ -70,7 +67,6 @@ fn principal_type_serde_uses_cedar_pascalcase_wire_names() {
     );
 }
 
-/// P1 PRRT_kwDOSbSl2s6CnhW0 (effect serde):
 /// `PolicyEffect` must serialize to UPPERCASE values so it is unambiguous on
 /// the wire and does not collide with Cedar reserved lowercase tokens.
 #[test]
@@ -87,7 +83,6 @@ fn policy_effect_serde_uses_uppercase_wire_values() {
     assert_eq!(roundtrip, PolicyEffect::Allow);
 }
 
-/// P1 PRRT_kwDOSbSl2s6CnoFA (audit-chain append-only):
 /// Synthetic violation: serializing a decision must not mutate state that
 /// could corrupt an append-only ledger entry if accidentally re-serialized.
 #[test]
@@ -100,7 +95,6 @@ fn authz_decision_default_deny_is_immutable_across_serialization_roundtrip() {
     assert!(d2.determining_policies.is_empty());
 }
 
-/// P2 synthetic (EvalLogFilter default limit):
 /// `EvalLogFilter::default()` must yield `limit = 100`, not `0`.
 #[test]
 fn eval_log_filter_default_limit_is_100() {

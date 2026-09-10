@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -152,5 +151,3 @@ fn authorization_uses_only_active_unsuperseded_policy_versions() {
     assert!(!decision.allowed);
     assert_eq!(decision.matched_policy.as_deref(), Some(POLICY_ID));
 }
-
-// ── P1-fix synthetic violation tests ─────────────────────────────────────

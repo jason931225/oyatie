@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -12,8 +11,7 @@ use policy_cedar_domain::authz_engine::{
 use policy_cedar_domain::*;
 use serde_json::json;
 
-/// obligations-1 acceptance: `AnnotationKind` and `PolicyAnnotation` round-trip
-/// through `serde_json` with lowercase kind wire values.
+/// The `kind` wire values are lowercase.
 #[test]
 fn annotation_kinds_serde_roundtrip() {
     // AnnotationKind wire values must be lowercase.
@@ -37,10 +35,6 @@ fn annotation_kinds_serde_roundtrip() {
     assert_eq!(ann, roundtrip);
 }
 
-// ── obligations: allow path surfaces annotations ──────────────────────────
-
-/// obligations-2 acceptance: a matching Allow rule's annotations are collected
-/// onto `AuthorizationDecision`.
 #[test]
 fn allow_decision_surfaces_rule_annotations() {
     let mut policies = PolicySet::default();
@@ -91,10 +85,6 @@ fn allow_decision_surfaces_rule_annotations() {
     assert_eq!(decision.annotations[1].key, "audit_event");
 }
 
-// ── obligations: deny wins suppresses annotations ─────────────────────────
-
-/// obligations-3 acceptance: forbid-wins — an explicit Deny fires before the
-/// annotated Allow rule; the decision is denied with empty annotations.
 #[test]
 fn deny_wins_suppresses_annotations() {
     let mut policies = PolicySet::default();
@@ -155,9 +145,6 @@ fn deny_wins_suppresses_annotations() {
     );
 }
 
-// ── obligations: default deny has empty annotations ───────────────────────
-
-/// obligations-4 acceptance: no matching rule → default deny with empty annotations.
 #[test]
 fn no_match_deny_has_empty_annotations() {
     let mut policies = PolicySet::default();
@@ -179,5 +166,3 @@ fn no_match_deny_has_empty_annotations() {
     assert!(decision.annotations.is_empty());
     assert_eq!(decision.reason, "no matching allow policy");
 }
-
-// ── obligations: multiple annotation kinds on one rule ────────────────────

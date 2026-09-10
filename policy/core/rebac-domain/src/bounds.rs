@@ -9,19 +9,13 @@
 /// fresh one-candidate session.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ExpansionBounds {
-    /// Maximum candidate memberships checked in one decision scope.
     pub max_candidates: usize,
-    /// Maximum rewrite nesting depth before refusing.
     pub max_depth: u32,
-    /// Maximum tuples read across the whole walk before refusing.
     pub max_tuples_read: usize,
-    /// Maximum pages read for any one tupleset before refusing.
     pub max_pages_per_tupleset: usize,
 }
 
 impl ExpansionBounds {
-    /// Bounds that comfortably admit ordinary object hierarchies while still
-    /// refusing a pathological config or tuple set.
     pub const DEFAULT: Self = Self {
         max_candidates: 256,
         max_depth: 32,
@@ -53,7 +47,6 @@ impl Budget {
         }
     }
 
-    /// Charge one candidate before starting its subwalk.
     pub(crate) fn charge_candidate(&mut self) -> Result<(), crate::ExpansionError> {
         self.candidates_checked = self.candidates_checked.saturating_add(1);
         if self.candidates_checked > self.bounds.max_candidates {
@@ -64,7 +57,6 @@ impl Budget {
         Ok(())
     }
 
-    /// Charge `count` tuples, refusing once the bound is passed.
     pub(crate) fn charge_tuples(&mut self, count: usize) -> Result<(), crate::ExpansionError> {
         self.tuples_read = self.tuples_read.saturating_add(count);
         if self.tuples_read > self.bounds.max_tuples_read {

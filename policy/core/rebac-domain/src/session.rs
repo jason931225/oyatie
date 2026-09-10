@@ -44,11 +44,6 @@ impl<'store, S: RebacTupleStore> ExpansionSession<'store, S> {
         self.evaluator.resolved_snapshot()
     }
 
-    /// Check one candidate against the session's shared budget.
-    ///
-    /// # Errors
-    /// Refuses when the total session bounds or any individual walk invariant
-    /// cannot be satisfied.
     pub fn check(
         &mut self,
         relation: &RebacRelation,

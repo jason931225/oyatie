@@ -48,10 +48,6 @@ impl<'a, S: RebacTupleStore> Expander<'a, S> {
 
     /// Does `subject` hold `relation` on `object` at a freshly resolved
     /// instance of the configured snapshot request?
-    ///
-    /// # Errors
-    /// Every [`ExpansionError`] is a refusal. `Ok(false)` alone means the
-    /// complete graph contains no grant.
     pub fn check(
         &self,
         subject: &RebacSubjectRef,

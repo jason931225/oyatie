@@ -16,8 +16,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::policy::{PolicyEffect, PolicyRuleInput};
 
-// ── Key type ─────────────────────────────────────────────────────────────────
-
 /// The identity tuple used to match rules across versions.
 ///
 /// Two rules are considered to address the *same subject* when they share the
@@ -41,8 +39,6 @@ impl From<&PolicyRuleInput> for RuleKey {
         }
     }
 }
-
-// ── RuleDelta ─────────────────────────────────────────────────────────────────
 
 /// Classification of a single rule-level change between two policy versions.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -90,14 +86,10 @@ pub enum RuleDelta {
     },
 }
 
-// ── ImpactReport ──────────────────────────────────────────────────────────────
-
 /// Aggregated diff result for a pair of `PolicyVersion`s.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ImpactReport {
-    /// Version string of the `prev` input.
     pub prev_version: String,
-    /// Version string of the `next` input.
     pub next_version: String,
     /// Ordered list of per-rule deltas (sorted deterministically).
     pub deltas: Vec<RuleDelta>,
@@ -106,19 +98,15 @@ pub struct ImpactReport {
 impl ImpactReport {
     /// Returns `true` if any delta broadens the effective allow surface or removes a
     /// deny guard.
-    ///
-    /// Widening conditions:
-    /// - [`RuleDelta::RuleAdded`] with `effect == Allow`
-    /// - [`RuleDelta::RemovedDeny`]
-    /// - [`RuleDelta::BroadenedAllow`]
-    /// - [`RuleDelta::EffectFlipped`] where `next_rule.effect == Allow` (was Deny)
     pub fn has_widening(&self) -> bool {
         self.deltas.iter().any(|delta| match delta {
             RuleDelta::RuleAdded(r) => r.effect == PolicyEffect::Allow,
             RuleDelta::RemovedDeny(_) => true,
             RuleDelta::BroadenedAllow { .. } => true,
             RuleDelta::EffectFlipped { next_rule, .. } => next_rule.effect == PolicyEffect::Allow,
-            _ => false,
+            RuleDelta::RuleRemoved(_)
+            | RuleDelta::NarrowedAllow { .. }
+            | RuleDelta::AddedDeny(_) => false,
         })
     }
 }
