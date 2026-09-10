@@ -19,22 +19,18 @@ pub enum RustType {
     Reference {
         /// `true` for `&mut`.
         mutable: bool,
-        /// What is referenced.
         inner: Box<RustType>,
     },
     /// A tuple. Empty is the unit type.
     Tuple(Vec<RustType>),
     /// A path applied to type arguments: `Vec<T>`, `Option<T>`, `BTreeMap<K, V>`.
     Generic {
-        /// The constructor's path.
         path: String, // data_class: INTERNAL_ONLY
-        /// Its arguments, in order.
         args: Vec<RustType>,
     },
 }
 
 impl RustType {
-    /// A type named by an already-resolved spelling.
     pub fn path(spelling: impl Into<String>) -> Self {
         Self::Path(spelling.into())
     }

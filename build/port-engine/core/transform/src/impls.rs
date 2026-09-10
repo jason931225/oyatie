@@ -1,24 +1,18 @@
 //! `impl Trait for Type`, from OBSERVED satisfaction rather than from structural matching.
 //!
 //! Source interfaces here are implicit: nothing in a type's declaration says which interfaces it
-//! satisfies. `docs/programs/k8s-port/census/interfaces.md` measured what the two emission
-//! strategies cost — 80,042 name-level structural matches against 1,316 pairs the source declares
-//! outright — and concluded that the engine must emit from USAGE. The front end does the
-//! observing; this module turns each observation into an item.
+//! satisfies, so the front end observes satisfaction and this module turns each observation into
+//! an item. See `docs/programs/k8s-port/census/interfaces.md`.
 //!
 //! Each method DELEGATES to the inherent method of the same name rather than carrying the body
 //! itself. A body can live in exactly one place, and a type satisfying two interfaces that share a
-//! method name would otherwise need it in both — so the inherent `impl` block stays the one home
-//! for a translated body and the trait impls are bridges to it. The call is spelled as a path
+//! method name would otherwise need it in both. The call is spelled as a path
 //! (`Label::name(self)`) rather than as a method call (`self.name()`), because inside a trait impl
 //! the method call resolves against the trait first and would recurse into itself.
 //!
-//! THE ORPHAN RULE DOES NOT BITE HERE, and it is worth recording why rather than adding a check
-//! that cannot fire. Rust forbids implementing a foreign trait for a foreign type; the engine
-//! emits every unit of one corpus as a MODULE of one crate, so both sides of every pair are local
-//! by construction. It becomes reachable when a trait or a type crosses a crate boundary — the
-//! `go-rt` runtime, or a corpus split across crates — and the census's 6 foreign-on-foreign
-//! assertions are the population that will need the newtype treatment then.
+//! THE ORPHAN RULE DOES NOT BITE HERE, which is why no check guards it: the engine emits every
+//! unit of one corpus as a MODULE of one crate, so both sides of every pair are local by
+//! construction. It becomes reachable only when a trait or a type crosses a crate boundary.
 
 use port_engine_api::Declaration;
 use port_engine_rust_ir::{RustExpr, RustFn, RustItem, RustStmt, RustType, Visibility};

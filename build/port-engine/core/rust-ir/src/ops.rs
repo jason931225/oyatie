@@ -49,10 +49,6 @@ pub enum BinaryOp {
 }
 
 /// Where each operator sits in the target's precedence order. Higher binds tighter.
-///
-/// Taken from the Rust reference's expression-precedence table rather than from the source
-/// language's, because this is what the EMITTED text will be parsed as. Getting it from the wrong
-/// language is precisely the defect the unconditional parentheses were avoiding.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Precedence(u8);
 
@@ -64,12 +60,11 @@ impl Precedence {
     pub const ATOMIC: Self = Self(u8::MAX);
 }
 
-/// Comparison operators are non-associative in Rust: `a == b == c` does not parse, so a comparison
-/// nested inside a comparison always needs parentheses regardless of level.
+/// The comparison band, which is also the only non-associative one: `a == b == c` does not parse,
+/// so a comparison nested in a comparison is bracketed at any level.
 const COMPARISON: Precedence = Precedence(3);
 
 impl BinaryOp {
-    /// The operator's precedence level.
     #[must_use]
     pub const fn precedence(self) -> Precedence {
         match self {
@@ -85,7 +80,6 @@ impl BinaryOp {
         }
     }
 
-    /// The operator's spelling.
     #[must_use]
     pub const fn spelling(self) -> &'static str {
         match self {
@@ -110,25 +104,21 @@ impl BinaryOp {
         }
     }
 
-    /// `true` when this operator may not be nested inside another of the same precedence without
-    /// parentheses.
     #[must_use]
     pub const fn is_non_associative(self) -> bool {
-        matches!(self.precedence().0, 3)
+        self.precedence().0 == COMPARISON.0
     }
 }
 
 /// Prefix operators.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum UnaryOp {
-    /// Arithmetic negation.
     Neg,
     /// Logical or bitwise NOT — one operator in the target, distinguished by operand type.
     Not,
 }
 
 impl UnaryOp {
-    /// The operator's spelling.
     #[must_use]
     pub const fn spelling(self) -> &'static str {
         match self {

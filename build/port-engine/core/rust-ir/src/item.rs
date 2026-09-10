@@ -36,7 +36,6 @@ pub enum Receiver {
 }
 
 impl Receiver {
-    /// The receiver's spelling.
     #[must_use]
     pub const fn spelling(self) -> &'static str {
         match self {
@@ -52,33 +51,27 @@ impl Receiver {
 pub struct RustParam {
     /// The parameter's name, already cased for the target.
     pub name: String, // data_class: INTERNAL_ONLY
-    /// Its type.
     pub ty: RustType,
 }
 
 /// One field of a struct.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RustField {
-    /// Documentation carried over from the source.
     pub docs: Vec<String>, // data_class: INTERNAL_ONLY
-    /// Whether the field is public.
     pub vis: Visibility,
     /// The field's name, already cased for the target.
     pub name: String, // data_class: INTERNAL_ONLY
-    /// Its type.
     pub ty: RustType,
 }
 
 /// A function, a method, or a trait method's signature.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RustFn {
-    /// Documentation carried over from the source.
     pub docs: Vec<String>, // data_class: INTERNAL_ONLY
     /// Whether the function is public. Always [`Visibility::Inherited`] for a trait item.
     pub vis: Visibility,
     /// The function's name, already cased for the target.
     pub name: String, // data_class: INTERNAL_ONLY
-    /// The receiver, when this is a method.
     pub receiver: Option<Receiver>,
     /// Parameters, in order — which is semantic.
     pub params: Vec<RustParam>,
@@ -104,48 +97,34 @@ pub enum StructShape {
 pub enum RustItem {
     /// `const NAME: T = value;`
     Const {
-        /// Documentation carried over from the source.
         docs: Vec<String>, // data_class: INTERNAL_ONLY
-        /// Whether the constant is public.
         vis: Visibility,
         /// Its name, already cased for the target.
         name: String, // data_class: INTERNAL_ONLY
-        /// Its type.
         ty: RustType,
         /// Its value, carried as a source spelling.
         value: String, // data_class: INTERNAL_ONLY
     },
     /// `type Name = T;` — transparent, for a source alias.
     TypeAlias {
-        /// Documentation carried over from the source.
         docs: Vec<String>, // data_class: INTERNAL_ONLY
-        /// Whether the alias is public.
         vis: Visibility,
-        /// Its name.
         name: String, // data_class: INTERNAL_ONLY
-        /// What it aliases.
         ty: RustType,
     },
     /// A struct, with any inherent methods that belong to it.
     Struct {
-        /// Documentation carried over from the source.
         docs: Vec<String>, // data_class: INTERNAL_ONLY
-        /// Whether the struct is public.
         vis: Visibility,
-        /// Its name.
         name: String, // data_class: INTERNAL_ONLY
-        /// Its data shape.
         shape: StructShape,
         /// Methods emitted into an `impl` block beside it.
         methods: Vec<RustFn>,
     },
     /// A trait, from a source interface.
     Trait {
-        /// Documentation carried over from the source.
         docs: Vec<String>, // data_class: INTERNAL_ONLY
-        /// Whether the trait is public.
         vis: Visibility,
-        /// Its name.
         name: String, // data_class: INTERNAL_ONLY
         /// Traits this one REQUIRES, from a source interface's embedded interfaces.
         ///
@@ -163,13 +142,10 @@ pub enum RustItem {
     TraitImpl {
         /// Documentation carried over from the source, plus how the satisfaction was observed.
         docs: Vec<String>, // data_class: INTERNAL_ONLY
-        /// The trait being implemented, as a path.
         trait_path: RustType,
-        /// The type implementing it.
         self_ty: RustType,
         /// The trait's required methods, each with a body.
         methods: Vec<RustFn>,
     },
-    /// A free function.
     Function(RustFn),
 }

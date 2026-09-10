@@ -22,19 +22,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-/// Every production source of this crate, read at compile time.
-const PRODUCTION_SOURCES: &[(&str, &str)] = &[
-    ("expr.rs", include_str!("../src/expr.rs")),
-    ("item.rs", include_str!("../src/item.rs")),
-    ("lib.rs", include_str!("../src/lib.rs")),
-    ("lower.rs", include_str!("../src/lower.rs")),
-    ("lower_body.rs", include_str!("../src/lower_body.rs")),
-    ("lower_parts.rs", include_str!("../src/lower_parts.rs")),
-    ("ops.rs", include_str!("../src/ops.rs")),
-    ("render.rs", include_str!("../src/render.rs")),
-    ("sources.rs", include_str!("../src/sources.rs")),
-    ("ty.rs", include_str!("../src/ty.rs")),
-];
+use port_engine_rust_ir::CRATE_SOURCES;
 
 /// The enumeration must BE the directory, not a subset somebody once curated.
 #[test]
@@ -60,14 +48,14 @@ fn scanned_sources_are_the_whole_crate() {
         .filter(|name| name.ends_with(".rs"))
         .collect();
 
-    let scanned: BTreeSet<String> = PRODUCTION_SOURCES
+    let scanned: BTreeSet<String> = CRATE_SOURCES
         .iter()
         .map(|(name, _)| (*name).to_owned())
         .collect();
 
     assert_eq!(
         scanned, on_disk,
-        "a source file exists that no architecture fence reads — add it to PRODUCTION_SOURCES"
+        "a source file exists that no architecture fence reads — regenerate src/sources.rs"
     );
 }
 
@@ -82,7 +70,7 @@ fn no_production_source_carries_corpus_vocabulary() {
         ["api", "machin", "ery"].concat(),
     ];
 
-    for (name, source) in PRODUCTION_SOURCES {
+    for (name, source) in CRATE_SOURCES {
         for needle in &needles {
             assert!(
                 !source.contains(needle),
@@ -100,7 +88,7 @@ fn no_production_source_spawns_a_host_toolchain() {
     let cmd_new = ["Command", "::", "new"].concat();
     let process_cmd = ["std", "::", "process", "::", "Command"].concat();
 
-    for (name, source) in PRODUCTION_SOURCES {
+    for (name, source) in CRATE_SOURCES {
         assert!(
             !source.contains(&cmd_new),
             "{name} must not spawn a process via {cmd_new}"

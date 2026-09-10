@@ -6,12 +6,6 @@ rust-version.workspace = true
 publish = false
 license = "Apache-2.0"
 
-# The neutral seam surface of the owned deterministic port engine (ADR-0637 D1, archived; live via
-# apex ADR-0704). W0-ONLY per ADR-0637 D4: seams, refusals and tests — no source-language front
-# end, no rule data, no corpus, no generated output. Zero dependencies by design: the kernel is
-# pure (no clock, no rand, no net, no filesystem), which is what lets the receipt/verify seam be
-# proven without any of the machinery it will later drive.
-
 [dependencies]
 port-engine-api = { path = "../../ports/api" }
 

@@ -41,6 +41,8 @@ pub const ATTR_VALUE: &str = "value";
 pub const ATTR_OP: &str = "op";
 /// Attribute key naming the source construct an `unsupported` node stands for.
 pub const ATTR_SOURCE_NODE: &str = "go_node";
+/// The [`ATTR_SOURCE_NODE`] value a `++`/`--` statement arrives as.
+pub(crate) const SOURCE_NODE_INCREMENT: &str = "IncDecStmt";
 /// The named POSITIONS a type can appear in, which is what decides the form a trait takes there.
 ///
 /// A borrowed trait object is right for a parameter and impossible for a value a function returns,
@@ -95,8 +97,6 @@ pub const FLAG_ESCAPES: &str = "escapes";
 /// facts being absent means UNPROVEN rather than false.
 pub const FLAG_EFFECT_UNKNOWN: &str = "effect_unknown";
 
-/// Child kinds a construction reads. Opaque here: these are the strings the pack and the front end
-/// agreed on, and this face compares them without interpreting them.
 pub(crate) const CHILD_FIELD: &str = "field";
 pub(crate) const CHILD_METHOD: &str = "method";
 pub(crate) const CHILD_PARAM: &str = "param";

@@ -10,11 +10,9 @@
 //! - A rule that captures one or more declaration kinds is **declaration-level**: one region per
 //!   captured declaration. This is the shape that actually ports Go.
 //!
-//! Neutrality is unchanged and load-bearing. No Go type, kind, or keyword is named in this crate:
-//! `int` arrives as a key to look up in the pack's type map, and `struct` as a string the pack
-//! chose to capture. What this crate DOES own is Rust's side of the translation — identifier
-//! casing and the shape of an emitted item — because that is the target language it renders, not
-//! the source language it must stay ignorant of.
+//! This crate owns the TARGET side of the translation — identifier casing and the shape of an
+//! emitted item. Source vocabulary reaches it as pack data, except for the few source node kinds
+//! declared in `vocabulary`; unlike the kernel, nothing scans this crate to keep it out.
 #![forbid(unsafe_code)]
 
 /// This crate's own sources, for the engine-identity axis assembled by the facade.
@@ -59,7 +57,6 @@ pub use vocabulary::{
     FLAG_EXPORTED, FLAG_POINTER_RECEIVER, FLAG_VARIADIC, PRECONDITION_UNIT_PRESENT,
 };
 
-/// Fail-closed readiness gate. `true` once transform apply is present.
 #[must_use]
 pub const fn w0_ready() -> bool {
     true

@@ -7,12 +7,7 @@ use port_engine_api::{Digest, PortError, RegionId, Renderer, TargetIr};
 use crate::item::RustItem;
 use crate::lower::lower_file;
 
-/// The formatter this crate emits through, named and versioned.
-///
-/// `formatter_digest` is one of the six receipt axes, and it used to hash a LABEL — the string
-/// `"fmt-port-go-v1"`, chosen by the caller. An axis that hashes a name somebody typed attests to
-/// nothing: change the formatter and the axis holds, so a reformatting of the whole corpus reads
-/// as `Unexplained`. This is the formatter's real identity, and it moves when the formatter does.
+/// The formatter this crate emits through, hashed into the receipt's `formatter_digest` axis.
 pub const FORMATTER_ID: &str = concat!(
     "prettyplease ",
     env!("CARGO_PKG_VERSION"),
