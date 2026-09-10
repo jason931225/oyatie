@@ -1,0 +1,24 @@
+rust_library(
+    name = "pipeline-revision-view",
+    srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
+    crate = "pipeline_revision_view",
+    crate_root = "src/lib.rs",
+    visibility = ["PUBLIC"],
+)
+
+rust_test(
+    name = "pipeline-revision-view-unittest",
+    srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
+    crate = "pipeline_revision_view",
+    crate_root = "src/lib.rs",
+    visibility = ["PUBLIC"],
+)
+
+rust_test(
+    name = "pipeline-revision-view-binding",
+    srcs = ["tests/binding.rs"],
+    crate = "pipeline_revision_view_binding",
+    crate_root = "tests/binding.rs",
+    visibility = ["PUBLIC"],
+    deps = [":pipeline-revision-view"],
+)
