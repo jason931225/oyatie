@@ -1,6 +1,9 @@
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` /
-// `.expect_err()` / `.unwrap_err()` to assert invariants — Tier 3 exemption.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+)]
 
 use audit_sealing_domain::{
     MerkleTreeEngine, PriorPeriod, PriorPeriodLookup, SealRecordInput, SealStatus,
@@ -30,8 +33,6 @@ impl PriorPeriodLookup for AlwaysFirst {
     }
 }
 
-/// End-to-end: seal a period, publish its proof material, walk it through
-/// its lifecycle, and confirm the signing key's epoch actually covers it.
 #[test]
 fn seals_a_period_walks_its_lifecycle_and_checks_epoch_coverage() {
     let signing_key = SigningKeyRef {
@@ -61,23 +62,18 @@ fn seals_a_period_walks_its_lifecycle_and_checks_epoch_coverage() {
         Some(format!("sha256:{}", "a1".repeat(32)))
     );
 
-    // A leaf's inclusion in the sealed root is independently verifiable via
-    // the same `MerkleTree` math the seal itself used.
     let tree = audit_sealing_domain::MerkleTree::new(leaves.clone());
     let root = tree.build_root();
     let path = tree.proof_path(2);
     verify_leaf_inclusion(leaves[2], 2, &path, root, record.leaf_count)
         .expect("leaf 2 is included under the sealed root");
 
-    // Walk the record through its declared lifecycle.
     let published =
         apply_seal_status_transition(&record, SealStatus::Published).expect("Sealed -> Published");
     let verified = apply_seal_status_transition(&published, SealStatus::Verified)
         .expect("Published -> Verified");
     assert_eq!(verified.status, SealStatus::Verified);
 
-    // Once Verified, the record may retire into either terminal state — but
-    // not both from the same starting point, and never back out.
     let retained = apply_seal_status_transition(&verified, SealStatus::Retained)
         .expect("Verified -> Retained");
     assert_eq!(
@@ -88,8 +84,6 @@ fn seals_a_period_walks_its_lifecycle_and_checks_epoch_coverage() {
         })
     );
 
-    // The key that signed this period must fall inside the epoch that names
-    // it as active, for the same (pack, tenant_partition, period).
     let epoch = PackEpoch {
         pack: "pack-alpha".to_string(),
         tenant_partition: "tenant-1".to_string(),
@@ -101,7 +95,6 @@ fn seals_a_period_walks_its_lifecycle_and_checks_epoch_coverage() {
     verify_epoch_covers_period(&epoch, "pack-alpha", "tenant-1", "2026-08-15", &signing_key)
         .expect("the signing key's epoch covers this period");
 
-    // The same key does NOT cover a period the epoch does not name.
     assert!(matches!(
         verify_epoch_covers_period(&epoch, "pack-alpha", "tenant-1", "2026-09-15", &signing_key),
         Err(SealingDomainError::PeriodOutsideEpochWindow { .. })
@@ -128,7 +121,6 @@ fn first_period_seal_has_no_prior_root_and_rejects_skipped_publish() {
     .expect("single-leaf first-period input seals");
     assert_eq!(record.prior_root, None);
 
-    // Sealed cannot jump straight to Verified, skipping Published.
     assert_eq!(
         apply_seal_status_transition(&record, SealStatus::Verified),
         Err(SealingDomainError::IllegalSealStatusTransition {

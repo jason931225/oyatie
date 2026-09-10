@@ -1,13 +1,12 @@
-//! `SealStatus` lifecycle transition rules.
-//!
-//! Legal path: `Accepted -> Unsealed -> Sealed -> Published -> Verified`.
-//! `Redacted` and `Retained` are reachable only from `Verified`, and are
-//! themselves terminal: no transition leaves either of them. Every other
-//! `(from, to)` pair — every backward move, every skipped stage, and every
-//! self-transition — is illegal.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+    )
+)]
 
 use audit_sealing_kernel::{SealRecord, SealStatus};
 
@@ -24,14 +23,9 @@ const LEGAL_EDGES: &[(SealStatus, SealStatus)] = &[
     (SealStatus::Verified, SealStatus::Retained),
 ];
 
-/// Check whether `to` is a legal successor of `from`.
-///
 /// # Errors
 /// [`SealingDomainError::IllegalSealStatusTransition`] for any `(from, to)`
-/// pair not in [`LEGAL_EDGES`] — including backward moves (e.g. `Sealed ->
-/// Unsealed`), skipped stages (e.g. `Accepted -> Sealed`), self-transitions
-/// (e.g. `Sealed -> Sealed`), and any transition out of `Redacted` or
-/// `Retained`.
+/// pair not in [`LEGAL_EDGES`].
 pub fn transition_seal_status(
     from: SealStatus,
     to: SealStatus,
@@ -43,9 +37,6 @@ pub fn transition_seal_status(
     }
 }
 
-/// Apply a lifecycle transition to `record`, returning a new [`SealRecord`]
-/// with `status` set to `to`. Every other field is carried over unchanged.
-///
 /// # Errors
 /// [`SealingDomainError::IllegalSealStatusTransition`] when `to` is not a
 /// legal successor of `record.status` — see [`transition_seal_status`].
@@ -74,210 +65,218 @@ mod tests {
         SealStatus::Retained,
     ];
 
-    // ── the six legal edges succeed ─────────────────────────────────────
+    mod legal_edges {
+        use super::*;
 
-    #[test]
-    fn accepted_to_unsealed_is_legal() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Accepted, SealStatus::Unsealed),
-            Ok(SealStatus::Unsealed)
-        );
+        #[test]
+        fn accepted_to_unsealed_is_legal() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Accepted, SealStatus::Unsealed),
+                Ok(SealStatus::Unsealed)
+            );
+        }
+
+        #[test]
+        fn unsealed_to_sealed_is_legal() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Unsealed, SealStatus::Sealed),
+                Ok(SealStatus::Sealed)
+            );
+        }
+
+        #[test]
+        fn sealed_to_published_is_legal() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Sealed, SealStatus::Published),
+                Ok(SealStatus::Published)
+            );
+        }
+
+        #[test]
+        fn published_to_verified_is_legal() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Published, SealStatus::Verified),
+                Ok(SealStatus::Verified)
+            );
+        }
+
+        #[test]
+        fn verified_to_redacted_is_legal() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Verified, SealStatus::Redacted),
+                Ok(SealStatus::Redacted)
+            );
+        }
+
+        #[test]
+        fn verified_to_retained_is_legal() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Verified, SealStatus::Retained),
+                Ok(SealStatus::Retained)
+            );
+        }
     }
 
-    #[test]
-    fn unsealed_to_sealed_is_legal() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Unsealed, SealStatus::Sealed),
-            Ok(SealStatus::Sealed)
-        );
+    mod illegal_transitions {
+        use super::*;
+
+        #[test]
+        fn rejects_backward_move_sealed_to_unsealed() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Sealed, SealStatus::Unsealed),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Sealed,
+                    to: SealStatus::Unsealed,
+                })
+            );
+        }
+
+        #[test]
+        fn rejects_backward_move_verified_to_published() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Verified, SealStatus::Published),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Verified,
+                    to: SealStatus::Published,
+                })
+            );
+        }
+
+        #[test]
+        fn rejects_skipped_stage_accepted_to_sealed() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Accepted, SealStatus::Sealed),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Accepted,
+                    to: SealStatus::Sealed,
+                })
+            );
+        }
+
+        #[test]
+        fn rejects_skipped_stage_accepted_to_verified() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Accepted, SealStatus::Verified),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Accepted,
+                    to: SealStatus::Verified,
+                })
+            );
+        }
+
+        #[test]
+        fn rejects_self_transition() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Sealed, SealStatus::Sealed),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Sealed,
+                    to: SealStatus::Sealed,
+                })
+            );
+        }
+
+        #[test]
+        fn rejects_exit_from_redacted() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Redacted, SealStatus::Retained),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Redacted,
+                    to: SealStatus::Retained,
+                })
+            );
+        }
+
+        #[test]
+        fn rejects_exit_from_retained() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Retained, SealStatus::Verified),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Retained,
+                    to: SealStatus::Verified,
+                })
+            );
+        }
+
+        #[test]
+        fn rejects_jump_straight_to_redacted_from_sealed() {
+            assert_eq!(
+                transition_seal_status(SealStatus::Sealed, SealStatus::Redacted),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Sealed,
+                    to: SealStatus::Redacted,
+                })
+            );
+        }
     }
 
-    #[test]
-    fn sealed_to_published_is_legal() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Sealed, SealStatus::Published),
-            Ok(SealStatus::Published)
-        );
-    }
+    mod exhaustive_matrix {
+        use super::*;
 
-    #[test]
-    fn published_to_verified_is_legal() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Published, SealStatus::Verified),
-            Ok(SealStatus::Verified)
-        );
-    }
-
-    #[test]
-    fn verified_to_redacted_is_legal() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Verified, SealStatus::Redacted),
-            Ok(SealStatus::Redacted)
-        );
-    }
-
-    #[test]
-    fn verified_to_retained_is_legal() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Verified, SealStatus::Retained),
-            Ok(SealStatus::Retained)
-        );
-    }
-
-    // ── named illegal-transition cases ──────────────────────────────────
-
-    #[test]
-    fn rejects_backward_move_sealed_to_unsealed() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Sealed, SealStatus::Unsealed),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Sealed,
-                to: SealStatus::Unsealed,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_backward_move_verified_to_published() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Verified, SealStatus::Published),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Verified,
-                to: SealStatus::Published,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_skipped_stage_accepted_to_sealed() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Accepted, SealStatus::Sealed),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Accepted,
-                to: SealStatus::Sealed,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_skipped_stage_accepted_to_verified() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Accepted, SealStatus::Verified),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Accepted,
-                to: SealStatus::Verified,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_self_transition() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Sealed, SealStatus::Sealed),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Sealed,
-                to: SealStatus::Sealed,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_exit_from_redacted() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Redacted, SealStatus::Retained),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Redacted,
-                to: SealStatus::Retained,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_exit_from_retained() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Retained, SealStatus::Verified),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Retained,
-                to: SealStatus::Verified,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_jump_straight_to_redacted_from_sealed() {
-        assert_eq!(
-            transition_seal_status(SealStatus::Sealed, SealStatus::Redacted),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Sealed,
-                to: SealStatus::Redacted,
-            })
-        );
-    }
-
-    // ── exhaustive matrix: every one of the 49 (from, to) pairs ────────
-
-    #[test]
-    fn exactly_the_six_declared_edges_are_legal() {
-        let mut legal_count = 0;
-        for &from in &ALL_STATUSES {
-            for &to in &ALL_STATUSES {
-                let result = transition_seal_status(from, to);
-                let is_legal = LEGAL_EDGES.contains(&(from, to));
-                assert_eq!(
-                    result.is_ok(),
-                    is_legal,
-                    "transition_seal_status({from:?}, {to:?}) legality mismatch"
-                );
-                if !is_legal {
+        #[test]
+        fn exactly_the_six_declared_edges_are_legal() {
+            let mut legal_count = 0;
+            for &from in &ALL_STATUSES {
+                for &to in &ALL_STATUSES {
+                    let result = transition_seal_status(from, to);
+                    let is_legal = LEGAL_EDGES.contains(&(from, to));
                     assert_eq!(
-                        result,
-                        Err(SealingDomainError::IllegalSealStatusTransition { from, to })
+                        result.is_ok(),
+                        is_legal,
+                        "transition_seal_status({from:?}, {to:?}) legality mismatch"
                     );
-                } else {
-                    legal_count += 1;
+                    if !is_legal {
+                        assert_eq!(
+                            result,
+                            Err(SealingDomainError::IllegalSealStatusTransition { from, to })
+                        );
+                    } else {
+                        legal_count += 1;
+                    }
                 }
             }
-        }
-        assert_eq!(legal_count, LEGAL_EDGES.len());
-        assert_eq!(legal_count, 6);
-    }
-
-    // ── apply_seal_status_transition ────────────────────────────────────
-
-    fn sample_record(status: SealStatus) -> SealRecord {
-        SealRecord {
-            pack: "pack-alpha".to_string(),
-            tenant_partition: "tenant-1".to_string(),
-            period_id: "2026-08".to_string(),
-            leaf_count: 3,
-            merkle_root: "sha256:aa".to_string(),
-            prior_root: None,
-            signing_key: audit_sealing_kernel::SigningKeyRef {
-                key_id: "key-1".to_string(),
-            },
-            status,
+            assert_eq!(legal_count, LEGAL_EDGES.len());
+            assert_eq!(legal_count, 6);
         }
     }
 
-    #[test]
-    fn apply_transition_updates_status_and_preserves_other_fields() {
-        let record = sample_record(SealStatus::Sealed);
-        let updated = apply_seal_status_transition(&record, SealStatus::Published)
-            .expect("Sealed -> Published is legal");
-        assert_eq!(updated.status, SealStatus::Published);
-        assert_eq!(updated.pack, record.pack);
-        assert_eq!(updated.merkle_root, record.merkle_root);
-    }
+    mod apply_transition {
+        use super::*;
 
-    #[test]
-    fn apply_transition_rejects_illegal_move_without_mutating() {
-        let record = sample_record(SealStatus::Accepted);
-        assert_eq!(
-            apply_seal_status_transition(&record, SealStatus::Verified),
-            Err(SealingDomainError::IllegalSealStatusTransition {
-                from: SealStatus::Accepted,
-                to: SealStatus::Verified,
-            })
-        );
+        fn sample_record(status: SealStatus) -> SealRecord {
+            SealRecord {
+                pack: "pack-alpha".to_string(),
+                tenant_partition: "tenant-1".to_string(),
+                period_id: "2026-08".to_string(),
+                leaf_count: 3,
+                merkle_root: "sha256:aa".to_string(),
+                prior_root: None,
+                signing_key: audit_sealing_kernel::SigningKeyRef {
+                    key_id: "key-1".to_string(),
+                },
+                status,
+            }
+        }
+
+        #[test]
+        fn apply_transition_updates_status_and_preserves_other_fields() {
+            let record = sample_record(SealStatus::Sealed);
+            let updated = apply_seal_status_transition(&record, SealStatus::Published)
+                .expect("Sealed -> Published is legal");
+            assert_eq!(updated.status, SealStatus::Published);
+            assert_eq!(updated.pack, record.pack);
+            assert_eq!(updated.merkle_root, record.merkle_root);
+        }
+
+        #[test]
+        fn apply_transition_rejects_illegal_move_without_mutating() {
+            let record = sample_record(SealStatus::Accepted);
+            assert_eq!(
+                apply_seal_status_transition(&record, SealStatus::Verified),
+                Err(SealingDomainError::IllegalSealStatusTransition {
+                    from: SealStatus::Accepted,
+                    to: SealStatus::Verified,
+                })
+            );
+        }
     }
 }

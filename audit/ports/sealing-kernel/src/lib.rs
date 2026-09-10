@@ -1,9 +1,3 @@
-//! Audit-chain sealing kernel: signer/publisher port traits and key epoch types.
-//!
-//! Signer/publisher port traits and key-epoch types. The kernel must remain free
-//! of PKCS#11, S3, Postgres, Mimir and HTTP imports — it is a pure boundary.
-//! `audit/core/sealing-domain` implements the rules over these types, against the
-//! RFC 6962 Merkle tree in `audit/core/chain-domain`.
 #![allow(dead_code)]
 
 /// Reference to a signing key handle held inside an HSM.
@@ -13,7 +7,6 @@ pub struct SigningKeyRef {
 }
 
 /// Pack-scoped key epoch covering the half-open period range `[period_lo, period_hi)`.
-/// Coverage is checked by `audit/core/sealing-domain`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PackEpoch {
     pub pack: String,                        // data_class: PUBLIC
@@ -24,8 +17,6 @@ pub struct PackEpoch {
     pub retiring_key: Option<SigningKeyRef>, // data_class: INTERNAL_ONLY
 }
 
-/// Lifecycle status of a SealRecord. Legal transitions are enforced by
-/// `audit/core/sealing-domain`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SealStatus {
     Accepted,
@@ -37,7 +28,6 @@ pub enum SealStatus {
     Retained,
 }
 
-/// Seal record summary; persisted by `audit-chain-sealing-adapter-postgres`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SealRecord {
     pub pack: String,               // data_class: PUBLIC
@@ -50,7 +40,6 @@ pub struct SealRecord {
     pub status: SealStatus,         // data_class: PUBLIC
 }
 
-/// Merkle root construction port. Pure; implementation in sealing-domain.
 pub trait MerkleEngine {
     type Leaf;
     type Root;
@@ -58,7 +47,6 @@ pub trait MerkleEngine {
     fn root(&self, leaves: &[Self::Leaf]) -> Result<Self::Root, Self::Error>;
 }
 
-/// Signer port: receives root bytes, returns key id plus signature metadata.
 pub trait SignerPort {
     type Root;
     type Signature;
@@ -66,7 +54,6 @@ pub trait SignerPort {
     fn sign(&self, root: &Self::Root, epoch: &PackEpoch) -> Result<Self::Signature, Self::Error>;
 }
 
-/// Publisher port: emits root references to WORM, Mimir, and GitHub channels.
 pub trait RootPublisher {
     type Root;
     type Reference;
@@ -74,13 +61,11 @@ pub trait RootPublisher {
     fn publish(&self, root: &Self::Root) -> Result<Self::Reference, Self::Error>;
 }
 
-/// Append-only seal index writer.
 pub trait IndexWriter {
     type Error;
     fn insert(&self, record: &SealRecord) -> Result<(), Self::Error>;
 }
 
-/// Append-only blob writer for raw proof material.
 pub trait ObjectStoreWriter {
     type Blob;
     type Error;

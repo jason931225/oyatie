@@ -1,12 +1,4 @@
-//! The verifier: resolve key, verify signature, verify proof, walk prior
-//! root, reject cross-pack mixtures, report redaction honestly.
-//!
-//! [`verify`] is pure and never mutates any of its arguments or any state
-//! reachable through the ports it is given — it is a function from
-//! `(request, key_resolver, root_registry, merkle_verifier)` to a
-//! [`VerificationVerdict`], nothing more.
-
-use audit_chain_domain::Sha256Hash;
+use audit_chain_domain::{Ed25519VerificationKey, Sha256Hash};
 use audit_verification_api::{VerificationFailureReason, VerificationVerdict};
 
 use crate::ports::{KeyResolver, MerkleVerifier, RedactionRegistry, RootRegistry};
@@ -26,38 +18,17 @@ use crate::request::{PriorRootClaim, VerificationRequest};
 /// merkle_root)`), independent of which context a caller later asks to
 /// verify it under. That separation is what lets [`verify`] tell a
 /// [`VerificationFailureReason::SignatureInvalid`] apart from a
-/// [`VerificationFailureReason::PackMismatch`] — see [`crate::request`]'s
-/// module doc.
-///
-/// ## Injective by construction (L9)
-///
-/// This crate is the sole producer of this byte format — nothing else in
-/// `audit/` mints it (see the crate doc's "what this crate depends on"
-/// section) — so it is this crate's job, not some downstream reader's, to
-/// make the encoding unambiguous. An earlier version of this function
-/// joined `"field=value"` strings with `\n` separators; because `pack` /
-/// `tenant_partition` / `period_id` are arbitrary caller strings with no
-/// charset restriction, a `\n` embedded in one field let content migrate
-/// across a field boundary, so two DIFFERENT `(pack, tenant_partition,
-/// period_id)` triples could serialize to byte-identical payloads — e.g.
-/// `("pack-a", "t", "X\nperiod_id=Y")` and `("pack-a", "t\nperiod_id=X",
-/// "Y")` both produced the same bytes, so a signature genuinely minted for
-/// one triple verified as valid for the other. Fixed here by length-
-/// prefixing every variable-length field with its exact byte count (a
-/// fixed-width 8-byte big-endian `u64`) instead of scanning for a
-/// delimiter: a reader consumes exactly `len` bytes for each field, so no
-/// byte sequence inside a field — `\n`, `=`, or anything else — can ever be
-/// misread as a boundary. `merkle_root` needs no length prefix of its own
-/// because [`Sha256Hash`] is already a fixed-size `[u8; 32]`, so its extent
-/// is never ambiguous either. The version tag changed from `v1` to `v2`
-/// alongside the wire-format change so the two encodings can never be
-/// confused with each other.
+/// [`VerificationFailureReason::PackMismatch`].
 pub fn verification_signing_payload(
     record_pack: &str,
     record_tenant_partition: &str,
     record_period_id: &str,
     merkle_root: &Sha256Hash,
 ) -> Vec<u8> {
+    // `-v2` names this exact framing, not this crate's version: change the
+    // framing and the suffix must change with it, or an old signer and a new
+    // verifier share a tag. `the_domain_tag_names_exactly_this_encoding` is
+    // what refuses one without the other.
     const DOMAIN_TAG: &[u8] = b"audit-verification-domain-v2";
     let mut out = Vec::with_capacity(
         DOMAIN_TAG.len()
@@ -75,12 +46,6 @@ pub fn verification_signing_payload(
     out
 }
 
-/// Appends `field` to `out`, preceded by its exact byte length as a
-/// fixed-width 8-byte big-endian integer. This is what makes
-/// [`verification_signing_payload`] injective (L9/L3): a reader never
-/// scans `field` for a delimiter, so nothing inside `field` — including a
-/// byte sequence that looks like another field's own length prefix — can
-/// ever be misinterpreted as a boundary.
 fn push_length_prefixed(out: &mut Vec<u8>, field: &[u8]) {
     out.extend_from_slice(&(field.len() as u64).to_be_bytes());
     out.extend_from_slice(field);
@@ -89,50 +54,7 @@ fn push_length_prefixed(out: &mut Vec<u8>, field: &[u8]) {
 /// Verify `request` against the trust material `key_resolver`,
 /// `root_registry`, `merkle_verifier`, and `redaction_registry` supply, and
 /// return the resulting [`VerificationVerdict`]. Never panics, never
-/// mutates `request` or anything reachable through the four ports, and
-/// never returns `VerificationVerdict::Verified` unless every one of the
-/// following holds:
-///
-/// 1. **Resolve key.** `key_resolver.resolve_key` succeeds for
-///    `request.context_*`. `Err` (or a key epoch that simply does not
-///    cover this request) →
-///    [`VerificationFailureReason::KeyEpochMismatch`].
-/// 2. **Verify signature.** `request.signature` verifies, via
-///    `audit_chain_domain::Ed25519Signature::verify_with_trusted_key`, over
-///    exactly [`verification_signing_payload`] built from `request.record_*`
-///    and `request.merkle_root`, under the resolved key. A failure here →
-///    [`VerificationFailureReason::SignatureInvalid`].
-/// 3. **Verify proof.** `merkle_verifier.verify(&request.leaf,
-///    &request.proof, &request.merkle_root)` returns `true`. `false` →
-///    [`VerificationFailureReason::ProofInvalid`].
-/// 4. **Walk prior root.** [`PriorRootClaim::First`] must be confirmed by
-///    `root_registry.is_first_period`; [`PriorRootClaim::Preceding`] must
-///    match what `root_registry.resolve_root` returns. Either an
-///    unconfirmed `First` claim or an unresolved/mismatched `Preceding`
-///    claim → [`VerificationFailureReason::PriorRootMissing`] — never a
-///    pass on `Err` alone (L4).
-/// 5. **Reject cross-pack mixtures.** `request.record_pack` /
-///    `record_tenant_partition` / `record_period_id` must equal
-///    `request.context_pack` / `context_tenant_partition` /
-///    `context_period_id`, leg for leg (L7). Any one leg differing →
-///    [`VerificationFailureReason::PackMismatch`], even though steps 1
-///    through 4 above all already passed using genuinely valid crypto (see
-///    [`crate::request`]'s module doc for why the crypto alone cannot
-///    catch this).
-/// 6. **Report redaction honestly.** If every check above passed, the
-///    leaf's inclusion has genuinely been proven — it is not silently
-///    reported as verified when it has actually been redacted.
-///    `request.redacted` alone is never trusted for this (L8: a `bool`
-///    field is exactly as free to construct as a unit enum variant): it is
-///    confirmed against `redaction_registry.is_redacted`, and only a
-///    confirmed `Ok(false)` (and `request.redacted == false`) lets this
-///    step pass. `request.redacted == true`, `Ok(true)`, or `Err` from the
-///    registry all fail the same way (L4: fail closed, never take an
-///    unconfirmed or unreachable "clean" answer as a pass) →
-///    [`VerificationFailureReason::RedactedEvent`].
-///
-/// Only when none of the above fires does `verify` return
-/// [`VerificationVerdict::Verified`].
+/// mutates `request` or anything reachable through the four ports.
 pub fn verify<KR, RR, MV, RG>(
     request: &VerificationRequest,
     key_resolver: &KR,
@@ -146,39 +68,65 @@ where
     MV: MerkleVerifier,
     RG: RedactionRegistry,
 {
-    // 1. Resolve key, against the verification CONTEXT — never the
-    // record's own unauthenticated identity claim (see module doc).
-    let Ok(key) = key_resolver.resolve_key(
-        &request.context_pack,
-        &request.context_tenant_partition,
-        &request.context_period_id,
-    ) else {
+    let Some(key) = resolve_context_trusted_key(request, key_resolver) else {
         return VerificationVerdict::Failed(VerificationFailureReason::KeyEpochMismatch);
     };
+    if !record_signature_is_valid(request, &key) {
+        return VerificationVerdict::Failed(VerificationFailureReason::SignatureInvalid);
+    }
+    if !leaf_inclusion_is_proven(request, merkle_verifier) {
+        return VerificationVerdict::Failed(VerificationFailureReason::ProofInvalid);
+    }
+    if !prior_root_claim_is_confirmed(request, root_registry) {
+        return VerificationVerdict::Failed(VerificationFailureReason::PriorRootMissing);
+    }
+    if !record_identity_matches_context(request) {
+        return VerificationVerdict::Failed(VerificationFailureReason::PackMismatch);
+    }
+    if !redaction_is_confirmed_clean(request, redaction_registry) {
+        return VerificationVerdict::Failed(VerificationFailureReason::RedactedEvent);
+    }
+    VerificationVerdict::Verified
+}
 
-    // 2. Verify signature, over a payload built from the RECORD's own
-    // identity (see `verification_signing_payload`'s doc for why).
+fn resolve_context_trusted_key<KR: KeyResolver>(
+    request: &VerificationRequest,
+    key_resolver: &KR,
+) -> Option<Ed25519VerificationKey> {
+    key_resolver
+        .resolve_key(
+            &request.context_pack,
+            &request.context_tenant_partition,
+            &request.context_period_id,
+        )
+        .ok()
+}
+
+fn record_signature_is_valid(request: &VerificationRequest, key: &Ed25519VerificationKey) -> bool {
     let payload = verification_signing_payload(
         &request.record_pack,
         &request.record_tenant_partition,
         &request.record_period_id,
         &request.merkle_root,
     );
-    if request
+    request
         .signature
-        .verify_with_trusted_key(&payload, &key)
-        .is_err()
-    {
-        return VerificationVerdict::Failed(VerificationFailureReason::SignatureInvalid);
-    }
+        .verify_with_trusted_key(&payload, key)
+        .is_ok()
+}
 
-    // 3. Verify proof.
-    if !merkle_verifier.verify(&request.leaf, &request.proof, &request.merkle_root) {
-        return VerificationVerdict::Failed(VerificationFailureReason::ProofInvalid);
-    }
+fn leaf_inclusion_is_proven<MV: MerkleVerifier>(
+    request: &VerificationRequest,
+    merkle_verifier: &MV,
+) -> bool {
+    merkle_verifier.verify(&request.leaf, &request.proof, &request.merkle_root)
+}
 
-    // 4. Walk prior root.
-    let prior_root_confirmed = match &request.prior_root {
+fn prior_root_claim_is_confirmed<RR: RootRegistry>(
+    request: &VerificationRequest,
+    root_registry: &RR,
+) -> bool {
+    match &request.prior_root {
         PriorRootClaim::First => matches!(
             root_registry.is_first_period(
                 &request.context_pack,
@@ -195,28 +143,20 @@ where
             ),
             Ok(resolved) if resolved == *root
         ),
-    };
-    if !prior_root_confirmed {
-        return VerificationVerdict::Failed(VerificationFailureReason::PriorRootMissing);
     }
+}
 
-    // 5. Reject cross-pack (and cross-tenant-partition, cross-period)
-    // mixtures: every leg of the identity tuple, not just `pack` (L7).
-    if request.record_pack != request.context_pack
-        || request.record_tenant_partition != request.context_tenant_partition
-        || request.record_period_id != request.context_period_id
-    {
-        return VerificationVerdict::Failed(VerificationFailureReason::PackMismatch);
-    }
+fn record_identity_matches_context(request: &VerificationRequest) -> bool {
+    request.record_pack == request.context_pack
+        && request.record_tenant_partition == request.context_tenant_partition
+        && request.record_period_id == request.context_period_id
+}
 
-    // 6. Report redaction honestly — only after inclusion has genuinely
-    // been proven above. `request.redacted` is a free-to-construct caller
-    // claim (L8) and is never trusted alone: it must be confirmed by
-    // `redaction_registry`. Anything other than a confirmed "clean" fails
-    // closed into `RedactedEvent` rather than a silent `Verified` (L4), so
-    // an unreachable or erroring registry can never be used to launder a
-    // genuinely redacted leaf through as verified.
-    let confirmed_not_redacted = matches!(
+fn redaction_is_confirmed_clean<RG: RedactionRegistry>(
+    request: &VerificationRequest,
+    redaction_registry: &RG,
+) -> bool {
+    let registry_confirms_clean = matches!(
         redaction_registry.is_redacted(
             &request.context_pack,
             &request.context_tenant_partition,
@@ -225,9 +165,28 @@ where
         ),
         Ok(false)
     );
-    if request.redacted || !confirmed_not_redacted {
-        return VerificationVerdict::Failed(VerificationFailureReason::RedactedEvent);
-    }
+    !request.redacted && registry_confirms_clean
+}
 
-    VerificationVerdict::Verified
+#[cfg(test)]
+mod tests {
+    use super::verification_signing_payload;
+
+    /// Pins the payload's absolute bytes against the `-v2` domain tag. Every
+    /// other payload test in this crate is relative (`assert_ne!` between two
+    /// outputs of this same function) or mints and checks with one build, so
+    /// none of them observes the tag or the encoding it names.
+    #[test]
+    fn the_domain_tag_names_exactly_this_encoding() {
+        let mut expected: Vec<u8> = b"audit-verification-domain-v2\
+            \x00\x00\x00\x00\x00\x00\x00\x06pack-a\
+            \x00\x00\x00\x00\x00\x00\x00\x01t\
+            \x00\x00\x00\x00\x00\x00\x00\x09period-01"
+            .to_vec();
+        expected.extend_from_slice(&[0xAB; 32]);
+        assert_eq!(
+            verification_signing_payload("pack-a", "t", "period-01", &[0xAB; 32]),
+            expected
+        );
+    }
 }
