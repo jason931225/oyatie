@@ -206,7 +206,8 @@ for the wave. So, carried forward intact:
   required while buck2 legs come up beside them is the prohibited state, not a
   safe transition through it. The changeover is a swap, not an overlap.
 - **A live CAS alone does not overturn**, and its scope is cache-only.
-  `warm_reads_licensed: false` remains the admission control. A CAS and action
+  `warm_reads_licensed: false`, in `specs/cache-warm-license.json`, remains the
+  admission control. A CAS and action
   cache store blobs and are architecture-agnostic, so aarch64 capacity may
   serve amd64 builds; remote execution is not, and stays out of scope until its
   own record.
@@ -219,8 +220,12 @@ configuration asserting so are correct rather than stale.
 
 The cache substrate exists. A NativeLink CAS serves
 `grpcs://cache.oyatie.dev:50051`, verified from a GitHub-hosted runner as well
-as locally: mTLS enforced, SHA256 and BLAKE3, action-cache writes enabled,
-Remote Execution API v2.0 through v2.3. In the substrate repository,
+as locally: mTLS enforced, SHA256 and BLAKE3, the action cache READ-ONLY, and
+Remote Execution API v2.0 through v2.3. Writes are refused deliberately: a CAS
+entry is content-addressed and hash-verified, so a write can only insert the
+bytes its digest names, but an action-cache entry maps an action digest to an
+arbitrary result -- one unauthenticated write is arbitrary code execution in
+every consumer. In the substrate repository,
 `./substrate cache-creds` mints a client certificate and `./substrate
 cache-check` reports whether the endpoint is usable.
 
@@ -230,8 +235,17 @@ fourteen minutes, and no cache hit has been demonstrated by any client.
 `GetCapabilities` answering is not a cache hit, and neither is a green weekly
 smoke; treat "the CAS is live" and "buck2 builds are warm" as separate claims
 until a build writes to the cache and a later build on a clean tree reads from
-it. A misconfigured or unreachable cache degrades a buck2 build to local
-execution rather than failing it, so a cache outage is not a build outage.
+it.
+
+An unusable cache configuration FAILS the build; it does not degrade to local
+execution. Measured three times: a `grpcs://` scheme a newer buck2 rejects, a
+daemon serving a stale RE client, and a SEC1 client key rustls cannot parse
+each produced retries at 1/2/3/4/5s and then `BUILD FAILED` -- on
+`prelude//rust/tools:rustc_cfg`, a target unrelated to the cache, with the real
+cause five screens above in a WARN. So a cache misconfiguration wears a
+build-rot costume, and the CI lane that wires the cache must decide it is
+unusable and skip it BEFORE writing any config. Its guards are the mechanism
+that makes a cache outage survivable; they are not redundant.
 
 ## Git and protected delivery
 
