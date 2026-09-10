@@ -1,7 +1,4 @@
 //! Cloud Region API boundary for region and availability-zone listing.
-//!
-//! This crate owns authenticated request normalization and public projection for
-//! the immutable Cloud region/AZ taxonomy before returning API records.
 
 mod error;
 mod model;

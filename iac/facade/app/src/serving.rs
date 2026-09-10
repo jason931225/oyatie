@@ -45,8 +45,6 @@ pub(super) fn run_iac_app_with_termination(
     config: CloudIacAppConfig,
     process_signals: bool,
 ) -> Result<(), CloudIacAppError> {
-    // BOOT-FATAL: refuse to serve the supply-chain surface without a verifiable
-    // bearer SECRET and a bound principal id (no default-allow; AUTH-005).
     let authz_provider = config.module_registry_authz_provider()?;
     let service =
         build_iac_app_service_from_release_index_path(&config.release_index_path, authz_provider)?;

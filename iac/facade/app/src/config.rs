@@ -2,10 +2,10 @@ use super::*;
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct CloudIacAppConfig {
-    pub bind_addr: SocketAddr,                  // data_class: INTERNAL_ONLY
-    pub release_index_path: PathBuf,            // data_class: INTERNAL_ONLY
-    pub module_registry_bearer: Option<String>, // data_class: SECRET
-    pub module_registry_principal_id: Option<String>, // data_class: INTERNAL_ONLY
+    pub bind_addr: SocketAddr,
+    pub release_index_path: PathBuf,
+    pub module_registry_bearer: Option<String>,
+    pub module_registry_principal_id: Option<String>,
 }
 
 impl std::fmt::Debug for CloudIacAppConfig {
@@ -74,11 +74,6 @@ impl CloudIacAppConfig {
         })
     }
 
-    /// Build the fail-closed module-registry authz provider from config. BOOT-FATAL
-    /// when the bearer SECRET or the bound principal id is unset — a process that
-    /// cannot prove a credential root and a bound identity must NEVER serve the
-    /// supply-chain surface (AUTH-005 / no default-allow).
-    ///
     /// # Errors
     /// [`CloudIacAppConfigError`] when the bearer or principal is unset, or the
     /// bearer is malformed.
@@ -124,22 +119,14 @@ pub(super) fn parse_release_index_path(value: &str) -> Result<PathBuf, CloudIacA
     Ok(PathBuf::from(value))
 }
 
-/// The permitted module-registry surfaces for the break-glass reader principal:
-/// the three read surfaces. Deny-by-default — anything not listed is refused by
-/// the [`ConfiguredSurfaceAuthorizer`].
 const CLOUD_IAC_MODULE_REGISTRY_READER_SURFACES: [&str; 3] = [
     CLOUD_IAC_MODULE_REGISTRY_DISCOVERY_SURFACE,
     CLOUD_IAC_MODULE_REGISTRY_VERSIONS_SURFACE,
     CLOUD_IAC_MODULE_REGISTRY_DOWNLOAD_SURFACE,
 ];
 
-/// Assemble the fail-closed module-registry authz provider from a bearer SECRET
-/// and a bound principal id: a constant-time bearer [`ConfiguredBearerPrincipalVerifier`]
-/// (AUTHN) plus a deny-by-default [`ConfiguredSurfaceAuthorizer`] (the PDP port).
-///
 /// The bearer must be free of whitespace/control characters so the `Bearer
-/// <token>` header round-trips byte-for-byte; the verifier additionally refuses an
-/// empty secret/identity at construction.
+/// <token>` header round-trips byte-for-byte.
 pub(super) fn build_module_registry_authz_provider(
     bearer: &str,
     principal_id: &str,

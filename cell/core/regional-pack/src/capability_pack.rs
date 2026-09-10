@@ -1,15 +1,7 @@
-//! Vertical capability pack types for M04-P01 (merge-variant 2026-05-17).
-//!
-//! A `CapabilityPack` identifies a versioned bundle of per-vertical capabilities
-//! that binds to a regional pack.  The elected vertical for M04 is
-//! `vertical-corporate` (council-resolution 2026-05-17).
+//! Vertical capability pack types.
 
 use data_boundary_kernel::{Classified, DataClass};
 
-/// Semantic version variant for a capability pack.
-///
-/// Variants correspond to the three SemVer axes; the `PackVersion` value is
-/// embedded in pack IDs and compared during upgrade checks.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PackVersion {
     /// Backward-compatible additions only.
@@ -21,7 +13,6 @@ pub enum PackVersion {
 }
 
 impl PackVersion {
-    /// Returns `(major, minor, patch)` tuple regardless of variant.
     pub const fn triplet(self) -> (u32, u32, u32) {
         match self {
             Self::Minor {
@@ -42,70 +33,49 @@ impl PackVersion {
         }
     }
 
-    /// Canonical string form: `"<major>.<minor>.<patch>"`.
     pub fn display(self) -> String {
         let (maj, min, pat) = self.triplet();
         format!("{maj}.{min}.{pat}")
     }
 }
 
-/// A versioned bundle of per-vertical capabilities bound to a regional pack.
-///
-/// The `vertical_id` must match the elected vertical slug (`"vertical-corporate"`).
-/// `pack_ref` must start with `"pack-"` to align with the `RegionalPack` id
-/// invariant.
-///
-/// All fields are private to enforce invariants through [`CapabilityPack::new`].
-/// Use the accessor methods to read field values.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CapabilityPack {
     vertical_id: Classified<String>,
-    pack_ref: String, // data_class: INTERNAL_ONLY; references RegionalPack.id
+    pack_ref: String,
     version: PackVersion,
     capabilities: Classified<Vec<String>>,
 }
 
-/// The elected vertical slug for M04 (council-resolution 2026-05-17).
 pub const ELECTED_VERTICAL_SLUG: &str = "vertical-corporate";
 
-/// Errors produced by [`CapabilityPack::new`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CapabilityPackError {
     EmptyVerticalId,
-    /// `vertical_id` is non-empty but does not match the elected slug
-    /// (`vertical-corporate`).  Non-elected verticals are rejected at
-    /// construction time to prevent invalid bindings propagating into
-    /// downstream pack-selection and upgrade flows.
+    /// Rejected at construction time so an invalid binding cannot propagate
+    /// into downstream pack-selection and upgrade flows.
     NonElectedVerticalId,
     InvalidPackRef,
     EmptyCapabilities,
 }
 
 impl CapabilityPack {
-    /// Returns the elected vertical ID.
     pub fn vertical_id(&self) -> &str {
         &self.vertical_id.value
     }
 
-    /// Returns the pack reference (e.g. `"pack-alpha"`).
     pub fn pack_ref(&self) -> &str {
         &self.pack_ref
     }
 
-    /// Returns the pack version.
     pub fn version(&self) -> PackVersion {
         self.version
     }
 
-    /// Returns the capability list.
     pub fn capabilities(&self) -> &[String] {
         &self.capabilities.value
     }
 
-    /// Constructs and validates a new [`CapabilityPack`].
-    ///
-    /// # Errors
-    /// Returns [`CapabilityPackError`] if any invariant is violated.
     pub fn new(
         vertical_id: String,
         pack_ref: String,
@@ -161,8 +131,6 @@ mod tests {
 
     #[test]
     fn rejects_non_elected_vertical_id() {
-        // Synthetic violation: a non-empty but non-elected slug must be
-        // rejected at construction time (M04 election invariant).
         let err = CapabilityPack::new(
             "vertical-healthcare".to_string(),
             "pack-alpha".to_string(),
@@ -197,7 +165,7 @@ mod tests {
     fn rejects_invalid_pack_ref() {
         let err = CapabilityPack::new(
             "vertical-corporate".to_string(),
-            "kr".to_string(), // missing "pack-" prefix
+            "kr".to_string(),
             PackVersion::Patch {
                 major: 1,
                 minor: 0,

@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudIacReleaseIndexSeed {
-    pub(super) modules: Vec<CloudIacReleaseIndexModuleSeed>, // data_class: INTERNAL_ONLY
+    pub(super) modules: Vec<CloudIacReleaseIndexModuleSeed>,
 }
 
 impl CloudIacReleaseIndexSeed {
@@ -13,26 +13,26 @@ impl CloudIacReleaseIndexSeed {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudIacReleaseIndexModuleSeed {
-    pub(super) namespace: String,          // data_class: INTERNAL_ONLY
-    pub(super) name: String,               // data_class: INTERNAL_ONLY
-    pub(super) system: String,             // data_class: INTERNAL_ONLY
-    pub(super) version: String,            // data_class: INTERNAL_ONLY
-    pub(super) source_path: String,        // data_class: INTERNAL_ONLY
-    pub(super) archive_file: String,       // data_class: INTERNAL_ONLY
-    pub(super) archive_sha256: String,     // data_class: INTERNAL_ONLY
-    pub(super) archive_media_type: String, // data_class: INTERNAL_ONLY
-    pub(super) archive_source_location: Option<String>, // data_class: PUBLIC
-    pub(super) archive_source_integrity_sha256: Option<String>, // data_class: INTERNAL_ONLY
-    pub(super) archive_source_version_id: Option<String>, // data_class: INTERNAL_ONLY
-    pub(super) archive_source_generation: Option<String>, // data_class: INTERNAL_ONLY
-    pub(super) evidence_ref: String,       // data_class: INTERNAL_ONLY
+    pub(super) namespace: String,
+    pub(super) name: String,
+    pub(super) system: String,
+    pub(super) version: String,
+    pub(super) source_path: String,
+    pub(super) archive_file: String,
+    pub(super) archive_sha256: String,
+    pub(super) archive_media_type: String,
+    pub(super) archive_source_location: Option<String>,
+    pub(super) archive_source_integrity_sha256: Option<String>,
+    pub(super) archive_source_version_id: Option<String>,
+    pub(super) archive_source_generation: Option<String>,
+    pub(super) evidence_ref: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct CloudIacAppArchiveArtifact {
-    pub(super) archive_file: PathBuf,  // data_class: INTERNAL_ONLY
-    pub(super) archive_sha256: String, // data_class: INTERNAL_ONLY
-    pub(super) media_type: String,     // data_class: INTERNAL_ONLY
+    pub(super) archive_file: PathBuf,
+    pub(super) archive_sha256: String,
+    pub(super) media_type: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

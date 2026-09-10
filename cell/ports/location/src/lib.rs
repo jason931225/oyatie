@@ -10,17 +10,17 @@ pub const CELL_ID_PREFIX: &str = "cell-";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RegionCode {
-    pub value: String, // data_class: PUBLIC
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AzCode {
-    pub value: String, // data_class: PUBLIC
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CellId {
-    pub value: String, // data_class: PUBLIC
+    pub value: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

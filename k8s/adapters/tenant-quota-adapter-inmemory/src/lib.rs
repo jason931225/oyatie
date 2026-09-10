@@ -1,13 +1,5 @@
 //! In-memory quota store fake for tests and single-node bring-up.
-//!
-//! Implements [`QuotaDecisionPort`] and [`QuotaAdminPort`] over a plain
-//! `BTreeMap`. No I/O, no async — safe for deterministic unit tests.
-//!
-//! **Fail-closed**: an unseeded tenant returns [`QuotaPortError::NotFound`]
-//! from `get_quota` and a `Deny(TenantMismatch)` from `check_quota`.
-//! Never silently allows.
 
-// ADR-0083 Tier-3: panic-free.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -19,10 +11,8 @@ use k8s_tenant_quota_kernel::{
     ProvisionRequest, QuotaDecision, TenantId, TenantQuota, TenantUsage,
 };
 
-/// In-memory quota store. Thread-safe via `Arc<Mutex<_>>`.
-///
-/// Suitable for acceptance tests and single-node bring-up only. Production
-/// wires a Postgres-backed adapter behind the same port.
+/// Test and bring-up only; production wires a Postgres-backed adapter behind
+/// the same port.
 #[derive(Clone, Default)]
 pub struct InMemoryQuotaStore {
     quotas: Arc<Mutex<BTreeMap<String, TenantQuota>>>,
@@ -30,14 +20,11 @@ pub struct InMemoryQuotaStore {
 }
 
 impl InMemoryQuotaStore {
-    /// Construct an empty store. All reads fail closed until seeded.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Seed a quota record (builder pattern for test setup).
-    ///
     /// # Panics
     /// Panics only if the internal Mutex is poisoned (test environment only).
     #[must_use]
@@ -49,8 +36,6 @@ impl InMemoryQuotaStore {
         self
     }
 
-    /// Seed a usage record (builder pattern for test setup).
-    ///
     /// # Panics
     /// Panics only if the internal Mutex is poisoned (test environment only).
     #[must_use]
@@ -81,15 +66,12 @@ impl QuotaDecisionPort for InMemoryQuotaStore {
             .map_err(|e| QuotaPortError::Persistence(e.to_string()))?
             .get(&tenant_key)
             .cloned()
-            .unwrap_or_else(|| {
-                // No usage recorded yet = zero usage; safe default.
-                TenantUsage {
-                    tenant_id: request.tenant_id.clone(),
-                    current_clusters: 0,
-                    max_nodes_in_any_cluster: 0,
-                    max_vcpu_in_any_cluster: 0,
-                    max_ram_gib_in_any_cluster: 0,
-                }
+            .unwrap_or_else(|| TenantUsage {
+                tenant_id: request.tenant_id.clone(),
+                current_clusters: 0,
+                max_nodes_in_any_cluster: 0,
+                max_vcpu_in_any_cluster: 0,
+                max_ram_gib_in_any_cluster: 0,
             });
 
         Ok(evaluate(&quota, &usage, request))
@@ -168,7 +150,7 @@ mod tests {
     fn seeded_quota_with_usage_denies_when_exceeded() {
         let store = InMemoryQuotaStore::new()
             .with_quota(quota("ten_acme"))
-            .with_usage(usage("ten_acme", 5)); // already at max
+            .with_usage(usage("ten_acme", 5));
         let req = request("ten_acme");
         let decision = store.check_quota(&req).unwrap();
         assert!(decision.is_deny());
@@ -194,7 +176,6 @@ mod tests {
 
     #[test]
     fn missing_usage_defaults_to_zero() {
-        // No usage seeded: check_quota should use zero usage and allow.
         let store = InMemoryQuotaStore::new().with_quota(quota("ten_acme"));
         let req = request("ten_acme");
         assert_eq!(store.check_quota(&req).unwrap(), QuotaDecision::Allow);

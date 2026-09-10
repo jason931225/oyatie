@@ -1,11 +1,6 @@
 //! Per-vertical regulatory profile: binds a vertical to its KR regulatory pack subset.
-//!
-//! M06-P03 merge-variant delta-1.  No new crate, no new deps (std-only additions).
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-/// The 13 ad verticals defined in M06-P02.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum AdVertical {
     Automotive,
@@ -44,11 +39,8 @@ impl AdVertical {
     }
 }
 
-/// Binds one vertical to a KR regulatory pack subset and a set of applicable controls.
-///
-/// `pack_id` must match a `RegionalPack::id` already provisioned in the pack registry
-/// (prefix `pack-`).  `controls` is the non-empty subset of controls from that pack
-/// that apply to this vertical.
+/// `pack_id` must match a `RegionalPack::id` already provisioned in the pack
+/// registry.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerticalRegulatoryProfile {
     pub vertical: AdVertical,
@@ -56,17 +48,13 @@ pub struct VerticalRegulatoryProfile {
     pub controls: Vec<String>,
 }
 
-/// Errors produced when constructing a [`VerticalRegulatoryProfile`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VerticalRegulatoryProfileError {
-    /// `pack_id` does not start with `pack-`.
     InvalidPackId,
-    /// `controls` slice is empty — every vertical must bind at least one control.
     EmptyControls,
 }
 
 impl VerticalRegulatoryProfile {
-    /// Construct and validate a binding.
     pub fn new(
         vertical: AdVertical,
         pack_id: String,

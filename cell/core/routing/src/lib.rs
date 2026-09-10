@@ -18,26 +18,26 @@ pub enum CellTier {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellBindingCreate {
-    pub tenant_id: String,               // data_class: INTERNAL_ONLY
-    pub region: RegionRef,               // data_class: INTERNAL_ONLY
-    pub residency_class: ResidencyClass, // data_class: INTERNAL_ONLY
-    pub az: String,                      // data_class: INTERNAL_ONLY
-    pub cell_id: String,                 // data_class: INTERNAL_ONLY
-    pub tier: CellTier,                  // data_class: INTERNAL_ONLY
-    pub hsm_partition_ref: String,       // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub region: RegionRef,
+    pub residency_class: ResidencyClass,
+    pub az: String,
+    pub cell_id: String,
+    pub tier: CellTier,
+    pub hsm_partition_ref: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellBinding {
-    pub tenant_id: String,                           // data_class: INTERNAL_ONLY
-    pub region: String,                              // data_class: INTERNAL_ONLY
-    pub region_ref: Classified<RegionRef>,           // data_class: INTERNAL_ONLY
-    pub residency_class: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub az: Classified<String>,                      // data_class: INTERNAL_ONLY
-    pub cell_id: Classified<String>,                 // data_class: INTERNAL_ONLY
-    pub tier: Classified<CellTier>,                  // data_class: INTERNAL_ONLY
-    pub hsm_partition_ref: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,             // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub region: String,
+    pub region_ref: Classified<RegionRef>,
+    pub residency_class: Classified<ResidencyClass>,
+    pub az: Classified<String>,
+    pub cell_id: Classified<String>,
+    pub tier: Classified<CellTier>,
+    pub hsm_partition_ref: Classified<String>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -130,9 +130,6 @@ fn internal<T>(value: T) -> Classified<T> {
 }
 
 fn internal_data_class() -> PrivacyDataClass {
-    // ADR-0083 Tier 1: use the infallible kernel constructor; the previous
-    // `.expect()` proved a statically known invariant that the kernel now
-    // encodes at the type level.
     PrivacyDataClass::internal_only()
 }
 

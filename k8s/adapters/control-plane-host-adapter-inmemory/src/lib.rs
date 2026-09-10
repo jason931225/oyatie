@@ -1,19 +1,5 @@
-//! Deterministic in-memory [`ControlPlaneProvisioning`] adapter (ADR-0376).
-//!
-//! This is the reference adapter for tests and single-node bring-up. It holds a
-//! [`BTreeMap`] of provisioned control planes keyed by their adapter-issued
-//! handle and advances each through the kernel
-//! [`ControlPlaneStatus`](k8s_control_plane_host_kernel::ControlPlaneStatus)
-//! state machine for BOTH tiers — no kube-rs, no network. `provision` walks the
-//! tier-determined branch (`requested -> datastore_bound | media_formed ->
-//! provisioning -> endpoint_ready -> active`) deterministically so an acceptance
-//! test sees a fully-`active` control plane; `teardown` walks
-//! `active -> draining -> deleted` and is idempotent.
-//!
-//! ## Layering invariant
-//!
-//! Path-deps inward on the api port + kernel only. The kube-rs dependency lives
-//! exclusively in the sibling `...-adapter-capi` crate (ADR-0376), never here.
+//! Deterministic in-memory [`ControlPlaneProvisioning`] adapter for tests and
+//! single-node bring-up.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
@@ -27,25 +13,20 @@ use k8s_control_plane_host_api::{
 };
 use k8s_control_plane_host_kernel::{ControlPlaneStatus, ControlPlaneTier};
 
-/// One stored control-plane record in the fake.
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Record {
-    cluster_ref: ClusterRef,    // data_class: TENANT_SCOPED
-    tier: ControlPlaneTier,     // data_class: TENANT_SCOPED
-    status: ControlPlaneStatus, // data_class: TENANT_SCOPED
-    endpoint: Option<String>,   // data_class: TENANT_SCOPED
+    cluster_ref: ClusterRef,
+    tier: ControlPlaneTier,
+    status: ControlPlaneStatus,
+    endpoint: Option<String>,
 }
 
-/// In-memory [`ControlPlaneProvisioning`] adapter. Cloneable handles share one
-/// backing store via an `Arc`-free interior `Mutex` (callers wrap it in `Arc`
-/// at the composition root, matching the other reference adapters).
 #[derive(Debug, Default)]
 pub struct InMemoryControlPlaneHost {
-    records: Mutex<BTreeMap<String, Record>>, // keyed by handle; data_class: TENANT_SCOPED
+    records: Mutex<BTreeMap<String, Record>>, // keyed by handle
 }
 
 impl InMemoryControlPlaneHost {
-    /// Build an empty in-memory host.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -68,16 +49,27 @@ impl InMemoryControlPlaneHost {
         format!("https://{handle}.control-plane.invalid:6443")
     }
 
-    /// Number of control planes currently tracked.
     #[must_use]
     pub fn len(&self) -> usize {
         self.records.lock().map(|guard| guard.len()).unwrap_or(0)
     }
 
-    /// Whether no control planes are tracked.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    fn walk_to_active(tier: ControlPlaneTier) -> Result<ControlPlaneStatus, ProvisioningError> {
+        let mut status = ControlPlaneStatus::initial();
+        for next in [
+            ControlPlaneStatus::next_after_request(tier),
+            ControlPlaneStatus::Provisioning,
+            ControlPlaneStatus::EndpointReady,
+            ControlPlaneStatus::Active,
+        ] {
+            status = status.transition(next)?;
+        }
+        Ok(status)
     }
 }
 
@@ -93,21 +85,7 @@ impl ControlPlaneProvisioning for InMemoryControlPlaneHost {
                 });
             }
             let handle = Self::handle_for(&request.cluster_ref, request.tier);
-
-            // Walk the tier-determined branch through to `active`, validating
-            // every hop against the kernel state machine (so the fake can never
-            // record an illegal status).
-            let mut status = ControlPlaneStatus::initial();
-            let branch = ControlPlaneStatus::next_after_request(request.tier);
-            for next in [
-                branch,
-                ControlPlaneStatus::Provisioning,
-                ControlPlaneStatus::EndpointReady,
-                ControlPlaneStatus::Active,
-            ] {
-                status = status.transition(next)?;
-            }
-
+            let status = Self::walk_to_active(request.tier)?;
             let record = Record {
                 cluster_ref: request.cluster_ref.clone(),
                 tier: request.tier,
@@ -167,7 +145,6 @@ impl ControlPlaneProvisioning for InMemoryControlPlaneHost {
             if record.status.is_terminal() {
                 return Ok(());
             }
-            // Walk active -> draining -> deleted, validating each hop.
             for next in [ControlPlaneStatus::Draining, ControlPlaneStatus::Deleted] {
                 record.status = record.status.transition(next)?;
             }
@@ -230,7 +207,6 @@ mod tests {
             host.status(&cp).await.unwrap().status,
             ControlPlaneStatus::Deleted
         );
-        // Second teardown is a no-op success.
         host.teardown(&cp).await.unwrap();
     }
 

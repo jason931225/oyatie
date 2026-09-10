@@ -1,33 +1,13 @@
-//! Cloud cell lifecycle state machine (P18-cloud-tenancy merge-variant delta-1).
-//!
-//! Implements the `CellState` FSM from IP-001-cloud-tenancy-kernel-scaffold:
-//! `Creating → Active → Draining → Decommissioned`.
-//! Decommissioned is a terminal state — re-activation is not permitted.
-//! No I/O; no framework deps; pure kernel primitives.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Cloud cell lifecycle state machine.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub const CELL_LIFECYCLE_SCHEMA_VERSION: u32 = 1;
 
-/// Lifecycle state of an infrastructure cell.
-///
-/// Transitions allowed:
-/// - `Creating  → Active`
-/// - `Active    → Draining`
-/// - `Draining  → Decommissioned`
-///
-/// `Decommissioned` is **terminal**: no further transitions are accepted.
-/// Any other pair is rejected with [`CellLifecycleError::InvalidTransition`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum CellState {
-    /// Cell is being provisioned; no tenants may be placed yet.
     Creating,
-    /// Cell is fully operational and accepts new tenant placements.
     Active,
-    /// Cell is winding down; existing tenants drain, no new placements allowed.
     Draining,
-    /// Cell has been permanently decommissioned. Terminal state.
     Decommissioned,
 }
 
@@ -42,38 +22,28 @@ impl CellState {
         }
     }
 
-    /// Returns `true` if new tenant placements are permitted in this state.
     pub fn accepts_new_tenants(self) -> bool {
         matches!(self, Self::Active)
     }
 }
 
-/// Command that drives a cell through its lifecycle.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CellLifecycleCommand {
-    /// Confirm that provisioning completed; move `Creating → Active`.
     Activate,
-    /// Begin draining; move `Active → Draining`.
     Drain,
-    /// Confirm decommission; move `Draining → Decommissioned`.
     Decommission,
 }
 
-/// Errors produced by lifecycle guard logic.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CellLifecycleError {
-    /// The requested transition is not permitted from the current state.
     InvalidTransition {
         from: CellState,
         command: CellLifecycleCommand,
     },
-    /// Attempted to activate a cell that has already been decommissioned.
-    /// Halt condition per IP-001 §Halt Conditions #2.
     ReactivationOfDecommissionedCell,
 }
 
 impl CellLifecycleError {
-    /// Human-readable description for logs and audit rows.
     pub fn message(&self) -> String {
         match self {
             Self::InvalidTransition { from, command } => format!(
@@ -88,14 +58,10 @@ impl CellLifecycleError {
     }
 }
 
-/// Apply `command` to `current` state, returning the next state on success.
-///
-/// Enforces halt condition: `Decommissioned` cells can never be reactivated.
 pub fn apply_lifecycle_command(
     current: CellState,
     command: CellLifecycleCommand,
 ) -> Result<CellState, CellLifecycleError> {
-    // Halt condition #2: decommissioned is terminal regardless of command.
     if current == CellState::Decommissioned {
         return Err(CellLifecycleError::ReactivationOfDecommissionedCell);
     }
@@ -114,8 +80,6 @@ pub fn apply_lifecycle_command(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // --- happy-path transitions ---
 
     #[test]
     fn creating_to_active_via_activate() {
@@ -152,8 +116,6 @@ mod tests {
         assert_eq!(s3, CellState::Decommissioned);
     }
 
-    // --- terminal-state guard (halt condition #2) ---
-
     #[test]
     fn decommissioned_rejects_activate() {
         assert_eq!(
@@ -180,8 +142,6 @@ mod tests {
             Err(CellLifecycleError::ReactivationOfDecommissionedCell)
         );
     }
-
-    // --- invalid forward/skip transitions ---
 
     #[test]
     fn creating_rejects_drain() {
@@ -248,8 +208,6 @@ mod tests {
             })
         ));
     }
-
-    // --- semantic guards ---
 
     #[test]
     fn only_active_accepts_new_tenants() {
