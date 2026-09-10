@@ -1,7 +1,3 @@
-# Shared dependency sets. The spine's test targets nearly all take the
-# same five edges; naming them once keeps this file inside the 300-line
-# budget as the suite grows, and makes a genuine deviation visible as a
-# deviation rather than as one more repeated block.
 SPINE_CRATE_DEPS = [
     "//app/foundry/core/edits:foundry-edits",
     "//app/foundry/ports/draft/records:foundry-records-draft",
@@ -265,9 +261,6 @@ rust_test(
     deps = SPINE_TEST_DEPS + ["//app/foundry/ports/draft/projection:foundry-projection-draft"],
 )
 
-# The only target holding `store == fold(log)` against the DURABLE
-# adapter rather than a second in-memory store, so it carries the
-# spine's one test edge to a projection adapter.
 rust_test(
     name = "foundry-spine-durable-projection-rebuild",
     srcs = ["tests/catchup_support/mod.rs", "tests/durable_projection_rebuild.rs"],

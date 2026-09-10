@@ -159,9 +159,12 @@ mod tests {
 
     #[test]
     fn every_wire_class_converts_and_recovers_its_own_label() {
+        let mut round_tripped = 0;
         for label in every_wire_data_class() {
             let kernel = data_class(label).expect("wire class has a kernel carrier");
             assert_eq!(wire_label(&kernel), Some(label));
+            round_tripped += 1;
         }
+        assert_eq!(round_tripped, PRIVACY_PROGRAM_DATA_CLASS_LABELS.len());
     }
 }

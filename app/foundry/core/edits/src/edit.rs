@@ -7,18 +7,21 @@
 
 use crate::property::WireProperty;
 
-const ENTITY_TYPE_ID_PREFIX: &str = "ety_";
-const LINK_TYPE_ID_PREFIX: &str = "lty_";
-const TARGET_ENTITY_ID_PREFIX: &str = "ent_";
+/// The prefix every entity type id an edit names must carry.
+pub const ENTITY_TYPE_ID_PREFIX: &str = "ety_";
+/// The prefix every link type id an edit names must carry.
+pub const LINK_TYPE_ID_PREFIX: &str = "lty_";
+/// The prefix every link target entity id must carry.
+pub const TARGET_ENTITY_ID_PREFIX: &str = "ent_";
 
 /// Why an edit or edit set was refused at construction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EditError {
-    /// Not `ENTITY_TYPE_ID_PREFIX`-prefixed, trimmed, and non-blank.
+    /// Not [`ENTITY_TYPE_ID_PREFIX`]-prefixed, trimmed, and non-blank.
     InvalidEntityTypeId,
-    /// Not `LINK_TYPE_ID_PREFIX`-prefixed, trimmed, and non-blank.
+    /// Not [`LINK_TYPE_ID_PREFIX`]-prefixed, trimmed, and non-blank.
     InvalidLinkTypeId,
-    /// Not `TARGET_ENTITY_ID_PREFIX`-prefixed, trimmed, and non-blank.
+    /// Not [`TARGET_ENTITY_ID_PREFIX`]-prefixed, trimmed, and non-blank.
     InvalidTargetEntityId,
     /// An edit set must carry at least one edit.
     EmptyEditSet,
