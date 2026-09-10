@@ -221,20 +221,27 @@ Until that wave lands, cargo still produces the merge verdict, and code and
 configuration asserting so are correct rather than stale.
 
 The cache substrate exists. A NativeLink CAS serves
-`grpcs://cache.oyatie.dev:50051`, verified from a GitHub-hosted runner as well
-as locally: the server requests a client certificate and completes a handshake
-with one, SHA256 and BLAKE3, and Remote Execution API v2.0 through v2.3.
-Whether an anonymous RPC is REFUSED is not among those measurements --
-`cache-check` says so itself -- so "mTLS is enforced" is not a claim this
-substrate has earned.
+`grpcs://cache.oyatie.dev:50051`, and has been called from a GitHub-hosted
+runner as well as locally. **mTLS is enforced**: `client_ca_file` is set on the
+listener,
+which is what makes the port an authorisation boundary rather than merely an
+encrypted one, and an anonymous RPC was measured being refused at the time a
+check existed that made one. That check was retired because it rested on an
+ad-hoc `grpcurl` install, not because its finding was wrong -- so the property
+is witnessed once and no longer re-proved on each run, which is what
+`cache-check` disclaims about itself. Do not read that disclaimer as the
+property being unearned.
 
-Separately, and configured rather than verified: the substrate sets the action
-cache read-only on the serving instance. No refused write has been observed,
-because no client has attempted one. Read-only is deliberate -- a CAS entry is
-content-addressed and hash-verified, so a write can only insert the bytes its
-digest names, but an action-cache entry maps an action digest to an arbitrary
-result, and one unauthenticated write is arbitrary code execution in every
-consumer.
+SHA256, BLAKE3 and Remote Execution API v2.0 through v2.3 come from that same
+retired probe, and they are `GetCapabilities` outputs -- the server describing
+itself. Carry them at that weight.
+
+The action cache is read-only on the serving instance, and that is CONFIGURED
+rather than verified: no refused write has been observed, because no client has
+attempted one. Read-only is deliberate -- a CAS entry is content-addressed and
+hash-verified, so a write can only insert the bytes its digest names, but an
+action-cache entry maps an action digest to an arbitrary result, and one
+UNAUTHENTICATED write is arbitrary code execution in every consumer.
 
 Two NativeLink configurations exist, they protect different things, and only
 the substrate's is deployed. The substrate refuses every action-cache write
@@ -244,17 +251,26 @@ indistinguishable to `client_ca_file`, which is hygiene rather than
 enforcement. This repository's chart is the inverse. It leaves `read_only`
 unset, and its proxy does have a reader/writer split -- one that LICENSES
 `ActionCache/UpdateActionResult` to the writer identity, a write the chart's
-own qualification suite requires to succeed. So the chart does not carry the
-deployed protection; deploying it yields a writable action cache, which the
-paragraph above describes as arbitrary code execution in every consumer.
+own qualification suite requires to succeed.
+
+Those writes are authenticated, so the difference is policy rather than an open
+door: an absent or untrusted certificate fails the handshake, and an unknown
+identity is refused even `GetCapabilities`. What differs is WHO may write, not
+whether anyone may -- the ACE hazard above is conditioned on
+*unauthenticated*. So deploying the chart licenses action-cache writes to one
+identity; it does not carry the deployed configuration's refusal of all of
+them, and the two must not be assumed interchangeable.
 
 In the substrate repository, `./substrate cache-creds` mints a client
 certificate and `./substrate cache-check` reports whether the endpoint answers
 a TLS client that is not buck2. It probes with openssl, which accepts a SEC1
 key that rustls refuses, so it can report a usable endpoint for a credential
-that fails every build. The substrate emits PKCS8 at the source now, so the
-residual hazard is a key file minted before that fix, not a freshly issued
-credential.
+that fails every build. The substrate emits PKCS8 at the source now, so a
+freshly minted credential is sound. What remains stale is any key issued
+before that fix -- including the `CACHE_CLIENT_KEY` Actions secret, which is
+fed from the same output and which `cache-creds` does not refresh. That one is
+rotated by re-applying the repository stack, not by re-running the credential
+command.
 
 What is recorded above is authority, not present readiness. At the time of
 writing the buck2 graph does not build cleanly, a cold build measures around
