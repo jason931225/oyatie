@@ -112,6 +112,9 @@ fn a_generic_implementation_header_names_its_trait() {
         "impl<'a, T: for<'b> Fn(&'b T)> CellStore<T> for Adapter<'a, T> {}\n",
     );
     assert!(refusals(&[port, adapter]).is_empty());
+
+    let keyed = "pub trait CellStore<K> {}\nimpl CellStore<crate::Key> for Postgres {}\n";
+    assert!(refusals(&[added(PORT, keyed)]).is_empty());
 }
 
 #[test]
@@ -237,17 +240,15 @@ fn a_return_arrow_does_not_close_an_inline_generic_list() {
 }
 
 #[test]
-fn a_bound_naming_another_crates_trait_does_not_forward() {
-    let port = added(PORT, "pub trait Write {}\n");
-    let adapter = added(ADAPTER, "impl<W: std::io::Write> Write for LogSink<W> {}\n");
-    assert!(refusals(&[port, adapter]).is_empty());
-
-    let service = added(PORT, "pub trait Service {}\n");
-    let tower = added(
-        ADAPTER,
-        "impl<S> Service for TowerAdapter<S>\nwhere\n    S: tower::Service<Request>,\n{\n}\n",
-    );
-    assert!(refusals(&[service, tower]).is_empty());
+fn a_bound_under_a_standard_library_root_does_not_forward() {
+    for port in [
+        "pub trait Write {}\nimpl<W: std::io::Write> Write for LogSink<W> {}\n",
+        "pub trait Write {}\nimpl<W:std::io::Write> Write for LogSink<W> {}\n",
+        "pub trait Debug {}\nimpl<T> Debug for Wrap<T>\nwhere\n    T: core::fmt::Debug,\n{\n}\n",
+        "pub trait Rc {}\nimpl<T: alloc::rc::Rc> Rc for Wrap<T> {}\n",
+    ] {
+        assert!(refusals(&[added(PORT, port)]).is_empty(), "{port:?}");
+    }
 }
 
 #[test]
@@ -273,24 +274,26 @@ fn a_stub_word_inside_a_body_on_the_header_line_is_not_the_target() {
 }
 
 #[test]
-fn a_mention_rooted_at_this_crate_forwards_like_a_bare_one() {
+fn a_mention_under_any_root_this_repository_could_define_forwards() {
     for port in [
         "pub trait CellStore {}\nimpl CellStore for Arc<dyn crate::CellStore + Send> {}\n",
         "pub trait CellStore {}\nimpl<T: crate::CellStore + ?Sized> CellStore for Arc<T> {}\n",
         "pub trait CellStore {}\nimpl<T: crate::store::CellStore + ?Sized> CellStore for Arc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: store::CellStore + ?Sized> CellStore for Arc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: s::CellStore> CellStore for Box<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: ports::CellStore> CellStore for Box<T> {}\n",
+        "pub trait CellStore {}\nimpl<T> CellStore for Arc<T>\nwhere\n    T: store::CellStore,\n{\n}\n",
+        "pub trait CellStore {}\nimpl CellStore for Arc<dyn store::CellStore + Send> {}\n",
         "pub trait CellStore {}\nimpl<T: super::CellStore> super::CellStore for Box<T> {}\n",
         "pub trait CellStore {}\nimpl<T: self::CellStore> self::CellStore for Rc<T> {}\n",
         "pub trait CellStore {}\nimpl<T> CellStore for Arc<T>\nwhere\n    T: crate::CellStore + ?Sized,\n{\n}\n",
         "pub trait CellStore {}\nimpl<T:CellStore> CellStore for Arc<T> {}\n",
-    ] {
-        assert_eq!(refusals(&[added(PORT, port)]).len(), 1, "{port:?}");
-    }
-
-    for port in [
-        "pub trait Write {}\nimpl<W: std::io::Write> Write for LogSink<W> {}\n",
         "pub trait CellStore {}\nimpl<T: mycrate::CellStore> CellStore for Arc<T> {}\n",
         "pub trait CellStore {}\nimpl<T: my_crate::CellStore> CellStore for Arc<T> {}\n",
+        "pub trait Service {}\nimpl<S> Service for TowerAdapter<S>\nwhere\n    S: tower::Service<Request>,\n{\n}\n",
+        "pub trait Write {}\nimpl<W: my_std::io::Write> Write for LogSink<W> {}\n",
+        "pub trait Cell_Store {}\nimpl<T: Cell_Store> Cell_Store for Arc<T> {}\n",
     ] {
-        assert!(refusals(&[added(PORT, port)]).is_empty(), "{port:?}");
+        assert_eq!(refusals(&[added(PORT, port)]).len(), 1, "{port:?}");
     }
 }
