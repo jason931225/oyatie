@@ -3,30 +3,21 @@
 use crate::error::{Error, Result};
 use core::fmt;
 
-/// A platform Talos can run on. Determines how config and network metadata are
-/// discovered at boot.
+/// Where the node runs, which decides how it discovers its config and network
+/// metadata at boot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Platform {
-    /// Bare-metal install.
     Metal,
-    /// Amazon Web Services.
     Aws,
-    /// Google Cloud Platform.
     Gcp,
-    /// Microsoft Azure.
     Azure,
-    /// QEMU/KVM virtual machine.
     Qemu,
-    /// `VMware` vSphere.
     VMware,
-    /// A container (Docker/sidero) runtime.
     Container,
-    /// Unknown / unrecognized platform.
     Unknown,
 }
 
 impl Platform {
-    /// Canonical lowercase platform name used by Talos.
     pub fn as_str(self) -> &'static str {
         match self {
             Platform::Metal => "metal",
@@ -40,7 +31,7 @@ impl Platform {
         }
     }
 
-    /// Parse a platform from its canonical name.
+    /// The second spelling in an arm is an accepted alias, not a typo.
     pub fn parse(s: &str) -> Result<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "metal" | "bare-metal" => Ok(Platform::Metal),
@@ -55,14 +46,13 @@ impl Platform {
         }
     }
 
-    /// Whether this platform is a cloud provider (has an instance metadata
-    /// service used for config discovery).
+    /// Cloud means: config is discoverable from an instance metadata service.
     pub fn is_cloud(self) -> bool {
         matches!(self, Platform::Aws | Platform::Gcp | Platform::Azure)
     }
 
-    /// Whether config is normally delivered via a virtual block device / ISO
-    /// rather than a metadata endpoint.
+    /// The complement of [`Platform::is_cloud`] for every known platform:
+    /// config arrives on a block device or ISO instead.
     pub fn uses_local_config(self) -> bool {
         matches!(
             self,

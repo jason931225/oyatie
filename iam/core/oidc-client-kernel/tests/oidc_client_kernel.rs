@@ -1,11 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-//! Integration tests for `shared-oidc-client-kernel`.
-//!
-//! These tests use a deterministic stub `JwsVerifier` (no live signature
-//! check) so we can isolate header/payload/issuer/audience/expiry/ACR
-//! validation logic. A production deployment wires a real verifier
-//! (ring/aws-lc-rs/HSM); that integration is tested in the adapter crate,
-//! not here.
+//! A stub `JwsVerifier` isolates the header, issuer, audience, expiry and ACR
+//! checks from signature verification. Real-crypto coverage lives in the
+//! adapter crate, so nothing here proves a signature is ever checked.
 
 use serde_json::json;
 use shared_oidc_client_kernel::{
@@ -13,7 +9,8 @@ use shared_oidc_client_kernel::{
     ReferenceOidcVerifier, VerifyConfig, b64url_encode,
 };
 
-/// Stub verifier that accepts everything except `kid == "broken"`.
+/// Accepts every signature except under `kid == "broken"`, which is the only
+/// way a test here can force a verification failure.
 struct StubVerifier;
 impl JwsVerifier for StubVerifier {
     fn verify(
@@ -176,7 +173,7 @@ fn accepts_audience_array_when_match_present() {
 fn rejects_expired_token_outside_skew() {
     let verifier = ReferenceOidcVerifier::new(mk_jwks(), StubVerifier);
     let token = forge_token("k1", valid_claims_json());
-    // exp=1_700_000_900, skew=60, now=1_700_001_000 → expired by 100s.
+    // 100s past exp, which is beyond the 60s skew allowance.
     let err = verifier
         .verify(&token, &default_cfg(1_700_001_000))
         .unwrap_err();
@@ -187,7 +184,7 @@ fn rejects_expired_token_outside_skew() {
 fn accepts_just_expired_within_skew() {
     let verifier = ReferenceOidcVerifier::new(mk_jwks(), StubVerifier);
     let token = forge_token("k1", valid_claims_json());
-    // exp=1_700_000_900, skew=60, now=1_700_000_950 → 50s past exp; within skew.
+    // 50s past exp, which the 60s skew allowance still covers.
     verifier
         .verify(&token, &default_cfg(1_700_000_950))
         .expect("within skew should pass");
@@ -262,9 +259,11 @@ fn b64url_round_trip() {
 
 #[test]
 fn rejects_disallowed_alg_hs256() {
-    // HS256 (symmetric) is forbidden for RP verification per RFC 8725 BCP §3.1.
+    // A symmetric alg lets anyone holding the verification key also mint
+    // tokens, so an RP must refuse it (RFC 8725 §3.1).
     let mut verifier = ReferenceOidcVerifier::new(mk_jwks(), StubVerifier);
-    // The default `allowed_algs` excludes HS256; reaffirm.
+    // Set explicitly rather than relying on the default, so this stays a test
+    // of the rejection and not of the default list.
     verifier.allowed_algs = vec!["RS256".to_owned(), "ES256".to_owned()];
     let header = JwtHeader {
         alg: "HS256".into(),

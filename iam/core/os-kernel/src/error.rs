@@ -3,65 +3,49 @@
 use alloc::string::String;
 use core::fmt;
 
-/// The workspace-wide [`Result`] alias.
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// The crate-wide error enum used across the OS.
-///
-/// Subsystems either use these variants directly or wrap their own richer error
-/// types and convert into [`Error`] at the crate boundary.
+/// A subsystem either uses these variants directly or converts its own richer
+/// error into one at the crate boundary. The `Display` arms carry the message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    /// A value failed validation (out of range, malformed, empty, etc.).
     Invalid(String),
-    /// A required resource, field, or service was not found.
     NotFound(String),
-    /// The operation is not permitted for the current role / context.
     PermissionDenied(String),
-    /// A precondition for a state transition was not met.
     InvalidState(String),
-    /// Parsing structured input (version, address, config) failed.
     Parse(String),
-    /// An operation timed out.
     Timeout,
-    /// A feature or platform is not supported.
     Unsupported(String),
-    /// Catch-all for an otherwise uncategorized failure.
+    /// Uncategorized. Prefer a variant above wherever one fits.
     Other(String),
 }
 
 impl Error {
-    /// Construct an [`Error::Invalid`] from anything string-like.
     pub fn invalid(msg: impl Into<String>) -> Self {
         Error::Invalid(msg.into())
     }
 
-    /// Construct an [`Error::NotFound`].
     pub fn not_found(msg: impl Into<String>) -> Self {
         Error::NotFound(msg.into())
     }
 
-    /// Construct an [`Error::PermissionDenied`].
     pub fn permission_denied(msg: impl Into<String>) -> Self {
         Error::PermissionDenied(msg.into())
     }
 
-    /// Construct an [`Error::InvalidState`].
     pub fn invalid_state(msg: impl Into<String>) -> Self {
         Error::InvalidState(msg.into())
     }
 
-    /// Construct an [`Error::Parse`].
     pub fn parse(msg: impl Into<String>) -> Self {
         Error::Parse(msg.into())
     }
 
-    /// Construct an [`Error::Unsupported`].
     pub fn unsupported(msg: impl Into<String>) -> Self {
         Error::Unsupported(msg.into())
     }
 
-    /// Returns a short, stable kind string useful for matching/logging.
+    /// Stable across releases: callers and log queries match on it.
     pub fn kind(&self) -> &'static str {
         match self {
             Error::Invalid(_) => "invalid",

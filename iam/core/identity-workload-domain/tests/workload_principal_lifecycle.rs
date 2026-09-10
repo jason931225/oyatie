@@ -1,10 +1,7 @@
-// ADR-0083 Tier 3: integration tests assert invariants with unwrap/expect.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! End-to-end exercise of the pure workload-identity domain kernel: provision a
-//! workload, activate it, attach verified claims and scopes, and assemble a
-//! PARC authorization request. No external dependencies are involved — this is
-//! the deterministic core other crates build on.
+//! End-to-end exercise of the workload-identity domain kernel, from provision
+//! through to an assembled authorization request.
 
 use iam_identity_workload_domain::{
     Action, AuthorizationDecision, AuthorizationRequest, ClaimValue, Effect, Resource,

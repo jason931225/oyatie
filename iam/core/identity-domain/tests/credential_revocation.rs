@@ -1,5 +1,3 @@
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` /
-// `.expect_err()` / `.unwrap_err()` to assert invariants — Tier 3 exemption.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use data_boundary_kernel::Purpose;
@@ -8,8 +6,6 @@ use iam_identity_domain::{
     RevocationLedger, RevocationReason, UnknownRevocationReason, issue_credential, issue_token,
     token_fingerprint,
 };
-
-// ── RevocationReason wire round-trip (edge case 9) ───────────────────────────
 
 #[test]
 fn revocation_reason_wire_round_trip_via_public_re_export() {
@@ -30,8 +26,6 @@ fn unknown_revocation_reason_rejects_unknown_and_empty() {
     assert!(msg.contains("compromised"));
 }
 
-// ── CredentialStatus::is_valid (edge case 11) ────────────────────────────────
-
 #[test]
 fn credential_status_is_valid_only_for_active() {
     assert!(CredentialStatus::Active.is_valid());
@@ -41,11 +35,8 @@ fn credential_status_is_valid_only_for_active() {
     }
 }
 
-// ── Token path: issue_token + token_fingerprint + revoke + evaluate_token ────
-
 #[test]
 fn token_path_full_deny_precedence_proof() {
-    // issue a token with a 900s TTL starting at t=1000, expires at t=1900
     let token = issue_token(
         "ten_alpha".into(),
         "usr_admin".into(),
@@ -63,24 +54,22 @@ fn token_path_full_deny_precedence_proof() {
 
     let mut ledger = RevocationLedger::new("ten_alpha").unwrap();
 
-    // Before revocation: active within TTL (edge case 2)
     assert_eq!(
         ledger.evaluate_token(&token, 1_899).unwrap(),
         CredentialStatus::Active
     );
 
-    // Boundary: now == expires_at -> Expired (edge case 1)
+    // Exactly at expiry, not past it: the boundary is exclusive.
     assert_eq!(
         ledger.evaluate_token(&token, 1_900).unwrap(),
         CredentialStatus::Expired
     );
 
-    // Revoke the token
     ledger
         .revoke(fp.clone(), RevocationReason::Compromised)
         .expect("first revoke must succeed");
 
-    // Revoked + now < expires_at -> Revoked (deny-precedence, edge case 3)
+    // Revocation outranks a still-valid TTL.
     let status = ledger.evaluate_token(&token, 1_500).unwrap();
     assert_eq!(
         status,
@@ -88,7 +77,7 @@ fn token_path_full_deny_precedence_proof() {
     );
     assert!(!status.is_valid(), "revoked credential must not be valid");
 
-    // Revoked + now >= expires_at -> Revoked (revocation outranks expiry, edge case 4)
+    // Revocation outranks expiry too: the status stays Revoked, not Expired.
     let status = ledger.evaluate_token(&token, 2_000).unwrap();
     assert_eq!(
         status,
@@ -96,8 +85,6 @@ fn token_path_full_deny_precedence_proof() {
     );
     assert!(!status.is_valid());
 }
-
-// ── token_fingerprint determinism (edge case 10) ─────────────────────────────
 
 #[test]
 fn token_fingerprint_is_deterministic_and_tok1_prefixed() {
@@ -119,8 +106,6 @@ fn token_fingerprint_is_deterministic_and_tok1_prefixed() {
     );
 }
 
-// ── StsCredential path: full deny-precedence proof ───────────────────────────
-
 fn make_sts(tenant: &str, issued: u64, ttl: u64) -> iam_identity_domain::StsCredential {
     let principal = Principal::human(tenant.into(), "usr_admin".into()).unwrap();
     issue_credential(CredentialRequest {
@@ -136,7 +121,6 @@ fn make_sts(tenant: &str, issued: u64, ttl: u64) -> iam_identity_domain::StsCred
 
 #[test]
 fn sts_path_revoked_but_live_reports_revoked_and_is_valid_false() {
-    // STS credential issued at t=1000, TTL=900, expires at t=1900
     let cred = make_sts("ten_alpha", 1_000, 900);
     let fp = cred.token_fingerprint.value.clone();
     assert!(
@@ -149,7 +133,7 @@ fn sts_path_revoked_but_live_reports_revoked_and_is_valid_false() {
         .revoke(fp, RevocationReason::PrincipalDeprovisioned)
         .expect("revoke must succeed");
 
-    // Revoked while still within TTL -> Revoked (deny-precedence)
+    // Revocation outranks a still-valid TTL.
     let status = ledger.evaluate_sts(&cred, 1_500).unwrap();
     assert_eq!(
         status,
@@ -180,8 +164,6 @@ fn sts_path_expired_at_boundary() {
     );
 }
 
-// ── Cross-tenant fail-closed (edge case 5) ───────────────────────────────────
-
 #[test]
 fn cross_tenant_token_is_tenant_mismatch_fail_closed() {
     let token = issue_token(
@@ -209,11 +191,8 @@ fn cross_tenant_sts_is_tenant_mismatch_fail_closed() {
     );
 }
 
-// ── Ledger idempotency + conflict (edge cases 6, 7, 8) ───────────────────────
-
 #[test]
 fn ledger_same_reason_revoke_is_idempotent() {
-    // edge case 6
     let mut ledger = RevocationLedger::new("ten_alpha").unwrap();
     ledger
         .revoke("fp_abc", RevocationReason::Superseded)
@@ -226,7 +205,6 @@ fn ledger_same_reason_revoke_is_idempotent() {
 
 #[test]
 fn ledger_conflicting_reason_returns_error_and_preserves_original() {
-    // edge case 7
     let mut ledger = RevocationLedger::new("ten_alpha").unwrap();
     ledger
         .revoke("fp_abc", RevocationReason::Compromised)
@@ -244,7 +222,6 @@ fn ledger_conflicting_reason_returns_error_and_preserves_original() {
 
 #[test]
 fn ledger_empty_fingerprint_returns_empty_fingerprint_error() {
-    // edge case 8
     let mut ledger = RevocationLedger::new("ten_alpha").unwrap();
     assert_eq!(
         ledger.revoke("", RevocationReason::Compromised),

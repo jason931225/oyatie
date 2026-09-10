@@ -1,61 +1,40 @@
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-//! HR employee lifecycle status value object.
+//! HR employee lifecycle status.
 //!
-//! This type is the merge-variant landing of the `employee_status`
-//! contract from `.omc/plans/milestones/M07-first-tenant/phases/P01-hr/
-//! impl-plan.md` (Concrete File Targets: `hr.employees` DDL column
-//! `status hr.employee_status`) into the existing `identity-domain`
-//! crate (merge-variant execution per user directive 2026-05-17,
-//! `execution_variant: merge-into-existing-crates`). It is additive —
-//! existing types (`UserId`, `User`, `Principal`, `Token`, `StsCredential`,
-//! `EmploymentClassification`) are unchanged.
-//!
-//! The three variants map exactly to the `hr.employee_status` Postgres ENUM
-//! defined in the P01-hr DDL (`'active' | 'terminated' | 'on_leave'`).
-//! Round-trip via [`EmployeeStatus::from_wire`] / [`EmployeeStatus::as_str`].
-//!
-//! Statute: 대한민국.노동.근로기준법 §17 (record retention 3yr), §42
-//! (ADR-0126 / Bominal ADR-0125 domain naming canon)
+//! Statute: 대한민국.노동.근로기준법 §17, §42.
 
 use std::fmt;
 
-/// Three-state employee lifecycle status per the P01-hr HR µservice schema.
-///
-/// Each variant's [`as_str`](EmployeeStatus::as_str) value is the wire/SQL
-/// string that appears in the `hr.employees.status` column (see
-/// `migrations/hr/001_hr_schema.sql`). Round-trip via
-/// [`EmployeeStatus::from_wire`].
+/// Employee lifecycle status. [`EmployeeStatus::as_str`] is the SQL wire form
+/// stored in `hr.employees.status`, and it is a frozen contract: renaming one
+/// orphans every row already written under the old spelling.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum EmployeeStatus {
-    /// 재직중 — employee is currently active
     Active,
-    /// 퇴직 — employment has been terminated
     Terminated,
-    /// 휴직중 — employee is on approved leave
     OnLeave,
 }
 
-/// Error returned when a raw string does not match any [`EmployeeStatus`] variant.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UnknownEmployeeStatus(pub String);
 
 impl fmt::Display for UnknownEmployeeStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "unknown employee status: {:?}; expected one of active|terminated|on_leave",
-            self.0
-        )
+        write!(f, "unknown employee status: {:?}; expected one of ", self.0)?;
+        for (index, accepted) in EmployeeStatus::ALL.iter().enumerate() {
+            if index > 0 {
+                f.write_str("|")?;
+            }
+            f.write_str(accepted.as_str())?;
+        }
+        Ok(())
     }
 }
 
 impl std::error::Error for UnknownEmployeeStatus {}
 
 impl EmployeeStatus {
-    /// Returns the canonical SQL wire string used in the `hr.employees.status` column.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Active => "active",
@@ -64,7 +43,6 @@ impl EmployeeStatus {
         }
     }
 
-    /// Parse from the SQL wire string.
     pub fn from_wire(s: &str) -> Result<Self, UnknownEmployeeStatus> {
         match s {
             "active" => Ok(Self::Active),
@@ -74,7 +52,6 @@ impl EmployeeStatus {
         }
     }
 
-    /// Returns the Korean display label for this status.
     pub const fn as_korean(self) -> &'static str {
         match self {
             Self::Active => "재직중",
@@ -83,15 +60,12 @@ impl EmployeeStatus {
         }
     }
 
-    /// `true` iff the employee may accrue leave or hold active employment terms.
-    ///
-    /// Terminated employees cannot; OnLeave employees retain accrual rights
-    /// per 근로기준법 §60.
+    /// 근로기준법 §60: leave keeps accruing through an approved absence, so
+    /// only termination stops it.
     pub const fn is_leave_accrual_eligible(self) -> bool {
         !matches!(self, Self::Terminated)
     }
 
-    /// All 3 variants in DDL declaration order (`active`, `terminated`, `on_leave`).
     pub const ALL: [Self; 3] = [Self::Active, Self::Terminated, Self::OnLeave];
 }
 
@@ -106,9 +80,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_three_variants_compile_and_are_distinct() {
+    fn every_variant_in_all_has_a_distinct_wire_string() {
         let all = EmployeeStatus::ALL;
-        assert_eq!(all.len(), 3);
         let mut seen = std::collections::HashSet::new();
         for variant in all {
             assert!(
@@ -179,11 +152,9 @@ mod tests {
     }
 
     #[test]
-    fn wire_strings_match_hr_ddl_enum_values() {
-        // Exhaustively verify the CHECK values from migrations/hr/001_hr_schema.sql
-        // CREATE TYPE hr.employee_status AS ENUM ('active', 'terminated', 'on_leave')
-        let ddl_values = ["active", "terminated", "on_leave"];
-        for wire in ddl_values {
+    fn wire_strings_are_frozen_against_renaming() {
+        let frozen_by_contract = ["active", "terminated", "on_leave"];
+        for wire in frozen_by_contract {
             let parsed = EmployeeStatus::from_wire(wire)
                 .unwrap_or_else(|_| panic!("DDL wire value {wire:?} must parse"));
             assert_eq!(parsed.as_str(), wire, "as_str must be identity for {wire}");

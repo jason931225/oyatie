@@ -5,12 +5,10 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-/// A short content fingerprint, used to deduplicate and version resources.
+/// A short content fingerprint for detecting that a resource changed.
 ///
-/// This is a self-contained, deterministic FNV-1a 64-bit hash rendered as a
-/// fixed-width hex string. It is NOT cryptographically secure — it mirrors the
-/// role of Talos resource "version" fingerprints used to detect change, not to
-/// authenticate.
+/// FNV-1a is NOT cryptographically secure: a fingerprint match must never stand
+/// in for authentication, only for change detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Fingerprint(u64);
 
@@ -18,7 +16,10 @@ impl Fingerprint {
     const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
     const FNV_PRIME: u64 = 0x0100_0000_01b3;
 
-    /// Compute a fingerprint over arbitrary bytes.
+    /// Width of the hex rendering: a `u64` zero-padded to its full extent, so
+    /// every fingerprint string sorts and compares as a fixed-width token.
+    const HEX_LEN: usize = 16;
+
     pub fn of(bytes: &[u8]) -> Self {
         let mut hash = Self::FNV_OFFSET;
         for &b in bytes {
@@ -28,25 +29,24 @@ impl Fingerprint {
         Fingerprint(hash)
     }
 
-    /// Compute a fingerprint over a string.
     pub fn of_str(s: &str) -> Self {
         Self::of(s.as_bytes())
     }
 
-    /// The raw 64-bit value.
     pub fn value(&self) -> u64 {
         self.0
     }
 
-    /// Render as a zero-padded 16-char lowercase hex string.
     pub fn to_hex(&self) -> String {
-        alloc::format!("{:016x}", self.0)
+        alloc::format!("{self}")
     }
 
-    /// Parse a fingerprint from a 16-char hex string.
     pub fn from_hex(s: &str) -> Result<Self> {
-        if s.len() != 16 {
-            return Err(Error::parse("fingerprint hex must be 16 characters"));
+        if s.len() != Self::HEX_LEN {
+            return Err(Error::parse(alloc::format!(
+                "fingerprint hex must be {} characters",
+                Self::HEX_LEN
+            )));
         }
         let v = u64::from_str_radix(s, 16).map_err(|_| Error::parse("invalid fingerprint hex"))?;
         Ok(Fingerprint(v))
@@ -55,23 +55,15 @@ impl Fingerprint {
 
 impl fmt::Display for Fingerprint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:016x}", self.0)
+        write!(f, "{:0width$x}", self.0, width = Fingerprint::HEX_LEN)
     }
 }
 
-/// Trait for components that generate unique identifiers.
-///
-/// Implementations may be monotonic counters, hash-based, or derived from
-/// platform entropy. Kept abstract so subsystems can inject deterministic
-/// generators in tests.
+/// Abstract so a subsystem can inject a deterministic generator under test.
 pub trait IdGenerator {
-    /// Produce the next identifier.
     fn next_id(&mut self) -> String;
 }
 
-/// A simple deterministic, monotonic id generator with a fixed prefix.
-///
-/// Useful as a default and for tests. Produces `"<prefix>-<n>"`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequentialIdGenerator {
     prefix: String,
@@ -79,7 +71,6 @@ pub struct SequentialIdGenerator {
 }
 
 impl SequentialIdGenerator {
-    /// Create a generator starting at 0 with the given prefix.
     pub fn new(prefix: impl Into<String>) -> Self {
         SequentialIdGenerator {
             prefix: prefix.into(),
@@ -87,12 +78,11 @@ impl SequentialIdGenerator {
         }
     }
 
-    /// Number of ids generated so far.
     pub fn count(&self) -> u64 {
         self.counter
     }
 
-    /// Collect the next `n` ids.
+    /// Advances the counter by `n`.
     pub fn take(&mut self, n: usize) -> Vec<String> {
         (0..n).map(|_| self.next_id()).collect()
     }
@@ -123,7 +113,7 @@ mod tests {
     fn fingerprint_hex_roundtrip() {
         let f = Fingerprint::of_str("hello world");
         let hex = f.to_hex();
-        assert_eq!(hex.len(), 16);
+        assert_eq!(hex.len(), Fingerprint::HEX_LEN);
         assert_eq!(Fingerprint::from_hex(&hex).unwrap(), f);
         assert!(Fingerprint::from_hex("xyz").is_err());
         assert!(Fingerprint::from_hex("zzzzzzzzzzzzzzzz").is_err());
@@ -140,8 +130,9 @@ mod tests {
     }
 
     #[test]
-    fn fnv_matches_known_vector() {
-        // FNV-1a of empty input is the offset basis.
+    fn hashing_no_bytes_leaves_the_fnv_offset_basis() {
+        // The literal, not FNV_OFFSET: comparing the constant to itself would
+        // still pass if the constant were wrong.
         assert_eq!(Fingerprint::of(b"").value(), 0xcbf2_9ce4_8422_2325);
     }
 }
