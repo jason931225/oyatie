@@ -1,9 +1,5 @@
 //! The discard path: empty one tenant's projection so a rebuild can
 //! start from nothing.
-//!
-//! Separate from the write path because it is the one operation here
-//! that destroys rather than accumulates, and that difference should be
-//! visible in the file list rather than buried in a trait impl.
 
 use foundry_projection_draft::ProjectionStoreError;
 use rusqlite::{Connection, OptionalExtension};
@@ -33,11 +29,6 @@ pub(crate) fn reset_tenant(
         .optional()
         .map_err(storage)?
         .unwrap_or(0);
-    // A head that will not convert is a corrupt store, not a zero one.
-    // Swallowing it would discard every row and report that nothing was
-    // discarded — the exact "loss" this operation returns a head to
-    // avoid. The refusal rolls the transaction back, so nothing is lost
-    // at all.
     let discarded = u64::try_from(discarded).map_err(|_| ProjectionStoreError::Storage {
         detail: format!("applied head is not a valid ordinal: {discarded}"),
     })?;

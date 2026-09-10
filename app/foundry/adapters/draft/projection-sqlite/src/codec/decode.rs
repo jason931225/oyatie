@@ -1,6 +1,3 @@
-//! The decode half of the canonical codec: a bounds-checked cursor and
-//! fail-closed reconstruction of [`ProjectedObject`]s.
-
 use std::collections::BTreeMap;
 
 use data_boundary_kernel::Classified;

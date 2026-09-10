@@ -1,9 +1,5 @@
-//! The action envelope and its receipt.
+const MAX_IDENTITY_FIELD_BYTES: usize = 256;
 
-/// Longest admitted identity field, in bytes.
-const MAX_FIELD_LEN: usize = 256;
-
-/// Why an envelope was refused at construction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EnvelopeError {
     Empty { field: &'static str },
@@ -28,7 +24,6 @@ pub struct ActionEnvelope {
 }
 
 impl ActionEnvelope {
-    /// Construct a validated envelope; every refusal is fail-closed.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         tenant_id: impl Into<String>,
@@ -60,7 +55,7 @@ impl ActionEnvelope {
             if value.trim() != value {
                 return Err(EnvelopeError::NotTrimmed { field });
             }
-            if value.len() > MAX_FIELD_LEN {
+            if value.len() > MAX_IDENTITY_FIELD_BYTES {
                 return Err(EnvelopeError::TooLong { field });
             }
         }
@@ -83,7 +78,6 @@ pub struct Receipt {
     pub deduplicated: bool,   // data_class: INTERNAL_ONLY
 }
 
-/// An envelope as the log returned it: content plus its proven position.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SealedEnvelope {
     pub envelope: ActionEnvelope, // data_class: PII_IDENTIFYING

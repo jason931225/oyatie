@@ -45,7 +45,6 @@ use crate::store::{
     AppliedEntry, EntryOutcome, ProjectedObject, ProjectionStore, ProjectionStoreError,
 };
 
-/// A store under test plus its lifecycle.
 pub trait ProjectionFixture {
     type Store: ProjectionStore;
 

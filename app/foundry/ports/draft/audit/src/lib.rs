@@ -12,20 +12,24 @@
 // `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-/// What became of the audited submission.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuditDisposition {
-    /// The Action applied at this per-tenant ordinal.
-    Applied { ordinal: u64 },
+    Applied {
+        ordinal: u64,
+    },
     /// The Action was refused at the named gate; no ordinal was spent.
-    Denied { gate: String },
+    Denied {
+        gate: String,
+    },
     /// The entry was consumed at this ordinal but the projection refused
     /// it for the named deterministic reason — the ordinal WAS spent,
     /// which is exactly what distinguishes a poison from a denial.
-    Poisoned { ordinal: u64, reason: String },
+    Poisoned {
+        ordinal: u64,
+        reason: String,
+    },
 }
 
-/// One auditable Foundry fact, validated at construction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FoundryAuditEvent {
     pub tenant_id: String,             // data_class: INTERNAL_ONLY
@@ -37,7 +41,6 @@ pub struct FoundryAuditEvent {
     pub occurred_at_epoch_ms: u64,     // data_class: INTERNAL_ONLY
 }
 
-/// Why an event or emission was refused.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuditPortError {
     Empty {
@@ -53,7 +56,6 @@ pub enum AuditPortError {
 }
 
 impl FoundryAuditEvent {
-    /// Construct a validated event; every refusal is fail-closed.
     pub fn new(
         tenant_id: impl Into<String>,
         audit_event_type: impl Into<String>,
@@ -123,7 +125,6 @@ pub trait AuditSink {
     fn emit(&mut self, event: FoundryAuditEvent) -> Result<(), AuditPortError>;
 }
 
-/// The reference in-memory sink: the contract's executable meaning.
 #[derive(Debug, Default)]
 pub struct MemoryAuditSink {
     events: Vec<FoundryAuditEvent>,

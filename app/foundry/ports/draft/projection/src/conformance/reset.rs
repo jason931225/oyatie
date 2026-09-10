@@ -11,9 +11,8 @@ use data_ontology_kernel::PropertyValue;
 use crate::predicate::PropertyPredicate;
 use crate::store::{EntryOutcome, PageRequest, ProjectionStore};
 
-/// Objects, edges, the poison ledger and the head all go. A reset that
-/// left any of them would rebuild a projection that still disagrees with
-/// its log, in a way the head no longer reveals.
+/// A reset that left anything behind would rebuild a projection that
+/// still disagrees with its log, in a way the head no longer reveals.
 pub fn check_reset_discards_everything_for_the_tenant<F: ProjectionFixture>(
     fixture: &mut F,
 ) -> Result<(), String> {

@@ -1,8 +1,5 @@
-//! Content addresses.
-
 use sha2::{Digest, Sha256};
 
-/// Why a rendered reference was refused at parse.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BlobRefError {
     /// Only the `sha256:` scheme is defined.
@@ -22,7 +19,6 @@ pub struct BlobRef {
 }
 
 impl BlobRef {
-    /// The address of these bytes.
     pub fn for_bytes(bytes: &[u8]) -> Self {
         let digest = Sha256::digest(bytes);
         let mut digest_hex = String::with_capacity(64);

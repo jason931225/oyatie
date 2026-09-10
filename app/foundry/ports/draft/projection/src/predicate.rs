@@ -11,11 +11,9 @@ use data_ontology_kernel::{ObjectEntity, PropertyValue};
 
 use crate::store::ProjectionStoreError;
 
-/// Why a predicate could not be constructed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PredicateError {
     BlankProperty,
-    /// `from` and `to` carry different value kinds.
     MixedValueKinds,
     /// Arrays and structs have no meaningful order; a range over them
     /// would pin the derived structural order into every adapter.
@@ -25,7 +23,6 @@ pub enum PredicateError {
     InvertedRange,
 }
 
-/// A type-scoped filter over one declared property.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PropertyPredicate {
     Equals {
@@ -48,8 +45,6 @@ impl PropertyPredicate {
         Ok(Self::Equals { property, value })
     }
 
-    /// An inclusive range; both bounds must share one scalar value kind
-    /// and `from` must not sort after `to`.
     pub fn range(
         property: impl Into<String>,
         from: PropertyValue,

@@ -1,7 +1,3 @@
-//! The write path: one immediate transaction per apply — dense,
-//! deduplicated, atomic — mirroring each fold outcome into the object
-//! rows and the property index together.
-
 use foundry_projection_draft::{
     AppliedEntry, ApplyReceipt, EntryOutcome, KeyDesignations, ProjectedObject,
     ProjectionStoreError,
@@ -58,8 +54,6 @@ pub(crate) fn apply(
     }
     match &entry.outcome {
         EntryOutcome::Applied { objects, links } => {
-            // KEY PASS — inside the transaction, before ANY write, so a
-            // refused duplicate rolls back to exactly nothing.
             if !keys.is_empty() {
                 for (index, object) in objects.iter().enumerate() {
                     key_law::check(

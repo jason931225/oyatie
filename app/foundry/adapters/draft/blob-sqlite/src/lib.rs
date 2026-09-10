@@ -12,7 +12,6 @@ use std::path::Path;
 use foundry_blob_draft::{BlobRef, BlobStore, BlobStoreError};
 use rusqlite::{Connection, OptionalExtension, params};
 
-/// A durable [`BlobStore`] over one SQLite database file.
 pub struct SqliteBlobStore {
     connection: Connection,
 }

@@ -3,9 +3,8 @@
 use crate::blob::BlobRef;
 use crate::store::BlobStore;
 
-/// An adapter under test, plus the reopen capability the trait cannot
-/// express. A volatile fixture answers `false` and the durability check
-/// reports that it proved nothing rather than passing against lost state.
+/// A volatile fixture answers `false` and the durability check reports
+/// that it proved nothing rather than passing against lost state.
 pub trait BlobFixture {
     type Store: BlobStore;
 

@@ -16,10 +16,6 @@ pub struct MemoryProjectionStore {
     heads: BTreeMap<String, u64>,
     entries: BTreeMap<(String, u64), AppliedEntry>,
     objects: BTreeMap<(String, String), ProjectedObject>,
-    /// Edges keyed by (tenant, from, link_type, to) so identity is the
-    /// key: dedup and deterministic read order fall out of it, and the
-    /// observation time is the VALUE, so a later sighting updates the
-    /// edge instead of duplicating it.
     links: BTreeMap<(String, String, String, String), u64>,
     poisons: BTreeMap<(String, u64), String>,
 }
@@ -58,8 +54,6 @@ impl MemoryProjectionStore {
                 detail: "zero page limit",
             });
         }
-        // Kind drift refuses window-independently: the whole type scope
-        // is checked before any cursor or limit narrows the walk.
         if let Some(predicate) = predicate
             && let Some((property, kind)) = predicate.range_kind()
         {
@@ -147,8 +141,6 @@ impl ProjectionStore for MemoryProjectionStore {
         }
         match &entry.outcome {
             EntryOutcome::Applied { objects, links } => {
-                // KEY PASS — every object is cleared before ANY is
-                // written, so a refused duplicate leaves nothing behind.
                 if !keys.is_empty() {
                     for (index, object) in objects.iter().enumerate() {
                         crate::keys::check_unique(&self.objects, object, keys, &objects[..index])?;
@@ -250,8 +242,6 @@ impl ProjectionStore for MemoryProjectionStore {
     }
 
     fn reset_tenant(&mut self, tenant_id: &str) -> Result<u64, ProjectionStoreError> {
-        // Refused here too, or code developed against the reference
-        // reads "nothing to discard" where production refuses.
         require_trimmed(tenant_id, "blank tenant")?;
         let discarded = self.heads.remove(tenant_id).unwrap_or(0);
         self.entries.retain(|(tenant, _), _| tenant != tenant_id);

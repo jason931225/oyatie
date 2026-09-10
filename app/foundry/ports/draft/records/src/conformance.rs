@@ -7,9 +7,6 @@
 use crate::envelope::ActionEnvelope;
 use crate::log::RecordsLog;
 
-/// An adapter under test, plus the one capability the trait cannot express:
-/// surviving a reopen. A volatile fixture answers `false` and the durability
-/// check reports honestly that it proved nothing.
 pub trait RecordsFixture {
     type Log: RecordsLog;
 

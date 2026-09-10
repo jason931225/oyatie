@@ -12,7 +12,6 @@ use std::path::Path;
 use foundry_records_draft::{ActionEnvelope, Receipt, RecordsLog, RecordsLogError, SealedEnvelope};
 use rusqlite::{Connection, OptionalExtension, params};
 
-/// A durable [`RecordsLog`] over one SQLite database file.
 pub struct SqliteRecordsLog {
     connection: Connection,
 }
@@ -142,7 +141,6 @@ impl RecordsLog for SqliteRecordsLog {
     }
 }
 
-/// The receipt and stored envelope for an already-spent idempotency key.
 fn spent_key(
     transaction: &rusqlite::Transaction<'_>,
     envelope: &ActionEnvelope,

@@ -1,12 +1,4 @@
 //! Primary-key enforcement against the property index.
-//!
-//! The reference store scans its map; this store asks its index. Both
-//! answer the same question — "does another object of this type in this
-//! tenant already hold this value?" — and both are held to the SAME
-//! shared conformance checks, which is what keeps the two planes from
-//! drifting. Composite (array/struct) keys are refused rather than
-//! probed: they have no typed column, so a probe over the typed columns
-//! would match every composite against every other.
 
 use data_ontology_kernel::PropertyValue;
 use foundry_projection_draft::{KeyDesignations, ProjectedObject, ProjectionStoreError};
@@ -19,8 +11,6 @@ const HELD_BY: &str = "SELECT object_ref FROM projection_property_index
      WHERE tenant_id = ?1 AND entity_type = ?2 AND property = ?3
        AND value_kind = ?4 AND object_ref <> ?5";
 
-/// Refuse an object that cannot be identified or whose key is held —
-/// by a stored object OR by an earlier object in the same entry.
 pub(crate) fn check(
     transaction: &rusqlite::Transaction<'_>,
     tenant_id: &str,
