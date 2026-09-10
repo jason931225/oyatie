@@ -89,14 +89,18 @@ jobs:
           # The admission control, honoured rather than stepped over.
           #
           # AGENTS.md:209 and ADR-0716 D2 name specs/cache-warm-license.json as
-          # the switch that licenses warm reads. The file had been deleted, so
-          # the control existed in three documents and nowhere in the tree --
-          # which is worse than no control, because a reader believes they are
-          # covered by it. It is restored, and this lane, as the first consumer
-          # of warm reads, reads it.
+          # the switch that licenses warm reads. That file does not exist and
+          # CANNOT: `specs` is in the layout gate's FORBIDDEN_NAMES
+          # (pipeline/core/admission/src/layout.rs:116), so the repository
+          # refuses the path its own ADR specifies. Restoring it was tried here
+          # and refused -- "forbidden root `specs`" -- which is why it is absent,
+          # and it is a contradiction between two governance artifacts rather
+          # than an oversight. Filed for a ruling; not resolved by a workflow.
           #
-          # False means this lane builds exactly as it does today. Licensing is
-          # a founder decision: one field, in one file, review-visible.
+          # Absence is read as UNLICENSED, which is the safe direction: this
+          # lane skips the cache until a licence exists and says otherwise. When
+          # the path question is settled the file appears and this reads it,
+          # with no change here.
           licensed=$(python3 -c 'import json;print(json.load(open("specs/cache-warm-license.json"))["warm_reads_licensed"])' 2>/dev/null || echo "error")
           if [ "$licensed" != "True" ]; then
             echo "warm reads are not licensed (specs/cache-warm-license.json: warm_reads_licensed=${licensed}); building without the cache"

@@ -68,25 +68,27 @@ fn the_root_build_config_carries_no_cache_knobs() {
 }
 
 #[test]
-fn the_warm_read_admission_control_exists_and_is_readable() {
-    // Named by ADR-0716 D2, AGENTS.md and the g004 enforcement-debt mapping,
-    // and absent from the tree until restored. A control three documents cite
-    // and no file implements is worse than no control: readers believe they
-    // are covered by it.
-    let path = repo_root().join("specs/cache-warm-license.json");
-    let text = std::fs::read_to_string(&path).unwrap_or_else(|error| {
-        panic!("{} must exist: {error}", path.display());
-    });
-    // serde_yaml, not a new dependency: YAML is a superset of JSON, and this
-    // crate already carries serde_yaml for the workflow tests.
-    let parsed: serde_yaml::Value =
-        serde_yaml::from_str(&text).expect("the licence must be readable JSON");
+fn the_admission_control_has_no_admissible_home() {
+    // Not a test of the licence -- a test of the contradiction that stops it
+    // existing. ADR-0716 D2, AGENTS.md:209 and the g004 mapping all name
+    // `specs/cache-warm-license.json`, and `specs` is in FORBIDDEN_NAMES, so
+    // the repository refuses the path its own ADR specifies. Restoring the
+    // file was tried and the layout gate rejected it: "forbidden root `specs`".
+    //
+    // This asserts the conflict is still live, so that whoever resolves it
+    // finds a failing test rather than a stale comment. When `specs` stops
+    // being forbidden, or the ADR names an admissible path, this fails and
+    // says so.
     assert!(
-        parsed
-            .get("warm_reads_licensed")
-            .and_then(serde_yaml::Value::as_bool)
-            .is_some(),
-        "the licence must declare a boolean `warm_reads_licensed`; a consumer \
-         that cannot read it cannot honour it. Got: {parsed:?}"
+        pipeline_admission::FORBIDDEN_NAMES.contains(&"specs"),
+        "`specs` is no longer forbidden, so the path ADR-0716 D2 names for the \
+         warm-read licence is now admissible. Restore \
+         specs/cache-warm-license.json at warm_reads_licensed: false and make \
+         the consumers read it."
+    );
+    assert!(
+        !repo_root().join("specs/cache-warm-license.json").exists(),
+        "the licence exists at a path the layout gate forbids; one of the two \
+         must give and it should be decided rather than discovered"
     );
 }
