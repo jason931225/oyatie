@@ -1,4 +1,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+// `mlocked` is private, so a `pub` item inside it is unreachable: widening one
+// is a compile error here rather than an inert edit.
+#![deny(unreachable_pub)]
 
 //! Crypto-enclave kernel for kms: the type-system one-way door for key
 //! material. Keys live inside the crypto boundary and key material never
@@ -10,13 +13,12 @@
 //!
 //! [`KekMaterial`], [`DekMaterial`] and [`EnclaveRoot`] have ingress doors
 //! (generation from the CSPRNG, [`EnclaveRoot::from_key_bytes`] for the
-//! unseal ceremony) and no egress doors. That absence is the enforcement,
-//! and no test can pin it.
+//! unseal ceremony) and no egress doors. That absence is the enforcement.
 
 pub mod chain;
 pub mod dek_cache;
 pub mod material;
-pub mod mlocked;
+mod mlocked;
 pub mod provenance;
 pub mod shred;
 pub mod token;

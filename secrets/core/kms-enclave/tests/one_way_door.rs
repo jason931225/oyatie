@@ -1,15 +1,14 @@
 //! Type-system one-way door checks: key material cannot leave the crypto
 //! boundary.
 //!
-//! The door is enforced by what the types do NOT implement. `Clone`,
-//! `serde::Serialize`-style egress, and byte accessors are absent by
-//! construction; this file pins that property so a future `#[derive(Clone)]`
-//! or `pub fn as_bytes()` fails review with a RED test, not silently.
+//! The door is enforced by what the types do NOT implement: `Clone` and
+//! `serde::Serialize`-style egress. This file pins that from outside the
+//! crate, so a future `#[derive(Clone)]` fails with a RED test, not silently.
+//! Raw bytes are pinned separately, in `mlocked`, which is private.
 
 use std::fmt::Write as _;
 use std::marker::PhantomData;
 
-use secrets_kms_enclave::mlocked::MlockedKey;
 use secrets_kms_enclave::{
     DekId, DekMaterial, EnclaveRoot, KekId, KekMaterial, KekVersion, KekVersionChain, SealingRootId,
 };
@@ -48,7 +47,6 @@ fn key_material_types_are_not_clone() {
     assert_not_clone!(KekMaterial);
     assert_not_clone!(DekMaterial);
     assert_not_clone!(KekVersionChain);
-    assert_not_clone!(MlockedKey);
     assert!(CloneProbe::<String>(PhantomData).detect());
 }
 

@@ -12,10 +12,10 @@ use zeroize::Zeroize;
 
 use crate::EnclaveError;
 
-pub const KEY_LEN: usize = 32;
+pub(crate) const KEY_LEN: usize = 32;
 
 /// 256-bit key in an `mlock`ed, zeroize-on-drop heap buffer.
-pub struct MlockedKey {
+pub(crate) struct MlockedKey {
     bytes: Box<[u8; KEY_LEN]>,
 }
 
@@ -67,5 +67,39 @@ impl Drop for MlockedKey {
 impl fmt::Debug for MlockedKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("MlockedKey([REDACTED])")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MlockedKey;
+    use std::marker::PhantomData;
+
+    // Autoref specialization: `detect()` resolves to the inherent method (true)
+    // only when `T: Clone`, else to the trait fallback (false).
+    struct CloneProbe<T>(PhantomData<T>);
+
+    impl<T: Clone> CloneProbe<T> {
+        fn detect(&self) -> bool {
+            true
+        }
+    }
+
+    trait NotCloneFallback {
+        fn detect(&self) -> bool {
+            false
+        }
+    }
+
+    impl<T> NotCloneFallback for CloneProbe<T> {}
+
+    #[test]
+    fn mlocked_key_is_not_clone() {
+        assert!(
+            !CloneProbe::<MlockedKey>(PhantomData).detect(),
+            "MlockedKey must NOT implement Clone: a derived clone copies the key \
+             into an unpinned, un-mlocked allocation"
+        );
+        assert!(CloneProbe::<String>(PhantomData).detect());
     }
 }
