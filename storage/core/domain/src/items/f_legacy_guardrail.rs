@@ -1,48 +1,44 @@
 // Retirement-bound mixed storage-product aggregate.
-//
-// The historical aggregate spans object, block, snapshot, filesystem, mount
-// policy, and provider evidence. No single ADR-0719 owner may adopt that
-// composition intact, so this shard preserves only the compatibility API.
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StorageTenantCellGuardrailCreate {
-    pub tenant_id: String,                     // data_class: INTERNAL_ONLY
-    pub region: String,                        // data_class: PUBLIC
-    pub primary_cell_id: String,               // data_class: PUBLIC
-    pub bucket_id: String,                     // data_class: INTERNAL_ONLY
-    pub object_key_prefix: String,             // data_class: INTERNAL_ONLY
-    pub object_versioning_enabled: bool,       // data_class: INTERNAL_ONLY
-    pub object_lock_enabled: bool,             // data_class: INTERNAL_ONLY
-    pub default_object_lock: ObjectLockPolicy, // data_class: INTERNAL_ONLY
-    pub volume_id: String,                     // data_class: INTERNAL_ONLY
-    pub volume_tier: VolumeTier,               // data_class: PUBLIC
-    pub snapshot_required: bool,               // data_class: INTERNAL_ONLY
-    pub snapshot_evidence_ref: String,         // data_class: INTERNAL_ONLY
-    pub filesystem_id: String,                 // data_class: INTERNAL_ONLY
-    pub filesystem_tier: FilesystemTier,       // data_class: PUBLIC
-    pub filesystem_mount_policy_ref: String,   // data_class: INTERNAL_ONLY
-    pub provider_evidence_refs: Vec<String>,   // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub region: String,
+    pub primary_cell_id: String,
+    pub bucket_id: String,
+    pub object_key_prefix: String,
+    pub object_versioning_enabled: bool,
+    pub object_lock_enabled: bool,
+    pub default_object_lock: ObjectLockPolicy,
+    pub volume_id: String,
+    pub volume_tier: VolumeTier,
+    pub snapshot_required: bool,
+    pub snapshot_evidence_ref: String,
+    pub filesystem_id: String,
+    pub filesystem_tier: FilesystemTier,
+    pub filesystem_mount_policy_ref: String,
+    pub provider_evidence_refs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StorageTenantCellGuardrail {
-    pub tenant_id: Classified<String>,  // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>, // data_class: PUBLIC
-    pub primary_cell_id: Classified<CellId>, // data_class: PUBLIC
-    pub bucket_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub object_key_prefix: Classified<ObjectKey>, // data_class: INTERNAL_ONLY
-    pub object_versioning_enabled: Classified<bool>, // data_class: INTERNAL_ONLY
-    pub object_lock_enabled: Classified<bool>, // data_class: INTERNAL_ONLY
-    pub default_object_lock: Classified<ObjectLockPolicy>, // data_class: INTERNAL_ONLY
-    pub volume_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub volume_tier: Classified<VolumeTier>, // data_class: PUBLIC
-    pub snapshot_required: Classified<bool>, // data_class: INTERNAL_ONLY
-    pub snapshot_evidence_ref: Classified<String>, // data_class: INTERNAL_ONLY
-    pub filesystem_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub filesystem_tier: Classified<FilesystemTier>, // data_class: PUBLIC
-    pub filesystem_mount_policy_ref: Classified<String>, // data_class: INTERNAL_ONLY
-    pub provider_evidence_refs: Classified<Vec<String>>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub tenant_id: Classified<String>,
+    pub region: Classified<RegionCode>,
+    pub primary_cell_id: Classified<CellId>,
+    pub bucket_id: Classified<ResourceId>,
+    pub object_key_prefix: Classified<ObjectKey>,
+    pub object_versioning_enabled: Classified<bool>,
+    pub object_lock_enabled: Classified<bool>,
+    pub default_object_lock: Classified<ObjectLockPolicy>,
+    pub volume_id: Classified<ResourceId>,
+    pub volume_tier: Classified<VolumeTier>,
+    pub snapshot_required: Classified<bool>,
+    pub snapshot_evidence_ref: Classified<String>,
+    pub filesystem_id: Classified<ResourceId>,
+    pub filesystem_tier: Classified<FilesystemTier>,
+    pub filesystem_mount_policy_ref: Classified<String>,
+    pub provider_evidence_refs: Classified<Vec<String>>,
+    pub schema_version: Classified<u32>,
 }
 
 impl StorageTenantCellGuardrail {

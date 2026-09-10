@@ -1,5 +1,3 @@
-// ADR-0083 Tier 3: integration tests use `.expect()` to assert invariants —
-// Tier 3 exemption.
 #![allow(clippy::expect_used)]
 
 use secrets_domain::{

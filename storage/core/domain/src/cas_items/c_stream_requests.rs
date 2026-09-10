@@ -6,8 +6,8 @@ pub trait CasPayloadReader {
     fn read_next_chunk(&mut self) -> Result<Option<Vec<u8>>, ObjectStoreError>;
 }
 
-/// Streaming sink for CAS payload bytes. Adapters push bounded chunks into this
-/// port instead of returning a whole object buffer.
+/// Adapters push bounded chunks into this port instead of returning a whole
+/// object buffer.
 pub trait CasPayloadSink {
     fn write_chunk(&mut self, chunk: &[u8]) -> Result<(), ObjectStoreError>;
 }
@@ -27,11 +27,6 @@ impl InMemoryPayloadReader {
         }
     }
 
-    /// Build a reference reader from chunks.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidPayload` when the chunks do not form a
-    /// valid CAS payload manifest.
     pub fn from_chunks(chunks: Vec<Vec<u8>>) -> Result<Self, ObjectStoreError> {
         CasPayload::from_chunks(&chunks)?;
         Ok(Self {
@@ -40,11 +35,6 @@ impl InMemoryPayloadReader {
         })
     }
 
-    /// Return the manifest represented by this reader.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidPayload` when the chunks do not form a
-    /// valid CAS payload manifest.
     pub fn payload(&self) -> Result<CasPayload, ObjectStoreError> {
         CasPayload::from_chunks(&self.chunks)
     }
@@ -66,11 +56,6 @@ pub struct InMemoryPayloadSink {
 }
 
 impl InMemoryPayloadSink {
-    /// Return the payload manifest written to the sink.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidPayload` when the chunks do not form a
-    /// valid CAS payload manifest.
     pub fn payload(&self) -> Result<CasPayload, ObjectStoreError> {
         CasPayload::from_chunks(&self.chunks)
     }
@@ -96,32 +81,25 @@ impl CasPayloadSink for InMemoryPayloadSink {
     }
 }
 
-// =====================================================================
-// Request/response types
-// =====================================================================
 
 /// CAS write request. The caller supplies a chunked payload and the kernel
 /// verifies that the supplied tenant-scoped address is the BLAKE3 root digest of
 /// those bytes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CasPutRequest {
-    pub address: TenantScopedBlake3Address, // data_class: INTERNAL_ONLY
-    pub payload: CasPayload,                // data_class: INTERNAL_ONLY
-    pub kms_boundary: TenantKekBoundary,    // data_class: INTERNAL_ONLY
-    pub worm_policy: CasWormPolicy,         // data_class: INTERNAL_ONLY
-    pub audit_anchor: CasAuditAnchor,       // data_class: INTERNAL_ONLY
-    pub durability: CasDurabilityPolicy,    // data_class: PUBLIC
-    pub user_metadata: BTreeMap<String, String>, // data_class: INTERNAL_ONLY
-    pub requested_at_epoch_seconds: u64,    // data_class: INTERNAL_ONLY
+    pub address: TenantScopedBlake3Address,
+    pub payload: CasPayload,
+    pub kms_boundary: TenantKekBoundary,
+    pub worm_policy: CasWormPolicy,
+    pub audit_anchor: CasAuditAnchor,
+    pub durability: CasDurabilityPolicy,
+    pub user_metadata: BTreeMap<String, String>,
+    pub requested_at_epoch_seconds: u64,
 }
 
 impl CasPutRequest {
     /// Build a write request from a single in-memory buffer and compute the
     /// tenant-scoped BLAKE3 address.
-    ///
-    /// # Errors
-    /// Returns validation errors from payload, WORM, audit, or KEK policy
-    /// objects.
     pub fn new(
         tenant_id: TenantId,
         bytes: Vec<u8>,
@@ -142,10 +120,6 @@ impl CasPutRequest {
     }
 
     /// Build a write request from a chunked payload.
-    ///
-    /// # Errors
-    /// Returns validation errors from payload, WORM, audit, or KEK policy
-    /// objects.
     pub fn new_with_payload(
         tenant_id: TenantId,
         payload: CasPayload,
@@ -208,8 +182,8 @@ impl CasPutRequest {
 /// tenant, even when the BLAKE3 digest is known.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CasReadRequest {
-    pub tenant_id: TenantId,                // data_class: INTERNAL_ONLY
-    pub address: TenantScopedBlake3Address, // data_class: INTERNAL_ONLY
+    pub tenant_id: TenantId,
+    pub address: TenantScopedBlake3Address,
 }
 
 impl CasReadRequest {
@@ -226,13 +200,13 @@ impl CasReadRequest {
     }
 }
 
-/// Tenant-bound delete request. WORM policy is enforced before deletion.
+/// Tenant-bound delete request.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CasDeleteRequest {
-    pub tenant_id: TenantId,                // data_class: INTERNAL_ONLY
-    pub address: TenantScopedBlake3Address, // data_class: INTERNAL_ONLY
-    pub requested_at_epoch_seconds: u64,    // data_class: INTERNAL_ONLY
-    pub audit_event_id: String,             // data_class: INTERNAL_ONLY
+    pub tenant_id: TenantId,
+    pub address: TenantScopedBlake3Address,
+    pub requested_at_epoch_seconds: u64,
+    pub audit_event_id: String,
 }
 
 impl CasDeleteRequest {

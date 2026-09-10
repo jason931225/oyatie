@@ -1,12 +1,8 @@
 // Retirement-bound EFS-like compatibility model.
-//
-// ADR-0719 has no file-service owner. This shard preserves the historical
-// root exports and behavior without misclassifying them as Drive or active
-// storage-engine scope. New consumers are forbidden.
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct FilesystemName {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -20,41 +16,41 @@ pub enum FilesystemState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FilesystemCreate {
-    pub resource_id: String,           // data_class: INTERNAL_ONLY
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub name: String,                  // data_class: INTERNAL_ONLY
-    pub region: String,                // data_class: PUBLIC
-    pub az: String,                    // data_class: PUBLIC
-    pub cell_id: String,               // data_class: PUBLIC
-    pub residency: ResidencyClass,     // data_class: INTERNAL_ONLY
-    pub tier: FilesystemTier,          // data_class: PUBLIC
-    pub size_gib: u64,                 // data_class: INTERNAL_ONLY
-    pub throughput_mbps: u64,          // data_class: PUBLIC
-    pub encryption: EncryptionMode,    // data_class: PUBLIC
-    pub kms_key: Option<String>,       // data_class: INTERNAL_ONLY
-    pub data_class: DataClass,         // data_class: INTERNAL_ONLY
-    pub state: FilesystemState,        // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
+    pub resource_id: String,
+    pub tenant_id: String,
+    pub name: String,
+    pub region: String,
+    pub az: String,
+    pub cell_id: String,
+    pub residency: ResidencyClass,
+    pub tier: FilesystemTier,
+    pub size_gib: u64,
+    pub throughput_mbps: u64,
+    pub encryption: EncryptionMode,
+    pub kms_key: Option<String>,
+    pub data_class: DataClass,
+    pub state: FilesystemState,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudFilesystem {
-    pub resource_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub name: Classified<FilesystemName>,    // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>,      // data_class: PUBLIC
-    pub az: Classified<AzCode>,              // data_class: PUBLIC
-    pub cell_id: Classified<CellId>,         // data_class: PUBLIC
-    pub residency: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub tier: Classified<FilesystemTier>,    // data_class: PUBLIC
-    pub size_gib: Classified<u64>,           // data_class: INTERNAL_ONLY
-    pub throughput_mbps: Classified<u64>,    // data_class: PUBLIC
-    pub encryption: Classified<EncryptionMode>, // data_class: PUBLIC
-    pub kms_key: Classified<Option<KmsKeyId>>, // data_class: INTERNAL_ONLY
-    pub data_class: Classified<PrivacyDataClass>, // data_class: INTERNAL_ONLY
-    pub state: Classified<FilesystemState>,  // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,     // data_class: PUBLIC
+    pub resource_id: Classified<ResourceId>,
+    pub tenant_id: Classified<String>,
+    pub name: Classified<FilesystemName>,
+    pub region: Classified<RegionCode>,
+    pub az: Classified<AzCode>,
+    pub cell_id: Classified<CellId>,
+    pub residency: Classified<ResidencyClass>,
+    pub tier: Classified<FilesystemTier>,
+    pub size_gib: Classified<u64>,
+    pub throughput_mbps: Classified<u64>,
+    pub encryption: Classified<EncryptionMode>,
+    pub kms_key: Classified<Option<KmsKeyId>>,
+    pub data_class: Classified<PrivacyDataClass>,
+    pub state: Classified<FilesystemState>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 impl FilesystemName {

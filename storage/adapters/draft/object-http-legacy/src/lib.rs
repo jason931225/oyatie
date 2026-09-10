@@ -1,7 +1,4 @@
 //! Deprecated HTTP-shaped object metadata compatibility boundary.
-//!
-//! This is a local P0 fixture, not the sold storage facade. P1 replaces it
-//! with the canonical protobuf transaction model.
 
 use std::collections::BTreeMap;
 

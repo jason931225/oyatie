@@ -78,56 +78,56 @@ impl CloudStorageBlockApiErrorCode {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockApiBoundaryContext {
-    pub request_id: String,      // data_class: INTERNAL_ONLY
-    pub tenant_id: String,       // data_class: INTERNAL_ONLY
-    pub idempotency_key: String, // data_class: INTERNAL_ONLY
+    pub request_id: String,
+    pub tenant_id: String,
+    pub idempotency_key: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockApiPrincipal {
-    pub tenant_id: String,    // data_class: INTERNAL_ONLY
-    pub principal_id: String, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub principal_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockApiAuthorization {
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub principal_id: String,          // data_class: INTERNAL_ONLY
-    pub decision_id: String,           // data_class: INTERNAL_ONLY
-    pub allowed_surfaces: Vec<String>, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub decision_id: String,
+    pub allowed_surfaces: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockVolumeCreateRequest {
-    pub resource_id: String, // data_class: INTERNAL_ONLY
-    pub tenant_id: String,   // data_class: INTERNAL_ONLY
-    pub name: String,        // data_class: INTERNAL_ONLY
-    pub region: String,      // data_class: PUBLIC
-    pub az: String,          // data_class: PUBLIC
-    pub cell_id: String,     // data_class: PUBLIC
-    pub residency: String,   // data_class: INTERNAL_ONLY
-    pub tier: String,        // data_class: PUBLIC
-    pub size_gib: u64,       // data_class: INTERNAL_ONLY
-    pub performance: CloudStorageBlockVolumePerformance, // data_class: PUBLIC
-    pub encryption: String,  // data_class: PUBLIC
-    pub kms_key: Option<String>, // data_class: INTERNAL_ONLY
-    pub data_class: String,  // data_class: INTERNAL_ONLY
-    pub created_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
+    pub resource_id: String,
+    pub tenant_id: String,
+    pub name: String,
+    pub region: String,
+    pub az: String,
+    pub cell_id: String,
+    pub residency: String,
+    pub tier: String,
+    pub size_gib: u64,
+    pub performance: CloudStorageBlockVolumePerformance,
+    pub encryption: String,
+    pub kms_key: Option<String>,
+    pub data_class: String,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockVolumePerformance {
-    pub iops: u64,            // data_class: PUBLIC
-    pub throughput_mbps: u64, // data_class: PUBLIC
+    pub iops: u64,
+    pub throughput_mbps: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockVolumeCreateApiRequest {
-    pub path_volume_id: String, // data_class: INTERNAL_ONLY
-    pub boundary: CloudStorageBlockApiBoundaryContext, // data_class: INTERNAL_ONLY
-    pub principal: CloudStorageBlockApiPrincipal, // data_class: INTERNAL_ONLY
-    pub authorization: CloudStorageBlockApiAuthorization, // data_class: INTERNAL_ONLY
-    pub body: CloudStorageBlockVolumeCreateRequest, // data_class: INTERNAL_ONLY
+    pub path_volume_id: String,
+    pub boundary: CloudStorageBlockApiBoundaryContext,
+    pub principal: CloudStorageBlockApiPrincipal,
+    pub authorization: CloudStorageBlockApiAuthorization,
+    pub body: CloudStorageBlockVolumeCreateRequest,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -135,7 +135,7 @@ pub struct CloudStorageBlockCreateIdempotencyLedger {
     entries: BTreeMap<
         CloudStorageBlockIdempotencyLedgerKey,
         CloudStorageBlockCreateIdempotencyLedgerEntry,
-    >, // data_class: INTERNAL_ONLY
+    >,
 }
 
 impl CloudStorageBlockCreateIdempotencyLedger {
@@ -150,21 +150,21 @@ impl CloudStorageBlockCreateIdempotencyLedger {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct CloudStorageBlockIdempotencyLedgerKey {
-    tenant_id: String,       // data_class: INTERNAL_ONLY
-    principal_id: String,    // data_class: INTERNAL_ONLY
-    surface: String,         // data_class: INTERNAL_ONLY
-    idempotency_key: String, // data_class: INTERNAL_ONLY
+    tenant_id: String,
+    principal_id: String,
+    surface: String,
+    idempotency_key: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct CloudStorageBlockCreateIdempotencyLedgerEntry {
-    fingerprint: CloudStorageBlockRequestFingerprint, // data_class: INTERNAL_ONLY
-    result: CloudStorageBlockCreateApiResult,         // data_class: INTERNAL_ONLY
+    fingerprint: CloudStorageBlockRequestFingerprint,
+    result: CloudStorageBlockCreateApiResult,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct CloudStorageBlockRequestFingerprint {
-    canonical: String, // data_class: INTERNAL_ONLY
+    canonical: String,
 }
 
 type CloudStorageBlockCreateApiResult =
@@ -172,8 +172,8 @@ type CloudStorageBlockCreateApiResult =
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockVolumeCreateSuccessResponse {
-    pub data: CloudStorageBlockVolumeRecord, // data_class: INTERNAL_ONLY
-    pub metadata: CloudStorageBlockApiMetadata, // data_class: INTERNAL_ONLY
+    pub data: CloudStorageBlockVolumeRecord,
+    pub metadata: CloudStorageBlockApiMetadata,
 }
 
 impl CloudStorageBlockVolumeCreateSuccessResponse {
@@ -189,48 +189,48 @@ impl CloudStorageBlockVolumeCreateSuccessResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockApiMetadata {
-    pub request_id: String, // data_class: INTERNAL_ONLY
+    pub request_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockVolumeRecord {
-    pub resource_id: String, // data_class: INTERNAL_ONLY
-    pub tenant_id: String,   // data_class: INTERNAL_ONLY
-    pub name: String,        // data_class: INTERNAL_ONLY
-    pub region: String,      // data_class: PUBLIC
-    pub az: String,          // data_class: PUBLIC
-    pub cell_id: String,     // data_class: PUBLIC
-    pub residency: String,   // data_class: INTERNAL_ONLY
-    pub tier: String,        // data_class: PUBLIC
-    pub size_gib: u64,       // data_class: INTERNAL_ONLY
-    pub performance: CloudStorageBlockVolumePerformance, // data_class: PUBLIC
-    pub encryption: String,  // data_class: PUBLIC
-    pub kms_key: Option<String>, // data_class: INTERNAL_ONLY
-    pub data_class: String,  // data_class: INTERNAL_ONLY
-    pub state: String,       // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
-    pub schema_version: u32, // data_class: PUBLIC
+    pub resource_id: String,
+    pub tenant_id: String,
+    pub name: String,
+    pub region: String,
+    pub az: String,
+    pub cell_id: String,
+    pub residency: String,
+    pub tier: String,
+    pub size_gib: u64,
+    pub performance: CloudStorageBlockVolumePerformance,
+    pub encryption: String,
+    pub kms_key: Option<String>,
+    pub data_class: String,
+    pub state: String,
+    pub created_at_epoch_seconds: u64,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockApiErrorResponse {
-    pub error: CloudStorageBlockApiErrorBody, // data_class: INTERNAL_ONLY
+    pub error: CloudStorageBlockApiErrorBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockApiErrorBody {
-    pub code: String,                                  // data_class: INTERNAL_ONLY
-    pub message: String,                               // data_class: INTERNAL_ONLY
-    pub message_localized: Option<String>,             // data_class: INTERNAL_ONLY
-    pub request_id: String,                            // data_class: INTERNAL_ONLY
-    pub details: Vec<CloudStorageBlockApiErrorDetail>, // data_class: INTERNAL_ONLY
-    pub retry_after_seconds: Option<u64>,              // data_class: INTERNAL_ONLY
+    pub code: String,
+    pub message: String,
+    pub message_localized: Option<String>,
+    pub request_id: String,
+    pub details: Vec<CloudStorageBlockApiErrorDetail>,
+    pub retry_after_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageBlockApiErrorDetail {
-    pub field: String, // data_class: INTERNAL_ONLY
-    pub issue: String, // data_class: INTERNAL_ONLY
+    pub field: String,
+    pub issue: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

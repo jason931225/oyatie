@@ -1,6 +1,5 @@
 use super::common::*;
 
-/// `IdempotencyKeyReused` maps to HTTP 422 and the canonical error code.
 #[test]
 fn idempotency_key_reused_error_maps_to_422_and_canonical_error_code() {
     let mut catalog = catalog_with_active_bucket();
@@ -38,7 +37,6 @@ fn idempotency_key_reused_error_maps_to_422_and_canonical_error_code() {
     assert_eq!(response.error.request_id, "req-ec-2");
 }
 
-/// `peek` returns exactly the key and response recorded by the PUT.
 #[test]
 fn peek_entry_fields_match_recorded_put_response_exactly() {
     let mut catalog = catalog_with_active_bucket();
@@ -80,7 +78,6 @@ fn peek_entry_fields_match_recorded_put_response_exactly() {
     }
 }
 
-/// Multiple independent idempotency keys on one ledger remain isolated.
 #[test]
 fn multiple_independent_keys_on_same_ledger_do_not_interfere() {
     let mut catalog = catalog_with_active_bucket();

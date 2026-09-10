@@ -106,81 +106,74 @@ impl CloudStorageObjectApiErrorCode {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectMutationBoundaryContext {
-    pub request_id: String,      // data_class: INTERNAL_ONLY
-    pub tenant_id: String,       // data_class: INTERNAL_ONLY
-    pub idempotency_key: String, // data_class: INTERNAL_ONLY
+    pub request_id: String,
+    pub tenant_id: String,
+    pub idempotency_key: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectReadBoundaryContext {
-    pub request_id: String, // data_class: INTERNAL_ONLY
-    pub tenant_id: String,  // data_class: INTERNAL_ONLY
+    pub request_id: String,
+    pub tenant_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectApiPrincipal {
-    pub tenant_id: String,    // data_class: INTERNAL_ONLY
-    pub principal_id: String, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub principal_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectApiAuthorization {
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub principal_id: String,          // data_class: INTERNAL_ONLY
-    pub decision_id: String,           // data_class: INTERNAL_ONLY
-    pub allowed_surfaces: Vec<String>, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub decision_id: String,
+    pub allowed_surfaces: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectPutRequest {
-    pub bucket_id: String,  // data_class: INTERNAL_ONLY
-    pub tenant_id: String,  // data_class: INTERNAL_ONLY
-    pub key: String,        // data_class: INTERNAL_ONLY
-    pub size_bytes: u64,    // data_class: INTERNAL_ONLY
-    pub etag: String,       // data_class: INTERNAL_ONLY
-    pub data_class: String, // data_class: INTERNAL_ONLY
-    pub encryption: CloudStorageObjectEncryptionBindingRequest, // data_class: INTERNAL_ONLY
-    pub stored_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
-    pub last_accessed_at_epoch_seconds: Option<u64>, // data_class: INTERNAL_ONLY
+    pub bucket_id: String,
+    pub tenant_id: String,
+    pub key: String,
+    pub size_bytes: u64,
+    pub etag: String,
+    pub data_class: String,
+    pub encryption: CloudStorageObjectEncryptionBindingRequest,
+    pub stored_at_epoch_seconds: u64,
+    pub last_accessed_at_epoch_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectEncryptionBindingRequest {
-    pub kms_key: String,                 // data_class: INTERNAL_ONLY
-    pub kms_key_version: u32,            // data_class: INTERNAL_ONLY
-    pub material_ref: String,            // data_class: INTERNAL_ONLY
-    pub ciphertext_ref: String,          // data_class: INTERNAL_ONLY
-    pub kms_encrypt_event_id: String,    // data_class: INTERNAL_ONLY
-    pub purpose: String,                 // data_class: INTERNAL_ONLY
-    pub shred_proof_ref: Option<String>, // data_class: INTERNAL_ONLY
+    pub kms_key: String,
+    pub kms_key_version: u32,
+    pub material_ref: String,
+    pub ciphertext_ref: String,
+    pub kms_encrypt_event_id: String,
+    pub purpose: String,
+    pub shred_proof_ref: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectPutApiRequest {
-    pub path_bucket_id: String,  // data_class: INTERNAL_ONLY
-    pub path_object_key: String, // data_class: INTERNAL_ONLY
-    pub boundary: CloudStorageObjectMutationBoundaryContext, // data_class: INTERNAL_ONLY
-    pub principal: CloudStorageObjectApiPrincipal, // data_class: INTERNAL_ONLY
-    pub authorization: CloudStorageObjectApiAuthorization, // data_class: INTERNAL_ONLY
-    pub body: CloudStorageObjectPutRequest, // data_class: INTERNAL_ONLY
+    pub path_bucket_id: String,
+    pub path_object_key: String,
+    pub boundary: CloudStorageObjectMutationBoundaryContext,
+    pub principal: CloudStorageObjectApiPrincipal,
+    pub authorization: CloudStorageObjectApiAuthorization,
+    pub body: CloudStorageObjectPutRequest,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectGetApiRequest {
-    pub path_bucket_id: String,  // data_class: INTERNAL_ONLY
-    pub path_object_key: String, // data_class: INTERNAL_ONLY
-    pub boundary: CloudStorageObjectReadBoundaryContext, // data_class: INTERNAL_ONLY
-    pub principal: CloudStorageObjectApiPrincipal, // data_class: INTERNAL_ONLY
-    pub authorization: CloudStorageObjectApiAuthorization, // data_class: INTERNAL_ONLY
+    pub path_bucket_id: String,
+    pub path_object_key: String,
+    pub boundary: CloudStorageObjectReadBoundaryContext,
+    pub principal: CloudStorageObjectApiPrincipal,
+    pub authorization: CloudStorageObjectApiAuthorization,
 }
 
-/// Typed outcome of inspecting a recorded idempotency ledger entry.
-///
-/// `Replayed` — the recorded entry holds a success response; the same idempotency
-/// key with a matching fingerprint can safely replay the stored result.
-///
-/// `Conflict` — the same idempotency key was recorded but the caller's fingerprint
-/// differs; the caller must return `CloudStorageObjectApiError::IdempotencyKeyReused`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CloudStorageObjectReplayOutcome {
     Replayed {

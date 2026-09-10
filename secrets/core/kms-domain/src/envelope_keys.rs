@@ -14,14 +14,10 @@
 
 use std::fmt;
 
-/// Error returned by [`KekId::new`] and [`DekId::new`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EnvelopeKeyError {
-    /// The supplied string does not start with the required prefix.
     InvalidPrefix,
-    /// The slug portion (after the prefix) is empty.
     EmptySlug,
-    /// The slug portion contains a `/` — only the prefix separator is allowed.
     SlugContainsSlash,
 }
 
@@ -50,7 +46,7 @@ const DEK_PREFIX: &str = "dek/";
 /// read the underlying string.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct KekId {
-    value: String, // data_class: INTERNAL_ONLY
+    value: String,
 }
 
 impl KekId {
@@ -64,7 +60,6 @@ impl KekId {
         Ok(Self { value })
     }
 
-    /// Return the full value string (e.g. `"kek/ten_abc123"`).
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -95,7 +90,7 @@ impl fmt::Display for KekId {
 /// read the underlying string.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DekId {
-    value: String, // data_class: INTERNAL_ONLY
+    value: String,
 }
 
 impl DekId {
@@ -109,7 +104,6 @@ impl DekId {
         Ok(Self { value })
     }
 
-    /// Return the full value string (e.g. `"dek/ten_abc123"`).
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -146,8 +140,6 @@ fn validate_envelope_key_id(value: &str, prefix: &str) -> Result<(), EnvelopeKey
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // --- KekId tests ---
 
     #[test]
     fn kek_id_valid_round_trip() {
@@ -188,8 +180,6 @@ mod tests {
         assert!(a < b);
     }
 
-    // --- DekId tests ---
-
     #[test]
     fn dek_id_valid_round_trip() {
         let dek = DekId::new("dek/ten_xyz789").unwrap();
@@ -229,8 +219,6 @@ mod tests {
         assert!(a < b);
     }
 
-    // --- EnvelopeKeyError display ---
-
     #[test]
     fn error_display_invalid_prefix() {
         let msg = EnvelopeKeyError::InvalidPrefix.to_string();
@@ -248,8 +236,6 @@ mod tests {
         let msg = EnvelopeKeyError::SlugContainsSlash.to_string();
         assert!(msg.contains("/"));
     }
-
-    // --- Cross-type: KekId != DekId for same slug ---
 
     #[test]
     fn kek_and_dek_same_slug_are_distinct_types() {

@@ -6,20 +6,20 @@ pub enum OciBlockStorageAdapterConfigError {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OciBlockStorageAdapter {
-    endpoint_origin: String,     // data_class: INTERNAL_ONLY
-    compartment_ref: String,     // data_class: INTERNAL_ONLY
-    availability_domain: String, // data_class: INTERNAL_ONLY
-    clock_epoch_seconds: u64,    // data_class: INTERNAL_ONLY
+    endpoint_origin: String,
+    compartment_ref: String,
+    availability_domain: String,
+    clock_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OciBlockStorageCommand {
-    pub operation: &'static str,       // data_class: PUBLIC
-    pub method: &'static str,          // data_class: PUBLIC
-    pub endpoint_origin: String,       // data_class: INTERNAL_ONLY
-    pub path: String,                  // data_class: INTERNAL_ONLY
-    pub body_canonical: String,        // data_class: INTERNAL_ONLY
-    pub provider_evidence_ref: String, // data_class: INTERNAL_ONLY
+    pub operation: &'static str,
+    pub method: &'static str,
+    pub endpoint_origin: String,
+    pub path: String,
+    pub body_canonical: String,
+    pub provider_evidence_ref: String,
 }
 
 impl OciBlockStorageAdapter {

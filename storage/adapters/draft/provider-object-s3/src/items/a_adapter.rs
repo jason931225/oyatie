@@ -7,20 +7,20 @@ pub enum S3AdapterConfigError {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct S3Adapter {
-    endpoint_origin: String,  // data_class: INTERNAL_ONLY
-    region: String,           // data_class: PUBLIC
-    bucket_name: String,      // data_class: INTERNAL_ONLY
-    clock_epoch_seconds: u64, // data_class: INTERNAL_ONLY
+    endpoint_origin: String,
+    region: String,
+    bucket_name: String,
+    clock_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct S3ObjectCommand {
-    pub operation: &'static str,       // data_class: PUBLIC
-    pub method: &'static str,          // data_class: PUBLIC
-    pub endpoint_origin: String,       // data_class: INTERNAL_ONLY
-    pub path: String,                  // data_class: INTERNAL_ONLY
-    pub body_canonical: String,        // data_class: INTERNAL_ONLY
-    pub provider_evidence_ref: String, // data_class: INTERNAL_ONLY
+    pub operation: &'static str,
+    pub method: &'static str,
+    pub endpoint_origin: String,
+    pub path: String,
+    pub body_canonical: String,
+    pub provider_evidence_ref: String,
 }
 
 impl S3Adapter {

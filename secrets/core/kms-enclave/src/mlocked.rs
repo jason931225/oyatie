@@ -5,10 +5,6 @@
 //! `mlock(2)` so the kernel never writes the page to swap, zeroized on drop,
 //! and only then `munlock(2)`ed. Construction fails closed if `mlock` refuses
 //! — unpinned key material is never accepted.
-//!
-//! The byte accessor is `pub(crate)`: key bytes are reachable only by the
-//! AEAD plumbing inside this crate, which is the type-system one-way door
-//! demanded by ADR-0536 D-8.
 
 use std::fmt;
 
@@ -16,18 +12,14 @@ use zeroize::Zeroize;
 
 use crate::EnclaveError;
 
-/// All enclave keys are 256-bit.
-pub const KEY_LEN: usize = 32;
+pub(crate) const KEY_LEN: usize = 32;
 
 /// 256-bit key in an `mlock`ed, zeroize-on-drop heap buffer.
-///
-/// Deliberately implements neither `Clone` nor any serialization trait.
-pub struct MlockedKey {
+pub(crate) struct MlockedKey {
     bytes: Box<[u8; KEY_LEN]>,
 }
 
 impl MlockedKey {
-    /// Allocate a zeroed, page-locked buffer.
     fn new_zeroed() -> Result<Self, EnclaveError> {
         let bytes = Box::new([0u8; KEY_LEN]);
         // SAFETY: `bytes` is a live heap allocation of exactly KEY_LEN bytes;
@@ -40,7 +32,6 @@ impl MlockedKey {
         Ok(Self { bytes })
     }
 
-    /// Generate a fresh key from the CSPRNG directly into locked memory.
     pub(crate) fn generate() -> Result<Self, EnclaveError> {
         let mut key = Self::new_zeroed()?;
         aws_lc_rs::rand::fill(key.bytes.as_mut_slice())
@@ -57,7 +48,6 @@ impl MlockedKey {
         Ok(key)
     }
 
-    /// Crate-internal byte access for the AEAD plumbing. Never public.
     pub(crate) fn expose(&self) -> &[u8; KEY_LEN] {
         &self.bytes
     }
@@ -77,5 +67,39 @@ impl Drop for MlockedKey {
 impl fmt::Debug for MlockedKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("MlockedKey([REDACTED])")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MlockedKey;
+    use std::marker::PhantomData;
+
+    // Autoref specialization: `detect()` resolves to the inherent method (true)
+    // only when `T: Clone`, else to the trait fallback (false).
+    struct CloneProbe<T>(PhantomData<T>);
+
+    impl<T: Clone> CloneProbe<T> {
+        fn detect(&self) -> bool {
+            true
+        }
+    }
+
+    trait NotCloneFallback {
+        fn detect(&self) -> bool {
+            false
+        }
+    }
+
+    impl<T> NotCloneFallback for CloneProbe<T> {}
+
+    #[test]
+    fn mlocked_key_is_not_clone() {
+        assert!(
+            !CloneProbe::<MlockedKey>(PhantomData).detect(),
+            "MlockedKey must NOT implement Clone: a derived clone copies the key \
+             into an unpinned, un-mlocked allocation"
+        );
+        assert!(CloneProbe::<String>(PhantomData).detect());
     }
 }

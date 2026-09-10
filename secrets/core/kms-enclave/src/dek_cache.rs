@@ -1,4 +1,4 @@
-//! Bounded-TTL DEK cache: data-plane static stability (ADR-0536 D-8).
+//! Bounded-TTL DEK cache: data-plane static stability.
 //!
 //! AWS KMS precedent: the data plane never makes a per-request KMS call.
 //! Unwrapped DEKs are cached with a hard TTL; while the KMS control plane is
@@ -22,11 +22,9 @@ use crate::material::{DekMaterial, KekVersion};
 /// Injectable time source so TTL behavior is deterministic under test and
 /// alignable with the platform clock substrate (G003 HLC `ClockSource`).
 pub trait ClockSource {
-    /// Milliseconds since the Unix epoch.
     fn now_epoch_millis(&self) -> u64;
 }
 
-/// Production clock backed by `SystemTime`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemClockSource;
 
@@ -43,11 +41,8 @@ impl ClockSource for SystemClockSource {
 /// it plus its own id — never across versions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DekCacheKey {
-    /// KEK that wrapped the DEK.
     pub kek_id: KekId,
-    /// KEK version that wrapped the DEK.
     pub kek_version: KekVersion,
-    /// The DEK's own identifier.
     pub dek_id: DekId,
 }
 
@@ -57,18 +52,13 @@ impl fmt::Display for DekCacheKey {
     }
 }
 
-/// Loader-side error: the KMS control plane could not produce the DEK.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ControlPlaneUnavailable;
 
-/// Cache-side errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DekCacheError {
-    /// No fresh cached DEK and the control plane is unavailable: fail closed.
     ControlPlaneUnavailable {
-        /// The key that could not be served.
         key: String,
-        /// When the previously cached entry expired, if one existed.
         expired_at_epoch_millis: Option<u64>,
     },
 }
@@ -98,9 +88,7 @@ impl std::error::Error for DekCacheError {}
 /// Where a served DEK came from — observability + static-stability evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FetchSource {
-    /// Served from a fresh cached entry; no control-plane call was made.
     Cache,
-    /// Fetched from the control plane and (re)cached.
     ControlPlane,
 }
 
@@ -110,7 +98,6 @@ struct CacheEntry {
     expires_at: u64,
 }
 
-/// Bounded-TTL, bounded-cardinality DEK cache.
 pub struct BoundedTtlDekCache<C: ClockSource> {
     ttl_millis: NonZeroU64,
     max_entries: NonZeroUsize,
@@ -119,8 +106,6 @@ pub struct BoundedTtlDekCache<C: ClockSource> {
 }
 
 impl<C: ClockSource> BoundedTtlDekCache<C> {
-    /// Build a cache with a hard TTL (the static-stability window) and a hard
-    /// entry cap.
     pub fn new(ttl_millis: NonZeroU64, max_entries: NonZeroUsize, clock: C) -> Self {
         Self {
             ttl_millis,
@@ -130,12 +115,10 @@ impl<C: ClockSource> BoundedTtlDekCache<C> {
         }
     }
 
-    /// Number of currently held entries (fresh or not-yet-collected).
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
-    /// Whether the cache holds no entries.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -159,20 +142,7 @@ impl<C: ClockSource> BoundedTtlDekCache<C> {
         } else {
             match fetch() {
                 Ok(dek) => {
-                    // Drop (and thereby zeroize) any stale entry, make room,
-                    // then cache the refreshed DEK.
-                    self.entries.remove(key);
-                    self.evict_expired(now);
-                    self.evict_to_capacity();
-                    let expires_at = now.saturating_add(self.ttl_millis.get());
-                    self.entries.insert(
-                        key.clone(),
-                        CacheEntry {
-                            dek,
-                            inserted_at: now,
-                            expires_at,
-                        },
-                    );
+                    self.replace_entry(key, dek, now);
                     FetchSource::ControlPlane
                 }
                 Err(ControlPlaneUnavailable) => {
@@ -196,12 +166,25 @@ impl<C: ClockSource> BoundedTtlDekCache<C> {
         }
     }
 
-    /// Drop every entry whose TTL has elapsed.
+    fn replace_entry(&mut self, key: &DekCacheKey, dek: DekMaterial, now: u64) {
+        self.entries.remove(key);
+        self.evict_expired(now);
+        self.evict_to_capacity();
+        let expires_at = now.saturating_add(self.ttl_millis.get());
+        self.entries.insert(
+            key.clone(),
+            CacheEntry {
+                dek,
+                inserted_at: now,
+                expires_at,
+            },
+        );
+    }
+
     fn evict_expired(&mut self, now: u64) {
         self.entries.retain(|_, entry| entry.expires_at > now);
     }
 
-    /// Evict oldest-inserted entries until one slot is free.
     fn evict_to_capacity(&mut self) {
         while self.entries.len() >= self.max_entries.get() {
             let oldest = self

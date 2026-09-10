@@ -1,5 +1,4 @@
-//! Decrypt-only key-version rotation (ADR-0536 D-8: version rotation, never
-//! re-encryption; rejected anti-pattern: re-encrypt-on-rotate).
+//! Decrypt-only key-version rotation: version rotation, never re-encryption.
 
 use secrets_kms_enclave::{DekId, EnclaveError, KekId, KekMaterial, KekVersion, KekVersionChain};
 
@@ -36,8 +35,6 @@ fn old_ciphertext_decrypts_after_rotation_without_reencryption() {
     versions.rotate().expect("rotate");
     versions.rotate().expect("rotate again");
 
-    // The wrapped DEK bytes are untouched (never re-encrypted) and still
-    // unwrap through the retired v1 material.
     assert_eq!(wrapped_v1.encode(), wrapped_bytes_before);
     let recovered = versions
         .unwrap_dek(&wrapped_v1)
@@ -73,7 +70,6 @@ fn unknown_version_fails_closed() {
         Err(EnclaveError::UnknownKekVersion { version: 3 })
     ));
 
-    // Same id and same version but DIFFERENT material: AEAD rejects.
     let mut same_shape = chain("kek/ten_alpha");
     same_shape.rotate().expect("rotate to v2");
     same_shape.rotate().expect("rotate to v3");

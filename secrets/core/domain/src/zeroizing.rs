@@ -1,25 +1,10 @@
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 //! Memory-zeroing secret holder + vault-path value object.
 //!
-//! These types are the merge-variant landing of two contracts from
-//! `.omc/plans/milestones/M02b-substrate/phases/P06-secrets/impl-plan.md`
-//! into the existing `secrets-domain` crate (kept per
-//! `F-M02B-PLAN-LIVE-CRATE-RECONCILIATION`). They are additive — sibling
-//! types `SecretRef`, `SecretMaterial`, `SecretVersion`, `SecretLease`,
-//! `SecretError`, `SecretVault` are unchanged.
-//!
-//! `ZeroizingSecret`: memory-zeroed-on-drop byte buffer for short-lived
-//! in-memory secret values. Distinct from `SecretMaterial` (which carries
-//! a `Classified<Vec<u8>>` data-class wrapper and a fingerprint and lives
-//! in the persistent-version surface). Use `ZeroizingSecret` for transient
-//! values during secret retrieval / rotation; use `SecretMaterial` for
-//! persisted vault rows.
-//!
-//! `VaultPath`: validated OpenBao path. Construction rejects empty paths,
-//! `..` traversal, and paths not rooted under `secret/`.
+//! Use `ZeroizingSecret` for transient values during secret retrieval or
+//! rotation, and `SecretMaterial` for persisted vault rows: the latter also
+//! carries a `Classified<Vec<u8>>` data-class wrapper and a fingerprint.
 
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
