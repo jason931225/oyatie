@@ -1,10 +1,3 @@
-//! Cloud Compute VM API boundary for instance creation.
-//!
-//! This crate owns request boundary normalization, compute-owned authorization
-//! verifier checks, idempotent create semantics, and tenant-safe VM metadata
-//! the Cloud compute kernel. Hypervisor scheduling and boot orchestration live
-//! behind later adapters.
-
 use std::collections::BTreeMap;
 
 use compute_domain::{

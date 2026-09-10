@@ -46,7 +46,6 @@ impl Operation {
         }
     }
 
-    /// A still-running operation.
     pub fn pending(
         name: impl Into<String>,
         metadata: OperationLedgerEntry,
@@ -68,7 +67,6 @@ impl Operation {
         })
     }
 
-    /// A terminal, successful operation.
     pub fn succeeded(
         name: impl Into<String>,
         metadata: OperationLedgerEntry,
@@ -91,7 +89,6 @@ impl Operation {
         })
     }
 
-    /// A terminal, failed operation.
     pub fn failed(
         name: impl Into<String>,
         metadata: OperationLedgerEntry,

@@ -9,8 +9,6 @@ use shared_resource_provider_contract_kernel::{
 use super::fixture::ReferenceFixture;
 use super::support::{Document, ReferenceProvider};
 
-/// Forgets the idempotency dedup log for create: a retried create collides
-/// with its own first attempt instead of replaying.
 #[derive(Debug, Default)]
 struct NonReplayingCreateProvider(ReferenceProvider);
 

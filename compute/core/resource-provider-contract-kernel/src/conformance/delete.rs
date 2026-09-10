@@ -2,8 +2,6 @@ use crate::{OPERATION_NAME_PREFIX, OperationResult, ProviderError, ResourceProvi
 
 use super::{ConformanceFixture, ConformanceViolation, MAX_OPERATION_POLLS, violation};
 
-/// AIP-151 operation conformance for async deletes: pollable to terminal,
-/// immutable once done, idempotent under key replay.
 pub async fn check_async_delete_operation<F: ConformanceFixture>(
     fixture: &F,
 ) -> Result<(), ConformanceViolation> {

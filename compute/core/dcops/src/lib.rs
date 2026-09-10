@@ -1,10 +1,3 @@
-//! Cloud datacenter-operations kernel.
-//!
-//! This crate owns the preview DC-ops control contract named by `cloud.dcops.*`:
-//! DCIM hierarchy, BMS points, power and cooling capacity, cable maps, physical
-//! security zones, asset lifecycle, work orders, and sustainability evidence.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 mod accounting;

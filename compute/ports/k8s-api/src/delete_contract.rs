@@ -1,9 +1,5 @@
-// ── Delete surface ────────────────────────────────────────────────────────────
-
-/// Authorization surface constant for cluster teardown requests.
 pub const CLOUD_COMPUTE_K8S_CLUSTER_DELETE_SURFACE: &str = "cloud.compute.k8s.cluster.delete";
 
-/// HTTP status codes for the cluster DELETE boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CloudComputeK8sClusterDeleteApiStatus {
     Accepted,
@@ -29,10 +25,6 @@ impl CloudComputeK8sClusterDeleteApiStatus {
     }
 }
 
-/// Inbound delete request boundary envelope.
-///
-/// There is no mutable body beyond the cluster identity in the path — the
-/// caller identifies the cluster via `path_cluster_id` alone.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudComputeK8sClusterDeleteApiRequest {
     pub path_cluster_id: String, // data_class: INTERNAL_ONLY
@@ -41,7 +33,6 @@ pub struct CloudComputeK8sClusterDeleteApiRequest {
     pub authorization: CloudComputeK8sApiAuthorization, // data_class: INTERNAL_ONLY
 }
 
-/// Successful delete acceptance response.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudComputeK8sClusterDeleteSuccessResponse {
     pub data: CloudComputeK8sClusterRecord, // data_class: INTERNAL_ONLY
@@ -73,7 +64,6 @@ pub struct CloudComputeK8sDeleteReceipt {
 }
 
 impl CloudComputeK8sApiError {
-    /// Maps this error to the HTTP status for the cluster DELETE surface.
     pub fn cluster_delete_status(&self) -> CloudComputeK8sClusterDeleteApiStatus {
         match self.status_kind() {
             CloudComputeK8sApiStatusKind::BadRequest => {
@@ -101,7 +91,6 @@ impl CloudComputeK8sApiError {
         }
     }
 
-    /// Convenience accessor — returns the numeric HTTP status code for delete.
     pub fn cluster_delete_status_code(&self) -> u16 {
         self.cluster_delete_status().code()
     }

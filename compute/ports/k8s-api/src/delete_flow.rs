@@ -1,8 +1,3 @@
-/// Validates all boundary conditions for a delete request without touching the
-/// catalog.
-///
-/// Returns the parsed [`ResourceId`] on success so the caller can use it for
-/// catalog lookup.
 pub fn validate_cloud_compute_k8s_cluster_delete_request(
     request: &CloudComputeK8sClusterDeleteApiRequest,
 ) -> Result<ResourceId, CloudComputeK8sApiError> {
@@ -29,8 +24,6 @@ pub fn validate_cloud_compute_k8s_cluster_delete_request_with_authorization_veri
     Ok(resource_id)
 }
 
-/// Full delete execution: validates the boundary, then delegates the atomic
-/// idempotency-and-intent transition to the deletion repository.
 pub async fn delete_cloud_compute_k8s_cluster_from_api(
     repository: &impl CloudComputeK8sLifecycleRepository,
     request: CloudComputeK8sClusterDeleteApiRequest,
@@ -136,16 +129,7 @@ fn delete_repository_error(
     }
 }
 
-/// Stable planned entrypoint for `cloud.compute.k8s.cluster.delete`.
-///
-/// Delegates to [`delete_cloud_compute_k8s_cluster_from_api`] so the plan
-/// symbol remains stable without adding a second validation path.
-pub async fn delete_cluster(
-    repository: &impl CloudComputeK8sLifecycleRepository,
-    request: CloudComputeK8sClusterDeleteApiRequest,
-) -> Result<CloudComputeK8sClusterDeleteSuccessResponse, CloudComputeK8sApiError> {
-    delete_cloud_compute_k8s_cluster_from_api(repository, request).await
-}
+pub use crate::delete_cloud_compute_k8s_cluster_from_api as delete_cluster;
 
 pub async fn delete_cluster_with_authorization_verifier(
     repository: &impl CloudComputeK8sLifecycleRepository,
@@ -160,8 +144,6 @@ pub async fn delete_cluster_with_authorization_verifier(
     .await
 }
 
-/// Validates that `path_cluster_id` is non-empty (delete has no body to match
-/// against).
 fn validate_path_cluster_id_only(path_cluster_id: &str) -> Result<(), CloudComputeK8sApiError> {
     if path_cluster_id.trim().is_empty() {
         return Err(CloudComputeK8sApiError::EmptyPathClusterId);
@@ -169,11 +151,6 @@ fn validate_path_cluster_id_only(path_cluster_id: &str) -> Result<(), CloudCompu
     Ok(())
 }
 
-/// Validates that the tenant encoded in the cluster resource-id matches both
-/// the boundary tenant header and the authenticated principal tenant.
-///
-/// Returns `EmptyPrincipalId` (401) if the principal id is absent, and
-/// `TenantMismatch` (403) if any tenant comparison fails.
 fn validate_delete_tenant_binding(
     boundary: &CloudComputeK8sApiBoundaryContext,
     principal: &CloudComputeK8sApiPrincipal,

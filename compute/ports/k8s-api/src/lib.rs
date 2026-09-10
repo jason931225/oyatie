@@ -1,15 +1,3 @@
-//! Cloud Compute managed Kubernetes API boundary for cluster lifecycle.
-//!
-//! This crate owns request boundary normalization, authorization proof checks,
-//! idempotent create and delete semantics, and tenant-safe Kubernetes cluster
-//! metadata projection around the Cloud compute kernel. Cluster reconciliation
-//! and provider adapters live behind later adapter crates.
-//!
-//! # Surfaces
-//!
-//! - [`CLOUD_COMPUTE_K8S_CLUSTER_CREATE_SURFACE`] — `cloud.compute.k8s.cluster.create`
-//! - [`CLOUD_COMPUTE_K8S_CLUSTER_DELETE_SURFACE`] — `cloud.compute.k8s.cluster.delete`
-
 use std::{collections::BTreeMap, future::Future, pin::Pin};
 
 use compute_domain::{

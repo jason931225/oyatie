@@ -63,15 +63,14 @@ pub(super) async fn assert_recovery(
         read(reader, original_query.clone()).await.unwrap(),
         CloudComputeK8sOperationLookup::NotObserved
     );
-    // NotObserved while the original write is in flight never licenses a replacement identity.
     assert_eq!(
-        original_query.boundary.idempotency_key,
-        "cancel-before-commit"
+        original_query.boundary.idempotency_key, "cancel-before-commit",
+        "NotObserved while the original write is in flight never licenses a replacement identity"
     );
     task.abort();
     assert!(task.await.unwrap_err().is_cancelled());
     blocker.rollback().await.unwrap();
-    round_trip(&single, backend).await;
+    drain_queued_rollback_on_connection(&single, backend).await;
     assert_eq!(tenant_count(app, "ten_alpha", "SELECT count(*)::bigint FROM compute_k8s_lifecycle.operations WHERE principal_id = 'sp-compute-live' AND surface = 'cloud.compute.k8s.cluster.create' AND idempotency_key = 'cancel-before-commit'").await, 0);
 
     let failed = accept(
@@ -83,7 +82,7 @@ pub(super) async fn assert_recovery(
         failed.unwrap_err(),
         CloudComputeK8sAcceptanceApiError::RepositoryUnavailable
     );
-    round_trip(&single, backend).await;
+    drain_queued_rollback_on_connection(&single, backend).await;
     assert_eq!(
         read(reader, operation_read_request("fail-before-commit"))
             .await
@@ -114,8 +113,7 @@ pub(super) async fn assert_recovery(
     single.close().await;
 }
 
-async fn round_trip(single: &PgPool, expected_backend: i32) {
-    // The sole connection processes queued rollback before this command can finish.
+async fn drain_queued_rollback_on_connection(single: &PgPool, expected_backend: i32) {
     let backend: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(single)
         .await

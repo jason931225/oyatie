@@ -3,8 +3,6 @@ use crate::{ProviderError, ResourceProvider, WriteDisposition};
 use super::listing::list_all;
 use super::{ConformanceFixture, ConformanceViolation, violation};
 
-/// Idempotent PUT: a replay under the same key is a visible no-op; a new
-/// write under a new key replaces.
 pub async fn check_idempotent_put<F: ConformanceFixture>(
     fixture: &F,
 ) -> Result<(), ConformanceViolation> {
@@ -86,8 +84,6 @@ pub async fn check_idempotent_put<F: ConformanceFixture>(
     Ok(())
 }
 
-/// No duplicate create under a client-UUID idempotency key; key reuse with
-/// different parameters and name reuse with a new key both fail.
 pub async fn check_create_idempotency<F: ConformanceFixture>(
     fixture: &F,
 ) -> Result<(), ConformanceViolation> {
@@ -163,8 +159,6 @@ pub async fn check_create_idempotency<F: ConformanceFixture>(
     Ok(())
 }
 
-/// Read-after-write equality: a get immediately after a write returns
-/// exactly the written resource; unknown names are not-found.
 pub async fn check_read_after_write<F: ConformanceFixture>(
     fixture: &F,
 ) -> Result<(), ConformanceViolation> {
