@@ -82,8 +82,6 @@ fn materialize_writes_single_file_under_allowlisted_dir() {
     let _ = fs::remove_dir_all(root.parent().expect("parent"));
 }
 
-/// Widening WHAT may be written did not widen WHERE. Both refusals still apply to the tree
-/// path exactly as they do to the canary path.
 #[test]
 fn tree_materialize_keeps_every_destination_refusal() {
     for path in [
@@ -129,9 +127,19 @@ fn tree_materialize_writes_one_file_per_region() {
     let _ = fs::remove_dir_all(root.parent().expect("parent"));
 }
 
-/// A region id is the only part of a destination path that comes from DATA, so it is checked
-/// rather than trusted: `../escape` as a region name would place a file outside the root that
-/// was just validated.
+#[test]
+fn every_allowlisted_basename_is_accepted_by_exactly_one_validator() {
+    for name in ALLOWED_OUT_DIRNAMES {
+        let dir = Path::new("out").join(name);
+        assert_ne!(
+            validate_canary_out_dir(&dir).is_ok(),
+            validate_emit_out_dir(&dir).is_ok(),
+            "`{name}` is allowlisted but no validator claims it, or both do"
+        );
+    }
+    assert!(validate_canary_out_dir(Path::new("out/port-engine-other-out")).is_err());
+}
+
 #[test]
 fn tree_materialize_refuses_a_region_id_that_is_not_a_bare_identifier() {
     let root = std::env::temp_dir().join(EMIT_OUT_DIRNAME);

@@ -1,7 +1,4 @@
 //! The decoded Go source model: artifact bytes in, identity and declarations out.
-//!
-//! No Go toolchain, ever. ADR-0638 D3 puts the extractor out of band and leaves this side
-//! consuming artifacts only.
 
 use std::collections::BTreeSet;
 
@@ -16,15 +13,18 @@ use crate::vocabulary::{
 use crate::wire::SnapshotDocument;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+struct Package {
+    unit: UnitId,
+    producer: String,
+    declarations: Vec<Declaration>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GoSourceModel {
     schema_version: u32,
     language: String,
     snapshot_digest: Digest,
-    units: Vec<UnitId>,
-    /// Parallel to [`Self::units`] — ADR-0638 D3 package→producer map (one producer per package).
-    producers: Vec<String>,
-    /// Parallel to [`Self::units`] — declaration tree per package. Empty for a v0 artifact.
-    declarations: Vec<Vec<Declaration>>,
+    packages: Vec<Package>,
 }
 
 impl GoSourceModel {
@@ -42,7 +42,7 @@ impl GoSourceModel {
     /// Decode snapshot JSON from an in-memory string (test hook and future adapter input).
     ///
     /// # Errors
-    /// [`SnapshotError`] on parse failure, schema violation, unknown producer, or duplicate unit.
+    /// Same refusals as [`Self::decode`].
     pub fn decode_str(json: &str) -> Result<Self, SnapshotError> {
         let doc: SnapshotDocument =
             serde_json::from_str(json).map_err(|err| SnapshotError::Parse {
@@ -64,9 +64,7 @@ impl GoSourceModel {
             });
         }
 
-        let mut units = Vec::with_capacity(doc.packages.len());
-        let mut producers = Vec::with_capacity(doc.packages.len());
-        let mut declarations = Vec::with_capacity(doc.packages.len());
+        let mut packages = Vec::with_capacity(doc.packages.len());
         let mut seen = BTreeSet::new();
         for pkg in doc.packages {
             if pkg.unit_id.is_empty() || pkg.unit_id.contains('\0') {
@@ -84,71 +82,57 @@ impl GoSourceModel {
                     unit_id: pkg.unit_id,
                 });
             }
-            // A v0 artifact carrying declarations is a version lie, not a bonus. Accepting it
-            // would mean the version field says one thing about the payload while the payload
-            // says another, and every later reader has to guess which one to believe.
             if doc.schema_version == SCHEMA_VERSION_IDENTITY_ONLY && !pkg.declarations.is_empty() {
                 return Err(SnapshotError::VersionPayloadMismatch {
                     detail: "schema_version 0 carries declarations",
                 });
             }
-            declarations.push(convert_declarations(&pkg.unit_id, &pkg.declarations)?);
-            units.push(UnitId(pkg.unit_id));
-            producers.push(pkg.producer);
+            packages.push(Package {
+                declarations: convert_declarations(&pkg.unit_id, &pkg.declarations)?,
+                unit: UnitId(pkg.unit_id),
+                producer: pkg.producer,
+            });
         }
         Ok(Self {
             schema_version: doc.schema_version,
             language: doc.language,
             snapshot_digest: Digest(doc.snapshot_digest),
-            units,
-            producers,
-            declarations,
+            packages,
         })
     }
 
-    /// Source-language slug claimed by the decoded snapshot.
     #[must_use]
     pub fn language(&self) -> &str {
         &self.language
     }
 
-    /// Semantic digest claimed by the decoded snapshot.
     #[must_use]
     pub fn snapshot_digest(&self) -> Digest {
         self.snapshot_digest.clone()
     }
 
-    /// Units in decoded snapshot order.
     #[must_use]
     pub fn units(&self) -> Vec<UnitId> {
-        self.units.clone()
+        self.packages.iter().map(|pkg| pkg.unit.clone()).collect()
     }
 
-    /// Envelope version this model was decoded from.
     #[must_use]
     pub const fn schema_version(&self) -> u32 {
         self.schema_version
     }
 
-    /// Producer identity for `unit`, if present in the snapshot map.
     #[must_use]
     pub fn producer_for(&self, unit: &UnitId) -> Option<&str> {
-        self.units
-            .iter()
-            .position(|u| u == unit)
-            .map(|idx| producers_at(self, idx))
+        self.package_for(unit).map(|pkg| pkg.producer.as_str())
     }
 
     /// Declaration tree for `unit`, or `None` when the model does not carry that unit.
     #[must_use]
     pub fn declarations_for(&self, unit: &UnitId) -> Option<Vec<Declaration>> {
-        self.units
-            .iter()
-            .position(|u| u == unit)
-            .map(|idx| self.declarations[idx].clone())
+        self.package_for(unit).map(|pkg| pkg.declarations.clone())
     }
-}
 
-fn producers_at(model: &GoSourceModel, idx: usize) -> &str {
-    &model.producers[idx]
+    fn package_for(&self, unit: &UnitId) -> Option<&Package> {
+        self.packages.iter().find(|pkg| &pkg.unit == unit)
+    }
 }

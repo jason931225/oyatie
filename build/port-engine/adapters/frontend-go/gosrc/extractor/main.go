@@ -7,15 +7,10 @@
 // with architecture tests over its own library sources; nothing here is linked into the
 // engine.
 //
-// Only the Go standard library is used. golang.org/x/tools/go/packages would give richer
-// package loading and would also give this fixture module a dependency graph, a go.sum,
-// and a vendoring question. The corpus is small and hermetic, so stdlib parsing is
-// sufficient and buys the module's dependency-freedom.
-//
 // Usage:
 //
 //	go run ./extractor -corpus ./corpus -module oyatie.example/portengine-fixture \
-//	    -out ../../port-engine-snapshot/src/fixture-snapshot-v1.json
+//	    -out ../../snapshot/src/fixture-snapshot-v1.json
 package main
 
 import (

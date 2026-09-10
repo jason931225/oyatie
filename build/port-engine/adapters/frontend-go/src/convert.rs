@@ -19,7 +19,7 @@ pub(crate) fn convert_declarations(
     convert_level(unit_id, entries, KNOWN_DECLARATION_KINDS, Namespace::Yes)
 }
 
-/// Whether a level is a namespace, in which one name means one thing.
+/// Whether a level is one of [`crate::vocabulary::NAMESPACE_KINDS`].
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum Namespace {
     Yes,

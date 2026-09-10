@@ -9,8 +9,8 @@ import (
 //
 // Go's interfaces are implicit: nothing in a type's declaration says which interfaces it satisfies,
 // and structural matching is combinatorial. docs/programs/k8s-port/census/interfaces.md measured
-// it — 80,042 name-level structural matches against 1,316 pairs the source declares outright, a
-// ~60x gap — and its conclusion is that the engine must emit impls from USAGE.
+// it — name-level structural matches outnumber the pairs the source declares outright by a wide
+// margin — and its conclusion is that the engine must emit impls from USAGE.
 //
 // This is that pass. A pair is recorded where a concrete value actually flows into an
 // interface-typed position: a declared assertion, an assignment, a call argument, a return. Each

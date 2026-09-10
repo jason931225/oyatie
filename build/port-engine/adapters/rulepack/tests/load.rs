@@ -89,8 +89,6 @@ fn embedded_go_rust_pack_loads_with_captures_types_and_deferrals() {
          because a const's reference is 'static by definition and spelling it draws a lint"
     );
 
-    // Every deferral, by KIND rather than by count. A count has to be edited whenever one lands,
-    // which makes the edit routine and the check ceremonial; the set says which one went missing.
     let deferred = pack.deferred();
     let kinds: std::collections::BTreeSet<&str> =
         deferred.iter().map(|entry| entry.kind.as_str()).collect();

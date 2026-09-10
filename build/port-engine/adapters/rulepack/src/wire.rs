@@ -1,7 +1,4 @@
 //! CLOSED serde wire shapes.
-//!
-//! `deny_unknown_fields` throughout: `type_map_override` for `type_map_overrides` used to parse
-//! clean, override nothing, and leave the author reading a green load and the wrong emitted types.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -92,9 +89,7 @@ pub(crate) struct RuleDocument {
     // behaviour that does not exist and is refused below.
     #[serde(default = "default_conflict")]
     pub(crate) conflict: String,
-    // Declared, and refused while unimplemented. These two used to be decoded and dropped, which
-    // meant a pack author could write a diagnostic requirement or a proof obligation, load green,
-    // and get nothing — the field said the engine would do something it had no code for.
+    // Declared, and refused while unimplemented — see `RulepackError::UnimplementedSemantics`.
     #[serde(default)]
     pub(crate) required_diagnostics: Vec<String>,
     #[serde(default)]

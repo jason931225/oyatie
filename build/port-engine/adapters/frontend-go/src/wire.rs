@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-/// Wire shape of one type-tree node.
 #[derive(Deserialize)]
 pub(crate) struct TypeEntry {
     pub(crate) kind: String,

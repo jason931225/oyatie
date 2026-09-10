@@ -13,7 +13,6 @@ rust_library(
     ],
 )
 
-# Admission: the pin binding, the cross-language digest, and every refusal.
 rust_test(
     name = "port-engine-snapshot-admission",
     srcs = glob(["tests/admission.rs", "src/**/*.json"]),

@@ -144,8 +144,6 @@ fn refuses_rule_with_only_negative_fixtures() {
     ));
 }
 
-/// A pack that declares a diagnostic requirement and gets nothing is worse than one that
-/// cannot declare it: the field reads as a promise the engine has no code to keep.
 #[test]
 fn refuses_declared_semantics_the_engine_does_not_implement() {
     for field in ["required_diagnostics", "proof_obligations"] {
@@ -164,9 +162,6 @@ fn refuses_declared_semantics_the_engine_does_not_implement() {
     }
 }
 
-/// Declaration order is the transform order — `plan` refuses a unit whose rules arrive out of
-/// declared position. A precedence that disagrees is a second ordering nothing obeys, and a
-/// reviewer reading it would be reading a fiction.
 #[test]
 fn refuses_precedence_that_disagrees_with_declaration_order() {
     let json = r#"{"pair":{"source":"go","target":"rust"},"rules":[
@@ -192,7 +187,6 @@ fn refuses_a_conflict_policy_with_no_implementation() {
     assert!(matches!(err, RulepackError::UnknownConflictPolicy { .. }));
 }
 
-/// A deferral without a reason is an omission wearing a label.
 #[test]
 fn refuses_a_deferral_without_a_recorded_reason() {
     let json = r#"{"pair":{"source":"go","target":"rust"},
@@ -223,8 +217,6 @@ fn refuses_a_kind_that_is_both_captured_and_deferred() {
     ));
 }
 
-/// A misspelled key used to parse clean and do nothing. `type_map_override` would have
-/// overridden no types at all while the load stayed green.
 #[test]
 fn refuses_an_unknown_key_rather_than_ignoring_it() {
     let json = r#"{"pair":{"source":"go","target":"rust"},"type_map_override":{},

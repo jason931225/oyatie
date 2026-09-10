@@ -7,72 +7,46 @@ use crate::vocabulary::{
     SCHEMA_VERSION_IDENTITY_ONLY,
 };
 
-/// Typed refusal from snapshot decode / producer validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SnapshotError {
-    /// JSON could not be parsed.
     Parse {
         /// Parser detail (no path — adapter receives bytes only).
         detail: String,
     },
-    /// Required field missing or wrong type / empty.
     Schema {
-        /// Which field failed.
         field: &'static str,
     },
-    /// Package producer is not one of the ADR-0638 canonical identities.
     UnknownProducer {
-        /// Producer string found on a package.
         actual: String,
     },
-    /// Duplicate `unit_id` — non-deterministic model shape.
+    /// Refused rather than deduplicated: a repeat makes the model shape non-deterministic.
     DuplicateUnit {
-        /// The repeated unit id.
         unit_id: String,
     },
-    /// Envelope claims a schema version this decoder does not implement.
     UnknownSchemaVersion {
-        /// Version claimed by the artifact.
         actual: u32,
     },
-    /// Declaration kind is outside the closed Go vocabulary.
     UnknownDeclarationKind {
-        /// Unit the declaration belongs to.
         unit_id: String,
-        /// Kind string found.
         actual: String,
     },
-    /// Type kind is outside the closed vocabulary.
     UnknownTypeKind {
-        /// Unit the type appears in.
         unit_id: String,
-        /// Kind string found.
         actual: String,
     },
-    /// Attribute key is outside the closed vocabulary.
     UnknownAttr {
-        /// Unit the declaration belongs to.
         unit_id: String,
-        /// Attribute key found.
         actual: String,
     },
-    /// Flag is outside the closed flag vocabulary.
     UnknownFlag {
-        /// Unit the declaration belongs to.
         unit_id: String,
-        /// Flag string found.
         actual: String,
     },
-    /// Two declarations share one name in a scope that has a single namespace.
     DuplicateDeclaration {
-        /// Unit the declarations belong to.
         unit_id: String,
-        /// The repeated name.
         name: String,
     },
-    /// The envelope version and its payload disagree.
     VersionPayloadMismatch {
-        /// What the version claims.
         detail: &'static str,
     },
 }
