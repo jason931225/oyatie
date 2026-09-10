@@ -29,8 +29,6 @@ rust_test(
     ],
 )
 
-# Architecture fence. `srcs` carries the library sources because the fence READS them with
-# include_str! — they are inputs to compiling this test, never modules of it.
 rust_test(
     name = "port-engine-rust-ir-fences",
     srcs = glob(["tests/fences.rs", "src/**/*.rs"]),

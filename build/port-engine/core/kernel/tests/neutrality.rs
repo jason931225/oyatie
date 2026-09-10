@@ -1,37 +1,23 @@
 //! Proof that the kernel's compile-time neutrality rule (ADR-0637 D1) is capable of going RED.
 //!
-//! ## Why the enforcement is not here
-//!
-//! The enforcement is the `const` assertion block in `src/lib.rs`: the kernel reads its own bytes
-//! with `include_str!` and refuses to COMPILE when a forbidden sequence is present. That is the
-//! "build error, not lint" the admission plan requires, and it cannot be skipped, filtered, or
-//! left unrun the way a test can.
-//!
 //! A const assertion cannot be demonstrated failing without breaking the build, so this file is
-//! the demonstration: it drives the SAME predicates (`contains_token`, `contains_word`) over the
-//! SAME needle sets (`FORBIDDEN_CORPUS_TOKENS`, `UNSCANNED_CODE_KEYWORDS`) that the build asserts
-//! with. Sharing the predicate is deliberate — a test that reimplemented the search could stay
-//! green while the enforced one was broken.
+//! the demonstration: it drives the SAME predicates over the SAME needle sets the kernel's own
+//! `const` block asserts with. Sharing the predicate is deliberate — a test that reimplemented
+//! the search could stay green while the enforced one was broken.
 //!
 //! The needles are safe to spell out HERE because nothing scans this file. That is also why they
 //! live as bytes in the kernel: a needle written as text in the scanned file would be a needle in
 //! the haystack.
 //!
-//! ## Coverage and its edges
-//!
-//! ENFORCED, at build time: the corpus vocabulary of the engine's first corpus, anywhere in the
-//! kernel, in code or in prose. A quoting exemption would be a hole, so there is none. Plus the
-//! two constructs that could hide code from the scan, which is what makes a one-file scan a
-//! complete one.
-//!
-//! NOT ENFORCED: source/target LANGUAGE names. ADR-0637's language-neutrality amendment is filed
-//! and not ratified, and a language-name scan is also unsound as written — the plausible slugs are
-//! ordinary English substrings. The kernel carries language neutrality STRUCTURALLY instead
-//! (`LanguagePair` is data, so a second pair is rule data rather than engine code) and its tests
-//! use only invented slugs. Promote this to a scan when the amendment ratifies.
-//!
-//! ADR-0083 Tier-3: integration tests use unwrap/expect to assert invariants.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+//! NOT ENFORCED: source/target LANGUAGE names. A language-name scan is unsound as written — the
+//! plausible slugs are ordinary English substrings — so the kernel carries language neutrality
+//! structurally instead, with `LanguagePair` as data.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "an integration test asserts its invariants by panicking"
+)]
 
 use port_engine_kernel::{
     FORBIDDEN_CORPUS_TOKENS, UNSCANNED_CODE_KEYWORDS, contains_token, contains_word,
@@ -231,3 +217,9 @@ fn the_word_predicate_anchors_on_identifier_boundaries_at_both_ends() {
     assert!(!contains_word(b"", b"mod"));
     assert!(!contains_word(b"anything", b""));
 }
+
+/// Promote this to a scan when the amendment ratifies. Until then the kernel's tests must name a
+/// language only by invented slugs, because no gate rejects a real one.
+#[test]
+#[ignore = "ADR-0637's language-neutrality amendment is filed and not ratified"]
+fn language_names_are_scanned_once_the_neutrality_amendment_ratifies() {}

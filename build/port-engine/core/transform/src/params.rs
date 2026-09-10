@@ -64,9 +64,7 @@ pub(crate) fn params(
             } else {
                 resolver.resolve_in(&param.type_ref, &declaration.name, POSITION_PARAM)?
             };
-            // An unnamed parameter is legal in the source and illegal in the target, so it is
-            // given a positional name. The position is already its identity, so nothing is
-            // invented that was not already true.
+            // An unnamed parameter is legal in the source and illegal in the target.
             let name = if param.name.is_empty() || param.name == "_" {
                 format!("arg{index}")
             } else {

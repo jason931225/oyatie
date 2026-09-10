@@ -22,23 +22,12 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-/// Every production source of this crate, read at compile time.
-const PRODUCTION_SOURCES: &[(&str, &str)] = &[
-    ("expr.rs", include_str!("../src/expr.rs")),
-    ("item.rs", include_str!("../src/item.rs")),
-    ("lib.rs", include_str!("../src/lib.rs")),
-    ("lower.rs", include_str!("../src/lower.rs")),
-    ("lower_body.rs", include_str!("../src/lower_body.rs")),
-    ("lower_parts.rs", include_str!("../src/lower_parts.rs")),
-    ("ops.rs", include_str!("../src/ops.rs")),
-    ("render.rs", include_str!("../src/render.rs")),
-    ("sources.rs", include_str!("../src/sources.rs")),
-    ("ty.rs", include_str!("../src/ty.rs")),
-];
+use port_engine_rust_ir::CRATE_SOURCES;
 
-/// The enumeration must BE the directory, not a subset somebody once curated.
+/// The enumeration must BE the directory, not a subset somebody once curated — and each entry must
+/// hold the bytes of the file it names, because a name matching proves nothing about what was read.
 #[test]
-fn scanned_sources_are_the_whole_crate() {
+fn scanned_sources_are_the_whole_crate_byte_for_byte() {
     let candidates = [
         option_env!("CARGO_MANIFEST_DIR").map(|dir| Path::new(dir).join("src")),
         Some(Path::new("src").to_path_buf()),
@@ -60,15 +49,27 @@ fn scanned_sources_are_the_whole_crate() {
         .filter(|name| name.ends_with(".rs"))
         .collect();
 
-    let scanned: BTreeSet<String> = PRODUCTION_SOURCES
+    let scanned: BTreeSet<String> = CRATE_SOURCES
         .iter()
         .map(|(name, _)| (*name).to_owned())
         .collect();
 
     assert_eq!(
         scanned, on_disk,
-        "a source file exists that no architecture fence reads — add it to PRODUCTION_SOURCES"
+        "a source file exists that no architecture fence reads — regenerate src/sources.rs"
     );
+
+    for (name, embedded) in CRATE_SOURCES {
+        let path = src.join(name);
+        let bytes = std::fs::read_to_string(&path).unwrap_or_else(|err| {
+            panic!("{} must be readable to be compared: {err}", path.display())
+        });
+        assert!(
+            *embedded == bytes,
+            "src/{name} is enumerated under its own name but carries another file's bytes, so it \
+             is scanned by no fence and hashed by no axis — regenerate src/sources.rs"
+        );
+    }
 }
 
 /// A CANARY SET, not a decision procedure — no finite list can decide "corpus-specific". The
@@ -82,7 +83,7 @@ fn no_production_source_carries_corpus_vocabulary() {
         ["api", "machin", "ery"].concat(),
     ];
 
-    for (name, source) in PRODUCTION_SOURCES {
+    for (name, source) in CRATE_SOURCES {
         for needle in &needles {
             assert!(
                 !source.contains(needle),
@@ -100,7 +101,7 @@ fn no_production_source_spawns_a_host_toolchain() {
     let cmd_new = ["Command", "::", "new"].concat();
     let process_cmd = ["std", "::", "process", "::", "Command"].concat();
 
-    for (name, source) in PRODUCTION_SOURCES {
+    for (name, source) in CRATE_SOURCES {
         assert!(
             !source.contains(&cmd_new),
             "{name} must not spawn a process via {cmd_new}"

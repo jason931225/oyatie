@@ -85,8 +85,6 @@ fn struct_renders_fields_and_an_inherent_impl() {
     assert!(!text.contains("pub label"), "{text}");
 }
 
-/// A defined type is a distinct type. Rendering it as an alias would erase the one property it
-/// was declared for, and the emitted code would compile while meaning something weaker.
 #[test]
 fn defined_type_becomes_a_newtype_and_alias_stays_transparent() {
     let celsius = decl("named", "Celsius", "float64");

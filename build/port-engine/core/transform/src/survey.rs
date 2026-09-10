@@ -4,11 +4,10 @@
 //! the right behaviour for PRODUCING a port — a partial port that compiles is worse than no port,
 //! because nothing downstream can tell which half is real.
 //!
-//! It is the wrong behaviour for MEASURING one. Pointed at a real third-party package, `apply`
-//! reports the first refusal and says nothing about the other nine hundred declarations, so the
-//! engine's own maturity can only be discovered one construct at a time. A survey attempts every
-//! declaration independently and reports all of it, which turns "what is missing" from a guess into
-//! a ranked list.
+//! It is the wrong behaviour for MEASURING one. `apply` reports the first refusal and nothing
+//! about the declarations behind it, so the engine's own maturity can only be discovered one
+//! construct at a time. A survey attempts every declaration independently and reports all of it,
+//! which turns "what is missing" from a guess into a ranked list.
 //!
 //! Two things this deliberately does NOT do, because both would make the number flattering:
 //!

@@ -16,9 +16,7 @@ use crate::ty::RustType;
 pub enum RustStmt {
     /// `let (a, b) = value;` — a destructuring bind.
     LetTuple {
-        /// The names bound, in order.
         names: Vec<String>, // data_class: INTERNAL_ONLY
-        /// What they are bound from.
         value: RustExpr,
     },
     /// `let [mut] <name>[: <ty>] [= <value>];`
@@ -31,7 +29,6 @@ pub enum RustStmt {
         /// target makes none of them: assuming either way is wrong for half the bindings in any
         /// real body.
         mutable: bool,
-        /// The declared type, when the source declared one.
         ty: Option<RustType>,
         /// What it is bound to. `None` is a binding the body fills in later, which the source
         /// spells as a `var` with no initializer.
@@ -47,25 +44,17 @@ pub enum RustStmt {
     Assign {
         /// What is assigned to: a path, a field, an index.
         target: RustExpr,
-        /// The new value.
         value: RustExpr,
     },
     /// `while <cond> { .. }`
-    While {
-        /// The loop condition.
-        cond: RustExpr,
-        /// The loop body.
-        body: Vec<RustStmt>,
-    },
+    While { cond: RustExpr, body: Vec<RustStmt> },
     /// `loop { .. }`
     Loop(Vec<RustStmt>),
     /// `for <binding> in <iter> { .. }`
     ForIn {
         /// The bound name, already cased for the target.
         binding: String, // data_class: INTERNAL_ONLY
-        /// What is iterated.
         iter: RustExpr,
-        /// The loop body.
         body: Vec<RustStmt>,
     },
     /// `break;`
@@ -75,23 +64,14 @@ pub enum RustStmt {
 /// An expression in an emitted body.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RustExpr {
-    /// A literal, carried as its source spelling.
-    ///
-    /// Pass-through is safe only because the emitted tree is parsed and then compiled: a source
-    /// literal with no valid target spelling fails the parse, which is the correct outcome. No
-    /// attempt is made to normalise numbers, because a rounded literal compiles and means
-    /// something else.
     /// `&base[lo..hi]` — a borrowed subrange, with either bound optional.
     ///
     /// BORROWED, not owned. The source's slice expression produces a VIEW over the same backing
     /// array and does not copy, so an owned target would be a different program with different
     /// costs and different aliasing.
     Slice {
-        /// What is being sliced.
         base: Box<RustExpr>,
-        /// The lower bound, or the start.
         low: Option<Box<RustExpr>>,
-        /// The upper bound, or the end.
         high: Option<Box<RustExpr>>,
     },
     /// `expr as T` — a truncating conversion.
@@ -99,42 +79,32 @@ pub enum RustExpr {
     /// A NODE rather than text, so a later rule can see the cast and remove it. A cast rendered
     /// into a string is invisible to integer right-sizing, which is the rule most likely to want it
     /// gone.
-    Cast {
-        /// What is being converted.
-        expr: Box<RustExpr>,
-        /// What it is converted to.
-        ty: RustType,
-    },
+    Cast { expr: Box<RustExpr>, ty: RustType },
     /// `expr?` — propagate a failure to the caller.
     ///
     /// An OPERATOR rather than a call, which is the whole point of recognising the source's
     /// propagation idiom: a two-statement bind-and-check becomes one expression that cannot be
     /// forgotten, where the source's version is a convention a caller may ignore.
     Try(Box<RustExpr>),
+    /// A literal, carried as its source spelling.
+    ///
+    /// Pass-through is safe only because the emitted tree is parsed and then compiled: a source
+    /// literal with no valid target spelling fails the parse, which is the correct outcome. No
+    /// attempt is made to normalise numbers, because a rounded literal compiles and means
+    /// something else.
     Literal(String), // data_class: INTERNAL_ONLY
     /// A path or identifier, already cased for the target.
     Path(String), // data_class: INTERNAL_ONLY
-    /// A binary operation.
     Binary {
-        /// The operator.
         op: BinaryOp,
-        /// Left operand.
         lhs: Box<RustExpr>,
-        /// Right operand.
         rhs: Box<RustExpr>,
     },
     /// A prefix operation.
-    Unary {
-        /// The operator.
-        op: UnaryOp,
-        /// The operand.
-        operand: Box<RustExpr>,
-    },
+    Unary { op: UnaryOp, operand: Box<RustExpr> },
     /// `if <cond> { .. } else ..`
     If {
-        /// The condition.
         cond: Box<RustExpr>,
-        /// The taken branch.
         then: Vec<RustStmt>,
         /// An `else` branch, which is itself a block or a further `if`.
         otherwise: Option<Box<RustExpr>>,
@@ -145,21 +115,18 @@ pub enum RustExpr {
     Tuple(Vec<RustExpr>),
     /// `<base>.<name>` — a field access.
     Field {
-        /// What the field is read from.
         base: Box<RustExpr>,
         /// The field's name, already cased for the target.
         name: String, // data_class: INTERNAL_ONLY
     },
     /// `<callee>(<args>)`
     Call {
-        /// The function being called.
         callee: Box<RustExpr>,
         /// Its arguments, in order.
         args: Vec<RustExpr>,
     },
     /// `<receiver>.<method>(<args>)`
     MethodCall {
-        /// What the method is called on.
         receiver: Box<RustExpr>,
         /// The method's name, already cased for the target.
         method: String, // data_class: INTERNAL_ONLY
@@ -168,14 +135,11 @@ pub enum RustExpr {
     },
     /// `<base>[<index>]`
     Index {
-        /// What is indexed.
         base: Box<RustExpr>,
-        /// The index.
         index: Box<RustExpr>,
     },
     /// `<path> { <field>: <value>, .. }`
     StructLiteral {
-        /// The struct's path.
         path: String, // data_class: INTERNAL_ONLY
         /// Its fields, in declared order.
         fields: Vec<(String, RustExpr)>,
@@ -191,14 +155,12 @@ pub enum RustExpr {
     Reference {
         /// `true` for `&mut`.
         mutable: bool,
-        /// What is referenced.
         inner: Box<RustExpr>,
     },
     /// `self`
     SelfValue,
     /// `match <scrutinee> { <patterns> => { .. }, .. }`
     Match {
-        /// What is matched on.
         scrutinee: Box<RustExpr>,
         /// The arms, in order. An arm with no patterns is the wildcard.
         arms: Vec<MatchArm>,
@@ -216,7 +178,6 @@ pub struct MatchArm {
     /// value to compare against, not a destructuring pattern. Modelling them as full patterns
     /// would be inventing a capability the source does not have.
     pub patterns: Vec<RustExpr>,
-    /// The arm's body.
     pub body: Vec<RustStmt>,
 }
 

@@ -10,83 +10,49 @@ use port_engine_api::PortError;
 /// Typed refusal from transform apply.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TransformError {
-    /// Pack did not declare construction/precondition/captures for a planned rule.
     MissingSemantics {
-        /// Rule missing semantics.
         rule: String,
-        /// Which field was absent.
         field: &'static str,
     },
-    /// Precondition evaluation refused.
     Precondition {
-        /// Rule being applied.
         rule: String,
-        /// Unit under transform.
         unit: String,
-        /// Precondition id that failed.
         precondition: String,
     },
-    /// Construction id is not one of the known set.
     UnknownConstruction {
-        /// Rule being applied.
         rule: String,
-        /// Construction id found.
         construction: String,
     },
-    /// A construction was applied to a declaration kind it cannot build from.
     ConstructionKindMismatch {
-        /// Construction that was asked.
         construction: String,
-        /// Declaration kind it was asked to build from.
         kind: String,
-        /// Declaration name, for locating it.
         name: String,
     },
-    /// A construction needs a declared datum the model does not carry.
     MissingDatum {
-        /// Construction that needs it.
         construction: String,
-        /// Declaration that lacks it.
         name: String,
-        /// What was missing.
         datum: &'static str,
     },
-    /// A type spelling resolves to nothing: not declared in the unit, not in the pack's type map.
     UnmappedType {
-        /// Unit under transform.
         unit: String,
-        /// Declaration whose type could not be resolved.
         name: String,
-        /// The unresolvable source type spelling.
         type_ref: String,
     },
-    /// A declaration is captured by no rule and deferred by no policy.
     UncapturedDeclaration {
-        /// Unit that declares it.
         unit: String,
-        /// Declaration name.
         name: String,
-        /// Declaration kind that nothing selects.
         kind: String,
     },
-    /// A construct the engine does not translate yet, refused by name.
     Unsupported {
-        /// Declaration that carries it.
         name: String,
-        /// What is unsupported, and where the program records the analysis.
         detail: String,
     },
-    /// The plan named a unit the model does not carry.
     UnitNotInModel {
-        /// The absent unit.
         unit: String,
     },
-    /// No ownership disposition could be decided for a pointer.
     Ownership {
-        /// What the analysis said.
         detail: String,
     },
-    /// IR / syn assembly refused.
     Ir(PortError),
 }
 
