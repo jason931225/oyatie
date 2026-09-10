@@ -104,7 +104,28 @@ jobs:
 
           [cache]
             remote_cache_enabled = true
-            allow_cache_uploads = true
+            # Reads only. The exposed action cache is read_only on instance
+            # "main" (substrate 1defdd0), so a write would be refused -- but
+            # that is not the reason this is false.
+            #
+            # A CAS entry is content-addressed: with verify_hash on, a hostile
+            # writer can only spend storage. An ACTION CACHE entry maps an
+            # action digest to an arbitrary result, so whoever writes one
+            # chooses what every later build receives INSTEAD of compiling. One
+            # unauthenticated AC write is arbitrary code execution in every
+            # consumer, and no argument about runner uniformity outranks that.
+            #
+            # The keying is not ready either. `build/toolchains/BUCK` passes
+            # /usr/bin/clang and /usr/bin/ar as strings and `system_cxx_toolchain`
+            # takes them as attrs.option(attrs.string()), with no artifact-accepting
+            # alternative -- so every link is cacheable and unkeyed on the C
+            # compiler. A CAS cannot detect a blob that is faithfully what a
+            # DIFFERENT clang produced; that is a keying problem, not an
+            # integrity one, and verify_hash does not touch it.
+            #
+            # Writes become their own decision, with their own evidence, after
+            # someone has watched a write be refused here.
+            allow_cache_uploads = false
 
           [build]
             execution_platforms = toolchains//cache:cache-platform
