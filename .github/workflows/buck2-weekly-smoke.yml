@@ -86,6 +86,23 @@ jobs:
             echo "wired=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # The admission control, honoured rather than stepped over.
+          #
+          # AGENTS.md:209 and ADR-0716 D2 name specs/cache-warm-license.json as
+          # the switch that licenses warm reads. The file had been deleted, so
+          # the control existed in three documents and nowhere in the tree --
+          # which is worse than no control, because a reader believes they are
+          # covered by it. It is restored, and this lane, as the first consumer
+          # of warm reads, reads it.
+          #
+          # False means this lane builds exactly as it does today. Licensing is
+          # a founder decision: one field, in one file, review-visible.
+          licensed=$(python3 -c 'import json;print(json.load(open("specs/cache-warm-license.json"))["warm_reads_licensed"])' 2>/dev/null || echo "error")
+          if [ "$licensed" != "True" ]; then
+            echo "warm reads are not licensed (specs/cache-warm-license.json: warm_reads_licensed=${licensed}); building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -z "${CACHE_ENDPOINT_URL}" ]; then
             echo "vars.CACHE_ENDPOINT is not published to this context; building without the cache"
             echo "wired=no" >> "$GITHUB_OUTPUT"
