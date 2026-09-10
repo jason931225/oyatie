@@ -18,10 +18,12 @@ use seams::{
     cmd_pin, cmd_plan, cmd_ready, cmd_rulepack, cmd_toolchain,
 };
 
-/// Every command [`run`] dispatches, in usage order.
+/// Every command [`run`] dispatches, in usage order, one entry per command. `help` is also
+/// reachable as `-h` and `--help`; those are argv spellings, not commands of their own.
 ///
-/// The usage text below is prose around this list rather than a second copy of it;
-/// `usage_lists_exactly_the_dispatchable_commands` holds the two together.
+/// Neither the usage text below nor the dispatch is a second copy of this list:
+/// `usage_documents_exactly_the_listed_commands` and `run_dispatches_exactly_the_listed_commands`
+/// hold each of them against it.
 pub(crate) const COMMANDS: &[&str] = &[
     "help",
     "ready",
@@ -149,12 +151,45 @@ mod tests {
             .collect()
     }
 
+    /// The tokens [`run`]'s `match` accepts, read back out of this file's own source.
+    ///
+    /// Reading the dispatch is the whole point: a list checked against another list agrees with
+    /// whatever both were written to say, and an arm added to `run` alone is what nothing else
+    /// here can see.
+    fn dispatched() -> Vec<&'static str> {
+        include_str!("mod.rs")
+            .lines()
+            .skip_while(|line| !line.contains("match cmd {"))
+            .take_while(|line| !line.contains("other =>"))
+            .filter(|line| line.contains("=>"))
+            .filter_map(|line| line.split("=>").next())
+            .flat_map(|arm| arm.split('"').skip(1).step_by(2))
+            .collect()
+    }
+
     #[test]
-    fn usage_lists_exactly_the_dispatchable_commands() {
+    fn usage_documents_exactly_the_listed_commands() {
         assert_eq!(
             documented(),
             COMMANDS.to_vec(),
             "the usage text and the command list must not drift apart"
+        );
+    }
+
+    #[test]
+    fn run_dispatches_exactly_the_listed_commands() {
+        let expected: Vec<&str> = COMMANDS
+            .iter()
+            .flat_map(|cmd| match *cmd {
+                "help" => vec!["help", "-h", "--help"],
+                other => vec![other],
+            })
+            .collect();
+        assert_eq!(
+            dispatched(),
+            expected,
+            "`run` dispatches a command COMMANDS does not carry, or has stopped dispatching one \
+             it does"
         );
     }
 }

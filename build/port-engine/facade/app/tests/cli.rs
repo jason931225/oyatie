@@ -17,7 +17,7 @@ fn help_and_ready_succeed() {
 /// Every command in `cli::COMMANDS` reaches its handler.
 ///
 /// Kept in step with that list by hand, because an integration test cannot see a `pub(crate)`
-/// const; `usage_lists_exactly_the_dispatchable_commands` is what holds the list itself honest.
+/// const; `run_dispatches_exactly_the_listed_commands` is what holds the list itself honest.
 #[test]
 fn every_command_succeeds_on_a_valid_invocation() {
     use std::time::{SystemTime, UNIX_EPOCH};
