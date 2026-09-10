@@ -1,4 +1,10 @@
 //! Thin CLI wrapper around [`data_ontology_scorecards_resolver`] kernel.
+//!
+//! Subcommands:
+//!  - default       — validate every (ms, framework) combination resolves green;
+//!  - `--emit-rollup` — rewrite `registry/hyperscaler-scorecards/index.json`;
+//!  - `--check`     — verify rollup on disk is byte-identical to recomputed.
+//!  - `<ms> <fw>`   — emit a single resolved scorecard JSON to stdout.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
