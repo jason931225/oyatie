@@ -18,7 +18,7 @@ use pipeline_repository_git_draft::GitRepository;
 mod repository_checks;
 
 use repository_checks::{
-    live_candidate_violations, owner_tree_state, regular_blob,
+    changed_port_violations, live_candidate_violations, owner_tree_state, regular_blob,
     reject_indirect_dependency_components, repository_cargo_config_violations,
 };
 
@@ -86,6 +86,13 @@ fn run() -> Result<(), String> {
         &repository,
         &head,
         &changes.layout_candidates,
+        &changes.exact_rename_sources,
+    )?);
+    violations.extend(changed_port_violations(
+        &repository,
+        &merge_base,
+        &head,
+        &changes.occupied,
         &changes.exact_rename_sources,
     )?);
     let mut manifests = Vec::new();

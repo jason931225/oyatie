@@ -74,7 +74,7 @@ fn report(violations: &mut Vec<String>, path: &str, run: Option<CommentRun>) {
     }
 }
 
-enum LineKind {
+pub(crate) enum LineKind {
     Comment,
     Blank,
     Code,
@@ -83,12 +83,12 @@ enum LineKind {
 /// Block-comment nesting carried across lines; Rust nests `/* /* */ */`, so a
 /// depth is the only reading that closes the right block.
 #[derive(Default)]
-struct CommentScanner {
+pub(crate) struct CommentScanner {
     depth: usize,
 }
 
 impl CommentScanner {
-    fn classify(&mut self, line: &str) -> LineKind {
+    pub(crate) fn classify(&mut self, line: &str) -> LineKind {
         if self.depth == 0 {
             if line.is_empty() {
                 return LineKind::Blank;

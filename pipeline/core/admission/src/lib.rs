@@ -9,6 +9,7 @@ pub mod line_budget;
 mod live_postgres;
 pub mod occupancy;
 pub mod owners;
+pub mod port_implementation;
 pub mod signing_authority;
 
 pub use cadence::{
@@ -48,4 +49,5 @@ pub use occupancy::{
     OccupancyRefused, OccupiedSet, admit, admit_authored, authored_paths, declared_mergeable,
 };
 pub use owners::{ROOT_OCCUPANT, owners_occupant};
+pub use port_implementation::{ChangedSource, port_implementation_violations};
 pub use signing_authority::{SIGNING_AUTHORITY, SigningPrincipal, allowed_signers};
