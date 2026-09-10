@@ -1,8 +1,4 @@
 //! Domain model for cloud-agnostic flag evaluation.
-//!
-//! Pure data types over which the deterministic engine ([`crate::engine`]) computes. No cloud,
-//! persistence, identity, or runtime coupling: a [`Flag`] is a value, an [`EvaluationContext`] is a
-//! value, and evaluation is a pure function of the two.
 
 use std::collections::BTreeMap;
 
@@ -16,15 +12,12 @@ pub type VariantKey = String;
 /// OpenFeature-compatible scalar/structured shapes, never a backend handle.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FlagValue {
-    /// Boolean variant value.
     Bool(bool),
-    /// String variant value.
     Str(String),
-    /// Integer variant value (i64 domain; serialization layer narrows as needed).
+    /// i64 domain; the serialization layer narrows as needed.
     Int(i64),
-    /// Floating-point variant value.
     Float(f64),
-    /// Structured/object variant value as ordered key→value pairs (deterministic iteration).
+    /// Ordered key→value pairs, so iteration is deterministic.
     Object(BTreeMap<String, String>),
 }
 
@@ -63,7 +56,6 @@ pub struct EvaluationContext {
 }
 
 impl EvaluationContext {
-    /// Construct a context for a targeting key with no attributes.
     pub fn for_key(targeting_key: impl Into<String>) -> Self {
         Self {
             targeting_key: targeting_key.into(),
@@ -71,7 +63,6 @@ impl EvaluationContext {
         }
     }
 
-    /// Builder-style attribute insertion.
     pub fn with_attr(mut self, name: impl Into<String>, value: AttrValue) -> Self {
         self.attributes.insert(name.into(), value);
         self
@@ -150,12 +141,7 @@ pub struct Rollout {
 pub const TOTAL_BASIS_POINTS: u32 = 10_000;
 
 /// A feature flag definition: the cloud-agnostic unit the engine evaluates.
-///
-/// Evaluation precedence (see [`crate::engine::evaluate`]):
-/// 1. If `enabled == false` → serve `off_variant` (Reason::Disabled).
-/// 2. First [`Rule`] (in order) whose conditions all match → its [`RuleOutcome`].
-/// 3. If a default [`Rollout`] is present → bucket the subject across it.
-/// 4. Otherwise → serve `default_variant` (Reason::Default).
+/// Evaluation precedence is documented on [`crate::engine::evaluate`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Flag {
     /// The flag key (also mixed into bucketing so the same subject buckets independently per flag).
@@ -177,7 +163,6 @@ pub struct Flag {
 }
 
 impl Flag {
-    /// Look up a variant by key.
     pub fn variant(&self, key: &str) -> Option<&Variant> {
         self.variants.iter().find(|v| v.key == key)
     }

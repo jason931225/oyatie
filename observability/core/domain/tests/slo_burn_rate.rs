@@ -1,20 +1,3 @@
-// Integration-level acceptance tests for the slo-burn-rate-vocabulary slice.
-//
-// These tests exercise the public API through the crate boundary (not inline
-// #[cfg(test)]) and map 1-to-1 to the sbr-1 and sbr-2 acceptance criteria:
-//
-//   sbr-1: SLOObjective value object + slo_fields constants
-//   sbr-2: AlertBurnRate classifier (classify_burn_rate) + AlertDecision enum
-//
-// The implementation lives in src/slo.rs; the public surface is re-exported
-// from the crate root (lib.rs).
-//
-// All test scenarios are drawn from the threshold table in
-// docs/specs/task-obs-domain-slo-burn-rate-vocabulary.md and the Google SRE
-// Workbook, Chapter 5 "Alerting on SLOs", "Multiwindow, Multi-Burn-Rate Alerts".
-//
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use observability_domain::slo::{
@@ -22,10 +5,6 @@ use observability_domain::slo::{
     SLOObjective, TICKET_BUDGET_CONSUMED_MIN, TICKET_BURN_RATE_THRESHOLD, classify_burn_rate,
     slo_fields,
 };
-
-// ---------------------------------------------------------------------------
-// sbr-1: SLOObjective — constructor acceptance + rejection
-// ---------------------------------------------------------------------------
 
 #[test]
 fn slo_objective_new_accepts_three_nines_ratio_and_thirty_day_window() {
@@ -91,10 +70,6 @@ fn invalid_slo_objective_is_publicly_accessible_from_crate_root() {
     let _err: InvalidSLOObjective = SLOObjective::new(0.0, 0).unwrap_err();
 }
 
-// ---------------------------------------------------------------------------
-// sbr-1: slo_fields — stable wire-value constants
-// ---------------------------------------------------------------------------
-
 #[test]
 fn slo_fields_slo_name_wire_value_is_stable() {
     assert_eq!(slo_fields::SLO_NAME, "oyatie.slo.name");
@@ -121,10 +96,6 @@ fn slo_fields_burn_rate_wire_value_is_stable() {
     assert_eq!(slo_fields::BURN_RATE, "oyatie.slo.burn_rate");
 }
 
-// ---------------------------------------------------------------------------
-// sbr-1: threshold constants — values match Google SRE spec
-// ---------------------------------------------------------------------------
-
 #[test]
 fn page_burn_rate_threshold_is_14_point_4() {
     assert_eq!(PAGE_BURN_RATE_THRESHOLD, 14.4);
@@ -145,43 +116,32 @@ fn ticket_budget_consumed_min_is_0_point_05() {
     assert_eq!(TICKET_BUDGET_CONSUMED_MIN, 0.05);
 }
 
-// ---------------------------------------------------------------------------
-// sbr-2: classify_burn_rate — page tier boundary tests
-// ---------------------------------------------------------------------------
-
-/// Both fast and slow windows exceed 14.4× and 3% budget consumed → Page.
 #[test]
 fn classify_both_windows_above_page_threshold_returns_page() {
     assert_eq!(classify_burn_rate(0.03, 15.0, 15.0), AlertDecision::Page);
 }
 
-/// Fast window is below 14.4× — page condition fails, must not return Page.
 #[test]
 fn classify_fast_below_page_slow_above_does_not_page() {
     assert_ne!(classify_burn_rate(0.03, 10.0, 15.0), AlertDecision::Page);
 }
 
-/// Slow window is below 14.4× — page condition fails, must not return Page.
 #[test]
 fn classify_fast_above_page_slow_below_does_not_page() {
     assert_ne!(classify_burn_rate(0.03, 15.0, 10.0), AlertDecision::Page);
 }
 
-/// Both burn rates exceed page threshold but budget barely consumed (<2%) → not Page.
 #[test]
 fn classify_page_budget_not_consumed_enough_returns_none() {
     // 0.01 < PAGE_BUDGET_CONSUMED_MIN (0.02); also below ticket budget min
     assert_eq!(classify_burn_rate(0.01, 15.0, 15.0), AlertDecision::None);
 }
 
-/// Exact page-tier boundary: fast=14.4, slow=14.4, consumed=0.02 → Page.
 #[test]
 fn classify_exact_page_boundary_returns_page() {
     assert_eq!(classify_burn_rate(0.02, 14.4, 14.4), AlertDecision::Page);
 }
 
-/// Just below fast page threshold (14.39 < 14.4): page must not fire.
-/// With slow=14.4, consumed=0.06 the slow ticket window fires → Ticket.
 #[test]
 fn classify_just_below_page_boundary_fast_falls_through_to_ticket() {
     // fast=14.39 < PAGE threshold → no page
@@ -189,33 +149,21 @@ fn classify_just_below_page_boundary_fast_falls_through_to_ticket() {
     assert_eq!(classify_burn_rate(0.06, 14.39, 14.4), AlertDecision::Ticket);
 }
 
-// ---------------------------------------------------------------------------
-// sbr-2: classify_burn_rate — ticket tier boundary tests
-// ---------------------------------------------------------------------------
-
-/// Both windows at 7× (above 6×) and 6% budget consumed → Ticket.
 #[test]
 fn classify_both_windows_above_ticket_threshold_returns_ticket() {
     assert_eq!(classify_burn_rate(0.06, 7.0, 7.0), AlertDecision::Ticket);
 }
 
-/// Ticket burn rates met but budget consumed only 4% (< 5% minimum) → None.
 #[test]
 fn classify_ticket_budget_not_consumed_enough_returns_none() {
     assert_eq!(classify_burn_rate(0.04, 7.0, 7.0), AlertDecision::None);
 }
 
-/// Burn rates well below all thresholds, even with 50% budget consumed → None.
 #[test]
 fn classify_below_all_thresholds_returns_none() {
     assert_eq!(classify_burn_rate(0.50, 1.0, 1.0), AlertDecision::None);
 }
 
-// ---------------------------------------------------------------------------
-// sbr-2: classify_burn_rate — decision priority + quiescent
-// ---------------------------------------------------------------------------
-
-/// Page conditions and ticket conditions both met → Page wins (checked first).
 #[test]
 fn classify_page_wins_over_ticket_when_both_thresholds_exceeded() {
     // fast=15 ≥ 14.4, slow=15 ≥ 14.4, consumed=0.10 ≥ 0.02 (page)
@@ -223,21 +171,15 @@ fn classify_page_wins_over_ticket_when_both_thresholds_exceeded() {
     assert_eq!(classify_burn_rate(0.10, 15.0, 15.0), AlertDecision::Page);
 }
 
-/// Zero burn rates and zero consumption → None.
 #[test]
 fn classify_zero_burn_rates_zero_consumption_returns_none() {
     assert_eq!(classify_burn_rate(0.0, 0.0, 0.0), AlertDecision::None);
 }
 
-/// Nominal burn (1×) → None regardless of budget consumed.
 #[test]
 fn classify_nominal_burn_rate_returns_none() {
     assert_eq!(classify_burn_rate(0.99, 1.0, 1.0), AlertDecision::None);
 }
-
-// ---------------------------------------------------------------------------
-// sbr-2: AlertDecision — enum properties
-// ---------------------------------------------------------------------------
 
 #[test]
 fn alert_decision_variants_are_distinct() {

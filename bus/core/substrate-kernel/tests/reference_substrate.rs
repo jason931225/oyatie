@@ -1,8 +1,3 @@
-//! Proves the conformance harness with the in-memory reference substrate
-//! (GREEN) and with a deliberately broken substrate (RED) — the masterplan
-//! no-false-green rule: a harness that cannot catch violations proves
-//! nothing.
-
 use std::num::NonZeroU32;
 use std::time::Duration;
 

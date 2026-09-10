@@ -12,16 +12,7 @@
 //!   subscribers can route without parsing payloads;
 //! - within one subscriber group, deliveries compete (a group scales
 //!   horizontally without double-processing).
-//!
-//! # Naming justification
-//! `messaging-bus-boundary-kernel` follows the ADR-0532/0533 de-branded
-//! grammar `<capability:messaging>-<topic:bus-boundary>-<layer:kernel>`,
-//! mirroring its sibling `messaging-substrate-kernel`. The `bus.`
-//! topic prefix below is a WIRE identifier, not a crate name: it is
-//! deliberately unchanged by the de-brand, because renaming a topic is a
-//! behavior change and must not ride along inside a relocation.
-//!
-//! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
+
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -83,6 +74,8 @@ impl ChannelName {
     /// Returns [`BusError::InvalidChannelName`] when the derived topic
     /// name would not be a canonical slug.
     pub fn parse(value: &str) -> Result<Self, BusError> {
+        // `bus.` is a WIRE identifier, not a crate name: a rename here is a
+        // behavior change and must not ride along inside a relocation.
         TopicName::parse(&format!("bus.{value}")).map_err(|_| BusError::InvalidChannelName {
             value: value.to_owned(),
         })?;
@@ -143,8 +136,6 @@ impl<'a, S: MessagingSubstrate> EventBus<'a, S> {
     /// Returns [`BusError::InvalidEventType`] for a malformed type slug;
     /// propagates substrate publish failures.
     pub fn publish(&self, event: Event) -> Result<MessageId, BusError> {
-        // Event types share the topic slug grammar so routing rules can
-        // reuse one validated vocabulary.
         TopicName::parse(&event.event_type).map_err(|_| BusError::InvalidEventType {
             value: event.event_type.clone(),
         })?;

@@ -1,17 +1,5 @@
-//! `flags-evaluation-domain` — the cloud-agnostic, deterministic flag-evaluation core for the
-//! `flags` capability.
-//!
-//! This crate is the FIRST decomposition step of the bundled `flags/core/server` per the
-//! capability-first reorg: the pure evaluation domain (rule targeting, percentage bucketing,
-//! variant resolution) is lifted out behind the `flags/*/*` workspace glob, with ZERO cloud,
-//! persistence, identity, or runtime dependencies. The server crate consumes this domain; the
-//! storage/cloud/identity adapters are DEFERRED behind the [`port`] traits (clean architecture,
-//! ports-in-core per ADR-0570).
-//!
-//! Design-for-the-owned-stack: the evaluation engine is a pure function over `(Flag,
-//! EvaluationContext)`. The same definition evaluated on the control plane, at an edge POP, or in a
-//! replay harness yields bit-identical results — the bucketing hash ([`bucket`]) is fixed by
-//! specification rather than by `std::hash::DefaultHasher`, which is not stable across toolchains.
+//! `flags-evaluation-domain` — the cloud-agnostic, deterministic flag-evaluation
+//! core for the `flags` capability.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
@@ -70,9 +58,10 @@ mod tests {
 
     #[test]
     fn no_rules_serves_default_variant() {
-        let flag = base_flag();
+        let mut flag = base_flag();
+        flag.default_variant = "on".into();
         let ev = evaluate(&flag, &EvaluationContext::for_key("user-1"));
-        assert_eq!(ev.variant, "off");
+        assert_eq!(ev.variant, "on");
         assert_eq!(ev.reason, Reason::Default);
     }
 
@@ -271,22 +260,24 @@ mod tests {
         assert_eq!(ev.value, FlagValue::Object(attrs));
     }
 
-    // --- Port: a trivial in-domain test double proving the FlagSource seam composes. ---
+    mod port_seam {
+        use super::*;
 
-    struct StaticSource(Vec<Flag>);
-    impl FlagSource for StaticSource {
-        fn get_flag(&self, key: &FlagKey) -> Result<Option<Flag>, FlagSourceError> {
-            Ok(self.0.iter().find(|f| &f.key == key).cloned())
+        struct StaticSource(Vec<Flag>);
+        impl FlagSource for StaticSource {
+            fn get_flag(&self, key: &FlagKey) -> Result<Option<Flag>, FlagSourceError> {
+                Ok(self.0.iter().find(|f| &f.key == key).cloned())
+            }
         }
-    }
 
-    #[test]
-    fn flag_source_port_drives_engine_end_to_end() {
-        let source = StaticSource(vec![base_flag()]);
-        let key = "checkout.new-cart".to_string();
-        let flag = source.get_flag(&key).unwrap().expect("flag present");
-        let ev = evaluate(&flag, &EvaluationContext::for_key("u1"));
-        assert_eq!(ev.variant, "off");
-        assert_eq!(source.get_flag(&"absent".to_string()).unwrap(), None);
+        #[test]
+        fn flag_source_port_drives_engine_end_to_end() {
+            let source = StaticSource(vec![base_flag()]);
+            let key = "checkout.new-cart".to_string();
+            let flag = source.get_flag(&key).unwrap().expect("flag present");
+            let ev = evaluate(&flag, &EvaluationContext::for_key("u1"));
+            assert_eq!(ev.variant, "off");
+            assert_eq!(source.get_flag(&"absent".to_string()).unwrap(), None);
+        }
     }
 }
