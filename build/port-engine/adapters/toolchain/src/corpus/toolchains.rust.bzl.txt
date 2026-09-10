@@ -5,15 +5,13 @@
 # at a binary, so rustc is resolved from PATH inside every action. On a runner PATH
 # is a rustup shim, so hundreds of concurrent actions each drive rustup against one
 # shared ~/.rustup, racing on the component install. That is what reds the weekly
-# smoke. Here the tools are artifacts instead, so they land in the action key and no
-# action consults PATH or rustup.
+# smoke. Here rustc, rustdoc and clippy-driver are artifacts instead, so they land in
+# the action key and no rustc action consults PATH or rustup.
 
 load("@prelude//rust:rust_toolchain.bzl", "PanicRuntime", "RustToolchainInfo")
 
-# The version is NOT restated here. `.buckconfig` pulls in rust-toolchain.toml with
-# `<file:rust-toolchain.toml>`, which makes `[toolchain] channel` readable as buckconfig,
-# so this file derives the channel instead of duplicating it. rust-toolchain.toml stays
-# the single statement of the version; a bump there is picked up here by construction.
+# `.buckconfig` pulls in rust-toolchain.toml with `<file:rust-toolchain.toml>`, which makes
+# `[toolchain] channel` readable as buckconfig, so the channel is read here, not declared.
 def _channel() -> str:
     raw = read_root_config("toolchain", "channel", "")
     return raw.replace("\"", "").replace("'", "").strip()
@@ -40,9 +38,8 @@ def _dist_url(component: str, triple: str) -> str:
     return "{}{}-{}-{}.tar.gz".format(_DIST_ROOT, component, RUST_CHANNEL, triple)
 
 # sha256 per channel/triple/component, from https://static.rust-lang.org/<path>.sha256.
-# Hash pinning means a bump needs fresh digests: the version is single-sourced, the
-# digests are derived data. A channel with no entry fails loudly below rather than
-# drifting silently.
+# A bump in rust-toolchain.toml needs a matching entry here; a channel with no entry
+# fails analysis in _digests_for below rather than drifting silently.
 _DIGESTS = {
     "1.98.0": {
         "aarch64-apple-darwin": {
@@ -158,8 +155,14 @@ def _hermetic_rust_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
         ),
     ]
 
-# Attr surface deliberately mirrors prelude `system_rust_toolchain`, plus
-# `distribution`, so swapping the two is a one-line change in BUCK.
+# Attr names mirror prelude `system_rust_toolchain`, plus a required `distribution`, so the
+# delta between this rule and the one it replaces stays reviewable. Not a drop-in swap:
+# `distribution` is unknown to `system_rust_toolchain`, and `rustc_target_triple` defaults to
+# RUST_TARGET_TRIPLE above rather than the prelude's host matrix. The remaining defaults match
+# `system_rust_toolchain` in the buck2 pinned at .github/workflows/buck2-weekly-smoke.yml —
+# `.buckconfig` takes the prelude bundled, so that pin is the only statement of which prelude
+# runs. Re-check when it moves: `nightly_features` already defaults the other way in a later
+# prelude.
 hermetic_rust_toolchain = rule(
     impl = _hermetic_rust_toolchain_impl,
     attrs = {
