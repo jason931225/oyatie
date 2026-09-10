@@ -266,11 +266,16 @@ certificate and `./substrate cache-check` reports whether the endpoint answers
 a TLS client that is not buck2. It probes with openssl, which accepts a SEC1
 key that rustls refuses, so it can report a usable endpoint for a credential
 that fails every build. The substrate emits PKCS8 at the source now, so a
-freshly minted credential is sound. What remains stale is any key issued
-before that fix -- including the `CACHE_CLIENT_KEY` Actions secret, which is
-fed from the same output and which `cache-creds` does not refresh. That one is
-rotated by re-applying the repository stack, not by re-running the credential
-command.
+freshly minted credential is sound, and any key issued before that fix is SEC1
+by construction.
+
+Whether a given HELD key is stale cannot be read back. The `CACHE_CLIENT_KEY`
+Actions secret is fed from the same output and `cache-creds` does not refresh
+it, but GitHub does not return a secret's value and the provider does not keep
+the plaintext in state -- so its format is not observable from either side.
+Re-applying the repository stack rewrites it from the current output, which
+settles the question instead of inferring it from when the secret was last
+written.
 
 What is recorded above is authority, not present readiness. At the time of
 writing the buck2 graph does not build cleanly, a cold build measures around
