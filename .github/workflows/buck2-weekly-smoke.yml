@@ -241,11 +241,11 @@ jobs:
           # a truncated config, redden the build, and still report wired=yes.
           # A hollow success line is the defect this lane is about.
           #
-          # One key from each heredoc: `instance_name` is the last key of the
-          # first, `execution_platforms` the last line of the second, so
-          # neither write can fail silently.
-          if ! grep -q '^\s*instance_name' .buckconfig.local 2>/dev/null \
-             || ! grep -q '^\s*execution_platforms' .buckconfig.local 2>/dev/null; then
+          # The last line of each heredoc, matched with its value rather than
+          # by key alone. `instance_name` sat mid-block: a first write that
+          # stopped after it matched, and reported wired=yes.
+          if ! grep -qF "tls_ca_certs = ${RUNNER_TEMP}/cache-creds/ca.crt" .buckconfig.local 2>/dev/null \
+             || ! grep -qF 'execution_platforms = toolchains//cache:cache-platform' .buckconfig.local 2>/dev/null; then
             echo "the cache config was not written completely; building without the cache"
             rm -f .buckconfig.local
             echo "wired=no" >> "$GITHUB_OUTPUT"

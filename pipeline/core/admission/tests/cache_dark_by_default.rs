@@ -31,19 +31,25 @@ fn repo_root() -> PathBuf {
 fn the_root_build_config_does_not_select_the_cache_platform() {
     let text = std::fs::read_to_string(repo_root().join(".buckconfig"))
         .expect(".buckconfig must exist at the repository root");
-    let selected = text
+    // Every occurrence, not the first. Which of two `execution_platforms`
+    // lines a parser keeps is its business; requiring exactly one leaves this
+    // test no reason to care.
+    let selected: Vec<String> = text
         .lines()
         .map(str::trim)
         .filter(|line| !line.starts_with('#'))
-        .find_map(|line| line.strip_prefix("execution_platforms"))
+        .filter_map(|line| line.strip_prefix("execution_platforms"))
         .map(|rest| rest.trim_start_matches([' ', '=']).trim().to_string())
-        .expect(".buckconfig must declare [build] execution_platforms");
+        .collect();
 
     assert_eq!(
-        selected, "prelude//platforms:default",
-        "the root config must keep the prelude platform. Selecting \
-         toolchains//cache:cache-platform here would put every ordinary build \
-         on the warm cache, which only the opt-in CI lane may do."
+        selected,
+        ["prelude//platforms:default"],
+        "the root config must declare `execution_platforms` exactly once, at \
+         the prelude platform. Selecting toolchains//cache:cache-platform \
+         here -- or adding a second line a parser may prefer -- would put \
+         every ordinary build on the warm cache, which only the opt-in CI \
+         lane may do."
     );
 }
 
