@@ -116,6 +116,7 @@ fn implemented_traits(contents: &[u8]) -> Vec<String> {
             continue;
         }
         let header = match open.take() {
+            Some(_) if starts_impl(line) => line.to_owned(),
             Some(head) => format!("{head} {line}"),
             None if starts_impl(line) => line.to_owned(),
             None => continue,
@@ -162,8 +163,10 @@ fn implemented_trait(header: &str) -> Option<String> {
     let name = last_segment(trait_path)?;
     let target = target.split('{').next().unwrap_or_default();
     let stub = words(target).any(|word| word.starts_with(STUB_PREFIX));
-    let forwards = words(generics)
-        .chain(words(bounds))
+    let forwards = unqualified_words(generics)
+        .into_iter()
+        .chain(unqualified_words(bounds))
+        .chain(unqualified_words(target))
         .any(|word| word == name);
     (!stub && !forwards).then_some(name)
 }
@@ -171,11 +174,12 @@ fn implemented_trait(header: &str) -> Option<String> {
 /// Split a generic parameter list at its balancing `>`, so a lifetime or a
 /// bound holding `for` cannot be read as the separator.
 fn split_generics(parameters: &str) -> (&str, &str) {
+    let bytes = parameters.as_bytes();
     let mut depth = 1usize;
     for (index, byte) in parameters.bytes().enumerate() {
         match byte {
             b'<' => depth += 1,
-            b'>' => {
+            b'>' if index == 0 || bytes[index - 1] != b'-' => {
                 depth -= 1;
                 if depth == 0 {
                     return (&parameters[..index], &parameters[index + 1..]);
@@ -185,6 +189,39 @@ fn split_generics(parameters: &str) -> (&str, &str) {
         }
     }
     (parameters, "")
+}
+
+/// Identifier words in `text` that no `::` qualifies, so `std::io::Write`
+/// contributes `std` and not `Write`. A bound naming another crate's trait
+/// therefore cannot be read as a mention of the trait being implemented.
+fn unqualified_words(text: &str) -> Vec<&str> {
+    let mut found = Vec::new();
+    let mut start = None;
+    for (index, character) in text.char_indices() {
+        match (character.is_ascii_alphanumeric() || character == '_', start) {
+            (true, None) => start = Some(index),
+            (false, Some(begin)) => {
+                push_unqualified(text, begin, index, &mut found);
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    if let Some(begin) = start {
+        push_unqualified(text, begin, text.len(), &mut found);
+    }
+    found
+}
+
+fn push_unqualified<'text>(
+    text: &'text str,
+    begin: usize,
+    end: usize,
+    found: &mut Vec<&'text str>,
+) {
+    if !text[..begin].ends_with("::") {
+        found.push(&text[begin..end]);
+    }
 }
 
 fn words(text: &str) -> impl Iterator<Item = &str> {
