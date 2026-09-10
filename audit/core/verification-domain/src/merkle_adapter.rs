@@ -25,14 +25,21 @@ pub struct ChainMerkleVerifier;
 impl MerkleVerifier for ChainMerkleVerifier {
     /// Delegates to `MerkleTree::verify_proof`, which already fails closed
     /// on an out-of-range index, a wrong-length path, and a zero leaf count
-    /// (see its own doc). This adapter refuses to widen rather than
-    /// truncating or saturating: `MerkleInclusionProof`'s `leaf_index` /
-    /// `leaf_count` are `u64` but `verify_proof` takes `usize`. On a 32-bit
-    /// target, a `u64` value that does not fit in `usize` returns `false`
-    /// here — a value that cannot even be represented can never be verified
-    /// as in-range. (On the 64-bit targets this crate actually ships on,
-    /// `usize` and `u64` have the same range, so this particular conversion
-    /// never fails there; the guard exists for portability.)
+    /// (see its own doc). This adapter refuses to widen two further things,
+    /// rejecting rather than truncating or saturating:
+    ///
+    /// - `MerkleInclusionProof`'s `leaf_index` / `leaf_count` are `u64` but
+    ///   `verify_proof` takes `usize`. On a 32-bit target, a `u64` value that
+    ///   does not fit in `usize` returns `false` here — a value that cannot
+    ///   even be represented can never be verified as in-range. (On the
+    ///   64-bit targets this crate ships on, `usize` and `u64` have the same
+    ///   range, so this conversion never fails there; it is for portability.)
+    /// - a `leaf_count` near `u64::MAX` clears that conversion on a 64-bit
+    ///   target, so `MAX_PLAUSIBLE_LEAF_COUNT` bounds it here before
+    ///   `MerkleTree`'s split-point arithmetic ever sees it. That arithmetic
+    ///   is overflow-safe at the source today; this bound is a ceiling kept
+    ///   in front of it, not the only thing standing between untrusted input
+    ///   and a panic.
     fn verify(&self, leaf: &Sha256Hash, proof: &MerkleInclusionProof, root: &Sha256Hash) -> bool {
         if proof.leaf_count > MAX_PLAUSIBLE_LEAF_COUNT {
             return false;

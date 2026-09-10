@@ -18,14 +18,17 @@ use crate::request::{PriorRootClaim, VerificationRequest};
 /// merkle_root)`), independent of which context a caller later asks to
 /// verify it under. That separation is what lets [`verify`] tell a
 /// [`VerificationFailureReason::SignatureInvalid`] apart from a
-/// [`VerificationFailureReason::PackMismatch`] — see [`crate::request`]'s
-/// module doc.
+/// [`VerificationFailureReason::PackMismatch`].
 pub fn verification_signing_payload(
     record_pack: &str,
     record_tenant_partition: &str,
     record_period_id: &str,
     merkle_root: &Sha256Hash,
 ) -> Vec<u8> {
+    // `-v2` names this exact framing, not this crate's version: change the
+    // framing and the suffix must change with it, or an old signer and a new
+    // verifier share a tag. `the_domain_tag_names_exactly_this_encoding` is
+    // what refuses one without the other.
     const DOMAIN_TAG: &[u8] = b"audit-verification-domain-v2";
     let mut out = Vec::with_capacity(
         DOMAIN_TAG.len()
@@ -163,4 +166,27 @@ fn redaction_is_confirmed_clean<RG: RedactionRegistry>(
         Ok(false)
     );
     !request.redacted && registry_confirms_clean
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verification_signing_payload;
+
+    /// Pins the payload's absolute bytes against the `-v2` domain tag. Every
+    /// other payload test in this crate is relative (`assert_ne!` between two
+    /// outputs of this same function) or mints and checks with one build, so
+    /// none of them observes the tag or the encoding it names.
+    #[test]
+    fn the_domain_tag_names_exactly_this_encoding() {
+        let mut expected: Vec<u8> = b"audit-verification-domain-v2\
+            \x00\x00\x00\x00\x00\x00\x00\x06pack-a\
+            \x00\x00\x00\x00\x00\x00\x00\x01t\
+            \x00\x00\x00\x00\x00\x00\x00\x09period-01"
+            .to_vec();
+        expected.extend_from_slice(&[0xAB; 32]);
+        assert_eq!(
+            verification_signing_payload("pack-a", "t", "period-01", &[0xAB; 32]),
+            expected
+        );
+    }
 }
