@@ -1,12 +1,6 @@
-//! Application product-catalog value objects (P19-application merge-variant delta-1).
-//!
-//! `ProductEntry` and `ProductMetadata` are the kernel-layer value objects described
-//! in the P19 impl-plan for the product-enablement bounded context.  They carry no
-//! framework dependencies and impose no new workspace crate requirements.
+//! Application product-catalog value objects.
 
 /// Stable product identifier used as a routing key across bounded contexts.
-///
-/// Examples: `"workflow"`, `"ontology"`, `"search"`, `"connect"`.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ProductId(String);
 
@@ -21,7 +15,6 @@ impl ProductId {
         Ok(Self(trimmed.to_owned()))
     }
 
-    /// Returns the inner string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -36,11 +29,8 @@ impl std::fmt::Display for ProductId {
 /// Human-readable metadata about a product shown in the tenant launchpad.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProductMetadata {
-    /// Display name shown in the UI, e.g. `"Workflow Studio"`.
     display_name: String,
-    /// Short one-sentence description of the product.
     description: String,
-    /// Relative icon slug, e.g. `"workflow-icon"`.
     icon_slug: String,
     /// Subdomain path suffix, e.g. `"workflow"` → `app.oyatie.com/workflow/…`.
     /// Stored as a single path segment (no leading/trailing slashes).
@@ -48,8 +38,8 @@ pub struct ProductMetadata {
 }
 
 impl ProductMetadata {
-    /// Constructs `ProductMetadata`, rejecting empty display_name or subdomain,
-    /// and rejecting subdomain values that contain `/` (must be a single slug).
+    /// Constructs `ProductMetadata`; refuses an empty display name or subdomain, or a
+    /// subdomain that is not a single URL-safe slug.
     pub fn new(
         display_name: impl Into<String>,
         description: impl Into<String>,
@@ -65,8 +55,6 @@ impl ProductMetadata {
         if subdomain.is_empty() {
             return Err(ProductCatalogError::EmptySubdomain);
         }
-        // Reject any character that is not a URL-safe slug character.
-        // Allowed: ASCII alphanumeric, hyphen, underscore, dot.
         if subdomain
             .chars()
             .any(|c| !matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.'))
@@ -86,17 +74,14 @@ impl ProductMetadata {
         })
     }
 
-    /// Returns the display name.
     pub fn display_name(&self) -> &str {
         &self.display_name
     }
 
-    /// Returns the description.
     pub fn description(&self) -> &str {
         &self.description
     }
 
-    /// Returns the icon slug.
     pub fn icon_slug(&self) -> &str {
         &self.icon_slug
     }
@@ -107,10 +92,8 @@ impl ProductMetadata {
     }
 }
 
-/// A single row in a tenant's enabled-product catalog.
-///
-/// `ProductEntry` combines a stable `ProductId` with human-readable `ProductMetadata`
-/// and a flag indicating whether the product is currently active for this tenant.
+/// A single row in a tenant's enabled-product catalog: a stable `ProductId`, its
+/// display metadata, and whether the product is active for this tenant.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProductEntry {
     /// Stable routing key.
@@ -122,7 +105,6 @@ pub struct ProductEntry {
 }
 
 impl ProductEntry {
-    /// Constructs a new `ProductEntry`.
     pub fn new(id: ProductId, metadata: ProductMetadata, enabled: bool) -> Self {
         Self {
             id,
@@ -137,8 +119,6 @@ impl ProductEntry {
     }
 
     /// Returns the deep-link path for this product under `app.oyatie.com`.
-    ///
-    /// Example: `ProductId("workflow")` → `"/workflow"`.
     pub fn deep_link_path(&self) -> String {
         format!("/{}", self.metadata.subdomain())
     }
@@ -150,8 +130,8 @@ pub enum ProductCatalogError {
     EmptyProductId,
     EmptyDisplayName,
     EmptySubdomain,
-    /// Subdomain contained a `/` after trimming leading/trailing slashes,
-    /// meaning it is a multi-segment path rather than a single slug.
+    /// Subdomain was not a single URL-safe slug: it held a `/`, an illegal
+    /// character, or was a `.`/`..` dot-segment.
     InvalidSubdomainSlug,
 }
 
@@ -249,7 +229,6 @@ mod tests {
 
     #[test]
     fn test_product_metadata_normalizes_leading_trailing_slash() {
-        // leading/trailing slashes are stripped; result is a valid single slug
         let meta = ProductMetadata::new("Workflow Studio", "desc", "icon", "/workflow/").unwrap();
         assert_eq!(meta.subdomain(), "workflow");
     }

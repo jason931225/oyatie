@@ -1,19 +1,4 @@
 //! D3 integration tests — CodexAdapter against a scripted HTTP server.
-//!
-//! Covers:
-//! 1. Token refresh — POST shape matches, response parsed correctly.
-//! 2. Proxy request — bearer header + cli-version User-Agent correct.
-//! 3. 429 with Retry-After → error includes the duration.
-//! 4. 401 invalid_grant → terminal RefreshFailed error.
-//! 5. 200 streaming SSE → bytes_stream returns the upstream bytes.
-//! 6. Hop-by-hop response headers stripped.
-//!
-//! Ported off `httpmock` onto the first-party `scripted-http-server` (ADR-0709 D-6
-//! Rule 2). Every test here makes exactly ONE upstream call, so each mock becomes a
-//! one-element positional script. Header MATCHERS become assertions on the recorded
-//! request, and the hop-by-hop canary mocks — 500-returning mocks asserted at
-//! `hits() == 0` — become direct assertions over the header list that actually crossed
-//! the wire, which cannot be made vacuous by a change in matcher precedence.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::collections::BTreeMap;
@@ -21,10 +6,6 @@ use std::sync::Arc;
 
 use intelligence_codex_adapter::{CodexAdapter, CodexAdapterError, CodexProxyRequest, HOP_BY_HOP};
 use scripted_http_server::{Chunk, ScriptedResponse, ScriptedServer};
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 fn make_client() -> Arc<reqwest::Client> {
     Arc::new(
@@ -41,10 +22,6 @@ fn empty_request() -> CodexProxyRequest {
         extra_headers: BTreeMap::new(),
     }
 }
-
-// ---------------------------------------------------------------------------
-// Test 1: Token refresh — POST shape matches, response parsed correctly.
-// ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn token_refresh_post_shape_and_response_parsed() {
@@ -63,7 +40,6 @@ async fn token_refresh_post_shape_and_response_parsed() {
 
     let requests = server.requests();
     assert_eq!(server.request_lines(), vec!["POST /api/auth/session"]);
-    // Were `header(..)` / `header_exists(..)` matchers on the mock.
     assert_eq!(
         requests[0].header("cookie"),
         Some("__Secure-next-auth.session-token=my-refresh-tok"),
@@ -74,10 +50,6 @@ async fn token_refresh_post_shape_and_response_parsed() {
         "the session refresh must identify itself with a User-Agent"
     );
 }
-
-// ---------------------------------------------------------------------------
-// Test 2: Proxy request — bearer header + cli-version User-Agent correct.
-// ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn proxy_sets_bearer_and_cli_version_user_agent() {
@@ -105,16 +77,11 @@ async fn proxy_sets_bearer_and_cli_version_user_agent() {
     );
     assert_eq!(requests[0].header("user-agent"), Some("cli/0.27.0"));
     assert_eq!(requests[0].header("x-openai-beta"), Some("codex-runs"));
-    // The mock never asserted the body reached upstream intact; this does.
     assert_eq!(
         requests[0].body,
         br#"{"model":"codex","messages":[]}"#.to_vec()
     );
 }
-
-// ---------------------------------------------------------------------------
-// Test 3: 429 with Retry-After → error includes the duration.
-// ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn proxy_429_with_retry_after_returns_rate_limited_error() {
@@ -166,10 +133,6 @@ async fn refresh_429_with_retry_after_returns_rate_limited_error() {
     assert_eq!(server.request_lines(), vec!["POST /api/auth/session"]);
 }
 
-// ---------------------------------------------------------------------------
-// Test 4: 401 invalid_grant → terminal RefreshFailed error.
-// ---------------------------------------------------------------------------
-
 #[tokio::test]
 async fn refresh_401_invalid_grant_returns_refresh_failed() {
     let server = ScriptedServer::start(vec![
@@ -194,10 +157,6 @@ async fn refresh_401_invalid_grant_returns_refresh_failed() {
     assert_eq!(server.request_lines(), vec!["POST /api/auth/session"]);
 }
 
-// ---------------------------------------------------------------------------
-// Test 5: 200 streaming SSE → bytes_stream returns the upstream bytes.
-// ---------------------------------------------------------------------------
-
 #[tokio::test]
 async fn proxy_stream_200_returns_upstream_bytes() {
     use futures_util::StreamExt;
@@ -205,9 +164,6 @@ async fn proxy_stream_200_returns_upstream_bytes() {
     let delta_event = "data: {\"delta\":\"hello\"}\n\n";
     let done_event = "data: [DONE]\n\n";
     let sse_body = format!("{delta_event}{done_event}");
-    // A genuinely chunked `text/event-stream` response, one flushed frame per event —
-    // httpmock sent the whole body in one write, so incremental pass-through was never
-    // actually exercised.
     let server = ScriptedServer::start(vec![ScriptedResponse::ok().sse(vec![
         Chunk::new(delta_event),
         Chunk::after(std::time::Duration::from_millis(30), done_event),
@@ -243,14 +199,8 @@ async fn proxy_stream_200_returns_upstream_bytes() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Test 6: Hop-by-hop response headers stripped.
-// ---------------------------------------------------------------------------
-
 #[tokio::test]
 async fn response_hop_by_hop_headers_stripped() {
-    // `.chunks(..)` makes `Transfer-Encoding: chunked` REAL rather than a header
-    // stapled onto a Content-Length body, so the filter has genuine framing to strip.
     let server = ScriptedServer::start(vec![
         ScriptedResponse::ok()
             .header("content-type", "application/json")
@@ -313,10 +263,8 @@ async fn request_hop_by_hop_headers_not_forwarded_upstream() {
         server.request_lines(),
         vec!["POST /backend-api/codex/responses"]
     );
-    // The canary mocks become direct assertions over the headers that actually went on
-    // the wire. `connection` is excluded because reqwest's own HTTP/1.1 client sets it:
-    // its presence is the transport's, not a forwarded inbound value, so the inbound
-    // sentinel VALUE is what gets asserted against instead.
+    // `connection` is excluded: reqwest's own HTTP/1.1 client sets it, so only the inbound
+    // sentinel VALUE is asserted against instead.
     for header in HOP_BY_HOP {
         if *header == "connection" {
             continue;
@@ -336,6 +284,5 @@ async fn request_hop_by_hop_headers_not_forwarded_upstream() {
         "the inbound Connection value leaked upstream: {:?}",
         requests[0].header_values("connection")
     );
-    // The safe header must survive, or the filter is simply dropping everything.
     assert_eq!(requests[0].header("x-safe-header"), Some("keep-me"));
 }

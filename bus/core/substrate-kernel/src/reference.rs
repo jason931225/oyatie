@@ -1,14 +1,3 @@
-//! The in-memory reference substrate.
-//!
-//! This is the contract's executable specification: it implements
-//! [`MessagingSubstrate`] exactly as the trait docs promise and is proven
-//! by the [`crate::conformance`] harness in this crate's tests (the same
-//! reference-provider play as `shared-resource-provider-contract-kernel`,
-//! per the masterplan no-false-green rule). The boundary kernels also test
-//! their composition logic against it. It is NOT a production broker: no
-//! durability across process restart — production traffic goes through the
-//! transitional Pulsar adapter (ADR-0510) behind the same port.
-
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 use std::sync::Mutex;
@@ -18,7 +7,6 @@ use crate::{
     MessagingAdmin, MessagingError, StreamPosition, SubscriptionName, TopicName, TopicSpec,
 };
 
-/// One stored message.
 #[derive(Clone, Debug)]
 struct StoredMessage {
     id: MessageId,
@@ -26,25 +14,17 @@ struct StoredMessage {
     envelope: MessageEnvelope,
 }
 
-/// Per-subscription delivery state for one message position.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SettleState {
-    /// Deliverable on the next matching `receive`.
     Available,
-    /// Held by an outstanding delivery token.
     InFlight,
-    /// Settled; never redelivered.
     Acked,
 }
 
 #[derive(Clone, Debug)]
 struct SubscriptionState {
-    /// Delivery state per message position.
     settle: BTreeMap<u64, SettleState>,
-    /// Redelivery counter per message position.
     delivery_count: BTreeMap<u64, u32>,
-    /// Positions earlier than this are invisible to the subscription
-    /// (subscriptions start at the topic head).
     floor: u64,
 }
 
@@ -60,7 +40,6 @@ struct TokenState {
     topic: TopicName,
     subscription: SubscriptionName,
     position: u64,
-    /// Tokens invalidated by a later seek must not settle anything.
     live: bool,
 }
 
@@ -78,7 +57,6 @@ pub struct InMemorySubstrate {
 }
 
 impl InMemorySubstrate {
-    /// An empty substrate.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -194,9 +172,6 @@ impl MessageConsumer for InMemorySubstrate {
             }
         })?;
 
-        // Per-key ordering: a key with an in-flight earlier message blocks
-        // its later messages, so single-key publish order is preserved
-        // across redeliveries.
         let mut blocked_keys: Vec<&crate::MessageKey> = Vec::new();
         for (position, settle) in &sub.settle {
             if *settle == SettleState::InFlight

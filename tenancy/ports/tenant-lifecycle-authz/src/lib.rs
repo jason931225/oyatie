@@ -1,29 +1,9 @@
-//! # tenancy-tenant-lifecycle-authz-port
-//!
 //! The authorization DECISION PORT the tenant-lifecycle delivery surface
-//! depends on (AUTH-005, ADR-0564 D7). The tenancy facade is a Policy
-//! Enforcement Point (PEP): it authenticates the caller, assembles the
-//! authorization request, asks this port for a decision, and enforces it.
-//!
-//! ## Posture (fail-closed, default-deny)
-//!
-//! - Every decision is `Allow` or `Deny`; there is no "not applicable" — the
-//!   absence of an explicit permit IS a deny (deny-by-default).
-//! - Any error a backing engine raises is fail-closed: the PEP MUST treat a
-//!   [`Result::Err`] as a deny, never as an allow or a bypass.
-//! - The verified bearer principal NEVER on its own grants the tenant axis: a
-//!   per-tenant action authorizes the caller against the TARGET tenant id, and
-//!   the platform-admin axis is a distinct scope from any tenant scope.
-//!
-//! ## Layering (ADR-0131 / ADR-0562 faces)
-//!
-//! This is a PORT crate: it depends only on the locked PDP contract family in
-//! `shared-platform-contracts-kernel`. It has ZERO dependency on any
-//! adapter or facade — the Cedar-backed PDP adapter and the axum facade both
-//! depend INWARD on this port. Face-direction review ("would this trait change
-//! at W5 cutover?"): no — it models the destination decision surface (caller +
-//! action + target tenant in, attributable allow/deny out), not any transient
-//! engine detail.
+//! depends on (ADR-0564 D7). The tenancy facade is the Policy Enforcement Point:
+//! it authenticates the caller, assembles the query, asks this port, and
+//! enforces the answer. Fail-closed and default-deny — the absence of an
+//! explicit permit IS a deny, an error is a deny, and a verified bearer
+//! principal never on its own grants the tenant axis.
 //!
 //! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
@@ -31,10 +11,9 @@
 
 use std::fmt;
 
-/// The authenticated caller a PEP presents to the authorizer. Construction is
-/// the PEP's job: the caller is materialized ONLY from a verified credential
-/// (e.g. a constant-time-checked bearer principal), never from an unverified
-/// URL path segment or a self-asserted header alone.
+/// The authenticated caller a PEP presents to the authorizer. Materialized ONLY
+/// from a verified credential — never from a URL path segment or a self-asserted
+/// header alone.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CallerIdentity {
     /// Stable principal id of the verified caller (e.g. `platform-admin`,
@@ -49,9 +28,8 @@ pub struct CallerIdentity {
     pub platform_admin: bool,
 }
 
-/// A fail-closed membership-resolution fault. Any backing-store error/timeout
-/// maps to this and the PEP DENIES (the operator gets no proven tenant scope) —
-/// a membership-store outage never grants a tenant axis (default-deny).
+/// A fail-closed membership-resolution fault: any backing-store error or timeout
+/// maps here and the PEP DENIES — an outage never grants a tenant axis.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MembershipFault {
     detail: String,
@@ -81,37 +59,25 @@ impl fmt::Display for MembershipFault {
 
 impl std::error::Error for MembershipFault {}
 
-/// SERVER-SIDE tenant-membership resolution PORT (the SECURITY remediation core).
+/// SERVER-SIDE tenant-membership resolution PORT.
 ///
-/// The tenant-operator bearer is a SHARED credential; on its own it proves only
-/// that the caller is *some* operator, NEVER which tenants that operator may act
-/// for. A self-attested `x-tenant` header therefore MUST NOT grant a tenant
-/// axis (the C7 finding: an operator holding the shared bearer could select ANY
-/// victim tenant via the header). This port resolves — from a TRUSTED server-side
-/// source keyed on the VERIFIED operator principal — the exact set of tenants the
-/// operator is assigned to. The PEP binds the tenant axis ONLY to a tenant in
-/// this set; the `x-tenant` header may at most SELECT among assigned tenants,
-/// never grant an unassigned one.
-///
-/// Default-deny: an unknown operator resolves to an EMPTY membership set, so
-/// every per-tenant op denies. Any backing-store fault maps to `Err` (the PEP
-/// denies) — never an allow. A production adapter is the cloud-iam / OIDC
-/// membership store; the in-memory seed adapter lives in the composition root.
+/// The tenant-operator bearer is a SHARED credential: on its own it proves only
+/// that the caller is *some* operator, never which tenants that operator may act
+/// for. A self-attested `x-tenant` header may at most SELECT among the tenants
+/// this port returns, never grant one; an unknown operator resolves to an EMPTY
+/// set, so every per-tenant op denies.
 pub trait TenantMembershipResolver: Send + Sync {
-    /// Resolve the set of tenant ids the verified operator principal is assigned
-    /// to. `operator_principal_id` is the VERIFIED operator's stable id (derived
-    /// from the credential, never from a self-attested header).
+    /// Resolve the tenant ids the VERIFIED operator principal is assigned to.
     ///
     /// # Errors
-    /// Returns [`MembershipFault`] on any backing-store failure; the PEP denies
+    /// [`MembershipFault`] on any backing-store failure; the PEP denies
     /// (fail-closed — the operator gets no tenant axis).
     fn assigned_tenants(&self, operator_principal_id: &str)
     -> Result<Vec<String>, MembershipFault>;
 }
 
-/// The tenancy control-plane actions guarded by this port. Each maps to a
-/// stable action slug the backing engine resolves; the slug is the contract,
-/// not the Rust variant name.
+/// The tenancy control-plane actions guarded by this port. The stable slug —
+/// not the Rust variant name — is the contract.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TenantLifecycleAction {
     /// Register a new tenant (`POST /v1/tenants`) — platform-admin scope; the
@@ -133,9 +99,8 @@ pub enum TenantLifecycleAction {
 }
 
 impl TenantLifecycleAction {
-    /// The stable action slug the backing engine resolves. Slugs are
-    /// lowercase dotted (`tenancy.<verb>`), matching the locked PDP-contract
-    /// slug charset.
+    /// The stable action slug the backing engine resolves: lowercase dotted
+    /// `tenancy.<verb>`, matching the locked PDP-contract slug charset.
     #[must_use]
     pub fn slug(self) -> &'static str {
         match self {
@@ -150,17 +115,15 @@ impl TenantLifecycleAction {
     }
 
     /// Whether this action requires the platform-admin (cross-tenant) scope
-    /// rather than authority over one target tenant. Register and List operate
-    /// over the whole control plane, not a single tenant.
+    /// rather than authority over one target tenant.
     #[must_use]
     pub fn is_platform_scoped(self) -> bool {
         matches!(self, Self::Register | Self::List)
     }
 }
 
-/// What the PEP is asking the authorizer to decide: a verified caller acting
-/// on a target. Per-tenant actions carry the target tenant id (the URL `{id}`,
-/// which by itself authorizes NOTHING). Platform-scoped actions carry `None`.
+/// What the PEP asks the authorizer to decide. The target tenant id is the URL
+/// `{id}`, which by itself authorizes NOTHING.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AuthorizationQuery<'a> {
     pub caller: &'a CallerIdentity,
@@ -185,24 +148,17 @@ impl AuthorizationDecision {
     }
 }
 
-/// The attributable outcome returned by the authorizer: the decision plus the
-/// forensic fields needed for audit. Every call to `authorize` produces an
-/// [`AuthorizationOutcome`]; the PEP MUST emit a structured audit record from it
-/// (message `"tenancy.authz.decision"`) so EVERY decision — allow and deny — is
-/// traceable. Discarding the outcome fields is a policy violation (AC-W-13).
-///
-/// `decision_id` is a ULID minted by the backing PDP engine for this decision;
-/// `determining_policy_ids` are the Cedar policy ids that drove the outcome
-/// (empty on a deny-by-default where no policy matched).
+/// The attributable outcome: the decision plus the forensic audit fields. The
+/// PEP MUST emit a structured audit record (`"tenancy.authz.decision"`) from
+/// EVERY outcome — allow and deny alike; discarding the fields is a policy
+/// violation (AC-W-13).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AuthorizationOutcome {
     pub decision: AuthorizationDecision,
     /// Opaque, globally unique id for this decision (PDP-minted ULID).
     /// Non-empty on every successful call. Key the audit trail on this id.
     pub decision_id: String,
-    /// The Cedar policy ids that determined the outcome. Non-empty on an
-    /// explicit allow; may be empty on a deny-by-default (no matching permit)
-    /// but non-empty when a forbid drove the deny.
+    /// The Cedar policy ids that determined the outcome.
     pub determining_policy_ids: Vec<String>,
 }
 
@@ -230,25 +186,18 @@ impl fmt::Display for AuthzError {
 impl std::error::Error for AuthzError {}
 
 /// The authorization decision port. The facade (PEP) depends on this trait and
-/// is wired to a concrete adapter (the Cedar-backed PDP) at the composition
-/// root. `Send + Sync` so axum handlers can share one instance behind an
-/// `Arc`.
+/// is wired to a concrete adapter at the composition root.
 ///
 /// Implementations evaluate deny-by-default and forbid-overrides-permit: a
-/// cross-tenant request (a caller scoped to tenant A acting on tenant B) MUST
-/// receive [`AuthorizationDecision::Deny`] regardless of any matching permit.
+/// cross-tenant request MUST Deny regardless of any matching permit.
 pub trait TenantLifecycleAuthorizer: Send + Sync {
-    /// Decide one authorization query. The returned [`AuthorizationOutcome`]
-    /// carries both the decision AND the forensic audit fields; the PEP MUST
-    /// emit a structured audit record from the outcome for EVERY call.
-    ///
-    /// `Ok(outcome)` where `outcome.decision == Deny` AND `Err(_)` are BOTH
-    /// refusals the PEP enforces; only `Ok(outcome)` where
-    /// `outcome.decision == Allow` permits the request.
+    /// Decide one authorization query; the PEP MUST emit an audit record from
+    /// the returned outcome. `Ok(outcome)` with `Deny` and `Err(_)` are BOTH
+    /// refusals.
     ///
     /// # Errors
-    /// [`AuthzError`] when the query is malformed or the backing engine
-    /// refuses — the PEP treats either as a deny (fail-closed).
+    /// [`AuthzError`] when the query is malformed or the engine refuses — the
+    /// PEP treats either as a deny (fail-closed).
     fn authorize(&self, query: &AuthorizationQuery<'_>)
     -> Result<AuthorizationOutcome, AuthzError>;
 }

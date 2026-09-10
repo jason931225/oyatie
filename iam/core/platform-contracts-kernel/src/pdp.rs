@@ -1,13 +1,4 @@
 //! PDP contract family: authorization request/response.
-//!
-//! Precedent: the PARC (principal, action, resource, context) request shape
-//! used by Cedar / Amazon Verified Permissions, and Google Zanzibar's
-//! "zookie" consistency token (Zanzibar paper §2.2): every decision carries
-//! the policy-store version it was evaluated against, and callers may pin a
-//! minimum version so a freshly written policy is guaranteed visible
-//! (read-your-writes against the policy store). Decisions are deny-by-default
-//! and forbid-overrides-permit — the engine's semantics, restated here as the
-//! contract every PDP implementation must satisfy.
 
 use std::collections::BTreeMap;
 
@@ -15,16 +6,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ContractViolation, MAX_ID_LEN, check_opaque_token, check_slug};
 
-/// Opaque policy-store version token (zookie-style). Tokens are compared for
-/// equality only; ordering is owned by the policy store, never inferred by
-/// consumers.
+/// Opaque policy-store version token; despite the derived `Ord`, compare only for equality.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PolicyVersion(String);
 
 impl PolicyVersion {
-    /// Build a policy version token, enforcing the opaque-token invariants
-    /// (non-empty, bounded, no whitespace).
     pub fn new(token: impl Into<String>) -> Result<Self, Vec<ContractViolation>> {
         let token = token.into();
         let mut out = Vec::new();
@@ -36,15 +23,12 @@ impl PolicyVersion {
         }
     }
 
-    /// The raw token.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
-/// A typed reference to an entity in the authorization model
-/// (e.g. `OyaPlatform::Principal` / `alice`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EntityRef {
@@ -75,9 +59,7 @@ impl EntityRef {
     }
 }
 
-/// The authorization decision. There are exactly two outcomes; "not
-/// applicable" does not exist — absence of a permit IS a deny
-/// (deny-by-default).
+/// The authorization decision. There is no "not applicable": absence of a permit IS a deny.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Decision {
@@ -86,7 +68,6 @@ pub enum Decision {
 }
 
 impl Decision {
-    /// Whether the decision permits the request.
     #[must_use]
     pub fn is_allow(self) -> bool {
         matches!(self, Self::Allow)
@@ -106,8 +87,7 @@ pub struct AuthorizationRequest {
     pub resource: EntityRef,  // data_class: TENANT_SCOPED
     /// ABAC context exposed to attribute conditions (deterministic order).
     pub context: BTreeMap<String, serde_json::Value>, // data_class: TENANT_SCOPED
-    /// Zookie-style freshness floor: when set, the PDP MUST evaluate against
-    /// a policy-store version at least as fresh as this token or refuse.
+    /// Zookie freshness floor: the PDP MUST evaluate against a version at least this fresh.
     pub min_policy_version: Option<PolicyVersion>, // data_class: INTERNAL_ONLY
 }
 
@@ -140,8 +120,7 @@ impl AuthorizationRequest {
     }
 }
 
-/// An obligation attached to an allow (e.g. "emit audit event", "require
-/// step-up within session"). PEPs MUST enforce obligations or fail closed.
+/// An obligation attached to an allow. PEPs MUST enforce obligations or fail closed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Obligation {
@@ -149,8 +128,7 @@ pub struct Obligation {
     pub parameters: BTreeMap<String, String>, // data_class: INTERNAL_ONLY
 }
 
-/// The PDP response: decision id (audit-chain key), the decision, and the
-/// policy-store version the decision was evaluated against.
+/// The PDP response: decision id, decision, and the policy version evaluated against.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AuthorizationResponse {
@@ -159,11 +137,9 @@ pub struct AuthorizationResponse {
     /// Echo of the request's correlation id.
     pub request_id: String, // data_class: INTERNAL_ONLY
     pub decision: Decision, // data_class: INTERNAL_ONLY
-    /// The policy-store version evaluated against (zookie echo). Callers can
-    /// pass it back as `min_policy_version` for read-your-writes freshness.
+    /// The policy-store version evaluated against; pass it back as `min_policy_version`.
     pub policy_version: PolicyVersion, // data_class: INTERNAL_ONLY
-    /// Ids of the policies that determined the outcome. An `Allow` MUST name
-    /// at least one permit policy — every allow is attributable.
+    /// Ids of the policies that determined the outcome; an `Allow` MUST name a permit policy.
     pub determining_policy_ids: Vec<String>, // data_class: INTERNAL_ONLY
     pub obligations: Vec<Obligation>, // data_class: INTERNAL_ONLY
 }
@@ -206,9 +182,7 @@ impl AuthorizationResponse {
         if out.is_empty() { Ok(()) } else { Err(out) }
     }
 
-    /// Whether this response satisfies a caller's zookie freshness floor.
-    /// Equality is the only comparison consumers may perform; anything else
-    /// requires asking the policy store.
+    /// Whether this response satisfies a caller's exact zookie freshness floor.
     #[must_use]
     pub fn satisfies_exact_version(&self, required: &PolicyVersion) -> bool {
         &self.policy_version == required

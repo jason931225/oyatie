@@ -1,86 +1,31 @@
-//! Fail-closed authorization seam for the `cedar.policy.publish` control plane
-//! (AUTH-005 class; task #124; ADR-0572).
+//! Fail-closed authorization seam for the `cedar.policy.publish` control plane.
 //!
-//! ## Why this module exists
-//!
-//! The publish surface (`POST /policies/{policy_id}/versions/{version}`) is a
-//! MUTATING multi-tenant control plane.  Before this seam, the only "authz" was
-//! [`crate::validate_authorization`], which merely cross-checks self-attested
-//! `x-principal-*` / `x-authorization-*` headers for internal consistency.  An
-//! attacker who can reach the socket sets those headers consistently and the
-//! request is accepted — an unauthenticated control plane (the AUTH-005 class
-//! that PR #768 shipped and the #780 authz-coverage gate baselined as debt).
-//!
-//! This module closes that gap by mirroring the proven fail-closed doctrine in
-//! `intelligence/adapters/rest/src/lib.rs` (`constant_time_eq` bearer compare +
-//! a PDP `decide` port) and the iam PDP caller-authn precedent
-//! (`iam/facade/pdp-app/src/mtls.rs`, ADR-0561 / #38):
-//!
-//! 1. A real principal is VERIFIED from a credential the caller cannot forge —
-//!    a bearer token compared in constant time against a configured secret (the
-//!    [`PrincipalVerifier`] port; an mTLS/SPIFFE verifier is a drop-in alternate
-//!    adapter).  The URL/header-supplied principal id is NEVER the source of
-//!    truth; it is only ever a cross-check input against the verified identity.
-//! 2. The verified principal is AUTHORIZED for
-//!    `action = cedar.policy.publish` on the target `{policy_id, tenant}` via a
-//!    PDP [`PublishAuthorizer`] port (`decide`).  The tenant axis is asserted by
-//!    the decision — a verified principal alone never grants a tenant.
-//! 3. The router REFUSES TO SERVE without both ports configured (no
-//!    default-allow fallback): see [`crate::rest::build_router`].
-//!
-//! ## Clean architecture (ADR-0131 / ports-for-owned-stack doctrine)
-//!
-//! [`PrincipalVerifier`] and [`PublishAuthorizer`] are PORTS owned by this
-//! boundary crate.  The concrete iam PDP client and the bearer/SVID
-//! credential store are ADAPTERS that live OUTSIDE this crate (the owned W5
-//! destination).  The port shapes model that destination so they do not change
-//! at cutover; transient infra is absorbed by the adapter.
+//! A caller credential is verified into a [`VerifiedPrincipal`] by a [`PrincipalVerifier`]
+//! port; that principal is then authorized for the action against the target policy by a
+//! [`PublishAuthorizer`] port. The header-supplied principal id is never the source of truth,
+//! and both ports are required: there is no default-allow fallback.
 
-// ADR-0083 Tier 3: production code stays panic-free.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 /// The credential a caller presents to prove a real principal identity.
 ///
-/// Today this is a bearer token (constant-time compared by
-/// [`ConfiguredBearerPrincipalVerifier`]); an mTLS/SPIFFE peer-SVID adapter is a
-/// drop-in alternate that consumes a verified peer leaf instead.  The
-/// header-supplied principal id travels alongside as a CROSS-CHECK only — never
-/// as proof of identity.
+/// The header-supplied principal id travels alongside as a CROSS-CHECK only, never as proof.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CallerCredential {
     /// Raw `Authorization` header value (e.g. `"Bearer abc..."`), if present.
     pub authorization: Option<String>, // data_class: SECRET
     /// The caller-asserted principal id from `x-principal-id` (cross-check input).
     pub claimed_principal_id: String, // data_class: INTERNAL_ONLY
-    /// The caller-asserted principal tenant from `x-principal-tenant-id`
-    /// (cross-check input).
+    /// The caller-asserted principal tenant from `x-principal-tenant-id` (cross-check input).
     pub claimed_tenant_id: String, // data_class: INTERNAL_ONLY
 }
 
 /// A principal whose identity has been verified from a caller credential.
 ///
-/// ## Type-level defense-in-depth (NOT a cryptographic guarantee)
-///
-/// The fields are **private**; the only public constructor is absent — external
-/// crates cannot build a `VerifiedPrincipal` by struct literal or any public API.
-/// [`VerifiedPrincipal::new`] is `pub(crate)`, callable only by
-/// [`PrincipalVerifier`] implementations inside this crate.  External crates must
-/// obtain one by running a real [`PrincipalVerifier`] (e.g.
-/// [`ConfiguredBearerPrincipalVerifier`]).
-///
-/// **Limits of this guarantee:** this is *structural* defense-in-depth, not a
-/// cryptographic proof.  It prevents accidental struct-literal forging and proves
-/// that *some* `PrincipalVerifier` ran.  It does NOT prevent hostile in-process
-/// code from constructing its own `ConfiguredBearerPrincipalVerifier` with a
-/// known secret and minting a token that way, nor does it protect against a
-/// compromised or stub verifier implementation.  The real security guarantee
-/// comes from the *combination* of: (1) bearer middleware running before body
-/// deserialization, (2) the PDP authorization decision, and (3) the active
-/// cross-check in [`crate::publish_cedar_policy_from_api`].  This type is one
-/// layer of that defense, not the sole barrier.
-///
-/// Within the same crate, tests use the `#[cfg(test)]` constructor
-/// [`VerifiedPrincipal::new_for_test`] to mint tokens without a real credential.
+/// Fields are private with no public constructor, so an external crate cannot forge one by
+/// struct literal. That is STRUCTURAL defense-in-depth, not a cryptographic proof: it shows
+/// only that some [`PrincipalVerifier`] ran, and hostile in-process code can still mint one
+/// through its own verifier with a known secret.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedPrincipal {
     principal_id: String, // data_class: INTERNAL_ONLY — private: see unforgeability note above
@@ -88,8 +33,8 @@ pub struct VerifiedPrincipal {
 }
 
 impl VerifiedPrincipal {
-    /// Mint a verified principal. **`pub(crate)` only** — callers outside this
-    /// crate cannot call this; they must go through a [`PrincipalVerifier`].
+    /// Mint a verified principal; callers outside this crate must go through a
+    /// [`PrincipalVerifier`].
     pub(crate) fn new(principal_id: impl Into<String>, tenant_id: impl Into<String>) -> Self {
         Self {
             principal_id: principal_id.into(),
@@ -97,18 +42,15 @@ impl VerifiedPrincipal {
         }
     }
 
-    /// The authoritative principal id bound from the verified credential.
     pub fn principal_id(&self) -> &str {
         &self.principal_id
     }
 
-    /// The authoritative tenant the principal acts within.
     pub fn tenant_id(&self) -> &str {
         &self.tenant_id
     }
 
     /// Test-only constructor that mints a token without a real credential.
-    /// Only available inside this crate under `#[cfg(test)]`.
     #[cfg(test)]
     pub(crate) fn new_for_test(
         principal_id: impl Into<String>,
@@ -122,11 +64,9 @@ impl VerifiedPrincipal {
 /// maps it to HTTP 401 and the request never reaches the authorizer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PrincipalVerificationError {
-    /// No credential was presented (no `Authorization` header).
     MissingCredential,
-    /// A credential was presented but did not verify (bad bearer, untrusted
-    /// SVID, expired, …). Deliberately opaque so probing cannot distinguish
-    /// "wrong token" from "no such principal".
+    /// A credential was presented but did not verify. Deliberately opaque, so probing cannot
+    /// distinguish "wrong token" from "no such principal".
     InvalidCredential,
 }
 
@@ -134,64 +74,48 @@ pub enum PrincipalVerificationError {
 /// authenticated but not permitted for this action/resource/tenant).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PublishAuthorizationError {
-    /// The PDP returned a deny decision for this principal/action/resource.
     Denied,
     /// The PDP refused to decide (fail-closed: a refusal is treated as deny).
     Refused,
 }
 
 /// The scope of a publish resource: whether it affects one specific tenant or
-/// all tenants (global / platform-level). This is carried explicitly so the
-/// PDP sees the **true blast radius** of the action, not a flattened
-/// per-tenant representation.
-///
-/// A global policy applies to EVERY tenant (see `PolicyScope::Global` in
-/// `iam-policy-cedar-domain`). Presenting it to the PDP as tenant-scoped with
-/// the caller's own tenant would silently authorize tenant-admins for
-/// platform-wide policy control — the CRITICAL escalation this enum prevents.
+/// all tenants. Carried explicitly so the PDP sees the true blast radius: presenting a global
+/// policy as tenant-scoped with the caller's own tenant would silently authorize a
+/// tenant-admin for platform-wide policy control.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PublishScope {
-    /// The policy is scoped to a single tenant identified by `tenant_id` in
-    /// the enclosing [`PublishResource`].
+    /// Scoped to the single tenant identified by `tenant_id` in the enclosing resource.
     Tenant,
-    /// The policy is global (applies to ALL tenants). The PDP must treat this
-    /// as a platform-level resource requiring platform-admin authority, NOT as
+    /// Applies to ALL tenants; the PDP must require platform-admin authority, not treat it as
     /// a resource belonging to any individual tenant.
     Global,
 }
 
-/// The resource a publish decision is made against: the target policy, the
-/// scope (tenant vs. global/platform-level), and the tenant when
-/// tenant-scoped. The scope is **explicit** so the PDP sees the true blast
-/// radius. The tenant axis is asserted by the authorizer — a verified
-/// principal alone never grants the tenant.
+/// The resource a publish decision is made against: the target policy, its scope, and the
+/// tenant when tenant-scoped. The tenant axis is asserted by the authorizer — a verified
+/// principal alone never grants it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PublishResource {
     /// The policy id being published (from the path/body, already bound equal).
     pub policy_id: String, // data_class: INTERNAL_ONLY
-    /// Whether this publish affects a single tenant or all tenants (global).
-    /// The PDP MUST distinguish these: global publish requires platform-admin
-    /// authority, not mere tenant-admin authority.
+    /// Whether this publish affects one tenant or all of them; the PDP MUST distinguish these.
+    /// A global publish requires platform-admin, not tenant-admin, authority.
     pub scope: PublishScope, // data_class: INTERNAL_ONLY
-    /// The tenant whose policy store the version lands in. For
-    /// [`PublishScope::Tenant`] this is the scope tenant; for
-    /// [`PublishScope::Global`] this field is an empty string (the PDP must
-    /// key on `scope == Global`, not this field).
+    /// The tenant whose policy store the version lands in; empty for [`PublishScope::Global`],
+    /// where the PDP must key on the scope rather than on this field.
     pub tenant_id: String, // data_class: INTERNAL_ONLY
 }
 
 /// PORT: verify a caller credential into a [`VerifiedPrincipal`].
 ///
-/// Adapters: a configured-bearer verifier (this crate's
-/// [`ConfiguredBearerPrincipalVerifier`]) or a iam mTLS/SPIFFE peer-SVID
-/// verifier (the W5 destination, ADR-0561). The verifier — not the headers — is
-/// the source of truth for caller identity.
+/// The verifier, never the headers, is the source of truth for caller identity.
 pub trait PrincipalVerifier: Send + Sync {
     /// Verify `credential` and return the authoritative principal, or refuse.
     ///
     /// # Errors
-    /// [`PrincipalVerificationError`] when no credential is presented or it does
-    /// not verify (fail-closed: the caller MUST treat this as 401).
+    /// [`PrincipalVerificationError`] when no credential is presented or it does not verify;
+    /// fail-closed, so the caller MUST treat this as 401.
     fn verify_principal(
         &self,
         credential: &CallerCredential,
@@ -200,36 +124,16 @@ pub trait PrincipalVerifier: Send + Sync {
 
 /// PORT: decide whether `principal` may publish `resource`.
 ///
-/// The decision is `decide(principal, action = cedar.policy.publish, resource)`.
-/// Adapter: the iam PDP client (the owned W5 destination). The default
-/// posture is deny; any refusal is treated as deny (fail-closed).
-///
-/// ## Adapter implementation contract (MUST follow; enforcement is by convention)
-///
-/// 1. **Map every internal fault to `Err(Refused)`.** Network errors, timeouts,
-///    parse failures, and unavailability MUST all return
-///    `Err(PublishAuthorizationError::Refused)` so the caller can map them to
-///    HTTP 403 (fail-closed). Never propagate an internal error as `Ok(())`.
-///
-/// 2. **Enforce a deadline.** This is a synchronous call on a request path;
-///    a hung PDP hangs the caller thread.  Adapters MUST enforce their own
-///    deadline and map expiry to `Err(Refused)`.  No deadline is enforced by
-///    this port — it is the adapter's responsibility.
-///
-/// 3. **Do not panic.** The release profile uses `panic = "abort"` (Cargo.toml
-///    `[profile.release]`), so a panic in production terminates the process
-///    rather than being catchable.  The `CedarPolicyAuthzProvider` wrapper
-///    calls `catch_unwind` as a **debug/test-only best-effort** backstop that
-///    works only when the panic strategy is `unwind` (i.e. in tests); it MUST
-///    NOT be relied upon in production.  Adapters MUST NOT panic — use
-///    `Err(Refused)` for every recoverable and unrecoverable fault.
+/// Default posture is deny. An adapter MUST map every internal fault — network error, timeout,
+/// parse failure, unavailability, expiry — to `Err(PublishAuthorizationError::Refused)`, MUST
+/// enforce its own deadline (this port enforces none, and a hung PDP hangs the caller
+/// thread), and MUST NOT panic: the release profile uses `panic = "abort"`, so the wrapper's
+/// `catch_unwind` is a test-only backstop and no production fault isolation.
 pub trait PublishAuthorizer: Send + Sync {
     /// Authorize `principal` to publish `resource`, or refuse.
     ///
     /// # Errors
-    /// [`PublishAuthorizationError`] on an explicit deny or any PDP fault
-    /// (timeout, network, unavailability — all MUST be `Refused`; fail-closed:
-    /// the caller maps this to HTTP 403).
+    /// [`PublishAuthorizationError`] on an explicit deny or any PDP fault; caller maps to 403.
     fn ensure_authorized(
         &self,
         principal: &VerifiedPrincipal,
@@ -237,16 +141,14 @@ pub trait PublishAuthorizer: Send + Sync {
     ) -> Result<(), PublishAuthorizationError>;
 }
 
-/// The authz provider the router depends on: a principal verifier PORT plus a
-/// publish authorizer PORT. The router REFUSES to serve without one configured
-/// (no default-allow fallback) — see [`crate::rest::build_router`].
+/// The authz provider the router depends on: a [`PrincipalVerifier`] port plus a
+/// [`PublishAuthorizer`] port. The router REFUSES to serve without both configured.
 pub struct CedarPolicyAuthzProvider {
     verifier: std::sync::Arc<dyn PrincipalVerifier>, // data_class: INTERNAL_ONLY
     authorizer: std::sync::Arc<dyn PublishAuthorizer>, // data_class: INTERNAL_ONLY
 }
 
 impl CedarPolicyAuthzProvider {
-    /// Assemble the provider from a principal verifier and a publish authorizer.
     #[must_use]
     pub fn new(
         verifier: std::sync::Arc<dyn PrincipalVerifier>,
@@ -258,12 +160,11 @@ impl CedarPolicyAuthzProvider {
         }
     }
 
-    /// Verify the caller principal. Returns the authoritative identity or a
-    /// fail-closed 401-class refusal. Delegates to the [`PrincipalVerifier`]
-    /// port — the headers are never trusted as identity.
+    /// Verify the caller principal via the [`PrincipalVerifier`] port; headers are never
+    /// trusted as identity.
     ///
     /// # Errors
-    /// [`PrincipalVerificationError`] — caller maps to HTTP 401.
+    /// [`PrincipalVerificationError`] — caller maps to 401.
     pub fn verify_principal(
         &self,
         credential: &CallerCredential,
@@ -271,33 +172,20 @@ impl CedarPolicyAuthzProvider {
         self.verifier.verify_principal(credential)
     }
 
-    /// Authorize the verified principal for the publish resource via the PDP
-    /// port. Default-deny / fail-closed.
+    /// Authorize the verified principal for the publish resource via the PDP port.
+    /// Default-deny / fail-closed.
     ///
-    /// ## Panic / fault handling
-    ///
-    /// This wrapper calls `catch_unwind` as a **test/debug-only best-effort**
-    /// backstop for panicking authorizer implementations.  In production the
-    /// release profile sets `panic = "abort"` (Cargo.toml line 896), which
-    /// terminates the process immediately on panic without any unwinding —
-    /// `catch_unwind` has NO effect and the process aborts.  The real
-    /// fail-closed guarantee comes from the [`PublishAuthorizer`] adapter
-    /// contract: adapters MUST map every fault (timeout, network error,
-    /// unavailability) to `Err(Refused)` and MUST NOT panic.  The catch_unwind
-    /// here catches only test panics so the router integration tests can verify
-    /// the `PanicAuthorizer → 403` property without process termination.
+    /// The `catch_unwind` here catches only test panics, so the router tests can check the
+    /// panicking-authorizer-to-403 property; under `panic = "abort"` it has no effect.
     ///
     /// # Errors
-    /// [`PublishAuthorizationError`] — caller maps to HTTP 403.
+    /// [`PublishAuthorizationError`] — caller maps to 403.
     pub fn ensure_authorized(
         &self,
         principal: &VerifiedPrincipal,
         resource: &PublishResource,
     ) -> Result<(), PublishAuthorizationError> {
-        // Best-effort catch for test-environment panics (panic strategy = unwind).
-        // In production (panic = "abort") this catch_unwind is a no-op and a
-        // panicking adapter terminates the process — do not rely on this for
-        // production fault isolation.
+        // No-op under `panic = "abort"`; not production fault isolation.
         let authorizer = std::sync::Arc::clone(&self.authorizer);
         let principal = principal.clone();
         let resource = resource.clone();
@@ -308,15 +196,11 @@ impl CedarPolicyAuthzProvider {
     }
 }
 
-/// Constant-time byte comparison (no early-exit) so a bearer compare cannot be
-/// timing-probed. Mirrors `intelligence/adapters/rest/src/lib.rs`
-/// `constant_time_eq` — NEVER use a naive `==` on secret material.
+/// Constant-time byte comparison (no early-exit) so a bearer compare cannot be timing-probed.
+/// NEVER use a naive `==` on secret material.
 ///
-/// **Residual:** the length of both inputs is visible from the XOR seed
-/// (`a.len() ^ b.len()`), so an attacker who can probe many lengths still
-/// learns whether lengths match. This is the same residual as the repo
-/// reference and is accepted; in practice bearer tokens are fixed-length
-/// secrets. Use a MAC (HMAC-SHA256) if length-hiding is required.
+/// Residual: the length of both inputs is visible from the XOR seed. Accepted here because
+/// bearer tokens are fixed-length; use a MAC if length-hiding is required.
 #[must_use]
 pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     let max_len = a.len().max(b.len());
@@ -333,22 +217,10 @@ pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 /// constant-time compare against a configured secret, then binds the principal
 /// identity from the configured mapping (NOT from the caller headers).
 ///
-/// ## ⚠ BREAK-GLASS ONLY — NOT multi-tenant production
-///
-/// This adapter binds ONE static `(principal_id, tenant_id)` pair to a single
-/// shared secret. It is suitable only as a **single-principal break-glass**
-/// credential (e.g. a deploy-time operator token for a single known tenant)
-/// or for integration tests. In multi-tenant production, every caller presents
-/// a distinct credential bound to their own tenant — a single shared secret
-/// cannot distinguish them, so all callers would be granted the same identity.
-///
-/// The production W5 adapter is the iam mTLS/SPIFFE peer-SVID verifier
-/// (ADR-0561), which derives the principal and tenant from the verified peer
-/// certificate, not from a configured mapping.
-///
-/// Construction REFUSES an empty bearer secret so a provider that cannot prove
-/// a credential root can never authenticate a caller (mirrors the pdp
-/// boot-refusal doctrine).
+/// BREAK-GLASS ONLY, not multi-tenant production: it binds ONE static `(principal_id,
+/// tenant_id)` pair to a single shared secret, so distinct callers would all be granted the
+/// same identity. Construction REFUSES an empty bearer secret or bound identity, so a
+/// process that cannot prove a credential root can never authenticate a caller.
 pub struct ConfiguredBearerPrincipalVerifier {
     bearer_secret: String,      // data_class: SECRET
     bound_principal_id: String, // data_class: INTERNAL_ONLY
@@ -356,8 +228,7 @@ pub struct ConfiguredBearerPrincipalVerifier {
 }
 
 impl ConfiguredBearerPrincipalVerifier {
-    /// Construct, REFUSING an empty bearer secret or empty bound identity. A
-    /// process that cannot prove a credential root must never authenticate.
+    /// Construct, REFUSING an empty bearer secret or bound identity.
     ///
     /// # Errors
     /// [`AuthzProviderConfigError`] when the secret or bound identity is empty.
@@ -404,13 +275,11 @@ impl PrincipalVerifier for ConfiguredBearerPrincipalVerifier {
     }
 }
 
-/// Why the authz provider refused construction. Boot-fatal: the composition root
-/// MUST refuse to serve, mirroring the pdp `build_state` boot-refusal.
+/// Why the authz provider refused construction. Boot-fatal: the composition root MUST refuse
+/// to serve.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuthzProviderConfigError {
-    /// The bearer secret was empty/whitespace (no provable credential root).
     EmptyBearerSecret,
-    /// The bound principal/tenant identity was empty.
     EmptyBoundIdentity,
 }
 

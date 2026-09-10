@@ -1,43 +1,11 @@
-//! Loom interleaving harness — seat-lease atomicity.
+//! Seat-lease atomicity — a sequential interleaving model, NOT a loom run.
 //!
-//! # Loom integration status
-//!
-//! The kernel uses `std::sync::Mutex` internally (Arc<Mutex<SubscriptionPool>>).
-//! Loom requires that ALL synchronisation primitives in the test model be loom
-//! primitives (`loom::sync::Mutex`, `loom::sync::Arc`, etc.).  Because the
-//! kernel's `SeatLease` holds an `Arc<Mutex<SubscriptionPool>>` that is
-//! constructed outside our control and uses `std::sync`, loom cannot intercept
-//! those operations, making a `loom::model { … }` block that calls
-//! `SubscriptionPool::lease` from multiple threads unsound under loom's
-//! execution model.
-//!
-//! The resolution is a **staged approach**:
-//!
-//! Stage-7 (future): expose a `loom`-feature flag on the kernel that swaps the
-//! internal `std::sync` primitives for `loom::sync` equivalents via
-//! `cfg_attr(loom, …)` cell wrappers.  That makes the full `loom::model`
-//! harness below valid.
-//!
-//! Until Stage-7 lands this file ships the harness as a `#[cfg(loom)]`-gated
-//! stub (always-skip in normal CI) plus an **exhaustive sequential interleaving
-//! scheduler** that verifies the no-double-lease invariant across every
-//! permutation of `N` lease+complete operations without requiring loom.
-//!
-//! # Interleavings to verify (Stage-7 checklist)
-//!
-//! 1. T1 calls `lease`, T2 calls `lease` — only one succeeds when pool has 1
-//!    seat; the other gets `NoEligibleSeat`.
-//! 2. T1 holds lease, T2 calls `lease`, T1 calls `complete(Ok)`, T2 retries —
-//!    T2 eventually succeeds after T1 releases.
-//! 3. T1 calls `lease`, panics before `complete` — Drop impl releases the seat;
-//!    T2 then succeeds.
-//! 4. Three tasks concurrently lease from a 3-seat pool — each gets a distinct
-//!    `SeatId`; none overlap.
+//! The kernel holds `Arc<Mutex<SubscriptionPool>>` from `std::sync`, which loom
+//! cannot intercept, so the `#[cfg(loom)]` model below is an unimplemented stub
+//! and every test that runs is sequential — no real interleaving is exercised.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
-// Silence the unexpected_cfgs lint for `loom` — it is an external crate feature
-// flag, not a Cargo feature, so rustc doesn't know about it without a build.rs.
-// When Stage-7 adds loom as a dev-dependency this can be removed or replaced
-// with a proper check-cfg entry in build.rs.
+// `loom` is an external cfg flag, not a Cargo feature, so rustc cannot know it
+// without a build.rs check-cfg entry.
 #![allow(unexpected_cfgs)]
 
 use std::collections::HashSet;
@@ -49,10 +17,6 @@ use intelligence_kernel::{
     SeatOutcome, SelectionStrategy, SubscriptionId, SubscriptionPool, SubscriptionPoolError,
     SubscriptionState, TenantId,
 };
-
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
 
 struct AllowAll;
 impl AuthzGate for AllowAll {
@@ -83,42 +47,14 @@ fn make_pool(n_seats: usize) -> Arc<Mutex<SubscriptionPool>> {
     Arc::new(Mutex::new(pool))
 }
 
-// ---------------------------------------------------------------------------
-// #[cfg(loom)] stub — placeholder for Stage-7 full interleaving harness.
-//
-// When the kernel exposes `cfg(loom)`-gated loom::sync primitives, replace the
-// body below with a real `loom::model { … }` block that spawns 3 loom threads
-// each calling SubscriptionPool::lease + complete in a tight loop.
-// ---------------------------------------------------------------------------
-
 #[cfg(loom)]
 #[test]
 fn loom_lease_complete_atomicity() {
     loom::model(|| {
-        // Stage-7 TODO: construct pool using loom-aware kernel primitives,
-        // spawn 3 loom threads, assert no SeatId is held by >1 thread at
-        // the same time.
-        //
-        // Blocked on: kernel exposing `#[cfg(loom)] use loom::sync::Mutex`
-        // swap for its internal Arc<Mutex<SubscriptionPool>>.
         unimplemented!("Stage-7: kernel loom plumbing required");
     });
 }
 
-// ---------------------------------------------------------------------------
-// Exhaustive sequential interleaving scheduler (loom v0 stand-in)
-//
-// Generates every interleaving of `lease` / `complete` events for N tasks
-// over a 3-seat pool and asserts that no SeatId is "double-leased" at any
-// point in any interleaving.
-//
-// Approach: model each "task" as a two-step state machine:
-//   Idle -> HoldingLease(SeatId) -> Done
-// An "interleaving" is a sequence of task indices that describes which task
-// takes the next step.  We enumerate all valid sequences via backtracking.
-// ---------------------------------------------------------------------------
-
-/// State of one simulated task.
 #[derive(Clone, Debug)]
 enum TaskState {
     Idle,
@@ -126,8 +62,6 @@ enum TaskState {
     Done,
 }
 
-/// Pool snapshot — just the set of currently-leased seats, reconstructed by
-/// replaying the interleaving.
 #[derive(Clone, Default)]
 struct PoolSnapshot {
     leased: HashSet<String>,
@@ -158,16 +92,12 @@ impl PoolSnapshot {
     }
 
     fn double_leased(&self) -> bool {
-        // In this model a seat can only appear once in `leased` (HashSet), so
-        // double-lease means the same seat was inserted twice — impossible with
-        // a HashSet.  The real invariant: leased ∩ available == ∅.
+        // Model caveat: `try_lease`/`release` keep these two sets disjoint by
+        // construction, so this check cannot fire; it pins the model's bookkeeping.
         self.leased.intersection(&self.available).count() > 0
     }
 }
 
-/// Recursively enumerate all interleavings for `n_tasks` tasks, each with 2
-/// steps (lease then complete), over a pool of `n_seats` seats.  Panics on
-/// any invariant violation.
 fn enumerate_interleavings(
     tasks: &mut Vec<TaskState>,
     pool: &mut PoolSnapshot,
@@ -177,13 +107,11 @@ fn enumerate_interleavings(
         return;
     }
 
-    // Check invariant: no seat is both leased and available.
     if pool.double_leased() {
         *violation_found = true;
         return;
     }
 
-    // Check if all tasks are Done.
     let all_done = tasks.iter().all(|t| matches!(t, TaskState::Done));
     if all_done {
         return;
@@ -196,7 +124,6 @@ fn enumerate_interleavings(
         }
         match tasks[i].clone() {
             TaskState::Idle => {
-                // Step: try to lease a seat for this task.
                 match pool.try_lease() {
                     Some(sid) => {
                         let old =
@@ -231,7 +158,6 @@ fn enumerate_interleavings(
 
 #[test]
 fn exhaustive_interleaving_no_double_lease_3_tasks_3_seats() {
-    // 3 tasks, 3 seats — enumerate all interleavings.
     let mut tasks = vec![TaskState::Idle, TaskState::Idle, TaskState::Idle];
     let mut pool = PoolSnapshot::new(&["loom-seat-0", "loom-seat-1", "loom-seat-2"]);
     let mut violation = false;
@@ -244,7 +170,6 @@ fn exhaustive_interleaving_no_double_lease_3_tasks_3_seats() {
 
 #[test]
 fn exhaustive_interleaving_no_double_lease_4_tasks_2_seats() {
-    // 4 tasks competing for 2 seats — some tasks must wait; still no double-lease.
     let mut tasks = vec![
         TaskState::Idle,
         TaskState::Idle,
@@ -260,13 +185,6 @@ fn exhaustive_interleaving_no_double_lease_4_tasks_2_seats() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Deterministic loop test (3 simulated tasks, lease+complete cycle)
-//
-// Verifies lease/complete atomicity under a simple sequential round-robin
-// scheduler — the "loom v0" smoke-test that exercises the real kernel API.
-// ---------------------------------------------------------------------------
-
 #[test]
 fn deterministic_3_task_lease_complete_loop() {
     let pool_ref = make_pool(3);
@@ -274,12 +192,9 @@ fn deterministic_3_task_lease_complete_loop() {
     let agent = AgentId::new("agent-loom-det").unwrap();
     let now = Instant::now();
 
-    // Simulate 3 tasks each doing 5 lease+complete cycles sequentially.
-    // Since this is sequential, no interleaving happens, but we verify that
-    // every lease succeeds and the seat_count stays stable throughout.
+    // Sequential: no interleaving occurs; this only pins the lease+complete cycle.
     let n_cycles = 5;
     for _ in 0..n_cycles {
-        // Each "task" acquires and immediately releases, in sequence.
         for task_idx in 0..3usize {
             let lease = SubscriptionPool::lease(
                 &pool_ref,
@@ -289,7 +204,6 @@ fn deterministic_3_task_lease_complete_loop() {
                 now,
             )
             .unwrap_or_else(|e| panic!("task {task_idx}: lease failed: {e:?}"));
-            // Verify seat_count is unchanged (seats never removed from map).
             assert_eq!(pool_ref.lock().unwrap().seat_count(), 3);
             lease
                 .complete(SeatOutcome::Ok, now)
@@ -297,7 +211,6 @@ fn deterministic_3_task_lease_complete_loop() {
         }
     }
 
-    // After all cycles, pool still has all 3 seats and none are leased.
     let pool = pool_ref.lock().unwrap();
     assert_eq!(pool.seat_count(), 3);
 }

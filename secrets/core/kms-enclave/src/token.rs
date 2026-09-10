@@ -1,40 +1,20 @@
 //! Wrapped-key tokens: the only serializable form of enclave key material.
 //!
-//! Encoding is a hand-rolled, versioned, strict binary format rather than a
-//! serde derive: a KMS token needs one canonical byte representation because
-//! the header bytes double as the AEAD associated data. Any header tamper
-//! (identifier, version, kind) therefore fails authentication, not just
-//! parsing.
-//!
-//! Layout (all integers big-endian):
-//!
-//! ```text
-//! header  := MAGIC(4) kind(1) format(1) field*           // fields per kind
-//! field   := len(u16) bytes                               // utf-8 ids
-//! version := u32
-//! body    := nonce(12) ct_len(u16) ciphertext
-//! token   := header body                                  // AAD = header
-//! ```
+//! The header bytes double as the AEAD associated data: any header tamper fails
+//! authentication, not just parsing.
 
 use std::fmt;
 
 use secrets_kms_domain::envelope_keys::{DekId, KekId};
 
-/// Token preamble shared by both kinds.
 const MAGIC: &[u8; 4] = b"OYK1";
-/// Token kind: KEK wrapped under a sealing root.
 const KIND_KEK: u8 = 0x01;
-/// Token kind: DEK wrapped under a KEK version.
 const KIND_DEK: u8 = 0x02;
-/// Current (only) format version.
 const FORMAT_V1: u8 = 0x01;
-/// AES-256-GCM nonce length.
 pub(crate) const NONCE_LEN: usize = 12;
 /// AES-256-GCM tag length — minimum valid ciphertext length.
 const TAG_LEN: usize = 16;
-/// Hard cap on any length-prefixed field; identifiers are short by contract.
 const MAX_FIELD_LEN: usize = 512;
-/// Hard cap on ciphertext carried by a token (keys, not payloads).
 const MAX_CIPHERTEXT_LEN: usize = 4096;
 
 /// Strict-decoding failures for wrapped tokens.
@@ -81,9 +61,7 @@ impl fmt::Display for TokenError {
 
 impl std::error::Error for TokenError {}
 
-/// A KEK sealed under a per-cell sealing root. The only form in which a KEK
-/// may be persisted or transported (ADR-0536 D-8: key material never leaves
-/// the crypto boundary).
+/// A KEK sealed under a per-cell sealing root.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WrappedKekToken {
     pub(crate) root_id: String,
@@ -94,22 +72,18 @@ pub struct WrappedKekToken {
 }
 
 impl WrappedKekToken {
-    /// Sealing root that wrapped this KEK.
     pub fn root_id(&self) -> &str {
         &self.root_id
     }
 
-    /// Identifier of the wrapped KEK.
     pub fn kek_id(&self) -> &KekId {
         &self.kek_id
     }
 
-    /// Version of the wrapped KEK (1-based).
     pub fn kek_version(&self) -> u32 {
         self.kek_version
     }
 
-    /// Canonical byte encoding.
     pub fn encode(&self) -> Vec<u8> {
         let header = kek_header(&self.root_id, &self.kek_id, self.kek_version);
         assemble(header, &self.nonce, &self.ciphertext)
@@ -144,8 +118,7 @@ impl WrappedKekToken {
     }
 }
 
-/// A DEK sealed under a specific KEK version. Carries enough header to route
-/// unwrapping to the right KEK version during decrypt-only rotation.
+/// A DEK sealed under a specific KEK version, which routes unwrapping to that version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WrappedDek {
     pub(crate) kek_id: KekId,
@@ -156,22 +129,18 @@ pub struct WrappedDek {
 }
 
 impl WrappedDek {
-    /// Identifier of the KEK that wrapped this DEK.
     pub fn kek_id(&self) -> &KekId {
         &self.kek_id
     }
 
-    /// KEK version that wrapped this DEK (1-based).
     pub fn kek_version(&self) -> u32 {
         self.kek_version
     }
 
-    /// Identifier of the wrapped DEK.
     pub fn dek_id(&self) -> &DekId {
         &self.dek_id
     }
 
-    /// Canonical byte encoding.
     pub fn encode(&self) -> Vec<u8> {
         let header = dek_header(&self.kek_id, self.kek_version, &self.dek_id);
         assemble(header, &self.nonce, &self.ciphertext)
@@ -232,8 +201,7 @@ fn preamble(kind: u8) -> Vec<u8> {
 }
 
 fn push_field(out: &mut Vec<u8>, bytes: &[u8]) {
-    // Identifiers are validated short (≤ MAX_FIELD_LEN < u16::MAX); the cast
-    // cannot truncate because encode paths only receive validated ids.
+    // Ids are validated <= MAX_FIELD_LEN < u16::MAX, so this cast cannot truncate.
     let len = bytes.len().min(MAX_FIELD_LEN) as u16;
     out.extend_from_slice(&len.to_be_bytes());
     out.extend_from_slice(&bytes[..len as usize]);

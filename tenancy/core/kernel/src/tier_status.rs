@@ -1,24 +1,9 @@
-//! Tenant tier and lifecycle-status value objects.
-//!
-//! These are pure kernel primitives — no I/O, no framework deps.
-//! Per IP-001-tenancy-kernel-scaffold (P13-tenancy) and ADR-0056 (kernel layer).
-//!
-//! [`TenantTier`] classifies the commercial plan a tenant is enrolled in.
-//! [`TenantStatus`] is the lifecycle FSM state of a tenant record.
-//! [`SuspensionReason`] carries a typed reason when a tenant transitions to
-//! `TenantStatus::Suspended`.
+//! Tenant tier and lifecycle-status value objects. Pure kernel primitives: no I/O.
 
 use std::fmt;
 use std::str::FromStr;
 
-// ---------------------------------------------------------------------------
-// TenantTier
-// ---------------------------------------------------------------------------
-
-/// Commercial tier a tenant is enrolled in.
-///
-/// Determines feature access and resource limits enforced by the application
-/// layer via `TierLimits` (also owned by this module).
+/// Commercial tier a tenant is enrolled in; determines feature access and limits.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TenantTier {
     Starter,
@@ -73,18 +58,9 @@ impl fmt::Display for TenantTierParseError {
 
 impl std::error::Error for TenantTierParseError {}
 
-// ---------------------------------------------------------------------------
-// TenantStatus
-// ---------------------------------------------------------------------------
-
 /// Lifecycle FSM state of a tenant record.
 ///
-/// Valid FSM transitions enforced by the application layer:
-/// - `Active` → `Suspended` (via `SuspendTenantUseCase`)
-/// - `Suspended` → `Active`  (via `ReinstateUseCase`)
-/// - `Active | Suspended` → `Terminated`
-///
-/// `Terminated` is a terminal state; re-activation is never permitted.
+/// `Terminated` is terminal: re-activation is never permitted.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TenantStatus {
     Active,
@@ -112,9 +88,7 @@ impl TenantStatus {
         }
     }
 
-    /// Returns `true` only when the tenant is `Active` and may process new
-    /// requests.  Both `Suspended` (FR-04: "block new requests") and
-    /// `Terminated` (terminal state) are non-operable.
+    /// Returns `true` only when the tenant is `Active` and may accept new requests.
     pub fn is_operable(self) -> bool {
         matches!(self, Self::Active)
     }
@@ -146,14 +120,7 @@ impl fmt::Display for TenantStatusParseError {
 
 impl std::error::Error for TenantStatusParseError {}
 
-// ---------------------------------------------------------------------------
-// SuspensionReason
-// ---------------------------------------------------------------------------
-
 /// Typed reason attached to a `TenantStatus::Suspended` transition.
-///
-/// Carried in the audit event and persisted to the `tenancy.tenants`
-/// suspension record for compliance traceability (ADR-0018).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SuspensionReason {
     /// Subscription payment is overdue beyond the grace period.
@@ -195,17 +162,9 @@ impl fmt::Display for SuspensionReason {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ------------------------------------------------------------------
-    // TenantTier
-    // ------------------------------------------------------------------
 
     #[test]
     fn tenant_tier_labels_are_stable_and_round_trip() {
@@ -233,13 +192,8 @@ mod tests {
     fn tenant_tier_from_str_returns_parse_error_for_unknown() {
         let err = "unknown_tier".parse::<TenantTier>().unwrap_err();
         assert_eq!(err.0, "unknown_tier");
-        // Display should mention the bad value
         assert!(err.to_string().contains("unknown_tier"));
     }
-
-    // ------------------------------------------------------------------
-    // TenantStatus
-    // ------------------------------------------------------------------
 
     #[test]
     fn tenant_status_labels_are_stable_and_round_trip() {
@@ -258,19 +212,13 @@ mod tests {
 
     #[test]
     fn tenant_status_is_operable_only_for_active() {
-        // FR-04: suspended tenants must not be treated as operable — a
-        // suspended tenant must not pass admission guards (P1 fix).
         assert!(TenantStatus::Active.is_operable());
         assert!(!TenantStatus::Suspended.is_operable());
         assert!(!TenantStatus::Terminated.is_operable());
     }
 
-    /// Synthetic-violation guard: ensures the old wrong implementation
-    /// (returning true for Suspended) cannot be silently reintroduced.
     #[test]
     fn suspended_tenant_must_not_pass_operability_guard_fr04() {
-        // If this fails, is_operable() was reverted to the pre-FR-04 shape
-        // that treated Suspended the same as Active.
         assert!(
             !TenantStatus::Suspended.is_operable(),
             "FR-04 violation: Suspended must block new requests; is_operable() must return false"
@@ -290,10 +238,6 @@ mod tests {
         assert_eq!(err.0, "unknown_status");
         assert!(err.to_string().contains("unknown_status"));
     }
-
-    // ------------------------------------------------------------------
-    // SuspensionReason
-    // ------------------------------------------------------------------
 
     #[test]
     fn suspension_reason_labels_are_stable() {
