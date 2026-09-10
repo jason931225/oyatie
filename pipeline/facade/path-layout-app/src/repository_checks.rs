@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use pipeline_admission::{
     ALLOWED_ROOT_DIRS, APP_PRODUCT_DIRS, BUILD_ROOT_DIRS, CARGO_CONFIG_PATHS,
-    cargo_config_violations, comment_run_violations, file_budget_violations, is_capability_root,
+    cargo_config_violations, comment_run_violations, data_class_home_violations,
+    file_budget_violations, is_capability_root, unclassified_field_violations,
 };
 use pipeline_repository_draft::{RepositoryEntryKind, RepositoryRead};
 
@@ -87,11 +88,15 @@ pub(super) fn repository_cargo_config_violations(
     Ok(violations)
 }
 
-/// Budgets charged against the content of every changed live path. Both are
-/// path-keyed, so both are judged at a rename's source.
+/// Rules charged against the content of every changed live path. All are
+/// path-keyed, so all are judged at a rename's source.
 type TouchedContentRule = fn(&str, &[u8]) -> Vec<String>;
-const TOUCHED_CONTENT_RULES: [TouchedContentRule; 2] =
-    [file_budget_violations, comment_run_violations];
+const TOUCHED_CONTENT_RULES: [TouchedContentRule; 4] = [
+    file_budget_violations,
+    comment_run_violations,
+    data_class_home_violations,
+    unclassified_field_violations,
+];
 
 pub(super) fn live_candidate_violations(
     repository: &impl RepositoryRead,

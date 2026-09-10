@@ -2,6 +2,7 @@
 
 pub mod cadence;
 pub mod commit_range;
+pub mod data_class;
 pub mod fanin;
 pub mod git_change;
 pub mod layout;
@@ -19,6 +20,7 @@ pub use cadence::{
     reindeer_qualification_exact_paths, reindeer_source_qualification_required,
 };
 pub use commit_range::{CommitFact, SignatureState, signing_violations};
+pub use data_class::{data_class_home_violations, unclassified_field_violations};
 pub use fanin::{
     FanIn, fan_in_ok, gate_value, live_postgres_cells_ok, occupancy_ok, postgres_ok, postsubmit_ok,
     reindeer_qualification_ok, required_success,

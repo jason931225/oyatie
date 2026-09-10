@@ -223,3 +223,15 @@ rust_test(
         "//pipeline/core/workspace-members-kernel:workspace-members-kernel",
     ],
 )
+
+rust_test(
+    name = "pipeline-admission-data-class",
+    srcs = ["tests/data_class.rs"],
+    crate = "pipeline_admission_data_class",
+    crate_root = "tests/data_class.rs",
+    env = _CARGO_ENV,
+    visibility = ["PUBLIC"],
+    deps = [
+        ":pipeline-admission",
+    ],
+)
