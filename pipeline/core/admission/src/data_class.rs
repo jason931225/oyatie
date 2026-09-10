@@ -33,21 +33,19 @@ pub fn data_class_home_violations(path: &str, contents: &[u8]) -> Vec<String> {
 }
 
 /// Enum declarations whose name carries the data-class vocabulary, as
-/// `(line, name)`. Rust puts a declaration at the head of its own line and
-/// ends the head with `{`, which is what separates a declaration from prose
-/// naming one; the same shape found every declaration in the tree with no
-/// false positive.
+/// `(line, name)`. What separates a declaration from prose naming one is that
+/// `enum ` opens the line once visibility is stripped: a comment, doc line or
+/// sentence keeps its marker or its words in front of `enum` and so never
+/// opens it. The opening brace is deliberately NOT required — demanding it
+/// would miss a declaration whose brace wrapped to the next line, and missing
+/// one is the failure that matters here.
 fn declared_enums(text: &str) -> Vec<(usize, String)> {
     text.lines()
         .enumerate()
         .filter_map(|(index, line)| {
-            let head = line.trim_start();
-            if head.starts_with("//") || head.starts_with('*') {
-                return None;
-            }
-            let head = head.strip_suffix('{')?.trim_end();
-            let rest = strip_visibility(head).strip_prefix("enum ")?.trim();
-            let name = rest.split(['<', ' ']).next().unwrap_or_default();
+            let head = strip_visibility(line.trim_start());
+            let rest = head.strip_prefix("enum ")?.trim();
+            let name = rest.split(['<', ' ', '{']).next().unwrap_or_default();
             (name.contains("DataClass") && is_identifier(name))
                 .then(|| (index + 1, name.to_owned()))
         })

@@ -74,6 +74,17 @@ fn prose_naming_an_enum_is_not_a_declaration() {
 }
 
 #[test]
+fn a_declaration_whose_brace_wrapped_to_the_next_line_is_still_refused() {
+    let refusals = home(OUTSIDE, "pub enum RouteDataClass\n{\n    Public,\n}\n");
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(
+        refusals[0].contains("enum RouteDataClass"),
+        "{}",
+        refusals[0]
+    );
+}
+
+#[test]
 fn an_unrelated_class_enum_is_not_a_data_class() {
     for name in ["DatastoreClass", "CapacityClass", "NodeClass"] {
         let text = format!("pub enum {name} {{\n    Public,\n}}\n");
@@ -148,9 +159,16 @@ fn a_domain_typed_field_delegates_its_class_and_is_not_a_hole() {
 
 #[test]
 fn a_non_rust_path_carries_neither_rule() {
-    let text = "pub enum RouteDataClass {\n    Public,\n}\n";
-    assert!(home("network/core/route/README.txt", text).is_empty());
-    assert!(unclassified_field_violations("network/core/route/x.txt", text.as_bytes()).is_empty());
+    let declaration = "pub enum RouteDataClass {\n    Public,\n}\n";
+    assert!(!home(OUTSIDE, declaration).is_empty(), "positive control");
+    assert!(home("network/core/route/README.txt", declaration).is_empty());
+
+    let hole = "pub struct Row {\n    pub id: Classified<String>,\n    pub email: String,\n}\n";
+    assert!(!holes(hole).is_empty(), "positive control");
+    assert!(
+        unclassified_field_violations("network/core/route/notes.txt", hole.as_bytes()).is_empty(),
+        "a non-Rust path carries no field rule even when its text would refuse"
+    );
 }
 
 #[test]
