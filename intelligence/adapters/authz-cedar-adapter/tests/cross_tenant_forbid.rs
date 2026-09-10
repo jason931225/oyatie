@@ -1,7 +1,7 @@
 //! Adversarial corpus for cross-tenant isolation: near-miss tenant ids that
 //! must not be treated as a match.
 //!
-//! The rule under attack is `cloud-intelligence-forbid-cross-tenant-inference`
+//! The rule under attack is `cloud-intelligence-forbid-cross-tenant-any-action`
 //! in `intelligence/cedar/cloud-intelligence.cedar`.
 use intelligence_authz_cedar_adapter::CedarAuthzGate;
 use intelligence_kernel::{
@@ -105,6 +105,7 @@ fn many_principal_tenants_versus_target_all_forbidden() {
     let g = gate();
     let rt = TenantId::new("target-tenant").unwrap();
     let pa = AgentId::new("attacker-1").unwrap();
+    let mut leaked: Vec<&str> = Vec::new();
     for foreign in &[
         "tenant-1",
         "tenant-2",
@@ -117,21 +118,25 @@ fn many_principal_tenants_versus_target_all_forbidden() {
         " ",
         "0",
     ] {
-        if let Ok(pt) = TenantId::new(*foreign) {
-            assert_eq!(
-                g.decide(&req(&pt, &pa, &rt, Provider::Anthropic)),
-                AuthzDecision::Forbid,
-                "principal tenant {foreign:?} should be forbidden",
-            );
+        if let Ok(pt) = TenantId::new(*foreign)
+            && g.decide(&req(&pt, &pa, &rt, Provider::Anthropic)) != AuthzDecision::Forbid
+        {
+            leaked.push(foreign);
         }
     }
+    assert!(
+        leaked.is_empty(),
+        "these foreign principal tenants reached target-tenant: {leaked:?}",
+    );
 }
 
-/// HAZARD, pinned rather than asserted-away: the cross-tenant forbid covers
-/// only the two inference actions, so an admin action reaching a foreign
-/// tenant is allowed here. A caller that must refuse it has to add that.
 #[test]
-fn cross_tenant_refresh_token_is_allowed_not_forbidden() {
+fn cross_tenant_refresh_token_is_forbidden() {
+    // RefreshToken maps to RefreshKeyPool + AdminRealm. The AdminRealm permit is
+    // resource-tenant-agnostic, so before the cross-tenant forbid was widened to
+    // every action this returned Allow: a foreign-tenant admin token reached
+    // another tenant's key pool. The realm gates WHICH action; the cross-tenant
+    // rule gates WHOSE resource.
     let g = gate();
     let pt = TenantId::new("tenant-a").unwrap();
     let rt = TenantId::new("tenant-b").unwrap();
@@ -143,7 +148,7 @@ fn cross_tenant_refresh_token_is_allowed_not_forbidden() {
         resource_tenant: &rt,
         resource_provider: Provider::Anthropic,
     };
-    assert_eq!(g.decide(&request), AuthzDecision::Allow);
+    assert_eq!(g.decide(&request), AuthzDecision::Forbid);
 }
 
 #[test]
@@ -174,13 +179,16 @@ fn ten_random_cross_tenant_pairs_all_forbidden() {
         ("eu-west-1", "us-east-1"),
         ("redacted-a", "redacted-b"),
     ];
+    let mut leaked: Vec<(&str, &str)> = Vec::new();
     for (a, b) in pairs {
         let pt = TenantId::new(a).unwrap();
         let rt = TenantId::new(b).unwrap();
-        assert_eq!(
-            g.decide(&req(&pt, &pa, &rt, Provider::Anthropic)),
-            AuthzDecision::Forbid,
-            "{a} vs {b} must be forbidden",
-        );
+        if g.decide(&req(&pt, &pa, &rt, Provider::Anthropic)) != AuthzDecision::Forbid {
+            leaked.push((a, b));
+        }
     }
+    assert!(
+        leaked.is_empty(),
+        "these principal/resource tenant pairs were not forbidden: {leaked:?}",
+    );
 }

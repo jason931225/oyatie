@@ -22,6 +22,29 @@ rust_library(
     ],
 )
 rust_test(
+    name = "intelligence-anthropic-subscription-adapter-pkce-and-refresh-integrity",
+    srcs = ["tests/pkce_and_refresh_integrity.rs"],
+    crate = "intelligence_anthropic_subscription_adapter_pkce_and_refresh_integrity",
+    crate_root = "tests/pkce_and_refresh_integrity.rs",
+    visibility = ["PUBLIC"],
+    deps = [
+        ":intelligence-anthropic-subscription-adapter",
+        "//intelligence/core/account-domain:intelligence-account-domain",
+        "//intelligence/core/account-kernel:intelligence-account-kernel",
+        "//intelligence/core/oauth-subscription-kernel:intelligence-oauth-subscription-kernel",
+        "//gateway/adapters/http-runtime-hyper:http-runtime-hyper-adapter",
+        "third-party//:bytes",
+        "third-party//:futures-util",
+        "third-party//:http-body-util",
+        "third-party//:hyper",
+        "third-party//:hyper-util",
+        "third-party//:serde",
+        "third-party//:serde_json",
+        "third-party//:tokio",
+        "third-party//:tracing",
+    ],
+)
+rust_test(
     name = "intelligence-anthropic-subscription-adapter-oauth-integration",
     srcs = ["tests/oauth_integration.rs"],
     crate = "intelligence_anthropic_subscription_adapter_oauth_integration",

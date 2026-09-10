@@ -20,7 +20,10 @@ impl PkceVerifier {
         Ok(Self(raw))
     }
 
-    fn as_str(&self) -> &str {
+    /// Expose the raw verifier. RFC 7636 requires sending it as
+    /// `code_verifier` on the token exchange, so the adapter needs the bytes.
+    /// Named to make every call site read as a deliberate secret exposure.
+    pub fn expose_secret(&self) -> &str {
         &self.0
     }
 }
@@ -42,7 +45,7 @@ pub struct PkceChallenge(String);
 
 impl PkceChallenge {
     pub fn derive_s256(verifier: &PkceVerifier) -> Self {
-        let digest = sha256(verifier.as_str().as_bytes());
+        let digest = sha256(verifier.expose_secret().as_bytes());
         let encoded = base64url_no_pad(&digest);
         Self(encoded)
     }
