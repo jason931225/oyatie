@@ -1,13 +1,7 @@
 use crate::error::ClaudeAgentError;
 use crate::options::*;
-use crate::status::McpServerPermissionPolicy;
-use crate::status::McpServerToolPolicy;
-use crate::tools::SdkMcpServer;
-use serde_json::Map;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::env;
-use std::fs;
 use std::sync::Arc;
 
 #[test]
