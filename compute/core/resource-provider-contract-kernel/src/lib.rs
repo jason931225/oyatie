@@ -1,3 +1,4 @@
+// ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 

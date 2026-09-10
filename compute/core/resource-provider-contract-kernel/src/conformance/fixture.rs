@@ -6,8 +6,8 @@ use super::violation;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceViolation {
-    pub check: &'static str,
-    pub detail: String,
+    pub check: &'static str, // data_class: INTERNAL_ONLY
+    pub detail: String,      // data_class: INTERNAL_ONLY
 }
 
 impl fmt::Display for ConformanceViolation {
