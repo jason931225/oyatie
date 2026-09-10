@@ -116,6 +116,7 @@ fn implemented_traits(contents: &[u8]) -> Vec<String> {
             continue;
         }
         let header = match open.take() {
+            Some(_) if starts_impl(line) => line.to_owned(),
             Some(head) => format!("{head} {line}"),
             None if starts_impl(line) => line.to_owned(),
             None => continue,
@@ -162,8 +163,10 @@ fn implemented_trait(header: &str) -> Option<String> {
     let name = last_segment(trait_path)?;
     let target = target.split('{').next().unwrap_or_default();
     let stub = words(target).any(|word| word.starts_with(STUB_PREFIX));
-    let forwards = words(generics)
-        .chain(words(bounds))
+    let forwards = unqualified_words(generics)
+        .into_iter()
+        .chain(unqualified_words(bounds))
+        .chain(unqualified_words(target))
         .any(|word| word == name);
     (!stub && !forwards).then_some(name)
 }
@@ -171,11 +174,12 @@ fn implemented_trait(header: &str) -> Option<String> {
 /// Split a generic parameter list at its balancing `>`, so a lifetime or a
 /// bound holding `for` cannot be read as the separator.
 fn split_generics(parameters: &str) -> (&str, &str) {
+    let bytes = parameters.as_bytes();
     let mut depth = 1usize;
     for (index, byte) in parameters.bytes().enumerate() {
         match byte {
             b'<' => depth += 1,
-            b'>' => {
+            b'>' if index == 0 || bytes[index - 1] != b'-' => {
                 depth -= 1;
                 if depth == 0 {
                     return (&parameters[..index], &parameters[index + 1..]);
@@ -185,6 +189,61 @@ fn split_generics(parameters: &str) -> (&str, &str) {
         }
     }
     (parameters, "")
+}
+
+/// Identifier words in `text` that no foreign path qualifies, so
+/// `std::io::Write` contributes `std` and not `Write`. A path rooted at
+/// `crate`, `self` or `super` names this crate's own item, so its last segment
+/// is a mention like a bare one; a bound naming another crate's trait is not.
+fn unqualified_words(text: &str) -> Vec<&str> {
+    let mut found = Vec::new();
+    let mut start = None;
+    for (index, character) in text.char_indices() {
+        match (character.is_ascii_alphanumeric() || character == '_', start) {
+            (true, None) => start = Some(index),
+            (false, Some(begin)) => {
+                push_unqualified(text, begin, index, &mut found);
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    if let Some(begin) = start {
+        push_unqualified(text, begin, text.len(), &mut found);
+    }
+    found
+}
+
+fn push_unqualified<'text>(
+    text: &'text str,
+    begin: usize,
+    end: usize,
+    found: &mut Vec<&'text str>,
+) {
+    if matches!(
+        path_root(&text[..begin]),
+        None | Some("crate" | "self" | "super")
+    ) {
+        found.push(&text[begin..end]);
+    }
+}
+
+/// The first segment of the `::`-joined path that ends at `prefix`, or `None`
+/// when nothing qualifies what follows it.
+fn path_root(prefix: &str) -> Option<&str> {
+    let mut rest = prefix;
+    let mut root = None;
+    while let Some(head) = rest.strip_suffix("::") {
+        let start = head
+            .char_indices()
+            .rev()
+            .take_while(|(_, character)| character.is_ascii_alphanumeric() || *character == '_')
+            .last()
+            .map_or(head.len(), |(index, _)| index);
+        root = Some(&head[start..]);
+        rest = &head[..start];
+    }
+    root
 }
 
 fn words(text: &str) -> impl Iterator<Item = &str> {

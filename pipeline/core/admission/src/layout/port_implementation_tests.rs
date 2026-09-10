@@ -1,7 +1,5 @@
-//! A port defined by a change carries its implementation in the same change.
-//!
-//! Every fixture is a single-line literal, so no line of this file begins with
-//! a `trait` item and the file cannot trip the rule it pins.
+//! Fixtures are single-line literals, so no line of this file begins with a
+//! `trait` item and the file cannot trip the rule it pins.
 
 use super::*;
 
@@ -225,5 +223,74 @@ fn reference_slice_unit_and_macro_targets_are_implementations() {
             refusals(&[port, added(ADAPTER, adapter)]).is_empty(),
             "{adapter:?}"
         );
+    }
+}
+
+#[test]
+fn a_return_arrow_does_not_close_an_inline_generic_list() {
+    let port = added(PORT, "pub trait Clock {}\n");
+    let adapter = added(ADAPTER, "impl<F: Fn() -> u64> Clock for F {}\n");
+    assert!(refusals(&[port, adapter]).is_empty());
+
+    let named = "pub trait Response {}\nimpl<F: Fn() -> Response> Clock for F {}\n";
+    assert_eq!(refusals(&[added(PORT, named)]).len(), 1);
+}
+
+#[test]
+fn a_bound_naming_another_crates_trait_does_not_forward() {
+    let port = added(PORT, "pub trait Write {}\n");
+    let adapter = added(ADAPTER, "impl<W: std::io::Write> Write for LogSink<W> {}\n");
+    assert!(refusals(&[port, adapter]).is_empty());
+
+    let service = added(PORT, "pub trait Service {}\n");
+    let tower = added(
+        ADAPTER,
+        "impl<S> Service for TowerAdapter<S>\nwhere\n    S: tower::Service<Request>,\n{\n}\n",
+    );
+    assert!(refusals(&[service, tower]).is_empty());
+}
+
+#[test]
+fn an_implementation_for_a_dyn_form_of_the_same_trait_forwards() {
+    let port = "pub trait CellStore {}\npub struct NotImplementedCellStore;\nimpl CellStore for NotImplementedCellStore {}\nimpl CellStore for Arc<dyn CellStore + Send + Sync> {}\n";
+    assert_eq!(refusals(&[added(PORT, port)]).len(), 1);
+}
+
+#[test]
+fn an_impl_line_inside_a_string_does_not_swallow_the_next_impl() {
+    let port = added(PORT, "pub trait CellStore {}\n");
+    let adapter = added(
+        ADAPTER,
+        "fn fixture() -> &'static str {\n    r#\"\nimpl Broken\n\"#\n}\n\nimpl CellStore for Postgres {}\n",
+    );
+    assert!(refusals(&[port, adapter]).is_empty());
+}
+
+#[test]
+fn a_stub_word_inside_a_body_on_the_header_line_is_not_the_target() {
+    let port = "pub trait CellStore {}\nimpl CellStore for PostgresCellStore { fn get(&self) { NotImplementedYet::refuse() } }\n";
+    assert!(refusals(&[added(PORT, port)]).is_empty());
+}
+
+#[test]
+fn a_mention_rooted_at_this_crate_forwards_like_a_bare_one() {
+    for port in [
+        "pub trait CellStore {}\nimpl CellStore for Arc<dyn crate::CellStore + Send> {}\n",
+        "pub trait CellStore {}\nimpl<T: crate::CellStore + ?Sized> CellStore for Arc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: crate::store::CellStore + ?Sized> CellStore for Arc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: super::CellStore> super::CellStore for Box<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: self::CellStore> self::CellStore for Rc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T> CellStore for Arc<T>\nwhere\n    T: crate::CellStore + ?Sized,\n{\n}\n",
+        "pub trait CellStore {}\nimpl<T:CellStore> CellStore for Arc<T> {}\n",
+    ] {
+        assert_eq!(refusals(&[added(PORT, port)]).len(), 1, "{port:?}");
+    }
+
+    for port in [
+        "pub trait Write {}\nimpl<W: std::io::Write> Write for LogSink<W> {}\n",
+        "pub trait CellStore {}\nimpl<T: mycrate::CellStore> CellStore for Arc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: my_crate::CellStore> CellStore for Arc<T> {}\n",
+    ] {
+        assert!(refusals(&[added(PORT, port)]).is_empty(), "{port:?}");
     }
 }
