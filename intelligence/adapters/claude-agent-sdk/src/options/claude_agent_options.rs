@@ -12,7 +12,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::env;
 use std::path::PathBuf;
 
 #[cfg(test)]

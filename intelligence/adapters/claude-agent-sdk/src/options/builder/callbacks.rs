@@ -21,8 +21,6 @@ use crate::session_store::SharedSessionStore;
 use crate::tools::SdkMcpServer;
 use crate::transport::ClaudeProcessSpawner;
 use crate::transport::SharedClaudeProcessSpawner;
-use serde_json::Map;
-use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
