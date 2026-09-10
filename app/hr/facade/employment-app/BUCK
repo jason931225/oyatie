@@ -5,7 +5,7 @@ rust_library(
     crate_root = "src/lib.rs",
     visibility = ["PUBLIC"],
     deps = [
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
         "//app/hr/core/employment-domain:hr-employment-domain",
     ],
 )
@@ -18,7 +18,7 @@ rust_test(
     visibility = ["PUBLIC"],
     deps = [
         ":hr-employment-app",
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
         "//app/hr/core/employment-domain:hr-employment-domain",
     ],
 )
@@ -31,7 +31,7 @@ rust_test(
     visibility = ["PUBLIC"],
     deps = [
         ":hr-employment-app",
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
         "//app/hr/core/employment-domain:hr-employment-domain",
     ],
 )
@@ -44,7 +44,7 @@ rust_test(
     visibility = ["PUBLIC"],
     deps = [
         ":hr-employment-app",
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
         "//app/hr/core/employment-domain:hr-employment-domain",
     ],
 )
