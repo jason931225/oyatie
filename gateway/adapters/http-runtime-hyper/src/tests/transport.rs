@@ -1,9 +1,5 @@
 use super::*;
 
-// F3 adversarial: boundary conversion preserves bytes byte-for-byte for
-// the full u8 range. We must drain the hyper Body back to bytes and
-// compare byte-for-byte; asserting only status would let a silent
-// body-mangling regression pass.
 #[tokio::test]
 async fn boundary_conversion_round_trip_identity() {
     let original: Vec<u8> = (0u8..=255).collect();
@@ -26,7 +22,6 @@ async fn boundary_conversion_round_trip_identity() {
     assert_eq!(drained[255], 255);
 }
 
-// F3 adversarial: empty body survives the boundary (the obvious edge).
 #[tokio::test]
 async fn boundary_conversion_empty_body_round_trip() {
     let resp = HttpResponse::new(204).with_body(Vec::new());

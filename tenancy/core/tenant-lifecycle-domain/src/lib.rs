@@ -1,18 +1,6 @@
-//! Tenant lifecycle reconciliation domain: the pure rules a K8s-native
-//! reconciler needs to drive a tenant toward a declared desired state.
-//!
-//! Precedent: Kubernetes controller convention (declared spec vs observed
-//! status, level-triggered convergence) and AWS ACK / Azure Service Operator
-//! resource controllers, which plan exactly one next mutation per reconcile
-//! pass. The transition function itself stays in the locked G001 contract
+//! The transition function stays in the locked G001 contract
 //! (`TenantLifecycleOperation::apply`) — this crate only PLANS which
 //! contract operation to request next; it never invents transitions.
-//!
-//! Per ADR-0105 the domain layer is pure business rules: zero I/O. The
-//! orchestration against the provider lives in the usecase layer; kube
-//! wiring lives in a later adapter slice.
-//!
-//! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -30,10 +18,8 @@ pub enum DesiredTenantState {
     Retired,
 }
 
-/// What the planner decides for one reconcile pass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Plan {
-    /// Observed state equals desired state; nothing to do.
     Converged,
     /// Request exactly this contract operation next (one step per pass —
     /// level-triggered, so multi-hop paths converge across passes).
@@ -125,16 +111,11 @@ pub fn derive_step_key(
     ))
 }
 
-/// The reconcile-visible phase of a tenant, projected for CR status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TenantPhase {
-    /// Observed state equals desired state.
     Converged,
-    /// An operation is in flight or was just requested.
     Progressing,
-    /// The plan is unreachable or an operation failed terminally; carries
-    /// the machine-readable reason.
     Blocked { reason: String },
 }
 
@@ -154,8 +135,6 @@ mod tests {
         DesiredTenantState::Retired,
     ];
 
-    /// Every planned step must be legal under the CONTRACT transition
-    /// function — the planner can never request what the FSM forbids.
     #[test]
     fn every_planned_step_is_contract_legal() {
         for observed in ALL_OBSERVED {
@@ -171,8 +150,6 @@ mod tests {
         }
     }
 
-    /// Following the plan repeatedly always reaches Converged or
-    /// Unreachable within the FSM diameter — no oscillation, no livelock.
     #[test]
     fn plans_converge_within_fsm_diameter() {
         for start in ALL_OBSERVED {
@@ -193,7 +170,6 @@ mod tests {
         }
     }
 
-    /// Convergence really lands on the desired state (not just any fixpoint).
     #[test]
     fn converged_means_desired() {
         for desired in ALL_DESIRED {
@@ -210,7 +186,6 @@ mod tests {
         }
     }
 
-    /// Retired is terminal: only Retired remains reachable.
     #[test]
     fn retired_blocks_everything_but_retired() {
         assert_eq!(
@@ -252,9 +227,11 @@ mod tests {
         assert_eq!(text.len(), 36);
         assert_eq!(&text[14..15], "4", "version nibble");
         assert_eq!(&text[19..20], "8", "variant nibble");
-        // Field-boundary domain separation: shifting bytes between fields
-        // must change the key.
         let shifted = derive_step_key("c7a9f9a21", 41, "etire-from-active").unwrap();
-        assert_ne!(key, shifted);
+        assert_ne!(
+            key, shifted,
+            "field-boundary domain separation: shifting a byte between fields \
+must change the key"
+        );
     }
 }

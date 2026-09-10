@@ -1,9 +1,3 @@
-//! Data-residency enforcer adapter — wraps outbound event + RPC ports, injects
-//! residency metadata, evaluates `policy/data-residency.cedar`, blocks
-//! disallowed routes, emits denial audit events.
-//!
-//! Wave 15-IMPL-truth-up scaffold; full implementation lands in IP-020 execution.
-//! Adapter shape so downstream services need not rediscover the residency rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![allow(dead_code)]
 

@@ -1,9 +1,5 @@
-//! Runtime-free protocol parity kernel for REST, AsyncAPI, and proto surfaces.
-//!
-//! This crate records the explicit binding between a typed handler/receipt and
-//! its REST operation, AsyncAPI event operation/channel/message, and proto RPC.
-//! It does not serialize protobufs or publish events; runtime adapters use these
-//! validated values later when they bind transports.
+//! This crate does not serialize protobufs or publish events; runtime
+//! adapters use these validated values later when they bind transports.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,39 +21,39 @@ pub enum ProtocolParityError {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProtocolParityBinding {
-    pub rest_operation_id: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_operation_id: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_channel_address: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_message_name: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_event_kind: &'static str, // data_class: INTERNAL_ONLY
-    pub receipt_event_type: &'static str, // data_class: INTERNAL_ONLY
-    pub proto_package: &'static str,     // data_class: INTERNAL_ONLY
-    pub proto_service: &'static str,     // data_class: INTERNAL_ONLY
-    pub proto_rpc: &'static str,         // data_class: INTERNAL_ONLY
+    pub rest_operation_id: &'static str,
+    pub asyncapi_operation_id: &'static str,
+    pub asyncapi_channel_address: &'static str,
+    pub asyncapi_message_name: &'static str,
+    pub asyncapi_event_kind: &'static str,
+    pub receipt_event_type: &'static str,
+    pub proto_package: &'static str,
+    pub proto_service: &'static str,
+    pub proto_rpc: &'static str,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProtocolParityBindingSpec {
-    pub rest_operation_id: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_operation_id: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_channel_address: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_message_name: &'static str, // data_class: INTERNAL_ONLY
-    pub asyncapi_event_kind: &'static str, // data_class: INTERNAL_ONLY
-    pub receipt_event_type: &'static str, // data_class: INTERNAL_ONLY
-    pub proto_package: &'static str,     // data_class: INTERNAL_ONLY
-    pub proto_service: &'static str,     // data_class: INTERNAL_ONLY
-    pub proto_rpc: &'static str,         // data_class: INTERNAL_ONLY
+    pub rest_operation_id: &'static str,
+    pub asyncapi_operation_id: &'static str,
+    pub asyncapi_channel_address: &'static str,
+    pub asyncapi_message_name: &'static str,
+    pub asyncapi_event_kind: &'static str,
+    pub receipt_event_type: &'static str,
+    pub proto_package: &'static str,
+    pub proto_service: &'static str,
+    pub proto_rpc: &'static str,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProtocolEventEnvelope {
-    pub binding: ProtocolParityBinding,  // data_class: INTERNAL_ONLY
-    pub schema_version: String,          // data_class: INTERNAL_ONLY
-    pub tenant_scope_ref: String,        // data_class: INTERNAL_ONLY
-    pub aggregate_id: String,            // data_class: INTERNAL_ONLY
-    pub audit_correlation_id: String,    // data_class: INTERNAL_ONLY
-    pub idempotency_key: Option<String>, // data_class: INTERNAL_ONLY
-    pub policy_decision_ref: String,     // data_class: INTERNAL_ONLY
+    pub binding: ProtocolParityBinding,
+    pub schema_version: String,
+    pub tenant_scope_ref: String,
+    pub aggregate_id: String,
+    pub audit_correlation_id: String,
+    pub idempotency_key: Option<String>,
+    pub policy_decision_ref: String,
 }
 
 impl ProtocolParityBinding {

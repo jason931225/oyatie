@@ -1,43 +1,33 @@
-//! Design-partner onboarding status for M04-P03.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-/// Lifecycle status of a design-partner tenant through the M04-P03 onboarding
-/// funnel.  Variants are ordered from earliest to latest stage; `Ord` reflects
-/// that ordering so callers can assert forward-only progression.
+/// Variants are ordered from earliest to latest stage; `Ord` reflects that
+/// ordering so callers can assert forward-only progression.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DesignPartnerStatus {
-    /// Tenant record created; KR pack bound; awaiting first workflow authoring.
     Provisioned,
-    /// At least one tenant-specific workflow authored in Workflow Studio.
     WorkflowAuthored,
-    /// Foundry agents activated under autonomy ceiling T1-T3.
     AgentsActive,
-    /// All M04-P03 acceptance criteria met; partner considered live.
     Live,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DesignPartnerStatusError {
-    /// Attempted to regress to an earlier or equal stage.
     IllegalRegression {
         from: DesignPartnerStatus,
         to: DesignPartnerStatus,
     },
-    /// Attempted to jump over one or more required intermediate stages
-    /// (e.g. `Provisioned -> Live` skipping `WorkflowAuthored`/`AgentsActive`).
+    /// e.g. `Provisioned -> Live`, skipping `WorkflowAuthored`/`AgentsActive`.
     SkippedStage {
         from: DesignPartnerStatus,
         to: DesignPartnerStatus,
         expected_next: DesignPartnerStatus,
     },
-    /// Attempted to advance past the terminal stage.
-    AlreadyTerminal { from: DesignPartnerStatus },
+    AlreadyTerminal {
+        from: DesignPartnerStatus,
+    },
 }
 
 impl DesignPartnerStatus {
-    /// Returns the ADR-0049-style snake_case label for this status.
     pub fn label(self) -> &'static str {
         match self {
             Self::Provisioned => "provisioned",
@@ -47,8 +37,6 @@ impl DesignPartnerStatus {
         }
     }
 
-    /// Returns the only legal next stage from `self`, or `None` when `self` is
-    /// terminal (`Live`).
     pub fn expected_next(self) -> Option<Self> {
         match self {
             Self::Provisioned => Some(Self::WorkflowAuthored),
@@ -58,9 +46,6 @@ impl DesignPartnerStatus {
         }
     }
 
-    /// Attempt to advance to `next`. Only the immediately-adjacent stage is
-    /// accepted; regressions and skipped-stage jumps are both rejected so that
-    /// every required onboarding gate is observed.
     pub fn advance(self, next: Self) -> Result<Self, DesignPartnerStatusError> {
         if next <= self {
             return Err(DesignPartnerStatusError::IllegalRegression {
@@ -171,12 +156,10 @@ mod tests {
         let err = DesignPartnerStatus::Live
             .advance(DesignPartnerStatus::Provisioned)
             .expect_err("advance past terminal must be rejected");
-        // Regression check fires first (Provisioned < Live), so this is
-        // IllegalRegression rather than AlreadyTerminal. Confirms ordering of
-        // guards.
-        assert!(matches!(
-            err,
-            DesignPartnerStatusError::IllegalRegression { .. }
-        ));
+        assert!(
+            matches!(err, DesignPartnerStatusError::IllegalRegression { .. }),
+            "the regression guard must fire before the terminal guard: \
+Provisioned < Live, so this is IllegalRegression, not AlreadyTerminal"
+        );
     }
 }

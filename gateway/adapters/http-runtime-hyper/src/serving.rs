@@ -1,15 +1,5 @@
 use super::*;
 
-/// Start a hyper server on `addr` that dispatches every request through
-/// `router` + `chain`, using `config` for security-critical limits.
-/// This is the Layer 5 entry point that per-cell binaries (Layer 6) call
-/// from their `tokio::main`.
-///
-/// Per ADR-0092 Phase 8 (S3 + S4):
-///   * Per-request bodies are capped at `config.max_body_bytes` — defends
-///     against unbounded-body DoS.
-///   * Hyper builder uses `config.header_read_timeout` + idle timeout —
-///     defends against Slowloris-class connection-holding attacks.
 pub async fn serve(
     addr: SocketAddr,
     router: Arc<Router<SyncHandler>>,
@@ -22,9 +12,7 @@ pub async fn serve(
     serve_listener(listener, router, chain, config).await
 }
 
-/// Serve an already-bound Tokio listener indefinitely.
-///
-/// This is the daemon-facing seam used by application composition roots that
+/// The daemon-facing seam used by application composition roots that
 /// own the bind decision outside this adapter. It keeps all Tokio/Hyper types
 /// inside this crate while still allowing callers to perform pre-bind policy
 /// checks with `std::net::TcpListener`.
@@ -47,9 +35,7 @@ pub async fn serve_listener(
     .into_result()
 }
 
-/// Serve exactly one accepted connection from an already-bound listener.
-///
-/// This is a deterministic loopback harness for service-level integration
+/// A deterministic loopback harness for service-level integration
 /// tests and local evidence capture. It does not replace `serve` for daemon
 /// operation and does not create deployment, readiness, or production endpoint
 /// evidence by itself.
@@ -62,9 +48,7 @@ pub async fn serve_one_connection(
     serve_n_connections(listener, router, chain, config, 1).await
 }
 
-/// Serve a bounded number of accepted connections from an already-bound listener.
-///
-/// This is for deterministic integration evidence only. It avoids unbounded
+/// For deterministic integration evidence only. It avoids unbounded
 /// daemon lifetime in tests while exercising the same Hyper request parsing,
 /// response serialization, router, middleware, and handler seam as `serve`.
 pub async fn serve_n_connections(
