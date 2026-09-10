@@ -42,3 +42,15 @@ fn a_source_that_derives_the_channel_is_clean() {
     let violations = channel_literal_violations("9.9.9", "d.rs", source);
     assert!(violations.is_empty(), "{violations:?}");
 }
+
+/// TOML reads a single-quoted channel as the same string, so the single quote
+/// was a one-character bypass of the whole rule.
+#[test]
+fn a_single_quoted_literal_equal_to_the_channel_is_refused() {
+    let source = "const D: &str = \"[toolchain]\\nchannel = '9.9.9'\\n\";\n";
+    let violations = channel_literal_violations("9.9.9", "s.rs", source);
+    assert!(
+        !violations.is_empty(),
+        "the single-quoted spelling names the same channel: {violations:?}"
+    );
+}

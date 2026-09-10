@@ -226,3 +226,65 @@ fn an_install_that_ran_work_before_being_replaced_is_still_judged() {
         "an install used before replacement must be judged: {violations:?}"
     );
 }
+
+/// A job key this scanner cannot name must clear attribution, not inherit the
+/// job above it. `step` counts file-globally, so a stale name lets the next
+/// job's install shadow the previous job's drift and the drift is admitted.
+/// Reported generally available for anchors since 2025-09-18, not verified
+/// here; a space before the colon is legal YAML and always was, and a
+/// column-zero key ends the block outright.
+#[test]
+fn a_job_key_the_scanner_cannot_name_does_not_extend_the_job_above_it() {
+    for (second, expected) in [
+        ("  second: &second\n", "second"),
+        ("  second : &second\n", ""),
+        ("concurrency:\n", ""),
+    ] {
+        let workflow = format!(
+            "jobs:\n  first:\n    steps:\n      - with: {{ toolchain: \"1.42.0\" }}\n\
+             {second}    steps:\n      - with: {{ toolchain: \"9.9.9\" }}\n"
+        );
+        let pins = workflow_toolchain_pins("w.yml", &workflow);
+        assert_eq!(
+            pins.iter().map(|pin| pin.job.as_str()).collect::<Vec<_>>(),
+            ["first", expected],
+            "{pins:?}"
+        );
+        let violations = execution_channel_violations("9.9.9", &pins);
+        assert_eq!(
+            violations.len(),
+            1,
+            "the drifted pin must not be shadowed across a job boundary: {violations:?}"
+        );
+        assert!(violations[0].contains("1.42.0"), "{violations:?}");
+    }
+}
+
+/// YAML opens a comment only at a `#` preceded by whitespace. Cut at the first
+/// `#`, this step yielded no pin at all and its drift was admitted silently.
+#[test]
+fn a_hash_inside_a_word_does_not_hide_the_rest_of_the_step() {
+    let workflow = concat!(
+        "jobs:\n  build:\n    steps:\n",
+        "      - with: { cache-key: rust#stable, toolchain: \"1.42.0\" }\n",
+    );
+    let pins = workflow_toolchain_pins("b.yml", workflow);
+    assert_eq!(
+        pins.len(),
+        1,
+        "the pin must survive an interior hash: {pins:?}"
+    );
+    let violations = execution_channel_violations("9.9.9", &pins);
+    assert_eq!(violations.len(), 1, "{violations:?}");
+    assert!(violations[0].contains("1.42.0"), "{violations:?}");
+}
+
+/// `without_comment` documents that a value keeps its own `#`. Read from the
+/// stripped line the value was cut at it, so the gate judged a channel the
+/// workflow does not declare.
+#[test]
+fn a_value_carrying_a_hash_is_read_whole() {
+    let workflow = "jobs:\n  build:\n    steps:\n      - with: { toolchain: \"stable #7\" }\n";
+    let pins = workflow_toolchain_pins("b.yml", workflow);
+    assert_eq!(pins[0].value.as_deref(), Some("stable #7"), "{pins:?}");
+}

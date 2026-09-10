@@ -57,6 +57,18 @@ fn every_hosted_toolchain_pin_agrees_with_the_declared_channel() {
     );
 }
 
+/// A YAML comment opens at a `#` that starts the line or follows whitespace.
+/// Written from that rule rather than from the scanner's code.
+fn structure_of(line: &str) -> &str {
+    match line
+        .match_indices('#')
+        .find(|(at, _)| *at == 0 || line[..*at].ends_with(char::is_whitespace))
+    {
+        Some((at, _)) => &line[..at],
+        None => line,
+    }
+}
+
 /// Without this, an unreadable pin would make the gate above pass by finding
 /// nothing rather than by finding agreement.
 #[test]
@@ -74,10 +86,11 @@ fn the_scanner_reads_a_pin_from_every_workflow_that_names_one() {
         let named: usize = contents
             .lines()
             .filter(|line| !line.trim_start().starts_with('#'))
-            // Comment-stripped, mirroring the scanner: a key named inside a
-            // trailing comment is not a pin, so counting it here would make
-            // this assertion fail over prose.
-            .map(|line| line.split('#').next().unwrap_or(line))
+            // Comment-stripped by this file's own implementation of the YAML
+            // rule, deliberately not by the scanner's helper: a mirror that
+            // calls the code it checks agrees with it by construction, and the
+            // transform is exactly where the scanner lost a pin before.
+            .map(structure_of)
             .map(|line| {
                 TOOLCHAIN_PIN_KEYS
                     .iter()
@@ -101,4 +114,32 @@ fn the_scanner_reads_a_pin_from_every_workflow_that_names_one() {
             "{name} names a toolchain input the scanner cannot read"
         );
     }
+}
+
+/// The rule's own module must satisfy it. It did not: an explanatory comment
+/// quoted the live channel, so this rule refused the file that defines it and
+/// the next change to that file would have been blocked by it. The gate is
+/// built from the trusted revision, so this pull request's own green was not
+/// evidence either way.
+#[test]
+fn the_source_literal_rule_admits_its_own_module() {
+    let channel = channel();
+    let violations: Vec<String> = [
+        "execution_toolchain.rs",
+        "execution_toolchain/channel_literal_tests.rs",
+        "execution_toolchain/live_tree_tests.rs",
+        "execution_toolchain/workflow_pin_tests.rs",
+    ]
+    .into_iter()
+    .flat_map(|name| {
+        let path = format!("pipeline/core/admission/src/{name}");
+        let contents = read(&path);
+        channel_literal_violations(&channel, &path, &contents)
+    })
+    .collect();
+    assert!(
+        violations.is_empty(),
+        "the rule refuses its own source:\n{}",
+        violations.join("\n")
+    );
 }

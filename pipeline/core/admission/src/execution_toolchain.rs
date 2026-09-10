@@ -50,21 +50,25 @@ pub fn declared_channel(declaration: &str) -> Result<String, String> {
         .ok_or_else(|| "rust-toolchain.toml declares no toolchain.channel".to_owned())
 }
 
-/// YAML structure only; values keep their `#` because a channel may not.
+/// YAML structure only. A comment opens at a `#` preceded by whitespace, so an
+/// interior one -- a cache key spelled `rust#stable` -- keeps the rest of the
+/// line. Cut at the first `#` instead, that step lost its pin entirely.
 fn without_comment(line: &str) -> &str {
-    line.split('#').next().unwrap_or(line).trim_end()
+    let mut after_space = true;
+    for (at, character) in line.char_indices() {
+        if character == '#' && after_space {
+            return line[..at].trim_end();
+        }
+        after_space = character.is_whitespace();
+    }
+    line.trim_end()
 }
 
-fn job_named_by(line: &str) -> Option<&str> {
-    let rest = line.strip_prefix("  ")?;
-    if rest.starts_with([' ', '#', '-']) {
-        return None;
-    }
-    let name = rest.strip_suffix(':')?;
-    if name.is_empty() || name.contains(char::is_whitespace) {
-        return None;
-    }
-    Some(name)
+/// The name of a job from its de-indented key line, or `None` when this
+/// scanner cannot read one.
+fn job_named_by(key_line: &str) -> Option<&str> {
+    let (name, _) = key_line.split_once(':')?;
+    (!name.is_empty() && !name.contains(char::is_whitespace)).then_some(name)
 }
 
 fn pin_value(rest: &str) -> Option<String> {
@@ -94,18 +98,33 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
             reached_jobs = true;
             continue;
         }
-        if reached_jobs && let Some(name) = job_named_by(structure) {
-            job = name.to_owned();
+        if reached_jobs && !structure.is_empty() && !structure.starts_with(char::is_whitespace) {
+            // A column-zero key ends the jobs block, so nothing below it
+            // belongs to the last job named above it either.
+            reached_jobs = false;
+            job.clear();
+        }
+        if reached_jobs
+            && let Some(key_line) = structure.strip_prefix("  ")
+            && !key_line.starts_with([' ', '#', '-'])
+        {
+            // A key this scanner cannot name clears attribution instead of
+            // leaving the job above it standing. An anchor, an alias or a value
+            // after the colon leaves no trailing colon to strip, and a stale
+            // name makes `supersedes` read two jobs as one.
+            job = job_named_by(key_line).unwrap_or_default().to_owned();
         }
         let item = structure.trim_start();
         if item == "-" || item.starts_with("- ") {
             step += 1;
         }
         for key in TOOLCHAIN_PIN_KEYS {
-            // Searched on the comment-stripped line. Against the raw line, a
-            // key named inside a trailing comment became a pin whose value
-            // parsed to whatever followed it, and the gate refused a workflow
-            // for a sentence about a toolchain.
+            // The key is searched on the comment-stripped line: against the raw
+            // line, a key named inside a trailing comment became a pin whose
+            // value parsed to whatever followed it, and the gate refused a
+            // workflow for a sentence about a toolchain. The value is read from
+            // the raw line, where `at` indexes equally, so a value keeps a `#`
+            // of its own.
             let Some(at) = structure.find(key) else {
                 continue;
             };
@@ -115,7 +134,7 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
                 key,
                 job: job.clone(),
                 step,
-                value: pin_value(&structure[at + key.len()..]),
+                value: pin_value(&line[at + key.len()..]),
             });
         }
     }
@@ -128,10 +147,11 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
 /// is an oracle for version comparison and is never matched here.
 pub fn channel_literal_violations(channel: &str, path: &str, contents: &str) -> Vec<String> {
     // Both quote spellings. Matching only the double-quoted form left a
-    // one-character bypass: TOML treats `'1.98.0'` as the same string, and the
-    // tree already restates the channel that way -- so the rule read clean over
-    // files that name the channel, which is the precise failure it exists to
-    // prevent.
+    // one-character bypass: TOML reads a single-quoted channel as the same
+    // string, and the tree already restates the channel that way -- so the rule
+    // read clean over files that name the channel, which is the precise failure
+    // it exists to prevent. This comment may not spell either form: the rule
+    // judges its own source file the moment that file is changed.
     let spellings = [format!("\"{channel}\""), format!("'{channel}'")];
     contents
         .lines()
