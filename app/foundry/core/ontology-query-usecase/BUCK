@@ -8,6 +8,7 @@ rust_library(
         "//data/core/data-boundary-kernel:data-boundary-kernel",
         "//data/core/ontology-kernel:data-ontology-kernel",
         "//app/foundry/core/ontology-query-domain:foundry-ontology-query-domain",
+        "//app/foundry/ports/draft/projection:foundry-projection-draft",
     ],
 )
 
@@ -21,5 +22,6 @@ rust_test(
         "//data/core/data-boundary-kernel:data-boundary-kernel",
         "//data/core/ontology-kernel:data-ontology-kernel",
         "//app/foundry/core/ontology-query-domain:foundry-ontology-query-domain",
+        "//app/foundry/ports/draft/projection:foundry-projection-draft",
     ],
 )

@@ -35,4 +35,4 @@ jobs:
           sudo mv /tmp/buck2 /usr/local/bin/buck2
           buck2 --version
       - name: Hermetic workspace build
-        run: buck2 build //...
+        run: buck2 build //... --keep-going

@@ -15,6 +15,10 @@ rust_test(
     srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
     crate = "intelligence_architecture_map_app",
     crate_root = "src/lib.rs",
+    # The live-workspace test walks three ancestors up from the manifest dir to
+    # reach the repo root; a leading "." makes that walk land on ".", which is
+    # buck2's project root and the working directory the rustc action runs in.
+    env = {"CARGO_MANIFEST_DIR": "./intelligence/core/architecture-map-app"},
     visibility = ["PUBLIC"],
     deps = [
         "//intelligence/core/architecture-map-kernel:intelligence-architecture-map-kernel",

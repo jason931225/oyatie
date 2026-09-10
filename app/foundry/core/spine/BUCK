@@ -11,6 +11,16 @@ SPINE_CRATE_DEPS = [
 
 SPINE_TEST_DEPS = [":foundry-spine"] + SPINE_CRATE_DEPS
 
+# The Cedar suites include two files from `app/foundry/cedar`, outside this
+# package. Mirroring the repo-relative layout into the hermetic sandbox keeps
+# one include-relative literal true for both cargo and buck2.
+CEDAR_GATE_SRCS = {"tests/cedar_policy_gate.rs": "app/foundry/core/spine/tests/cedar_policy_gate.rs"}
+CEDAR_GATE_SRCS["//app/foundry/cedar:foundry-policies.cedar"] = "app/foundry/cedar/foundry-policies.cedar"
+CEDAR_GATE_SRCS["//app/foundry/cedar:foundry.cedarschema"] = "app/foundry/cedar/foundry.cedarschema"
+CEDAR_SEED_SRCS = {"tests/cedar_seed.rs": "app/foundry/core/spine/tests/cedar_seed.rs"}
+CEDAR_SEED_SRCS["//app/foundry/cedar:foundry-policies.cedar"] = "app/foundry/cedar/foundry-policies.cedar"
+CEDAR_SEED_SRCS["//app/foundry/cedar:foundry.cedarschema"] = "app/foundry/cedar/foundry.cedarschema"
+
 rust_library(
     name = "foundry-spine",
     srcs = glob(["src/**/*.rs"]),
@@ -127,18 +137,20 @@ rust_test(
 
 rust_test(
     name = "foundry-spine-cedar",
-    srcs = ["tests/cedar_policy_gate.rs"],
+    srcs = [],
+    mapped_srcs = CEDAR_GATE_SRCS,
     crate = "cedar_policy_gate",
-    crate_root = "tests/cedar_policy_gate.rs",
+    crate_root = "app/foundry/core/spine/tests/cedar_policy_gate.rs",
     visibility = ["PUBLIC"],
     deps = SPINE_TEST_DEPS + ["third-party//:cedar-policy"],
 )
 
 rust_test(
     name = "foundry-spine-cedar-seed",
-    srcs = ["tests/cedar_seed.rs"],
+    srcs = [],
+    mapped_srcs = CEDAR_SEED_SRCS,
     crate = "cedar_seed",
-    crate_root = "tests/cedar_seed.rs",
+    crate_root = "app/foundry/core/spine/tests/cedar_seed.rs",
     visibility = ["PUBLIC"],
     deps = ["third-party//:cedar-policy"],
 )

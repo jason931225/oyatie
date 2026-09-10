@@ -1,10 +1,6 @@
 # The dependency set every driven-surface test in this package shares: the
 # library under test, the durable records adapter behind its port, and the
 # axum/tower machinery for driving a router in-process.
-#
-# Named rather than repeated. Twelve verbatim copies is how this file reached
-# the 300-line budget, and a budget spent on duplication buys nothing — the
-# next test target had nowhere to go.
 FACADE_TEST_DEPS = [
     ":foundry-ontology-app",
     "//app/foundry/adapters/draft/records-sqlite:foundry-records-sqlite-draft",
@@ -15,12 +11,6 @@ FACADE_TEST_DEPS = [
     "third-party//:tower",
 ]
 
-# The migration suites evolve a composed registry, so they name the kernel's
-# definition vocabulary on top of the shared driven-surface set.
-# The two modules every migration suite carries. Named for the same reason the
-# dep set is: four verbatim copies is how a BUCK file reaches its line budget,
-# and a budget spent on duplication buys nothing.
-# Shared module sets: duplication is what fills this file's budget.
 FAULT_SRCS = [
     "tests/facade_support/mod.rs",
     "tests/failing_log/mod.rs",
@@ -38,11 +28,20 @@ MIGRATION_TEST_DEPS = FACADE_TEST_DEPS + [
     "//data/core/ontology-kernel:data-ontology-kernel",
 ]
 
+# `src/pdp.rs` includes the shared Cedar schema and policy from
+# `app/foundry/cedar`, outside this package; mirroring the repo-relative
+# layout into the hermetic sandbox keeps one include-relative literal true
+# for both cargo and buck2.
+APP_SRCS = {src: "app/foundry/facade/ontology-app/" + src for src in glob(["src/**/*.rs"])}
+APP_SRCS["//app/foundry/cedar:foundry-policies.cedar"] = "app/foundry/cedar/foundry-policies.cedar"
+APP_SRCS["//app/foundry/cedar:foundry.cedarschema"] = "app/foundry/cedar/foundry.cedarschema"
+
 rust_library(
     name = "foundry-ontology-app",
-    srcs = glob(["src/**/*.rs"]),
+    srcs = [],
+    mapped_srcs = APP_SRCS,
     crate = "foundry_ontology_app",
-    crate_root = "src/lib.rs",
+    crate_root = "app/foundry/facade/ontology-app/src/lib.rs",
     visibility = ["PUBLIC"],
     deps = [
         "//app/foundry/adapters/draft/records-sqlite:foundry-records-sqlite-draft",
