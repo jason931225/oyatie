@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -9,7 +8,6 @@ use common::*;
 use policy_cedar_domain::policy_diff::*;
 use policy_cedar_domain::{PolicyEffect, PolicyRuleInput, PolicyScope, PolicyVersion};
 
-/// ACCEPTANCE: adding an Allow rule to an empty prev widens the surface.
 #[test]
 fn added_allow_widens() {
     let prev = pv("1.0.0", vec![]);
@@ -33,9 +31,6 @@ fn added_allow_widens() {
     );
 }
 
-// ── acceptance: removed-deny widens ──────────────────────────────────────
-
-/// ACCEPTANCE: removing a Deny rule widens the effective allow surface.
 #[test]
 fn removed_deny_widens() {
     let deny = deny_rule("admin", "account.delete", "acct:");
@@ -58,10 +53,6 @@ fn removed_deny_widens() {
     );
 }
 
-// ── acceptance: narrowed resource prefix is NOT widening ──────────────────
-
-/// ACCEPTANCE: making an Allow rule more specific (longer prefix) is narrowing,
-/// not widening.
 #[test]
 fn narrowed_resource_prefix_not_widening() {
     // prev: Allow on "docs:" (broader)
@@ -89,9 +80,6 @@ fn narrowed_resource_prefix_not_widening() {
     );
 }
 
-// ── acceptance: effect flip Deny→Allow widens ─────────────────────────────
-
-/// ACCEPTANCE: flipping an existing rule from Deny to Allow widens the surface.
 #[test]
 fn effect_flip_deny_to_allow_widens() {
     let prev_rule = deny_rule("ops", "cluster.drain", "k8s:cluster:");
@@ -117,9 +105,6 @@ fn effect_flip_deny_to_allow_widens() {
     );
 }
 
-// ── acceptance: identical versions produce empty report ───────────────────
-
-/// ACCEPTANCE: diffing a version against itself yields no deltas.
 #[test]
 fn identical_versions_empty_report() {
     let rules = vec![
@@ -139,10 +124,6 @@ fn identical_versions_empty_report() {
     assert!(!report.has_widening());
 }
 
-// ── acceptance: serde round-trip on ImpactReport ──────────────────────────
-
-/// ACCEPTANCE: ImpactReport (including RuleDelta variants) round-trips through
-/// serde_json without error.
 #[test]
 fn impact_report_serde_round_trip() {
     let prev = pv("1.0.0", vec![]);
@@ -165,5 +146,3 @@ fn impact_report_serde_round_trip() {
     assert_eq!(report.deltas.len(), roundtrip.deltas.len());
     assert_eq!(roundtrip.has_widening(), report.has_widening());
 }
-
-// ── additional: broadened allow widens ───────────────────────────────────

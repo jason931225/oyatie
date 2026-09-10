@@ -30,10 +30,6 @@ pub enum PdpError {
     /// unaudited authorization outcome.
     AuditChainEmission { detail: String },
     /// The wrapped PDP returned only after its elapsed-time budget.
-    ///
-    /// This is fail-closed but intentionally NOT a hard cancellation claim: the
-    /// guard does not detach worker threads, so it returns only after the inner
-    /// PDP call has completed and cannot continue producing late side effects.
     RuntimeTimeout { deadline_ms: u64 },
     /// The wrapped PDP panicked; the guard caught it and failed closed.
     RuntimePanic { detail: String },
@@ -94,10 +90,8 @@ impl fmt::Display for PdpError {
 impl std::error::Error for PdpError {}
 
 impl PdpError {
-    /// Whether this error represents a PDP runtime fault that should count
-    /// toward the fail-closed circuit breaker. Caller-shape refusals (invalid
-    /// request, stale zookie, unknown action) remain deny outcomes, but they do
-    /// not mean the runtime itself is unhealthy.
+    /// Whether this error should count toward the fail-closed circuit breaker.
+    /// Caller-shape refusals stay deny outcomes without accusing the runtime.
     #[must_use]
     pub fn is_runtime_fault(&self) -> bool {
         matches!(

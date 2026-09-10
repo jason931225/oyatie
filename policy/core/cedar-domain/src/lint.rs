@@ -5,8 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::policy::PolicyVersion;
 
-// ── Cedar policy authoring-time lint ─────────────────────────────────────────
-
 /// Severity of a lint finding.
 ///
 /// `Error` findings block publish; `Warning` findings are advisory.
@@ -32,30 +30,18 @@ pub struct PolicyLintReport {
 }
 
 impl PolicyLintReport {
-    /// Returns `true` if any finding has `LintSeverity::Error`.
     pub fn has_blocking(&self) -> bool {
         self.findings
             .iter()
             .any(|f| f.severity == LintSeverity::Error)
     }
 
-    /// Returns `true` if there are no findings at all.
     pub fn is_clean(&self) -> bool {
         self.findings.is_empty()
     }
 }
 
 /// Lint a candidate `PolicyVersion` without publishing it.
-///
-/// Detects:
-/// - Intra-policy conflicts: an Allow and a Deny rule on identical
-///   `(principal_role, action, resource_prefix, required_attribute)` → `Error`.
-/// - Duplicate rules: two rules with identical
-///   `(effect, principal_role, action, resource_prefix, required_attribute)` → `Error`.
-/// - Shadowed/unreachable rules: a later same-effect rule whose
-///   `resource_prefix` is subsumed by an earlier rule's prefix and whose
-///   `required_attribute` is equal-or-weaker (the earlier rule's attribute
-///   guard subsumes the later one) → `Warning`.
 ///
 /// Pure, deterministic, no network or storage access.
 pub fn lint_policy_version(version: &PolicyVersion) -> PolicyLintReport {
@@ -74,25 +60,9 @@ pub fn lint_policy_version(version: &PolicyVersion) -> PolicyLintReport {
 
             if same_tuple {
                 if a.effect == b.effect {
-                    // Duplicate rule (same effect + identical tuple).
-                    findings.push(PolicyLintFinding {
-                        severity: LintSeverity::Error,
-                        rule_indices: vec![i, j],
-                        reason: format!(
-                            "rules {i} and {j} are duplicates: identical (effect, principal_role, \
-                             action, resource_prefix, required_attribute)"
-                        ),
-                    });
+                    findings.push(duplicate_rule_finding(i, j));
                 } else {
-                    // Conflicting Allow/Deny pair on identical tuple.
-                    findings.push(PolicyLintFinding {
-                        severity: LintSeverity::Error,
-                        rule_indices: vec![i, j],
-                        reason: format!(
-                            "rules {i} and {j} conflict: Allow and Deny on identical \
-                             (principal_role, action, resource_prefix, required_attribute)"
-                        ),
-                    });
+                    findings.push(conflicting_effect_finding(i, j));
                 }
             } else if a.effect == b.effect
                 && a.principal_role == b.principal_role
@@ -100,16 +70,12 @@ pub fn lint_policy_version(version: &PolicyVersion) -> PolicyLintReport {
                 && b.resource_prefix.starts_with(&a.resource_prefix)
                 && attr_subsumed_by(&b.required_attribute, &a.required_attribute)
             {
-                // Later rule j is shadowed/unreachable under earlier rule i.
-                findings.push(PolicyLintFinding {
-                    severity: LintSeverity::Warning,
-                    rule_indices: vec![i, j],
-                    reason: format!(
-                        "rule {j} is unreachable: its resource_prefix {:?} is subsumed by rule \
-                         {i}'s prefix {:?} with an equal-or-weaker attribute guard",
-                        b.resource_prefix, a.resource_prefix
-                    ),
-                });
+                findings.push(shadowed_rule_finding(
+                    i,
+                    j,
+                    &a.resource_prefix,
+                    &b.resource_prefix,
+                ));
             }
         }
     }
@@ -117,12 +83,46 @@ pub fn lint_policy_version(version: &PolicyVersion) -> PolicyLintReport {
     PolicyLintReport { findings }
 }
 
+fn duplicate_rule_finding(i: usize, j: usize) -> PolicyLintFinding {
+    PolicyLintFinding {
+        severity: LintSeverity::Error,
+        rule_indices: vec![i, j],
+        reason: format!(
+            "rules {i} and {j} are duplicates: identical (effect, principal_role, \
+             action, resource_prefix, required_attribute)"
+        ),
+    }
+}
+
+fn conflicting_effect_finding(i: usize, j: usize) -> PolicyLintFinding {
+    PolicyLintFinding {
+        severity: LintSeverity::Error,
+        rule_indices: vec![i, j],
+        reason: format!(
+            "rules {i} and {j} conflict: Allow and Deny on identical \
+             (principal_role, action, resource_prefix, required_attribute)"
+        ),
+    }
+}
+
+fn shadowed_rule_finding(
+    i: usize,
+    j: usize,
+    dominator_prefix: &str,
+    shadowed_prefix: &str,
+) -> PolicyLintFinding {
+    PolicyLintFinding {
+        severity: LintSeverity::Warning,
+        rule_indices: vec![i, j],
+        reason: format!(
+            "rule {j} is unreachable: its resource_prefix {shadowed_prefix:?} is subsumed by \
+             rule {i}'s prefix {dominator_prefix:?} with an equal-or-weaker attribute guard"
+        ),
+    }
+}
+
 /// Returns `true` if `candidate`'s attribute guard is subsumed by (i.e., at
 /// least as restrictive as) `dominator`'s attribute guard.
-///
-/// - `dominator = None` matches everything → always subsumes.
-/// - `dominator = Some(x)` and `candidate = Some(x)` → equal → subsumes.
-/// - `dominator = Some(x)` and `candidate = None` → candidate is broader → does NOT subsume.
 fn attr_subsumed_by(
     candidate: &Option<(String, String)>,
     dominator: &Option<(String, String)>,

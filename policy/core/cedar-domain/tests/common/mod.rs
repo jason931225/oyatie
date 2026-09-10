@@ -74,8 +74,6 @@ pub fn sample_resource_id(operation: BackboneWriteOperation) -> &'static str {
     }
 }
 
-// ── obligations: serde round-trip ─────────────────────────────────────────
-
 // ── policy-diff fixtures ─────────────────────────────────────────────────────
 
 pub fn allow_rule(role: &str, action: &str, prefix: &str) -> PolicyRuleInput {
@@ -125,5 +123,3 @@ pub fn pv(version: &str, rules: Vec<PolicyRuleInput>) -> PolicyVersion {
         rules,
     }
 }
-
-// ── acceptance: added-allow widens ────────────────────────────────────────

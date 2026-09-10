@@ -4,10 +4,8 @@ use shared_platform_contracts_kernel::pdp::{
 
 use crate::{EntitySlice, PdpError, PolicyBundle};
 
-/// Audit record per decision (G004 acceptance): every decision — allow or
-/// deny, cached or freshly evaluated — produces one attributable record
-/// keyed by `decision_id` (the audit-chain correlation key from the locked
-/// contract).
+/// Every decision — allow or deny, cached or freshly evaluated — produces one
+/// of these, keyed by `decision_id`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionAuditRecord {
@@ -29,8 +27,7 @@ pub struct DecisionAuditRecord {
 pub struct PdpOutcome {
     pub response: AuthorizationResponse, // data_class: INTERNAL_ONLY
     pub audit: DecisionAuditRecord,      // data_class: INTERNAL_ONLY
-    /// Whether the decision content was served from the decision cache.
-    pub cache_hit: bool, // data_class: INTERNAL_ONLY
+    pub cache_hit: bool,                 // data_class: INTERNAL_ONLY
 }
 
 /// The embedded-PDP port. Implementations evaluate in-process against the

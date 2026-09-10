@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -12,9 +11,6 @@ use policy_cedar_domain::authz_engine::{
 use policy_cedar_domain::*;
 use serde_json::json;
 
-/// cedar-lint-1 acceptance: `PolicyLintReport` round-trips through
-/// `serde_json` and `has_blocking` is true iff any finding is
-/// `LintSeverity::Error`.
 #[test]
 fn lint_report_serde_roundtrip_and_has_blocking_tracks_error_severity() {
     // A report with one Error finding is blocking.
@@ -77,11 +73,6 @@ fn lint_report_serde_roundtrip_and_has_blocking_tracks_error_severity() {
     assert_eq!(warning_json, "\"Warning\"");
 }
 
-// ── cedar-lint-2: conflict + duplicate detection ───────────────────────────
-
-/// cedar-lint-2 acceptance: a conflicting Allow+Deny pair on identical
-/// (principal_role, action, resource_prefix, required_attribute) emits one
-/// Error finding citing both rule indices.
 #[test]
 fn lint_detects_conflict_allow_deny_pair_emits_one_error_with_both_indices() {
     let version = PolicyVersion {
@@ -127,8 +118,6 @@ fn lint_detects_conflict_allow_deny_pair_emits_one_error_with_both_indices() {
     assert!(report.has_blocking());
 }
 
-/// cedar-lint-2 acceptance: a conflict with a required_attribute on the
-/// same (role, action, prefix, attr) tuple emits one Error finding.
 #[test]
 fn lint_detects_conflict_with_required_attribute_emits_error() {
     let attr = Some(("tier".to_string(), "premium".to_string()));
@@ -170,8 +159,6 @@ fn lint_detects_conflict_with_required_attribute_emits_error() {
     assert_eq!(errors[0].rule_indices, vec![0usize, 1]);
 }
 
-/// cedar-lint-2 acceptance: two identical rules (same effect + tuple) emit
-/// one Error duplicate finding.
 #[test]
 fn lint_detects_duplicate_rules_emits_error() {
     let rule = PolicyRuleInput {

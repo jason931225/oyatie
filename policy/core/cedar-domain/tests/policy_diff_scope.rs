@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -9,7 +8,6 @@ use common::*;
 use policy_cedar_domain::policy_diff::*;
 use policy_cedar_domain::{PolicyEffect, PolicyRuleInput, PolicyScope, PolicyVersion};
 
-/// Shortening the resource_prefix (broader match) classifies as BroadenedAllow.
 #[test]
 fn broadened_resource_prefix_widens() {
     // prev: Allow on "docs:private:" (narrower)
@@ -37,9 +35,6 @@ fn broadened_resource_prefix_widens() {
     );
 }
 
-// ── additional: dropping required_attribute widens ────────────────────────
-
-/// Removing a required_attribute guard widens the allow surface.
 #[test]
 fn dropping_required_attribute_widens() {
     let prev = pv(
@@ -78,9 +73,6 @@ fn dropping_required_attribute_widens() {
     );
 }
 
-// ── additional: added deny is not widening ────────────────────────────────
-
-/// Adding a Deny rule is not widening (it restricts the surface).
 #[test]
 fn added_deny_is_not_widening() {
     let prev = pv("1.0.0", vec![]);
@@ -102,9 +94,6 @@ fn added_deny_is_not_widening() {
     );
 }
 
-// ── additional: effect flip Allow→Deny is not widening ────────────────────
-
-/// Flipping Allow→Deny narrows the surface; must not trigger has_widening.
 #[test]
 fn effect_flip_allow_to_deny_not_widening() {
     let prev_rule = allow_rule("ops", "cluster.drain", "k8s:cluster:");

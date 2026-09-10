@@ -1,9 +1,6 @@
-//! P14-policy Cedar engine types — `AuthzRequest`, `AuthzDecision`, `EvalLogFilter`.
-//!
-//! Pure value types for Cedar-based authorization evaluation. IDs use `String`
-//! to match the existing codebase convention. Wire-marshaling crosses the gRPC/HTTP
-//! boundary at the adapter layer — kernel keeps zero external deps beyond serde.
-//! `PolicyEffect` (defined above) is re-used as the decision effect discriminant.
+//! Pure value types for Cedar-based authorization evaluation. Wire-marshaling
+//! crosses the gRPC/HTTP boundary at the adapter layer — this kernel keeps zero
+//! external deps beyond serde.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -12,7 +9,6 @@ use crate::PolicyEffect;
 
 /// The principal type that is making an authorization request.
 ///
-/// Maps 1:1 to Cedar entity types as defined in ADR-0007.
 /// Serialized with Cedar PascalCase names (`"User"`, `"Employee"`, …) so that
 /// the wire format matches `as_cedar_str()` and Cedar policy evaluation engines
 /// do not require remapping at every boundary.
@@ -118,8 +114,6 @@ impl AuthzDecision {
 }
 
 /// Filter parameters for querying the evaluation log.
-///
-/// All fields are optional; `limit` defaults to `100`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EvalLogFilter {
     /// Restrict to a specific principal identifier.
@@ -128,14 +122,15 @@ pub struct EvalLogFilter {
     pub effect: Option<PolicyEffect>,
     /// Restrict to a specific Cedar resource type.
     pub resource_type: Option<String>,
-    /// Maximum number of log entries to return (default `100`).
     #[serde(default = "EvalLogFilter::default_limit")]
     pub limit: u32,
 }
 
+const DEFAULT_EVAL_LOG_LIMIT: u32 = 100;
+
 impl EvalLogFilter {
     fn default_limit() -> u32 {
-        100
+        DEFAULT_EVAL_LOG_LIMIT
     }
 }
 
@@ -145,7 +140,7 @@ impl Default for EvalLogFilter {
             principal_id: None,
             effect: None,
             resource_type: None,
-            limit: 100,
+            limit: DEFAULT_EVAL_LOG_LIMIT,
         }
     }
 }

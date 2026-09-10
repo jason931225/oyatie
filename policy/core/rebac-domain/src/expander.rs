@@ -224,8 +224,7 @@ impl<'a, S: RebacTupleStore> ResolvedExpansion<'a, S> {
         Ok(false)
     }
 
-    /// Reads every page of `object#relation`. A reader that stopped at the
-    /// first page would return a wrong answer, not a partial one.
+    /// Reads every page of `object#relation`.
     fn read_tupleset(
         &self,
         object: &RebacObjectRef,

@@ -17,20 +17,13 @@ use shared_platform_contracts_kernel::pdp::{
 /// tenancy axes stay visible in ABAC context for policy conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecisionAuthzRequest<'a> {
-    /// Tenant bound to the verified caller credential.
-    pub caller_tenant: &'a str, // data_class: TENANT_SCOPED
-    /// Verified caller/principal id.
-    pub caller_id: &'a str, // data_class: TENANT_SCOPED
-    /// Tenant whose policy/resource is being acted on.
-    pub target_tenant: &'a str, // data_class: TENANT_SCOPED
-    /// Target subject for tenant-rbac/PBAC/ReBAC policy admission decisions.
+    pub caller_tenant: &'a str,     // data_class: TENANT_SCOPED
+    pub caller_id: &'a str,         // data_class: TENANT_SCOPED
+    pub target_tenant: &'a str,     // data_class: TENANT_SCOPED
     pub target_subject_id: &'a str, // data_class: TENANT_SCOPED
-    /// Contract action slug to evaluate.
-    pub action: &'a str, // data_class: INTERNAL_ONLY
-    /// PDP resource entity type (for example `OyaPlatform::TenantResource`).
-    pub resource_type: &'a str, // data_class: INTERNAL_ONLY
-    /// PDP resource entity id.
-    pub resource_id: &'a str, // data_class: TENANT_SCOPED
+    pub action: &'a str,            // data_class: INTERNAL_ONLY
+    pub resource_type: &'a str,     // data_class: INTERNAL_ONLY
+    pub resource_id: &'a str,       // data_class: TENANT_SCOPED
 }
 
 impl DecisionAuthzRequest<'_> {
@@ -159,10 +152,6 @@ impl std::error::Error for DecisionAuthzError {}
 /// is fail-closed: [`Decision::Deny`] or [`DecisionAuthzError`] both stop the
 /// caller.
 pub trait DecisionAuthorizer: Send + Sync {
-    /// Return the authorization decision for `request`.
-    ///
-    /// # Errors
-    /// [`DecisionAuthzError`] when the authorizer cannot safely decide.
     fn decide(&self, request: &DecisionAuthzRequest<'_>) -> Result<Decision, DecisionAuthzError>;
 }
 

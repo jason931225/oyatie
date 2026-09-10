@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -150,5 +149,3 @@ fn runtime_evaluator_rejects_missing_audit_and_invalid_role_context() {
         Err(CedarRuntimeError::InvalidRoleContext)
     );
 }
-
-// ── cedar-lint-1: value-type serde round-trip ─────────────────────────────

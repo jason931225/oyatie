@@ -24,13 +24,6 @@ pub(crate) struct Walk<'subject, 'budget> {
     /// where each enclosing subtraction began.
     order: Vec<(String, String)>,
     pub(crate) budget: &'budget mut Budget,
-    /// Where each enclosing subtraction began.
-    ///
-    /// Re-entry returns "not a member", which is sound while every enclosing
-    /// operator is monotone. Under a subtraction it is not: the re-entry reads
-    /// as "not excluded" and grants. The model-time stratifier catches cycles
-    /// the MODEL declares; a tuple whose subject is a userset can close the
-    /// same cycle in data, where no static check can see it.
     /// `order.len()` when each enclosing subtraction was entered.
     ///
     /// Re-entry is only unsound when the cycle CROSSES the subtraction. A

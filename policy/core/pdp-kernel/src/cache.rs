@@ -56,10 +56,6 @@ pub struct CachedDecision {
     pub obligations: Vec<Obligation>,        // data_class: INTERNAL_ONLY
 }
 
-/// Cache key per the G004 acceptance shape: `(request-hash, policy-version)`.
-/// Keying on the bundle version makes revocation structural: a bundle swap
-/// changes the version, every prior entry becomes unreachable, and the
-/// sub-60s revocation SLO reduces to bundle-propagation latency.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DecisionCacheKey {
     pub request_fingerprint: String, // data_class: INTERNAL_ONLY

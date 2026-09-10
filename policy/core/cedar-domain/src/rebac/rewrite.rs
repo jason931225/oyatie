@@ -1,5 +1,3 @@
-//! Zanzibar/OpenFGA-style userset rewrite trees.
-
 use serde::{Deserialize, Serialize};
 
 use super::RebacTupleValidationError;

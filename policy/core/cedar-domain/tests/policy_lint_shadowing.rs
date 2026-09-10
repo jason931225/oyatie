@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests legitimately use `.unwrap()` / `.expect()` / `panic!()`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -12,8 +11,6 @@ use policy_cedar_domain::authz_engine::{
 use policy_cedar_domain::*;
 use serde_json::json;
 
-/// cedar-lint-2 acceptance: a policy with no conflicts, duplicates, or
-/// shadows yields an empty report (is_clean() true).
 #[test]
 fn lint_clean_policy_is_clean() {
     let version = PolicyVersion {
@@ -49,11 +46,6 @@ fn lint_clean_policy_is_clean() {
     assert!(report.findings.is_empty());
 }
 
-// ── cedar-lint-3: shadow/unreachable detection ────────────────────────────
-
-/// cedar-lint-3 acceptance: a later same-effect rule whose resource_prefix
-/// is subsumed by an earlier rule's broader prefix is flagged as Warning
-/// (unreachable/shadowed).
 #[test]
 fn lint_detects_shadowed_rule_under_broader_prefix_emits_warning() {
     let version = PolicyVersion {
@@ -100,8 +92,6 @@ fn lint_detects_shadowed_rule_under_broader_prefix_emits_warning() {
     );
 }
 
-/// cedar-lint-3 acceptance: two rules with sibling (non-prefix) resource
-/// prefixes do not shadow each other — no shadow finding emitted.
 #[test]
 fn lint_sibling_prefixes_not_shadowed() {
     let version = PolicyVersion {
@@ -141,9 +131,6 @@ fn lint_sibling_prefixes_not_shadowed() {
     assert!(report.is_clean());
 }
 
-/// cedar-lint-3 acceptance: when earlier rule has `required_attribute =
-/// Some(...)` and later rule has `required_attribute = None` (broader), the
-/// later rule is NOT shadowed — no warning emitted.
 #[test]
 fn lint_broader_attr_on_later_rule_is_not_shadowed() {
     let version = PolicyVersion {

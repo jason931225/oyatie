@@ -39,8 +39,6 @@ pub struct PolicyRule {
     pub action: String,
     pub resource_prefix: String,
     pub required_attribute: Option<(String, String)>,
-    /// Cedar-style annotations (obligations and advice) attached to this rule.
-    /// Collected onto `AuthorizationDecision` when this rule triggers an Allow.
     pub annotations: Vec<PolicyAnnotation>,
 }
 

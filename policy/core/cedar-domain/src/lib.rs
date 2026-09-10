@@ -2,19 +2,6 @@
 //!
 //! This is deliberately pure: it stores versioned policy records and evaluates
 //! role + attribute predicates without network, storage, or runtime side effects.
-//!
-//! The [`authz_engine`] module carries the `AuthzRequest` / `AuthzDecision` /
-//! `EvalLogFilter` value types that encode the Cedar evaluation contract without
-//! importing any framework crates beyond `serde`.
-//!
-//! The [`obligations`] module carries Cedar-style annotation/obligation
-//! key-value pairs that ride out with `Allow` decisions for downstream PEP
-//! step-up, audit, and redaction.
-//!
-//! The [`rebac`] module carries the Zanzibar-style relationship-tuple
-//! vocabulary: tuples, usersets, consistency tokens, and the tuple-store port.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod authorization;

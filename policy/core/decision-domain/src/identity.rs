@@ -19,10 +19,6 @@ pub struct PrincipalMapping {
 }
 
 impl PrincipalMapping {
-    /// Validate one exact Cedar-type to ReBAC-type mapping.
-    ///
-    /// # Errors
-    /// When either type cannot inhabit its native vocabulary.
     pub fn new(
         cedar_entity_type: impl Into<String>,
         rebac_object_type: impl Into<String>,

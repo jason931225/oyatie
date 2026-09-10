@@ -115,10 +115,6 @@ impl From<MaterializationError> for DecisionError {
 }
 
 /// Materialize all candidate memberships from one privately bound scope.
-///
-/// # Errors
-/// Identity, snapshot, store, traversal, and bound failures remain typed and
-/// abort the entire materialization.
 pub fn materialize_parents<S: RebacTupleStore>(
     inputs: &DecisionInputs<'_, S>,
     request: &AuthorizationRequest,

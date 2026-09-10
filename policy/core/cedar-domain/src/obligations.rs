@@ -3,14 +3,6 @@
 //! Annotations are key/value pairs attached to [`crate::PolicyRule`] at authoring
 //! time and collected onto [`crate::AuthorizationDecision`] at evaluation time.
 //!
-//! # Forbid-wins invariant
-//!
-//! Annotations are surfaced **only** on Allow decisions.  A Deny win (explicit or
-//! default) unconditionally yields an empty annotation list.  A Policy Enforcement
-//! Point (PEP) that ignores `AuthorizationDecision::allowed == false` to consume
-//! annotations would be bypassing the PDP; the empty-on-deny contract is enforced
-//! inside [`crate::PolicySet::authorize`].
-//!
 //! # Cedar semantics
 //!
 //! Cedar distinguishes **obligations** (must-execute side effects the PEP is required
