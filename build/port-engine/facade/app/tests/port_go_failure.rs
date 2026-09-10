@@ -7,7 +7,6 @@
 
 use port_engine_app::driver;
 
-/// equivalent to it.
 #[test]
 fn a_fallible_signature_becomes_a_result() {
     let report = driver::port_go_pipeline().expect("the Go corpus must port");
@@ -30,7 +29,6 @@ fn a_fallible_signature_becomes_a_result() {
     }
 }
 
-/// system.
 #[test]
 fn the_propagation_idiom_becomes_the_try_operator() {
     let report = driver::port_go_pipeline().expect("the Go corpus must port");
@@ -58,7 +56,6 @@ fn the_propagation_idiom_becomes_the_try_operator() {
     );
 }
 
-/// library is exactly the part that does not come along.
 #[test]
 fn a_mapped_call_is_answered_by_the_pack() {
     let report = driver::port_go_pipeline().expect("the Go corpus must port");

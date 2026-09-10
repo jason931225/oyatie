@@ -25,10 +25,9 @@ use port_engine_transform::{TransformError, apply, apply_with_provenance, module
 
 use crate::receipt_codec::{emit_tree_digest, format_receipt, matches_golden};
 
-/// Committed golden for the assembled Go port.
 const PORT_GO_GOLDEN: &str = include_str!("../port-go-golden-v1.txt");
 
-use crate::driver::report::{PipelineError, PipelineReport};
+use crate::driver::report::{PipelineError, PipelineReport, bind_receipt, bind_report};
 use crate::driver::smoke::smoke_admit_snapshot;
 
 pub fn port_go_pipeline() -> Result<PipelineReport, PipelineError> {
@@ -71,34 +70,15 @@ pub fn port_go_from(admitted: AdmittedSnapshot) -> Result<PipelineReport, Pipeli
         .render_rust_ir(&transformed.ir)
         .map_err(PipelineError::Emit)?;
 
-    let receipt = Receipt {
+    let receipt = bind_receipt(
+        "port-go",
         pin,
-        snapshot_digest: admitted.artifact_digest().clone(),
-        engine_digest: engine_digest(),
-        rulepack_digest: pack.digest(),
-        toolchain_digest: toolchain_digest(),
-        // The renderer reports its own identity and version; the digest is taken of THAT
-        // rather than of a label, so the axis moves when the formatter does.
-        formatter_digest: digest_str(&renderer.formatter_digest().0),
-    };
-    if !receipt.incomplete_axes().is_empty() {
-        return Err(PipelineError::Emit(port_engine_api::PortError::Render {
-            detail: format!(
-                "port-go receipt incomplete axes: {:?}",
-                receipt.incomplete_axes()
-            ),
-        }));
-    }
+        admitted.artifact_digest().clone(),
+        &pack,
+        &renderer,
+    )?;
 
-    Ok(PipelineReport {
-        plan_steps: plan.steps.len(),
-        emit_regions: emitted.len(),
-        emit_digest: emit_tree_digest(&emitted),
-        region_units: transformed.region_units,
-        dispositions: transformed.dispositions,
-        emitted,
-        receipt,
-    })
+    Ok(bind_report(plan.steps.len(), transformed, emitted, receipt))
 }
 
 /// Attempt to port the refusal corpus, returning the refusal.
@@ -113,7 +93,7 @@ pub fn port_go_refused() -> Result<usize, PipelineError> {
 /// Attempt to port the ownership-refusal corpus, returning the refusal.
 ///
 /// # Errors
-/// [`PipelineError`] — a `Transform` refusal is the SUCCESSFUL outcome for this input.
+/// [`PipelineError`]; see [`port_go_refused`].
 pub fn port_go_refused_ownership() -> Result<usize, PipelineError> {
     refuse(admit_embedded_fixture_ownership_v1().map_err(PipelineError::Admit)?)
 }
@@ -121,7 +101,7 @@ pub fn port_go_refused_ownership() -> Result<usize, PipelineError> {
 /// Attempt to port the interface-position refusal corpus, returning the refusal.
 ///
 /// # Errors
-/// [`PipelineError`] — a `Transform` refusal is the SUCCESSFUL outcome for this input.
+/// [`PipelineError`]; see [`port_go_refused`].
 pub fn port_go_refused_interface() -> Result<usize, PipelineError> {
     refuse(admit_embedded_fixture_interface_v1().map_err(PipelineError::Admit)?)
 }
@@ -129,7 +109,7 @@ pub fn port_go_refused_interface() -> Result<usize, PipelineError> {
 /// Attempt to port the failure-convention refusal corpus, returning the refusal.
 ///
 /// # Errors
-/// [`PipelineError`] — a `Transform` refusal is the SUCCESSFUL outcome for this input.
+/// [`PipelineError`]; see [`port_go_refused`].
 pub fn port_go_refused_failure() -> Result<usize, PipelineError> {
     refuse(admit_embedded_fixture_failure_v1().map_err(PipelineError::Admit)?)
 }
@@ -143,13 +123,9 @@ fn refuse(admitted: AdmittedSnapshot) -> Result<usize, PipelineError> {
 
 /// Assemble an emitted tree into one compilable Rust source: a module per source unit.
 ///
-/// Regions are grouped by the unit the TRANSFORM reported, never by parsing the region id — see
-/// [`port_engine_transform::apply_with_provenance`] for why a sanitized id cannot be un-sanitized.
-///
-/// A module per unit is not cosmetic. The corpus's declarations reference each other within a unit
-/// (a method returns its own struct; a function takes a locally aliased type), so they must share a
-/// scope; and two units may each declare a `Point`, so they must not share one. Flattening would
-/// compile today's fixture and collide on the second corpus that has a repeated name.
+/// A module per unit is not cosmetic: two units may each declare a `Point`, so they must not share
+/// a scope. Flattening would compile today's fixture and collide on the second corpus that has a
+/// repeated name.
 #[must_use]
 pub fn assemble_modules(report: &PipelineReport) -> String {
     let mut by_unit: BTreeMap<String, Vec<&RegionId>> = BTreeMap::new();
@@ -168,33 +144,27 @@ pub fn assemble_modules(report: &PipelineReport) -> String {
         for region in regions {
             let bytes = report.emitted.get(region).map_or(&[][..], Vec::as_slice);
             out.push_str(&format!("    // region: {}\n", region.0));
-            // Indent EVERY line, not only the first. The formatter emits a multi-line item, and a
-            // single leading pad left its body sitting at module indentation — legal Rust, and a
-            // golden that reads like a formatting bug on every future change.
-            for line in String::from_utf8_lossy(bytes).lines() {
-                if line.is_empty() {
-                    out.push('\n');
-                } else {
-                    out.push_str(&format!("    {line}\n"));
-                }
-            }
+            indent_block(&String::from_utf8_lossy(bytes), &mut out);
         }
         out.push_str("}\n");
     }
     out
 }
 
+fn indent_block(text: &str, out: &mut String) {
+    for line in text.lines() {
+        if line.is_empty() {
+            out.push('\n');
+        } else {
+            out.push_str(&format!("    {line}\n"));
+        }
+    }
+}
+
 /// Assemble the ported corpus and fail closed against the committed golden.
 ///
-/// The golden is not a substitute for the compile proof — it cannot tell correct Rust from
-/// incorrect. What it is for is REVIEW: a rule change, a type-map edit, or a corpus change shows
-/// up here as a diff in emitted source, so the effect of a data change is visible in the same
-/// pull request as the data change.
-///
 /// Returns the assembled source and whether it matches the golden. The source comes back EITHER
-/// WAY, deliberately: refreshing the golden is `port-go-source > src/port-go-golden-v1.txt`, and a
-/// command that refused to print the new bytes would make the only way to update the golden be to
-/// hand-transcribe them from an error message.
+/// WAY, deliberately: refreshing the golden means printing the new bytes.
 ///
 /// # Errors
 /// [`PipelineError`] on pipeline failure.
@@ -207,14 +177,9 @@ pub fn port_go_source() -> Result<(String, bool), PipelineError> {
 
 /// The ownership record, as a reviewable artifact.
 ///
-/// An ownership disposition is an inference over facts the reader cannot see from the emitted
-/// code: `&mut self` looks identical whether it was proven or assumed. So the reasoning is a
-/// SEPARATE artifact rather than a comment in the output — diffable on its own, and out of the
-/// place where a rule change is hardest to review.
-///
-/// `unproven` marks a decision made on facts the front end could not establish. It is not an error
-/// and it is not hidden: it is the difference between "safe as far as anyone looked" and "safe as
-/// far as anyone looked, and nobody looked past the first call".
+/// `&mut self` looks identical whether it was proven or assumed, so the reasoning is a SEPARATE
+/// artifact rather than a comment in the output. `unproven` marks a decision made on facts the
+/// front end could not establish — it is not an error and it is not hidden.
 ///
 /// # Errors
 /// [`PipelineError`] on pipeline failure.
@@ -239,8 +204,6 @@ pub fn port_go_dispositions() -> Result<String, PipelineError> {
     Ok(out)
 }
 
-/// Re-run the Go port twice and classify with kernel `verify`.
-///
 /// # Errors
 /// [`PipelineError`] on pipeline failure, or when the two runs are not identical.
 pub fn port_go_delta() -> Result<port_engine_kernel::Verification, PipelineError> {

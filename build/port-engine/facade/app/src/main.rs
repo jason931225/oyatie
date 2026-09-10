@@ -1,4 +1,3 @@
-//! `port-engine-app` binary — W0-B Slice 6 CLI (bridge feedback only).
 use std::env;
 use std::process::ExitCode;
 

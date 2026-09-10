@@ -1,23 +1,13 @@
 //! Two fences on the `engine_digest` axis, each proving one half, because neither is worth anything
-//! alone.
-//!
-//! The axis is only meaningful if BOTH hold: the manifest is the whole engine, and the digest moves
-//! when the manifest does. A complete manifest hashed by an insensitive function reports a constant;
-//! a sensitive function over a partial manifest reports a constant for every change to the part it
-//! cannot see. The implementation this replaced had the second failure in its purest form — a
-//! correct sha256 of a list of crate NAMES, which no engine change ever touched, so the kernel's
-//! "changed bytes with no moved axis is RED" rule could not fire on the engine itself.
+//! alone: the manifest is the whole engine, and the digest moves when the manifest does. A complete
+//! manifest hashed by an insensitive function reports a constant; a sensitive function over a
+//! partial manifest reports a constant for every change to the part it cannot see.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use port_engine_app::engine::{engine_crates, engine_digest};
 
-/// The manifest is the whole engine.
-///
-/// Walks the engine tree and compares it to what the crates embed. A source file nobody listed is a
-/// hole in the axis: changing it alters emitted bytes with no digest movement, which is exactly the
-/// `Unexplained` case the kernel calls RED — except nothing would ever report it.
 #[test]
 fn the_manifest_is_the_whole_engine() {
     let root = engine_root()
@@ -64,9 +54,7 @@ fn every_crate_contributes_and_none_twice() {
 
 /// The digest moves when the engine does.
 ///
-/// Perturbs a COPY of the preimage rather than a file on disk, so the fence is hermetic. It proves
-/// the hash is sensitive to every field it covers; completeness is the other fence's job, and the
-/// two together are the claim.
+/// Perturbs a COPY of the preimage rather than a file on disk, so the fence is hermetic.
 #[test]
 fn a_changed_source_moves_the_digest() {
     let baseline = port_engine_identity::engine_preimage(&engine_crates());
@@ -91,7 +79,6 @@ fn a_changed_source_moves_the_digest() {
     }
 }
 
-/// The digest is a stable sha256.
 #[test]
 fn the_digest_is_a_stable_sha256() {
     let digest = engine_digest();
@@ -104,7 +91,22 @@ fn the_digest_is_a_stable_sha256() {
     );
 }
 
-/// Locate `build/port-engine/` from this crate's manifest directory.
+/// The manifest order is sorted by crate name, and stays that way.
+///
+/// The order is part of the preimage, so a reordering moves the digest with no engine change behind
+/// it. Any fixed order would do; this one is checkable, which is why it is the one asserted rather
+/// than described.
+#[test]
+fn engine_crates_are_sorted_by_crate_name() {
+    let names: Vec<&str> = engine_crates().iter().map(|(name, _)| *name).collect();
+    let mut sorted = names.clone();
+    sorted.sort_unstable();
+    assert_eq!(
+        names, sorted,
+        "the crate list must stay sorted, or the digest moves without the engine changing"
+    );
+}
+
 fn engine_root() -> Option<PathBuf> {
     let manifest = option_env!("CARGO_MANIFEST_DIR")?;
     // .../build/port-engine/facade/app → .../build/port-engine
@@ -151,7 +153,6 @@ fn collect(root: &Path, dir: &Path, out: &mut BTreeSet<String>) {
     }
 }
 
-/// The package name for a crate directory leaf, which is the leaf with the engine's prefix.
 fn crate_name(leaf: &str) -> String {
     format!("port-engine-{leaf}")
 }

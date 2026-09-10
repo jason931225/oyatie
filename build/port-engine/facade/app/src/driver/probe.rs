@@ -1,13 +1,9 @@
 //! Surveying source the engine has never seen.
 //!
-//! Everything else in this driver ports the embedded fixture corpus, which is hermetic on purpose:
-//! it is the same bytes every run, so a change in the output is a change in the engine. That makes
-//! it the right thing to prove determinism against and the wrong thing to measure MATURITY against,
-//! because a corpus written alongside the engine only ever contains what the engine already handles.
-//!
-//! This takes a snapshot from a path — a real package, extracted out of band — and reports what the
-//! engine could and could not do with it. The report is a ranked work list rather than a score: the
-//! useful output is which missing rule would unblock the most declarations.
+//! The embedded fixture corpus everything else here ports is the right thing to prove determinism
+//! against and the wrong thing to measure MATURITY against, because a corpus written alongside the
+//! engine only ever contains what the engine already handles. This takes a snapshot from a path
+//! instead, and reports a ranked work list rather than a score.
 
 use std::path::Path;
 

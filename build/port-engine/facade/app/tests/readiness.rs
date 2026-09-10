@@ -1,6 +1,6 @@
 use port_engine_app::w0_ready;
 
 #[test]
-fn slice14_claims_driver_readiness() {
+fn driver_readiness_is_claimed() {
     assert!(w0_ready());
 }

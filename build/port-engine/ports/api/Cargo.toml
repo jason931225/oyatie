@@ -6,10 +6,6 @@ rust-version.workspace = true
 publish = false
 license = "Apache-2.0"
 
-# Neutral seam types for the owned deterministic port engine (ADR-0637 D1, archived; live via
-# apex ADR-0704). W0-B Slice 2: SourceModel, RulePack, TransformPlan, TargetIr, Renderer, Receipt,
-# and PortError. Zero dependencies by design at this slice.
-
 [dependencies]
 
 [lib]

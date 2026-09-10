@@ -6,7 +6,6 @@
 
 use port_engine_app::driver;
 
-/// inferred one is not, and the two produce identical Rust.
 #[test]
 fn trait_impls_are_emitted_from_observed_satisfaction() {
     let report = driver::port_go_pipeline().expect("the Go corpus must port");
@@ -27,7 +26,6 @@ fn trait_impls_are_emitted_from_observed_satisfaction() {
     }
 }
 
-/// mutates.
 #[test]
 fn a_trait_method_binds_the_receiver_its_implementors_need() {
     let report = driver::port_go_pipeline().expect("the Go corpus must port");
@@ -43,7 +41,6 @@ fn a_trait_method_binds_the_receiver_its_implementors_need() {
     );
 }
 
-/// naming a method nothing implements — and nothing short of compiling it would notice.
 #[test]
 fn embedding_becomes_supertraits_and_forwarding_methods() {
     let report = driver::port_go_pipeline().expect("the Go corpus must port");
@@ -65,7 +62,6 @@ fn embedding_becomes_supertraits_and_forwarding_methods() {
     }
 }
 
-/// method's own ownership facts precisely so this is a decision rather than a default.
 #[test]
 fn a_forwarding_method_inherits_its_receiver_from_what_it_forwards_to() {
     let report = driver::port_go_pipeline().expect("the Go corpus must port");

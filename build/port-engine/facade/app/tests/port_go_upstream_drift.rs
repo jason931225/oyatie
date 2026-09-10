@@ -1,20 +1,8 @@
-//! Re-porting a MOVED upstream, which is the property a continuously maintained port rests on.
+//! Re-porting a MOVED upstream: it has to come back GREEN and EXPLAINED, which is the property a
+//! continuously maintained port rests on and the one determinism alone does not cover.
 //!
-//! Everything else in this crate proves the engine is deterministic: the same source twice gives
-//! the same bytes, and bytes that change with no axis to account for them are RED. Neither says
-//! anything about the case that actually happens in service — upstream releases a new version, the
-//! engine re-runs, and the output is different because the SOURCE is different.
-//!
-//! That case has to come back GREEN and it has to come back EXPLAINED. Green because nothing is
-//! wrong; explained because the receipt has to name what changed. An engine that reported
-//! `Unexplained` every time a dependency moved would be telling its operator that the engine is
-//! broken, over and over, until nobody read the signal again — and the signal is the only thing
-//! standing between a maintained port and a fork nobody dares regenerate.
-//!
-//! The pair is a real second EXTRACTION of one package at two versions, at the same unit id, with
-//! the two changes a dependency bump actually makes: a body changed and a declaration appeared. It
-//! is not a hand-edited receipt, because a hand-edited receipt would prove something about the
-//! edit.
+//! The fixture pair is a real second EXTRACTION of one package at two versions, not a hand-edited
+//! receipt — a hand-edited receipt would prove something about the edit.
 
 use std::collections::BTreeSet;
 
@@ -22,7 +10,6 @@ use port_engine_api::ReceiptAxis;
 use port_engine_app::driver;
 use port_engine_kernel::{Delta, Verdict, verify};
 
-/// A moved upstream is GREEN and EXPLAINED, and the axis that explains it is the source.
 #[test]
 fn a_moved_upstream_re_ports_green_and_explained() {
     let before = driver::port_go_drift_before().expect("the earlier version must port");

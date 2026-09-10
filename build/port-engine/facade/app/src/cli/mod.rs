@@ -1,8 +1,7 @@
 //! Hand-rolled CLI for `port-engine-app`.
 //!
-//! Bridge feedback only — never merge authority (CLI surfaces are retirement-marked). No clap or
-//! argv crate: keeping the facade free of new lock-forcing dependencies is worth more than the
-//! ergonomics, at this size.
+//! No clap or argv crate: keeping the facade free of new lock-forcing dependencies is worth more
+//! than the ergonomics, at this size.
 
 mod pipeline;
 mod seams;
@@ -19,8 +18,42 @@ use seams::{
     cmd_pin, cmd_plan, cmd_ready, cmd_rulepack, cmd_toolchain,
 };
 
+/// Every command [`run`] dispatches, in usage order.
+///
+/// The usage text below is prose around this list rather than a second copy of it;
+/// `usage_lists_exactly_the_dispatchable_commands` holds the two together.
+pub(crate) const COMMANDS: &[&str] = &[
+    "help",
+    "ready",
+    "pin",
+    "emit-stub",
+    "emit-syn",
+    "emit-canary",
+    "materialize-canary",
+    "canary-defect",
+    "digest",
+    "rulepack",
+    "plan",
+    "admit-snapshot",
+    "declarations",
+    "port-go",
+    "port-go-source",
+    "survey",
+    "region-digests",
+    "dispositions",
+    "transform",
+    "render",
+    "engine",
+    "toolchain",
+    "pipeline",
+    "receipt",
+    "verify",
+    "delta",
+    "verify-e2e",
+];
+
 pub(crate) const USAGE: &str = "\
-port-engine-app — owned deterministic port-engine driver (W0-B Slice 14)
+port-engine-app — owned deterministic port-engine driver
 
 Usage:
   port-engine-app <command> [args]
@@ -35,7 +68,7 @@ Commands:
   materialize-canary <dir>
                     Write single canary.rs under allowlisted canary-out dir
   canary-defect     Plant canary byte defect; expect Red/Unexplained
-  digest <text>     SHA-256 digest of UTF-8 text (Slice 7 hash adapter)
+  digest <text>     SHA-256 digest of UTF-8 text
   rulepack          Load fixture-gated rulepack v0; print digest + fixture count
   plan              Plan embedded rulepack against example units
   admit-snapshot    Admit hermetic OOB bootstrap snapshot fixture
@@ -47,8 +80,8 @@ Commands:
   dispositions      Print every ownership decision and its justification
   transform         Admit→plan→apply constructions → RustIr region count
   render            Transform+emit; print region count + emit tree digest
-  engine            Print Slice 9 engine identity digest
-  toolchain         Print Slice 9 dual-home toolchain corpus digest
+  engine            Print engine identity digest
+  toolchain         Print dual-home toolchain corpus digest
   pipeline          pin→admit→plan→transform→emit→six-axis receipt
   receipt           Print canonical receipt; fail closed vs golden
   verify            Deterministic re-run classify (alias of delta)
@@ -97,5 +130,31 @@ pub fn run(args: &[String]) -> ExitCode {
             eprint!("{USAGE}");
             ExitCode::from(2)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COMMANDS, USAGE};
+
+    /// The command names USAGE documents, read back out of the text it prints.
+    fn documented() -> Vec<&'static str> {
+        USAGE
+            .lines()
+            .skip_while(|line| *line != "Commands:")
+            .skip(1)
+            .take_while(|line| !line.starts_with("Exit codes:"))
+            .filter(|line| line.starts_with("  ") && !line.starts_with("   "))
+            .filter_map(|line| line.split_whitespace().next())
+            .collect()
+    }
+
+    #[test]
+    fn usage_lists_exactly_the_dispatchable_commands() {
+        assert_eq!(
+            documented(),
+            COMMANDS.to_vec(),
+            "the usage text and the command list must not drift apart"
+        );
     }
 }
