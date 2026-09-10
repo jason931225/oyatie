@@ -138,7 +138,9 @@ pub fn channel_literal_violations(channel: &str, path: &str, contents: &str) -> 
         .enumerate()
         .filter(|(_, line)| {
             let unescaped = line.replace('\\', "");
-            spellings.iter().any(|spelling| unescaped.contains(spelling))
+            spellings
+                .iter()
+                .any(|spelling| unescaped.contains(spelling))
         })
         .map(|(index, _)| {
             format!(
@@ -192,3 +194,10 @@ pub fn execution_channel_violations(channel: &str, pins: &[ToolchainPin]) -> Vec
     }
     violations
 }
+
+#[cfg(test)]
+mod channel_literal_tests;
+#[cfg(test)]
+mod live_tree_tests;
+#[cfg(test)]
+mod workflow_pin_tests;
