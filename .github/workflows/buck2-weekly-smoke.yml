@@ -99,6 +99,30 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/cache-creds"
           printf '%s\n%s\n' "${CACHE_CLIENT_CERT}" "${CACHE_CLIENT_KEY}" > "${RUNNER_TEMP}/cache-creds/client.pem"
           printf '%s\n' "${CACHE_CA_CERT}" > "${RUNNER_TEMP}/cache-creds/ca.crt"
+          # A key buck2 cannot parse is a skipped cache, not a red build.
+          #
+          # This guard exists because the one below does not cover it: a TCP
+          # connect succeeds against a healthy endpoint whatever the key
+          # contains, so reachability would report usable and buck2 would then
+          # die at handshake -- failing the build, which inverts this lane's
+          # whole contract. That is this lane measuring one thing and reporting
+          # another, which is the defect it was written to avoid.
+          #
+          # The specific case: this PKI mints ECDSA P-256 and the tls provider
+          # emits SEC1 (`BEGIN EC PRIVATE KEY`). rustls, which buck2's RE client
+          # uses, parses only RSA or PKCS8 and refuses SEC1. The substrate now
+          # emits PKCS8 at source, but nothing forces a hand-set secret to
+          # rotate, so a stale SEC1 value would still reach here.
+          # The header, not `openssl pkey`. Measured: `openssl pkey -noout`
+          # ACCEPTS a SEC1 key, because OpenSSL reads both encodings and rustls
+          # reads only one -- so the obvious check passes on precisely the input
+          # it was written to reject. rustls keys off the PEM label, so that is
+          # what this reads.
+          if ! grep -q -- "-----BEGIN PRIVATE KEY-----" "${RUNNER_TEMP}/cache-creds/client.pem"; then
+            echo "the client key is not PKCS8 (rustls reads no other EC encoding); building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Reachability is checked before buck2 is told the endpoint exists, so
           # an unreachable cache is a skipped feature rather than a failed build.
           #
