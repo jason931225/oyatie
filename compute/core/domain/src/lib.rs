@@ -1,11 +1,3 @@
-//! Cloud compute aggregate kernel.
-//!
-//! This crate owns the stable `cloud.compute.*` metadata contracts for VM,
-//! managed Kubernetes, and function invocation surfaces. Hypervisors,
-//! schedulers, registries, and function runtimes consume these typed contracts
-//! through adapters; this kernel stays adapter-free and keeps placement,
-//! quota, identity, image, and data-class invariants explicit.
-
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 mod capacity;

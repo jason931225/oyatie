@@ -16,16 +16,13 @@ pub(crate) fn is_slug(value: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '.' | '_'))
 }
 
-/// A client-supplied idempotency key: canonical RFC 4122 textual UUID
-/// (8-4-4-4-12 hex groups), normalized to lowercase. Precedent: AIP-155
-/// request ids and AWS client tokens, both of which require client-generated
-/// UUIDs so retries are deduplicated server-side.
+/// A client-supplied idempotency key: canonical RFC 4122 textual UUID,
+/// normalized to lowercase.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct IdempotencyKey(String);
 
 impl IdempotencyKey {
-    /// Parse and normalize a canonical textual UUID.
     pub fn new(value: impl Into<String>) -> Result<Self, ContractShapeError> {
         let value = value.into();
         let normalized = value.to_ascii_lowercase();
@@ -42,7 +39,6 @@ impl IdempotencyKey {
         }
     }
 
-    /// The normalized key text.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
@@ -72,7 +68,6 @@ pub struct ResourceName {
 }
 
 impl ResourceName {
-    /// Build a resource name from its two segments.
     pub fn new(
         collection: impl Into<String>,
         resource_id: impl Into<String>,
@@ -91,13 +86,11 @@ impl ResourceName {
         }
     }
 
-    /// The collection segment.
     #[must_use]
     pub fn collection(&self) -> &str {
         &self.collection
     }
 
-    /// The resource-id segment.
     #[must_use]
     pub fn resource_id(&self) -> &str {
         &self.resource_id

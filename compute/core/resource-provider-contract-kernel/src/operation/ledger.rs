@@ -4,7 +4,6 @@ use super::{OperationPhase, OperationState};
 use crate::error::ContractShapeError;
 use crate::identity::{IdempotencyKey, is_slug};
 
-/// Retry metadata persisted in the operation ledger.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RetryPolicy {
@@ -13,8 +12,6 @@ pub struct RetryPolicy {
     pub retry_classification: String, // data_class: INTERNAL_ONLY
 }
 
-/// Retry classifications allowed by
-/// `specs/cloud-control-plane-operation-contract.json#idempotency_retry_cancel_contract`.
 pub const ALLOWED_RETRY_CLASSIFICATIONS: &[&str] = &[
     "transient",
     "quota",
@@ -23,7 +20,6 @@ pub const ALLOWED_RETRY_CLASSIFICATIONS: &[&str] = &[
     "operator_required",
 ];
 
-/// Cancellation metadata persisted in the operation ledger.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CancellationMetadata {
@@ -31,7 +27,6 @@ pub struct CancellationMetadata {
     pub audit_required: bool, // data_class: INTERNAL_ONLY
 }
 
-/// Compensation metadata persisted in the operation ledger.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompensationMetadata {
@@ -39,9 +34,6 @@ pub struct CompensationMetadata {
     pub strategy: String, // data_class: INTERNAL_ONLY
 }
 
-/// Durable operation-ledger row required before acknowledging a mutating
-/// resource-provider request. This mirrors
-/// `specs/cloud-control-plane-operation-contract.json#operation_ledger_entry`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OperationLedgerEntry {
@@ -63,39 +55,54 @@ pub struct OperationLedgerEntry {
     pub transition_sequence: u64,           // data_class: INTERNAL_ONLY
 }
 
+fn malformed(message: impl Into<String>) -> ContractShapeError {
+    ContractShapeError::MalformedOperationLedger {
+        message: message.into(),
+    }
+}
+
 impl OperationLedgerEntry {
-    /// Validate the metadata-only operation-ledger contract: write-before-ack
-    /// idempotency key, request hash, audit-chain linkage, generation bounds,
-    /// retry/cancel/compensation metadata, and monotonic sequence presence.
     pub fn validate(&self) -> Result<(), ContractShapeError> {
+        self.validate_identity()?;
+        self.validate_generation_bounds()?;
+        self.validate_required_scope_fields()?;
+        self.validate_retry_policy()?;
+        self.validate_cancellation()?;
+        self.validate_transition_sequence()
+    }
+
+    fn validate_identity(&self) -> Result<(), ContractShapeError> {
         if !is_slug(&self.operation_id) {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: format!("operation_id {:?} is not slug-shaped", self.operation_id),
-            });
+            return Err(malformed(format!(
+                "operation_id {:?} is not slug-shaped",
+                self.operation_id
+            )));
         }
-        IdempotencyKey::new(self.idempotency_key.clone()).map_err(|error| {
-            ContractShapeError::MalformedOperationLedger {
-                message: error.to_string(),
-            }
-        })?;
+        IdempotencyKey::new(self.idempotency_key.clone())
+            .map_err(|error| malformed(error.to_string()))?;
         if self.request_hash.is_empty() {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: "request_hash must be non-empty".to_owned(),
-            });
+            return Err(malformed("request_hash must be non-empty"));
         }
         if !self.resource_orn.starts_with("orn:") || !self.resource_orn.contains('/') {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: format!("resource_orn {:?} is not ORN-shaped", self.resource_orn),
-            });
+            return Err(malformed(format!(
+                "resource_orn {:?} is not ORN-shaped",
+                self.resource_orn
+            )));
         }
+        Ok(())
+    }
+
+    fn validate_generation_bounds(&self) -> Result<(), ContractShapeError> {
         if self.desired_generation == 0 || self.observed_generation > self.desired_generation {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: format!(
-                    "generation bounds invalid: desired={}, observed={}",
-                    self.desired_generation, self.observed_generation
-                ),
-            });
+            return Err(malformed(format!(
+                "generation bounds invalid: desired={}, observed={}",
+                self.desired_generation, self.observed_generation
+            )));
         }
+        Ok(())
+    }
+
+    fn validate_required_scope_fields(&self) -> Result<(), ContractShapeError> {
         for (field, value) in [
             (
                 "tenant_account_project",
@@ -112,34 +119,37 @@ impl OperationLedgerEntry {
             ("compensation.strategy", self.compensation.strategy.as_str()),
         ] {
             if value.is_empty() {
-                return Err(ContractShapeError::MalformedOperationLedger {
-                    message: format!("{field} must be non-empty"),
-                });
+                return Err(malformed(format!("{field} must be non-empty")));
             }
         }
+        Ok(())
+    }
+
+    fn validate_retry_policy(&self) -> Result<(), ContractShapeError> {
         if self.retry_policy.max_attempts == 0 {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: "retry_policy.max_attempts must be non-zero".to_owned(),
-            });
+            return Err(malformed("retry_policy.max_attempts must be non-zero"));
         }
         if !ALLOWED_RETRY_CLASSIFICATIONS.contains(&self.retry_policy.retry_classification.as_str())
         {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: format!(
-                    "retry_policy.retry_classification {:?} is not one of {:?}",
-                    self.retry_policy.retry_classification, ALLOWED_RETRY_CLASSIFICATIONS
-                ),
-            });
+            return Err(malformed(format!(
+                "retry_policy.retry_classification {:?} is not one of {:?}",
+                self.retry_policy.retry_classification, ALLOWED_RETRY_CLASSIFICATIONS
+            )));
         }
-        if !self.cancellation.audit_required {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: "cancellation.audit_required must be true".to_owned(),
-            });
+        Ok(())
+    }
+
+    fn validate_cancellation(&self) -> Result<(), ContractShapeError> {
+        if self.cancellation.audit_required {
+            Ok(())
+        } else {
+            Err(malformed("cancellation.audit_required must be true"))
         }
+    }
+
+    fn validate_transition_sequence(&self) -> Result<(), ContractShapeError> {
         if self.transition_sequence == 0 {
-            return Err(ContractShapeError::MalformedOperationLedger {
-                message: "transition_sequence must be non-zero".to_owned(),
-            });
+            return Err(malformed("transition_sequence must be non-zero"));
         }
         Ok(())
     }

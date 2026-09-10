@@ -3,22 +3,14 @@ use std::fmt;
 use crate::operation::OPERATION_NAME_PREFIX;
 use crate::pagination::MAX_PAGE_SIZE;
 
-/// A contract-shape error raised while constructing harness types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContractShapeError {
-    /// The idempotency key is not a canonical RFC 4122 textual UUID.
     MalformedIdempotencyKey { value: String },
-    /// The resource name is not `collection/resource-id` in slug form.
     MalformedResourceName { value: String },
-    /// The page token is empty.
     EmptyPageToken,
-    /// The page size is zero or exceeds [`MAX_PAGE_SIZE`].
     PageSizeOutOfRange { requested: u32 },
-    /// The operation name lacks the [`OPERATION_NAME_PREFIX`].
     MalformedOperationName { value: String },
-    /// The operation ledger entry is missing required AIP-151/control-plane metadata.
     MalformedOperationLedger { message: String },
-    /// The operation's done/result shape disagrees with its ledger state.
     InvalidOperationState { message: String },
 }
 

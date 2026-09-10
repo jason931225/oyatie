@@ -37,22 +37,22 @@ pub struct ResourceCreate {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resource {
-    pub id: Classified<ResourceId>,     // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,  // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>, // data_class: PUBLIC
-    pub az: Classified<Option<AzCode>>, // data_class: PUBLIC
-    pub cell_id: Classified<CellId>,    // data_class: PUBLIC
-    pub kind: Classified<ResourceKind>, // data_class: PUBLIC
-    pub data_class: Classified<PrivacyDataClass>, // data_class: PUBLIC
-    pub owner_principal: Classified<PrincipalId>, // data_class: INTERNAL_ONLY
-    pub state: Classified<ResourceState>, // data_class: PUBLIC
-    pub tags: Classified<BTreeMap<TagKey, TagValue>>, // data_class: INTERNAL_ONLY
-    pub iam_policy_attachments: Classified<Vec<IamPolicyId>>, // data_class: INTERNAL_ONLY
-    pub metering_tag: Classified<MeteringTag>, // data_class: INTERNAL_ONLY
-    pub residency: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub updated_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub id: Classified<ResourceId>,
+    pub tenant_id: Classified<String>,
+    pub region: Classified<RegionCode>,
+    pub az: Classified<Option<AzCode>>,
+    pub cell_id: Classified<CellId>,
+    pub kind: Classified<ResourceKind>,
+    pub data_class: Classified<PrivacyDataClass>,
+    pub owner_principal: Classified<PrincipalId>,
+    pub state: Classified<ResourceState>,
+    pub tags: Classified<BTreeMap<TagKey, TagValue>>,
+    pub iam_policy_attachments: Classified<Vec<IamPolicyId>>,
+    pub metering_tag: Classified<MeteringTag>,
+    pub residency: Classified<ResidencyClass>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub updated_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 impl Resource {

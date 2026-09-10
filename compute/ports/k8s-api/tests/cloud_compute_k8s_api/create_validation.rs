@@ -240,5 +240,3 @@ async fn k8s_record_projection_rejects_every_immutable_field_drift() {
     )
     .is_err());
 }
-
-// ── Delete surface tests ──────────────────────────────────────────────────────

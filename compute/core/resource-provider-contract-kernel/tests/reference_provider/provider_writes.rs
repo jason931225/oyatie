@@ -13,7 +13,7 @@ pub(super) fn create<'a>(
 ) -> ProviderFuture<'a, CreateOutcome<Document>> {
     Box::pin(async move {
         let key = idempotency_key.as_str().to_owned();
-        if let Some(applied) = provider.applied.get(&key) {
+        if let Some(applied) = provider.dedup_log.get(&key) {
             return match applied {
                 AppliedWrite::Create { name: n, payload }
                     if *n == name.to_string() && *payload == resource =>
@@ -32,7 +32,7 @@ pub(super) fn create<'a>(
             });
         }
         provider.items.insert(name.to_string(), resource.clone());
-        provider.applied.insert(
+        provider.dedup_log.insert(
             key,
             AppliedWrite::Create {
                 name: name.to_string(),
@@ -54,7 +54,7 @@ pub(super) fn put<'a>(
 ) -> ProviderFuture<'a, PutOutcome<Document>> {
     Box::pin(async move {
         let key = idempotency_key.as_str().to_owned();
-        if let Some(applied) = provider.applied.get(&key) {
+        if let Some(applied) = provider.dedup_log.get(&key) {
             return match applied {
                 AppliedWrite::Put { name: n, payload }
                     if *n == name.to_string() && *payload == resource =>
@@ -73,7 +73,7 @@ pub(super) fn put<'a>(
             WriteDisposition::Created
         };
         provider.items.insert(name.to_string(), resource.clone());
-        provider.applied.insert(
+        provider.dedup_log.insert(
             key,
             AppliedWrite::Put {
                 name: name.to_string(),

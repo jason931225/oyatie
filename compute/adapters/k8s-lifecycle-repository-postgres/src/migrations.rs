@@ -53,7 +53,6 @@ impl PgK8sLifecycleMigration {
     }
 }
 
-/// Creates the non-login, non-bypass runtime role and grants schema usage.
 pub const K8S_LIFECYCLE_RUNTIME_ROLE_MIGRATION: &str = r#"DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'compute_k8s_lifecycle_runtime') THEN
@@ -67,7 +66,6 @@ CREATE SCHEMA IF NOT EXISTS compute_k8s_lifecycle;
 GRANT USAGE ON SCHEMA compute_k8s_lifecycle TO compute_k8s_lifecycle_runtime;
 "#;
 
-/// Creates the lifecycle tables, indexes, forced RLS policies, and runtime grants.
 pub const K8S_LIFECYCLE_REPOSITORY_MIGRATION: &str = r#"CREATE SCHEMA IF NOT EXISTS compute_k8s_lifecycle;
 
 CREATE TABLE IF NOT EXISTS compute_k8s_lifecycle.clusters (

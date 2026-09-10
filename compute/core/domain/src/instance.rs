@@ -43,24 +43,24 @@ pub struct InstanceCreate {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Instance {
-    pub resource_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>,      // data_class: PUBLIC
-    pub az: Classified<AzCode>,              // data_class: PUBLIC
-    pub cell_id: Classified<CellId>,         // data_class: PUBLIC
-    pub flavor: Classified<ComputeFlavorSpec>, // data_class: PUBLIC
-    pub image: Classified<ImageRef>,         // data_class: INTERNAL_ONLY
-    pub key_pair: Classified<Option<KeyPairId>>, // data_class: INTERNAL_ONLY
-    pub vpc_id: Classified<ResourceId>,      // data_class: INTERNAL_ONLY
-    pub subnet_id: Classified<ResourceId>,   // data_class: INTERNAL_ONLY
-    pub security_groups: Classified<Vec<SecurityGroupId>>, // data_class: INTERNAL_ONLY
-    pub iam_role: Classified<Option<IamRoleId>>, // data_class: INTERNAL_ONLY
-    pub user_data_uri: Classified<Option<UserDataUri>>, // data_class: INTERNAL_ONLY
-    pub residency: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub state: Classified<InstanceState>,    // data_class: PUBLIC
-    pub data_class: Classified<PrivacyDataClass>, // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,     // data_class: PUBLIC
+    pub resource_id: Classified<ResourceId>,
+    pub tenant_id: Classified<String>,
+    pub region: Classified<RegionCode>,
+    pub az: Classified<AzCode>,
+    pub cell_id: Classified<CellId>,
+    pub flavor: Classified<ComputeFlavorSpec>,
+    pub image: Classified<ImageRef>,
+    pub key_pair: Classified<Option<KeyPairId>>,
+    pub vpc_id: Classified<ResourceId>,
+    pub subnet_id: Classified<ResourceId>,
+    pub security_groups: Classified<Vec<SecurityGroupId>>,
+    pub iam_role: Classified<Option<IamRoleId>>,
+    pub user_data_uri: Classified<Option<UserDataUri>>,
+    pub residency: Classified<ResidencyClass>,
+    pub state: Classified<InstanceState>,
+    pub data_class: Classified<PrivacyDataClass>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 impl Instance {
     pub fn new(input: InstanceCreate) -> Result<Self, CloudComputeError> {

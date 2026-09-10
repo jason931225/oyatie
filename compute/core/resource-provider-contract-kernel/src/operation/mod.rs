@@ -9,5 +9,4 @@ pub use ledger::{
 pub use resource::Operation;
 pub use state::{OperationError, OperationPhase, OperationResult, OperationState};
 
-/// Required name prefix for AIP-151 operation resources.
 pub const OPERATION_NAME_PREFIX: &str = "operations/";

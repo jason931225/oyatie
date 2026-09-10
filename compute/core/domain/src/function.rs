@@ -40,24 +40,24 @@ pub struct FunctionDeploymentCreate {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionDeployment {
-    pub resource_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>,      // data_class: PUBLIC
-    pub az: Classified<AzCode>,              // data_class: PUBLIC
-    pub cell_id: Classified<CellId>,         // data_class: PUBLIC
-    pub runtime: Classified<FunctionRuntime>, // data_class: PUBLIC
-    pub name: Classified<FunctionName>,      // data_class: PUBLIC
-    pub bundle: Classified<ImageRef>,        // data_class: INTERNAL_ONLY
-    pub cold_start_budget_ms: Classified<u32>, // data_class: PUBLIC
-    pub timeout_ms: Classified<u32>,         // data_class: PUBLIC
-    pub memory_mb: Classified<u32>,          // data_class: PUBLIC
-    pub max_concurrency: Classified<u32>,    // data_class: PUBLIC
-    pub allowed_data_classes: Classified<Vec<PrivacyDataClass>>, // data_class: INTERNAL_ONLY
-    pub residency: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub state: Classified<FunctionDeploymentState>, // data_class: PUBLIC
-    pub data_class: Classified<PrivacyDataClass>, // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,     // data_class: PUBLIC
+    pub resource_id: Classified<ResourceId>,
+    pub tenant_id: Classified<String>,
+    pub region: Classified<RegionCode>,
+    pub az: Classified<AzCode>,
+    pub cell_id: Classified<CellId>,
+    pub runtime: Classified<FunctionRuntime>,
+    pub name: Classified<FunctionName>,
+    pub bundle: Classified<ImageRef>,
+    pub cold_start_budget_ms: Classified<u32>,
+    pub timeout_ms: Classified<u32>,
+    pub memory_mb: Classified<u32>,
+    pub max_concurrency: Classified<u32>,
+    pub allowed_data_classes: Classified<Vec<PrivacyDataClass>>,
+    pub residency: Classified<ResidencyClass>,
+    pub state: Classified<FunctionDeploymentState>,
+    pub data_class: Classified<PrivacyDataClass>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -74,15 +74,15 @@ pub struct FunctionInvocationRequest {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionInvocationReceipt {
-    pub invocation_id: Classified<InvocationId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,           // data_class: INTERNAL_ONLY
-    pub function_id: Classified<ResourceId>,     // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>,          // data_class: PUBLIC
-    pub payload_data_class: Classified<PrivacyDataClass>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<IdempotencyKey>, // data_class: INTERNAL_ONLY
-    pub cold_start_budget_ms: Classified<u32>,   // data_class: PUBLIC
-    pub accepted_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,         // data_class: PUBLIC
+    pub invocation_id: Classified<InvocationId>,
+    pub tenant_id: Classified<String>,
+    pub function_id: Classified<ResourceId>,
+    pub region: Classified<RegionCode>,
+    pub payload_data_class: Classified<PrivacyDataClass>,
+    pub idempotency_key: Classified<IdempotencyKey>,
+    pub cold_start_budget_ms: Classified<u32>,
+    pub accepted_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 impl FunctionDeployment {
     pub fn new(input: FunctionDeploymentCreate) -> Result<Self, CloudComputeError> {

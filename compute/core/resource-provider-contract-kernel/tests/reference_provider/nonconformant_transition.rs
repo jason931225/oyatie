@@ -12,9 +12,6 @@ use shared_resource_provider_contract_kernel::{
 use super::fixture::ReferenceFixture;
 use super::support::{Document, ReferenceProvider};
 
-/// Starts an operation in `accepted` and then jumps directly to `succeeded`,
-/// which is not one of the allowed state-machine transitions in the control
-/// plane operation contract.
 #[derive(Debug, Default)]
 struct DisallowedTransitionProvider {
     inner: ReferenceProvider,

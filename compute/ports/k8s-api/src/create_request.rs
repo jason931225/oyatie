@@ -188,8 +188,6 @@ pub enum CloudComputeK8sApiError {
         data_class: String, // data_class: PUBLIC
     },
     Compute(CloudComputeError), // data_class: INTERNAL_ONLY
-    /// The cluster identified by `path_cluster_id` does not exist in the
-    /// catalog. Used exclusively by the delete surface.
     ClusterNotFound {
         cluster_id: String, // data_class: INTERNAL_ONLY
     },

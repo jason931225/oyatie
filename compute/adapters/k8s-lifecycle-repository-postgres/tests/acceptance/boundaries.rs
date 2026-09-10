@@ -56,7 +56,6 @@ impl CloudComputeK8sAcceptanceRepository for Transport<'_> {
 }
 
 pub(super) async fn assert_boundaries(repository: &PgK8sLifecycleRepository) {
-    // This drops a real committed acknowledgement; it does not emulate all network failures.
     let transport = Transport {
         inner: repository,
         boundary: Boundary::LostAcknowledgement,

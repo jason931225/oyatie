@@ -1,9 +1,3 @@
-//! Cloud Compute Functions API boundary for invocation receipts.
-//!
-//! This crate owns request boundary normalization, authorization proof checks,
-//! idempotent invoke semantics, and tenant-safe function invocation projection
-//! around the Cloud compute kernel.
-
 use std::collections::BTreeMap;
 
 use compute_domain::{

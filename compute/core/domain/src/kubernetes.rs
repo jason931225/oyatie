@@ -105,19 +105,19 @@ pub struct KubernetesClusterCreate {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KubernetesCluster {
-    pub resource_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>,      // data_class: PUBLIC
-    pub flavor: Classified<K8sFlavor>,       // data_class: PUBLIC
-    pub control_plane_version: Classified<ControlPlaneVersion>, // data_class: PUBLIC
-    pub control_plane_private: Classified<bool>, // data_class: PUBLIC
-    pub node_pools: Classified<Vec<KubernetesNodePool>>, // data_class: INTERNAL_ONLY
-    pub residency: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub state: Classified<KubernetesClusterState>, // data_class: PUBLIC
-    pub desired_state: Classified<KubernetesClusterDesiredState>, // data_class: PUBLIC
-    pub data_class: Classified<PrivacyDataClass>, // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,     // data_class: PUBLIC
+    pub resource_id: Classified<ResourceId>,
+    pub tenant_id: Classified<String>,
+    pub region: Classified<RegionCode>,
+    pub flavor: Classified<K8sFlavor>,
+    pub control_plane_version: Classified<ControlPlaneVersion>,
+    pub control_plane_private: Classified<bool>,
+    pub node_pools: Classified<Vec<KubernetesNodePool>>,
+    pub residency: Classified<ResidencyClass>,
+    pub state: Classified<KubernetesClusterState>,
+    pub desired_state: Classified<KubernetesClusterDesiredState>,
+    pub data_class: Classified<PrivacyDataClass>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 impl KubernetesCluster {
     pub fn new(input: KubernetesClusterCreate) -> Result<Self, CloudComputeError> {
