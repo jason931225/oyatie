@@ -88,10 +88,11 @@ jobs:
           fi
           # The admission control, honoured rather than stepped over.
           #
-          # AGENTS.md:209 and ADR-0716 D2 name specs/cache-warm-license.json as
-          # the switch that licenses warm reads. That file does not exist and
-          # CANNOT: `specs` is in the layout gate's FORBIDDEN_NAMES
-          # (pipeline/core/admission/src/layout.rs:116), so the repository
+          # ADR-0716 D2 and the g004 mapping name specs/cache-warm-license.json
+          # as the switch that licenses warm reads; AGENTS.md:209 names the
+          # `warm_reads_licensed` key but not that path. The file does not exist
+          # and CANNOT: `specs` is in `pipeline_admission::FORBIDDEN_NAMES`
+          # (the constant, not a line number -- it moves), so the repository
           # refuses the path its own ADR specifies. Restoring it was tried here
           # and refused -- "forbidden root `specs`" -- which is why it is absent,
           # and it is a contradiction between two governance artifacts rather
@@ -147,35 +148,36 @@ jobs:
             echo "wired=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Does the SERVER accept this client cert? The TCP probe below proves
-          # the port answers; it says nothing about mTLS. An expired, revoked or
-          # wrong-CA cert passes every other guard and then kills the build at
-          # handshake -- the likeliest real failure, and the one the guards
-          # missed. This is a different question from the PKCS8 check above:
-          # that one asks whether rustls can PARSE the key, this asks whether
-          # the far end ACCEPTS the identity.
-          if ! echo | timeout 20 openssl s_client -connect "${CACHE_ENDPOINT}" \
-                 -cert "${RUNNER_TEMP}/cache-creds/client.pem" \
-                 -CAfile "${RUNNER_TEMP}/cache-creds/ca.crt" >/dev/null 2>&1; then
-            echo "the cache did not accept this client certificate; building without the cache"
-            echo "wired=no" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Reachability is checked before buck2 is told the endpoint exists, so
-          # an unreachable cache is a skipped feature rather than a failed build.
+          # Guard order is load-bearing, cheapest and most specific question
+          # first: each probe may only run once every cause it does NOT measure
+          # has been excluded, or it reports a cause it never tested.
           #
-          # The probe names which of the two things it found. An earlier version
-          # ran `timeout 20 bash -c ...` and printed "unreachable" when the real
-          # cause was that `timeout` is absent -- a check reporting a specific
-          # cause it had not measured. Both outcomes skip the cache; only one of
-          # them means the cache is down.
+          # `timeout` is used by both probes below, so its absence is settled
+          # before either runs.
           if ! command -v timeout >/dev/null 2>&1; then
             echo "no timeout(1) on this runner, so reachability cannot be bounded; building without the cache"
             echo "wired=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Reachability is checked before buck2 is told the endpoint exists, so
+          # an unreachable cache is a skipped feature rather than a failed build.
           if ! timeout 20 bash -c "cat < /dev/null > /dev/tcp/${CACHE_ENDPOINT%:*}/${CACHE_ENDPOINT##*:}" 2>/dev/null; then
             echo "${CACHE_ENDPOINT} did not accept a connection; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Does the SERVER accept this client cert? The TCP probe above proves
+          # the port answers; it says nothing about mTLS. An expired, revoked or
+          # wrong-CA cert passes every other guard and then kills the build at
+          # handshake -- the likeliest real failure, and the one the guards
+          # missed. This is a different question from the PKCS8 check above:
+          # that one asks whether rustls can PARSE the key, this asks whether
+          # the far end ACCEPTS the identity. It runs last because a connect
+          # failure here is indistinguishable from a rejected identity.
+          if ! echo | timeout 20 openssl s_client -connect "${CACHE_ENDPOINT}" \
+                 -cert "${RUNNER_TEMP}/cache-creds/client.pem" \
+                 -CAfile "${RUNNER_TEMP}/cache-creds/ca.crt" >/dev/null 2>&1; then
+            echo "the cache did not accept this client certificate; building without the cache"
             echo "wired=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -188,6 +190,10 @@ jobs:
             tls = true
             tls_client_cert = ${RUNNER_TEMP}/cache-creds/client.pem
             tls_ca_certs = ${RUNNER_TEMP}/cache-creds/ca.crt
+          EOF
+          # Quoted delimiter: everything below is literal. Unquoted, bash runs
+          # the backticked identifiers in the prose as command substitutions.
+          cat >> .buckconfig.local <<'EOF'
 
           [cache]
             remote_cache_enabled = true
@@ -227,7 +233,12 @@ jobs:
           # -- so a heredoc that failed part way (ENOSPC) would otherwise leave
           # a truncated config, redden the build, and still report wired=yes.
           # A hollow success line is the defect this lane is about.
-          if ! grep -q '^\s*instance_name' .buckconfig.local 2>/dev/null; then
+          #
+          # One key from each heredoc: `instance_name` is the last key of the
+          # first, `execution_platforms` the last line of the second, so
+          # neither write can fail silently.
+          if ! grep -q '^\s*instance_name' .buckconfig.local 2>/dev/null \
+             || ! grep -q '^\s*execution_platforms' .buckconfig.local 2>/dev/null; then
             echo "the cache config was not written completely; building without the cache"
             rm -f .buckconfig.local
             echo "wired=no" >> "$GITHUB_OUTPUT"

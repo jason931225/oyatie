@@ -1,4 +1,4 @@
-//! The root build config never selects the warm cache, and the licence exists.
+//! The root build config never selects the warm cache, and the licence cannot exist.
 //!
 //! `build/toolchains/cache/defs.bzl` states the invariant and names a
 //! conformance gate at `ci/facade/build-cache-policy` that asserts it. That
@@ -7,14 +7,23 @@
 //! the shape this repository keeps finding: it reports protection while
 //! measuring nothing.
 //!
+//! The same paragraph, and `build/toolchains/cache/BUCK`, name opt-in overlays
+//! at `infra/ci/buckconfig/warm-cache-{rw,ro}.buckconfig` as the only thing
+//! that selects the platform. Those files were never created and `infra/` is
+//! not a root of this tree, so it has no checked-in selector at all. Both
+//! sites are byte-mirrored into the port-engine toolchain corpus, so neither
+//! can be corrected without re-pinning that corpus digest; this is the only
+//! admissible home for the correction until that happens.
+//!
 //! Two facts, both cheap and both currently true:
 //!
 //! 1. The root `.buckconfig` selects the prelude platform and carries no
-//!    `[cache]` section, so an ordinary build cannot reach the cache however
-//!    the substrate is configured.
-//! 2. `specs/cache-warm-license.json` exists and parses, because ADR-0716 D2,
-//!    AGENTS.md and the g004 mapping all name it as the admission control and
-//!    it was absent from the tree until it was restored.
+//!    `[cache]` section. That is the whole of what these tests read; the
+//!    `.buckconfig.d/` overlay directory is closed off by
+//!    `ALLOWED_DOT_ROOT_DIRS`, which is a different gate.
+//! 2. `specs/cache-warm-license.json` does not exist and cannot: ADR-0716 D2
+//!    and the g004 mapping name that path as the admission control, and
+//!    `specs` is in FORBIDDEN_NAMES.
 
 use std::path::{Path, PathBuf};
 
@@ -70,8 +79,9 @@ fn the_root_build_config_carries_no_cache_knobs() {
 #[test]
 fn the_admission_control_has_no_admissible_home() {
     // Not a test of the licence -- a test of the contradiction that stops it
-    // existing. ADR-0716 D2, AGENTS.md:209 and the g004 mapping all name
-    // `specs/cache-warm-license.json`, and `specs` is in FORBIDDEN_NAMES, so
+    // existing. ADR-0716 D2 and the g004 mapping name
+    // `specs/cache-warm-license.json` (AGENTS.md:209 names only the
+    // `warm_reads_licensed` key), and `specs` is in FORBIDDEN_NAMES, so
     // the repository refuses the path its own ADR specifies. Restoring the
     // file was tried and the layout gate rejected it: "forbidden root `specs`".
     //
