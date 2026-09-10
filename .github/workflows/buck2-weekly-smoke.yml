@@ -62,7 +62,20 @@ jobs:
           CACHE_CLIENT_CERT: ${{ secrets.OYATIE_CACHE_CLIENT_CERT }}
           CACHE_CLIENT_KEY: ${{ secrets.OYATIE_CACHE_CLIENT_KEY }}
           CACHE_CA_CERT: ${{ secrets.OYATIE_CACHE_CA_CERT }}
-          CACHE_ENDPOINT: cache.oyatie.dev:50051
+          # The substrate publishes this, so it is not restated here. Its value
+          # is a URL (`grpcs://host:port`), which is right for its other
+          # consumers -- cache-check treats it as a URL and it documents the
+          # protocol -- and wrong for buck2, whose addresses are `host:port`
+          # with TLS selected by the `tls` key below, not by the scheme.
+          #
+          # buck2 rejects a scheme in a way that costs an afternoon: it WARNs
+          # "Invalid URI scheme: `grpcs` (you should omit it)", retries at
+          # 1/2/3/4/5s, and then fails the build on an unrelated prelude
+          # target. Under folded CI log groups that reads as graph rot.
+          #
+          # So the one consumer that needs the bare form strips it, rather than
+          # a second variable existing to state the same fact differently.
+          CACHE_ENDPOINT_URL: ${{ vars.CACHE_ENDPOINT }}
         run: |
           set -uo pipefail
           if [ -z "${CACHE_CLIENT_CERT}" ] || [ -z "${CACHE_CLIENT_KEY}" ] || [ -z "${CACHE_CA_CERT}" ]; then
@@ -70,6 +83,18 @@ jobs:
             echo "wired=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          if [ -z "${CACHE_ENDPOINT_URL}" ]; then
+            echo "vars.CACHE_ENDPOINT is not published to this context; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # `grpcs://host:port` -> `host:port`; a value already bare is unchanged.
+          CACHE_ENDPOINT="${CACHE_ENDPOINT_URL#*://}"
+          case "$CACHE_ENDPOINT" in
+            *:*) ;;
+            *) echo "vars.CACHE_ENDPOINT (${CACHE_ENDPOINT_URL}) has no port after stripping its scheme; building without the cache"
+               echo "wired=no" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
           umask 077
           mkdir -p "${RUNNER_TEMP}/cache-creds"
           printf '%s\n%s\n' "${CACHE_CLIENT_CERT}" "${CACHE_CLIENT_KEY}" > "${RUNNER_TEMP}/cache-creds/client.pem"
