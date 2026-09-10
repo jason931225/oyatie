@@ -1,5 +1,4 @@
-//! Shared fixtures for the split halves of this suite. Included via
-//! `mod`, so this file is also discovered as an (empty) test binary.
+//! Shared fixtures for the split halves of this suite.
 #![allow(dead_code, unused_imports)]
 
 pub use data_boundary_kernel::{DataClass, PrivacyDataClass};
@@ -8,10 +7,6 @@ pub use data_ontology_kernel::{
     EntityTypePropertyDefinition, LinkCardinality, LinkTypeDefinition, LinkTypeId, OntologyEngine,
     OntologyEngineError, OntologyPillar, PropertyTier,
 };
-
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
 
 pub fn prop(name: &str) -> EntityTypePropertyDefinition {
     EntityTypePropertyDefinition::new(
@@ -42,7 +37,3 @@ pub fn entity_with_pillar(
 ) -> EntityTypeDefinition {
     entity(tenant, id, display).with_pillar(pillar)
 }
-
-// ---------------------------------------------------------------------------
-// st1 – cross-tenant endpoint isolation
-// ---------------------------------------------------------------------------

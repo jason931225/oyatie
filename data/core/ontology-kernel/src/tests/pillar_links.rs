@@ -3,8 +3,6 @@ use data_boundary_kernel::{DataClass, PrivacyDataClass};
 
 use super::support::property;
 
-// --- st2: pillar-consistency tests ---
-
 fn patient_type_with_pillar(pillar: OntologyPillar) -> EntityTypeDefinition {
     EntityTypeDefinition::new(
         "ten_hr",

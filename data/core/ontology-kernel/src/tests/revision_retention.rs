@@ -34,8 +34,6 @@ fn ety() -> EntityTypeId {
     EntityTypeId::new("ety_profile").unwrap()
 }
 
-/// Each accepted evolution is retrievable at its own revision, revisions
-/// may skip numbers, and unlanded revisions answer None.
 #[test]
 fn accepted_revisions_are_retained_and_addressable() {
     let mut engine = OntologyEngine::default();
@@ -74,7 +72,6 @@ fn accepted_revisions_are_retained_and_addressable() {
     assert_eq!(engine.entity_type("ten_test", &ety()), Some(v4));
 }
 
-/// A rejected evolution leaves no trace in history.
 #[test]
 fn rejected_candidates_never_enter_history() {
     let mut engine = OntologyEngine::default();
@@ -107,7 +104,6 @@ fn rejected_candidates_never_enter_history() {
     );
 }
 
-/// First registration through the evolve path is retained too.
 #[test]
 fn first_registration_via_evolve_is_retained() {
     let mut engine = OntologyEngine::default();
@@ -121,7 +117,6 @@ fn first_registration_via_evolve_is_retained() {
     );
 }
 
-/// Revision history is tenant-isolated.
 #[test]
 fn revision_history_is_tenant_isolated() {
     let mut engine = OntologyEngine::default();

@@ -1,5 +1,4 @@
-//! Shared fixtures for the split halves of this suite. Included via
-//! `mod`, so this file is also discovered as an (empty) test binary.
+//! Shared fixtures for the split halves of this suite.
 #![allow(dead_code, unused_imports)]
 
 pub use data_boundary_kernel::{DataClass, PrivacyDataClass};
@@ -7,10 +6,6 @@ pub use data_ontology_kernel::{
     EntityTypeDefinition, EntityTypeId, EntityTypePropertyDefinition, OntologyEngine,
     OntologyEngineError, PropertyTier,
 };
-
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
 
 pub fn internal() -> PrivacyDataClass {
     PrivacyDataClass::try_from(DataClass::InternalOnly).unwrap()
@@ -65,7 +60,3 @@ pub fn other_tenant_def(revision: u32) -> EntityTypeDefinition {
     )
     .unwrap()
 }
-
-// ---------------------------------------------------------------------------
-// ST1 – additive-only backward-compatibility checker
-// ---------------------------------------------------------------------------

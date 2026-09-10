@@ -6,16 +6,14 @@ use super::identifiers::{EntityTypeId, LinkCardinality, LinkTypeId, validate_ont
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkTypeDefinition {
-    pub tenant_id: String,              // data_class: INTERNAL_ONLY
-    pub id: LinkTypeId,                 // data_class: INTERNAL_ONLY
-    pub from_entity_type: EntityTypeId, // data_class: INTERNAL_ONLY
-    pub to_entity_type: EntityTypeId,   // data_class: INTERNAL_ONLY
-    pub cardinality: LinkCardinality,   // data_class: INTERNAL_ONLY
-    pub allow_cross_tenant: bool,       // data_class: INTERNAL_ONLY
-    pub revision: u32,                  // data_class: INTERNAL_ONLY
-    /// Rendering hints; freely evolvable — the first field outside the
-    /// frozen set.
-    pub display: Option<crate::display::DisplayMetadata>, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub id: LinkTypeId,
+    pub from_entity_type: EntityTypeId,
+    pub to_entity_type: EntityTypeId,
+    pub cardinality: LinkCardinality,
+    pub allow_cross_tenant: bool,
+    pub revision: u32,
+    pub display: Option<crate::display::DisplayMetadata>,
 }
 
 impl LinkTypeDefinition {
@@ -41,7 +39,6 @@ impl LinkTypeDefinition {
         })
     }
 
-    /// Attach rendering hints. Returns `self` for chaining.
     pub fn with_display(mut self, display: crate::display::DisplayMetadata) -> Self {
         self.display = Some(display);
         self

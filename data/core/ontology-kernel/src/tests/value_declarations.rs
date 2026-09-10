@@ -1,4 +1,4 @@
-//! Lane-2 pins: the tier projection is total, validation rejects malformed
+//! Pins: the tier projection is total, validation rejects malformed
 //! schemas and over-deep nesting, and admits_value is a zero-coercion
 //! lockstep walk with honest paths.
 
@@ -28,8 +28,6 @@ fn struct_of(fields: Vec<StructFieldDeclaration>) -> ValueTypeDeclaration {
     ValueTypeDeclaration::Struct(StructSchema { fields })
 }
 
-/// The projection is total over V1's three shapes and lands on the ruled
-/// tiers.
 #[test]
 fn tier_projection_total() {
     assert_eq!(scalar(ScalarType::Integer).tier(), PropertyTier::Scalar);
@@ -43,7 +41,6 @@ fn tier_projection_total() {
     );
 }
 
-/// Depth 8 validates; depth 9 is rejected.
 #[test]
 fn depth_ceiling_enforced() {
     let mut decl = scalar(ScalarType::Integer); // depth 1
@@ -58,7 +55,6 @@ fn depth_ceiling_enforced() {
     );
 }
 
-/// Struct schemas must be non-empty with unique, non-blank field names.
 #[test]
 fn struct_schema_well_formedness() {
     assert_eq!(
@@ -84,7 +80,6 @@ fn struct_schema_well_formedness() {
     );
 }
 
-/// Zero coercion: every scalar admits exactly its own variant.
 #[test]
 fn scalar_admission_is_exact() {
     let date = PropertyValue::Date(CalendarDate::new(2026, 8, 30).unwrap());
@@ -114,7 +109,6 @@ fn scalar_admission_is_exact() {
     assert_eq!(violation.path, "");
 }
 
-/// Array elements are checked with indexed paths.
 #[test]
 fn array_elements_checked_with_paths() {
     let decl = array_of(scalar(ScalarType::Integer));
@@ -136,8 +130,6 @@ fn array_elements_checked_with_paths() {
     assert_eq!(violation.found, "string");
 }
 
-/// Struct admission: required fields present, undeclared rejected, nested
-/// violations carry dotted-and-indexed paths.
 #[test]
 fn struct_admission_fail_closed() {
     let decl = struct_of(vec![
@@ -186,8 +178,6 @@ fn struct_admission_fail_closed() {
     assert_eq!(deep.found, "integer");
 }
 
-/// A declaration-driven walk bounds value depth by declaration depth: a
-/// value deeper than its declaration mismatches at the declared leaf.
 #[test]
 fn value_depth_bounded_by_declaration() {
     let decl = array_of(scalar(ScalarType::Integer)); // depth 2

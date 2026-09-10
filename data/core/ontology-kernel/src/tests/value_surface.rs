@@ -1,4 +1,4 @@
-//! Lane-6 pins: the tier→typing coverage of V1 is frozen verbatim (any
+//! Pins: the tier→typing coverage of V1 is frozen verbatim (any
 //! widening must be an explicit reviewed diff here), and the legacy bridge
 //! constructors are pinned byte-identical to the pre-model contract.
 
@@ -24,10 +24,6 @@ fn register(properties: Vec<EntityTypePropertyDefinition>) -> Result<(), Ontolog
         .map(|_| ())
 }
 
-/// V1's coverage, enumerated verbatim over every tier: Scalar, Vector, and
-/// Struct are exactly the projections of the three declaration shapes;
-/// Timeseries, Geo, and Ciphertext admit NO declaration. Widening this
-/// coverage is a loosen-only law change and must change this test.
 #[test]
 fn tier_typing_coverage_is_frozen() {
     let declaration_for = |tier: PropertyTier| -> Option<ValueTypeDeclaration> {
@@ -74,9 +70,6 @@ fn tier_typing_coverage_is_frozen() {
     }
 }
 
-/// The three bridge constructors are pinned byte-identical to the
-/// pre-model contract: the carrier is exactly `PropertyValue::String` of
-/// the input, the data class is unchanged, and `as_str` round-trips.
 #[test]
 fn bridge_constructors_pinned_byte_identical() {
     let by_new = ObjectProperty::new(

@@ -9,9 +9,9 @@ use crate::property::{ObjectProperty, validate_property};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObjectEntity {
-    pub tenant_id: String,                            // data_class: INTERNAL_ONLY
-    pub id: String,                                   // data_class: INTERNAL_ONLY
-    pub entity_type: Classified<String>,              // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub id: String,
+    pub entity_type: Classified<String>,
     pub properties: BTreeMap<String, ObjectProperty>, // data_class: PROPERTY_VALUE_PRIVACY_CLASS
 }
 
@@ -34,8 +34,8 @@ pub struct ObjectGraph {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct ObjectEntityKey {
-    tenant_id: String, // data_class: INTERNAL_ONLY
-    id: String,        // data_class: INTERNAL_ONLY
+    tenant_id: String,
+    id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

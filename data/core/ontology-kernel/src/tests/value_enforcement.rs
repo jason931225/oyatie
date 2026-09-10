@@ -1,4 +1,4 @@
-//! Lane-5 pins: declared value types are ENFORCED — the shared checker runs
+//! Pins: declared value types are ENFORCED — the shared checker runs
 //! as the final per-property / per-parameter conformance step, an untyped
 //! (`None`) declaration requires the legacy `String` carrier, and every
 //! pre-existing conformance error still wins its precedence slot.
@@ -216,7 +216,6 @@ fn untyped_declaration_admits_bridge_carrier() {
     assert_eq!(engine.check_instance_conformance(&entity), Ok(()));
 }
 
-/// The pre-existing tier check still wins over the value check.
 #[test]
 fn tier_mismatch_precedes_value_check() {
     let engine = engine_with(vec![
@@ -236,7 +235,6 @@ fn tier_mismatch_precedes_value_check() {
     );
 }
 
-/// The pre-existing data-class check still wins over the value check.
 #[test]
 fn data_class_mismatch_precedes_value_check() {
     let engine = engine_with(vec![

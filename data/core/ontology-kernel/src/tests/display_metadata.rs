@@ -61,7 +61,6 @@ fn action() -> ActionTypeDefinition {
     .unwrap()
 }
 
-/// Display attaches to every kind and survives registration.
 #[test]
 fn display_attaches_to_every_kind() {
     let mut engine = OntologyEngine::default();
@@ -96,8 +95,6 @@ fn display_attaches_to_every_kind() {
     );
 }
 
-/// A present-but-blank display field is refused, with the field named,
-/// on every registration path.
 #[test]
 fn blank_display_fields_refused() {
     let mut engine = engine_with_entity();
@@ -126,8 +123,6 @@ fn blank_display_fields_refused() {
     );
 }
 
-/// Display evolves freely on every kind — the first mutable field under
-/// the frozen-field law.
 #[test]
 fn display_evolves_freely() {
     let mut engine = engine_with_entity();

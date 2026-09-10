@@ -52,11 +52,11 @@ impl PropertyTier {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObjectProperty {
-    pub name: String, // data_class: INTERNAL_ONLY
+    pub name: String,
     /// The typed carrier. Every String-taking constructor wraps
     /// [`PropertyValue::String`] — the legacy bridge.
     pub value: Classified<PropertyValue>, // data_class: PROPERTY_VALUE_PRIVACY_CLASS
-    pub tier: PropertyTier, // data_class: INTERNAL_ONLY
+    pub tier: PropertyTier,
 }
 
 impl ObjectProperty {
