@@ -44,6 +44,8 @@ pub struct VerificationCase {
     pub screenings: Vec<ScreeningResult>,
 }
 
+/// Stub: returns `case.decision` unchanged. `screenings` and `requirements`
+/// are not consulted until IP-018 lands.
 pub fn decide(case: &VerificationCase) -> VerificationDecision {
     case.decision
 }

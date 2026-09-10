@@ -8,7 +8,7 @@ use network_residency::{ResidencyClass, residency_class_allows_home_region_label
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Tenant {
-    pub id: String,
+    pub id: String, // data_class: INTERNAL_ONLY
     pub legal_name: Classified<String>,
     pub home_region: Classified<String>,
     pub residency_class: Classified<ResidencyClass>,
