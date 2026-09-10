@@ -1,4 +1,8 @@
 //! Desired properties for one joined authorization decision scope.
+//!
+//! Adapted from the exact-base red source, SHA-256
+//! `370b3cd43a22e1fc9a4e9dd6cb5c15e260fde8fe4da5f5d942a74b3fcca61a08`. The
+//! hash is the only link back to that source and is recorded nowhere else.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod decision_scope_adversaries;
