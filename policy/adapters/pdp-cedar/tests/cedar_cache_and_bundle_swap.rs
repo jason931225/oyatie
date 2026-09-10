@@ -1,6 +1,3 @@
-//! Decision cache freshness, atomic bundle swap, and refusal to serve a rejected bundle.
-//!
-//! Part of the G004 Cedar conformance suite; shared fixtures in `conformance/`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;
@@ -27,8 +24,6 @@ fn stale_policy_version_pin_is_refused_not_answered() {
     req.min_policy_version = Some(pdp.loaded_policy_version());
     assert!(pdp.authorize(&req, &entity_slice()).is_ok());
 }
-
-// --------------------------------------------- decision cache + swap ----
 
 #[test]
 fn cache_replays_decision_content_with_fresh_decision_ids() {
@@ -60,13 +55,11 @@ fn cache_replays_decision_content_with_fresh_decision_ids() {
 
 #[test]
 fn bundle_swap_revokes_immediately_and_disarms_prior_cache() {
-    // acme-doc-2 is non-restricted: the pre-swap grant is an ordinary read,
-    // isolated from the step-up forbid.
     let link = TemplateLink {
         template_id: TEMPLATE_ID.to_owned(),
         link_id: "pbac-link-bob-doc2".to_owned(),
         principal: entity_ref("OyaPlatform::Principal", "bob"),
-        resource: entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+        resource: non_restricted_acme_doc(),
     };
     let pdp = pdp(vec![link]);
     let req = request(
@@ -74,13 +67,12 @@ fn bundle_swap_revokes_immediately_and_disarms_prior_cache() {
         "acme",
         entity_ref("OyaPlatform::Principal", "bob"),
         "resource.read",
-        entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+        non_restricted_acme_doc(),
     );
     let before = pdp.authorize(&req, &entity_slice()).unwrap();
     assert_eq!(before.response.decision, Decision::Allow);
-    // Revocation: the policy store pushes a bundle WITHOUT the grant. The
-    // swap is atomic; the version change makes every cached allow
-    // unreachable (sub-60s revocation = bundle propagation latency).
+    // Revocation: the policy store pushes a bundle WITHOUT the grant. The swap
+    // is atomic; the version change makes every cached allow unreachable.
     pdp.swap_bundle(&locked_seed_bundle("psv-000002", vec![]))
         .unwrap();
     let mut after_req = req.clone();
@@ -195,8 +187,6 @@ fn disabled_cache_stays_disabled_after_replacement() {
     assert!(!pdp.authorize(&request, &entity_slice()).unwrap().cache_hit);
     assert!(!pdp.authorize(&request, &entity_slice()).unwrap().cache_hit);
 }
-
-// --------------------------------------------------- audit + errors ----
 
 #[test]
 fn every_decision_yields_an_attributable_audit_record() {

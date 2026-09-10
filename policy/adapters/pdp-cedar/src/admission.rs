@@ -13,8 +13,6 @@ use super::LoadedBundle;
 use super::entity::entity_uid;
 use super::overlay::compile_tenant_overlay;
 
-/// Validate a bundle using the same admission path as a serving Cedar PDP.
-///
 /// # Errors
 /// Returns the load-time refusal when bundle metadata, schema, policies,
 /// templates, links, overlays, or action mappings cannot be admitted.
@@ -38,8 +36,6 @@ pub(super) fn compile(bundle: &PolicyBundle) -> Result<LoadedBundle, PdpError> {
         PolicySet::from_str(&bundle.policies_src).map_err(|e| PdpError::BundleRejected {
             detail: format!("static policies rejected: {e}"),
         })?;
-    // Authored ids remain stable across source reorderings; duplicate ids
-    // fail admission through PolicySet::add.
     let mut policy_set = PolicySet::new();
     for policy in parsed.policies() {
         let policy = match policy.annotation("id") {
@@ -116,7 +112,7 @@ fn admit_actions(
     mappings
         .iter()
         .map(|(slug, source)| {
-            validate_action_slug(slug)?;
+            validate_action_slug_via_request_contract(slug)?;
             let uid = EntityUid::from_str(source).map_err(|error| PdpError::BundleRejected {
                 detail: format!("action map entry {slug:?} rejected: {error}"),
             })?;
@@ -130,9 +126,7 @@ fn admit_actions(
         .collect()
 }
 
-fn validate_action_slug(slug: &str) -> Result<(), PdpError> {
-    // Fixed valid non-action fields isolate the public request contract's
-    // action validation, avoiding a second copy of its spelling and length rules.
+fn validate_action_slug_via_request_contract(slug: &str) -> Result<(), PdpError> {
     let request = AuthorizationRequest {
         request_id: "action-map-admission".to_owned(),
         tenant_id: "policy".to_owned(),

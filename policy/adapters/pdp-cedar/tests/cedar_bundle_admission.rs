@@ -1,4 +1,3 @@
-//! Admission rejects unusable bundles before any serving state is created.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;
@@ -146,4 +145,24 @@ fn validation_and_load_share_schema_policy_and_link_refusals() {
             Err(PdpError::BundleRejected { .. })
         ));
     }
+}
+
+#[test]
+fn duplicate_authored_policy_id_is_rejected_at_admission() {
+    let mut bundle = locked_seed_bundle("psv-000001", vec![]);
+    bundle.policies_src.push_str(
+        "\n@id(\"rbac-tenant-admin-group\")\npermit (\n  principal is OyaPlatform::Principal,\n  action == OyaPlatform::Action::\"ReadResource\",\n  resource\n)\nwhen { principal.tenant_id == resource.tenant_id };\n",
+    );
+    let Err(PdpError::BundleRejected { detail }) = validate_bundle(&bundle) else {
+        panic!("a second policy re-using an authored @id must fail admission");
+    };
+    assert!(
+        detail.contains("rbac-tenant-admin-group"),
+        "the refusal must name the duplicated id, not some later schema \
+         complaint that would make this test pass for the wrong reason: {detail}"
+    );
+    assert!(matches!(
+        load(&bundle),
+        Err(PdpError::BundleRejected { .. })
+    ));
 }

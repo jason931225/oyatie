@@ -100,7 +100,6 @@ fn edges(
     }
 }
 
-/// Oracle: some negated edge `u -> v` exists where `v` reaches `u`.
 fn oracle_non_stratified(graph: &BTreeMap<Node, Vec<(Node, bool)>>) -> bool {
     for (from, outgoing) in graph {
         for (to, negated) in outgoing {

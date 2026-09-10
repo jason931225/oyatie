@@ -23,18 +23,12 @@ pub enum EngineLoadError {
     ReloadUnavailable,
 }
 
-/// Embedded composition; store verification and source content identity precede Cedar admission.
-/// Only content-addressed bundles produced by PolicySource are admitted. The low-level
-/// Cedar adapter remains available for legacy stores that allocate their own opaque versions.
-/// Runtime ID custody, request authentication and obligation enforcement remain caller-owned.
 pub struct PolicyEngine {
     pdp: CedarPdp,
     reload: Mutex<()>,
 }
 
 impl PolicyEngine {
-    /// # Errors
-    /// Refuses unavailable/untrusted artifacts and invalid Cedar bundles.
     pub fn load(
         store: &dyn PolicyBundleStore,
         id_gen: Arc<dyn IdGenerator>,
@@ -50,11 +44,13 @@ impl PolicyEngine {
         })
     }
 
-    /// Serialize store-read and swap as one reload operation, without blocking serving reads
-    /// while loading/compiling. Failed reloads leave the previous bundle serving.
+    /// Serializes store-read and swap as one reload operation without blocking
+    /// serving reads while loading and compiling. A failed reload leaves the
+    /// previous bundle serving.
     ///
     /// # Errors
-    /// Preserves store and admission refusals; refuses a poisoned reload coordinator.
+    /// Preserves store, content-identity and admission refusals; refuses a
+    /// poisoned reload coordinator.
     pub fn reload(&self, store: &dyn PolicyBundleStore) -> Result<PolicyVersion, EngineLoadError> {
         let _reload = self
             .reload
@@ -68,8 +64,8 @@ impl PolicyEngine {
         Ok(bundle.version)
     }
 
-    /// Compose the existing identity-bound graph join with the same serving PDP.
-    /// The caller supplies its admitted graph-to-Cedar candidate mapping; this does not infer it.
+    /// The caller supplies its admitted graph-to-Cedar candidate mapping; this
+    /// does not infer it.
     ///
     /// # Errors
     /// Returns complete typed graph/identity/PDP refusals, never a substituted deny.

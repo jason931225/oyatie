@@ -22,7 +22,6 @@ pub struct PolicyCase {
     pub expected: DecisionExpectation,
 }
 
-/// Closed source-and-tests input to offline qualification.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PolicyProject {

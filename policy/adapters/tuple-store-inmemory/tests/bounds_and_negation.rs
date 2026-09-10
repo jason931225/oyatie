@@ -1,5 +1,3 @@
-//! The cases four surviving mutants proved were untested, and the two
-//! wrong-answer defects independent review found.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod common;
@@ -41,19 +39,32 @@ fn a_model_whose_negation_is_self_referential_cannot_be_built() {
 
 #[test]
 fn a_cycle_that_never_passes_under_a_subtraction_is_still_buildable() {
-    // The refusal is specific to negation. Mutual membership is a legitimate
-    // shape and must keep working.
+    // The refusal is specific to negation: `member` and `owner` reach each
+    // other, but no edge on that cycle is subtracted.
     NamespaceConfig::new()
-        .define("group", &relation("member"), UsersetRewrite::this())
+        .define(
+            "group",
+            &relation("member"),
+            UsersetRewrite::union(vec![
+                UsersetRewrite::this(),
+                UsersetRewrite::computed_userset(relation("owner")),
+            ])
+            .expect("a two-child union is valid"),
+        )
+        .define(
+            "group",
+            &relation("owner"),
+            UsersetRewrite::computed_userset(relation("member")),
+        )
         .validated()
-        .expect("a monotone model is stratified");
+        .expect("a monotone cycle is stratified");
 }
 
 #[test]
 fn difference_denies_a_subject_in_neither_set() {
-    // The surviving mutant: dropping the base and answering from `subtract`
-    // alone reproduced both previously-tested outcomes, because nobody asked
-    // about a subject that is in neither set.
+    // Dropping the base and answering from `subtract` alone reproduces both
+    // previously-tested outcomes, because nobody asked about a subject that is
+    // in neither set.
     let model = NamespaceConfig::new()
         .define("doc", &relation("writer"), UsersetRewrite::this())
         .define("doc", &relation("banned"), UsersetRewrite::this())

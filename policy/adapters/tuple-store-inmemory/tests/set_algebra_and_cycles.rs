@@ -1,6 +1,3 @@
-//! Set algebra over rewrites, and the two ways a config can be hostile:
-//! a relation that grants nothing because it was never defined, and a graph
-//! that refers back to itself.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod common;
@@ -10,7 +7,6 @@ use policy_cedar_domain::rebac::{RebacReadSnapshot, UsersetRewrite};
 use policy_rebac_domain::{ExpansionError, NamespaceConfig, ValidatedNamespace};
 use policy_tuple_store_inmemory::InMemoryTupleStore;
 
-/// `editor` is anyone with `writer`, except anyone with `banned`.
 fn difference_model() -> ValidatedNamespace {
     NamespaceConfig::new()
         .define("doc", &relation("writer"), UsersetRewrite::this())
@@ -130,9 +126,6 @@ fn a_userset_subject_expands_to_its_members() {
 
 #[test]
 fn a_cycle_answers_instead_of_hanging() {
-    // Two groups that contain each other is a legitimate shape to write, and
-    // a walk that revisits a relation on its own path must contribute nothing
-    // rather than recurse forever.
     let model = NamespaceConfig::new()
         .define("group", &relation("member"), UsersetRewrite::this())
         .validated()

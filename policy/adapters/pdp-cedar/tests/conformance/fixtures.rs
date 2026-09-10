@@ -1,6 +1,3 @@
-//! The locked FD-001 seed bundle, the two-tenant entity slice, and the
-//! request/PDP constructors every concern in the suite builds on.
-
 pub use audit_chain_domain::{
     AuditAppendInput, AuditChain, AuditChainError, Ed25519SigningKey, Ed25519VerificationKeySet,
     Plane, append as audit_append,
@@ -27,6 +24,20 @@ pub use std::sync::Arc;
 pub use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const TEMPLATE_ID: &str = "pbac-resource-read-grant";
+
+/// Targeted by every ordinary within-tenant read grant (PBAC links, tenant
+/// overlays, workload permits) so they exercise their real intent without
+/// colliding with `forbid-restricted-read-without-step-up`, which only fires on
+/// `data_class == "restricted"`.
+pub fn non_restricted_acme_doc() -> EntityRef {
+    entity_ref("OyaPlatform::TenantResource", "acme-doc-2")
+}
+
+/// Lets a cross-tenant read (acme principal -> globex resource) be exercised so
+/// the structural forbid can be proved as the runtime boundary.
+pub fn foreign_tenant_doc() -> EntityRef {
+    entity_ref("OyaPlatform::TenantResource", "globex-doc-1")
+}
 
 pub fn entity_ref(entity_type: &str, entity_id: &str) -> EntityRef {
     EntityRef {
@@ -155,13 +166,8 @@ pub fn entity_slice() -> EntitySlice {
                 ]),
                 parents: vec![entity_ref("OyaPlatform::Tenant", "acme")],
             },
-            // A NON-restricted acme resource. Ordinary within-tenant read
-            // grants (PBAC links, tenant overlays, workload permits) target
-            // this doc so they exercise their real intent without colliding
-            // with the security-critical `forbid-restricted-read-without-step-up`
-            // gate (which only fires on data_class == "restricted").
             EntityRecord {
-                uid: entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+                uid: non_restricted_acme_doc(),
                 attributes: string_attrs(&[
                     ("tenant_id", "acme"),
                     ("resource_kind", "document"),
@@ -170,11 +176,8 @@ pub fn entity_slice() -> EntitySlice {
                 ]),
                 parents: vec![entity_ref("OyaPlatform::Tenant", "acme")],
             },
-            // A globex (foreign-tenant) resource: lets a cross-tenant read
-            // (acme principal -> globex resource) be exercised so the
-            // structural forbid can be proved as the runtime boundary.
             EntityRecord {
-                uid: entity_ref("OyaPlatform::TenantResource", "globex-doc-1"),
+                uid: foreign_tenant_doc(),
                 attributes: string_attrs(&[
                     ("tenant_id", "globex"),
                     ("resource_kind", "document"),
@@ -235,5 +238,3 @@ pub fn audit_input(tenant_id: &str, decision: &str) -> AuditAppendInput {
         decision: decision.to_owned(),
     }
 }
-
-// ---------------------------------------------------------------- RBAC ----

@@ -1,5 +1,3 @@
-//! Tenant-overlay fixtures and the G004 security-audit permit corpora.
-
 use super::fixtures::*;
 
 /// A legitimate acme overlay: grant bob ReadResource, tenant-confined by the
@@ -24,13 +22,9 @@ pub fn pdp_with_overlays(tenant_policies: BTreeMap<String, String>) -> CedarPdp 
     .expect("bundle with overlays must load")
 }
 
-/// The 5 cross-tenant evasion permit shapes from the G004 security audit. Each
-/// carries the same-tenant equality as a NON-binding token (behind `||`, in an
-/// `unless`, behind `!`, etc.), so a substring/EST-presence detector would
-/// wrongly accept them. The sound detector REJECTS all 5 at load
-/// (`sound_detector_rejects_every_audit_evasion_overlay`); and even if one were
-/// admitted, the runtime forbid still denies the cross-tenant read
-/// (`structural_forbid_denies_cross_tenant_read_for_any_permit_shape`).
+/// Each carries the same-tenant equality as a NON-binding token (behind `||`,
+/// in an `unless`, behind `!`), so a substring/EST-presence detector would
+/// wrongly accept them all.
 pub const EVASION_PERMITS: &[(&str, &str)] = &[
     (
         "evasion-or-true",
@@ -59,9 +53,6 @@ pub const EVASION_PERMITS: &[(&str, &str)] = &[
     ),
 ];
 
-/// Legitimate, genuinely tenant-confined permit shapes the sound detector MUST
-/// keep accepting: canonical, operand-swapped, parenthesized (parens are
-/// transparent in the EST), and `&&`-nested.
 pub const LEGITIMATE_PERMITS: &[(&str, &str)] = &[
     (
         "ok-canonical",
@@ -86,8 +77,8 @@ pub const LEGITIMATE_PERMITS: &[(&str, &str)] = &[
 ];
 
 // option_env!, not env!: CARGO_MANIFEST_DIR is undefined at buck2 compile
-// time (hermetic sandbox), and the buck2 lane must still COMPILE this target
-// (FRIC-019). The cargo lane enforces parity; buck2 skips with a notice.
+// time (hermetic sandbox), and the buck2 lane must still COMPILE this target.
+// The cargo lane enforces parity; buck2 skips with a notice.
 pub fn manifest_dir() -> Option<&'static Path> {
     option_env!("CARGO_MANIFEST_DIR").map(Path::new)
 }

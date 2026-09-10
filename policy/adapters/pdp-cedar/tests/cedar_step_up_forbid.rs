@@ -1,6 +1,3 @@
-//! Step-up authentication as a forbid no permit shape can bypass.
-//!
-//! Part of the G004 Cedar conformance suite; shared fixtures in `conformance/`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;
@@ -9,9 +6,7 @@ use conformance::*;
 
 #[test]
 fn tenant_overlay_permit_cannot_bypass_step_up_forbid() {
-    // MAJOR (G004 audit): an overlay `permit` must NOT defeat the global,
-    // security-critical step-up gate on restricted reads. The gate is encoded
-    // as a FORBID (`forbid-restricted-read-without-step-up`), so even a
+    // `forbid-restricted-read-without-step-up` must stay non-bypassable: even a
     // perfectly tenant-confined overlay permit cannot grant bob (NO
     // step_up_class) a read of the RESTRICTED acme-doc-1. Forbid wins.
     let overlay = r#"
@@ -41,8 +36,8 @@ when { principal.tenant_id == resource.tenant_id };
         Decision::Deny,
         "an overlay permit must not bypass the step-up forbid on restricted reads"
     );
-    // The SAME overlay grants the non-restricted acme-doc-2 (the legitimate
-    // overlay purpose is preserved — only the security gate is non-bypassable).
+    // The SAME overlay must still grant something, or the deny above proves
+    // nothing about the gate.
     let allowed = pdp
         .authorize(
             &request(
@@ -50,7 +45,7 @@ when { principal.tenant_id == resource.tenant_id };
                 "acme",
                 entity_ref("OyaPlatform::Principal", "bob"),
                 "resource.read",
-                entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+                non_restricted_acme_doc(),
             ),
             &entity_slice(),
         )
@@ -64,8 +59,6 @@ when { principal.tenant_id == resource.tenant_id };
 
 #[test]
 fn step_up_forbid_still_allows_a_stepped_up_restricted_read() {
-    // The forbid's `unless` exception holds: alice (step_up_class "a") still
-    // reads the restricted acme-doc-1 — the gate denies only the non-stepped-up.
     let pdp = pdp(vec![]);
     let outcome = pdp
         .authorize(
@@ -84,16 +77,9 @@ fn step_up_forbid_still_allows_a_stepped_up_restricted_read() {
 
 #[test]
 fn step_up_forbid_blocks_a_pbac_link_to_a_restricted_read() {
-    // MAJOR (G004 audit): a PBAC template-link must NOT defeat the global,
-    // security-critical step-up gate on restricted reads. This locks the
-    // template-link grant path specifically (the overlay path is locked by
-    // `tenant_overlay_permit_cannot_bypass_step_up_forbid`, and the
-    // template-link path against the STRUCTURAL forbid by
-    // `structural_forbid_overrides_misissued_cross_tenant_template_link`; this
-    // is the template-link path against the STEP-UP forbid). The gate is
-    // encoded as a FORBID (`forbid-restricted-read-without-step-up`), so even an
-    // explicit link granting bob (NO step_up_class) a read of the RESTRICTED
-    // acme-doc-1 stays denied — forbid overrides permit.
+    // The one path no other test in this file covers: an EXPLICIT template link
+    // granting bob (NO step_up_class) a read of the RESTRICTED acme-doc-1 still
+    // loses to `forbid-restricted-read-without-step-up`.
     let link = TemplateLink {
         template_id: TEMPLATE_ID.to_owned(),
         link_id: "pbac-link-bob-restricted".to_owned(),
@@ -119,14 +105,13 @@ fn step_up_forbid_blocks_a_pbac_link_to_a_restricted_read() {
         "a PBAC template-link must not bypass the step-up forbid on restricted reads"
     );
 
-    // The SAME link grants the NON-restricted acme-doc-2 (the legitimate link
-    // purpose is preserved — only the restricted-read security gate is
-    // non-bypassable).
+    // The SAME link must still grant something, or the deny above proves the
+    // link never worked rather than that the forbid beat it.
     let link_ok = TemplateLink {
         template_id: TEMPLATE_ID.to_owned(),
         link_id: "pbac-link-bob-restricted".to_owned(),
         principal: entity_ref("OyaPlatform::Principal", "bob"),
-        resource: entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+        resource: non_restricted_acme_doc(),
     };
     let pdp_ok = pdp(vec![link_ok]);
     let allowed = pdp_ok
@@ -136,7 +121,7 @@ fn step_up_forbid_blocks_a_pbac_link_to_a_restricted_read() {
                 "acme",
                 entity_ref("OyaPlatform::Principal", "bob"),
                 "resource.read",
-                entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+                non_restricted_acme_doc(),
             ),
             &entity_slice(),
         )
@@ -147,5 +132,3 @@ fn step_up_forbid_blocks_a_pbac_link_to_a_restricted_read() {
         "the link still grants an ordinary (non-restricted) within-tenant read"
     );
 }
-
-// ------------------------------------------------- zookie freshness ----
