@@ -1,57 +1,19 @@
-//! Deterministic integer-only Reddit-style hot/controversy ranking kernel.
-//!
-//! # Score formulas
-//!
-//! All arithmetic is integer-only (no floats) to guarantee identical results
-//! across platforms and compiler versions.
-//!
-//! ## hot_score
-//! ```text
-//! RECENCY_WEIGHT  = 86_400   (seconds in one day; mirrors feed_ranking.rs model)
-//!
-//! age_secs      = now.saturating_sub(created_at)
-//! recency_term  = RECENCY_WEIGHT.saturating_sub(age_secs.min(RECENCY_WEIGHT))
-//! hot_score     = tally().saturating_add(recency_term as i64)
-//! ```
-//!
-//! ## controversy_score
-//! ```text
-//! up    = count of Up receipts
-//! down  = count of Down receipts
-//! score = min(up, down).saturating_mul(up.saturating_add(down))
-//! ```
-//!
-//! ## rank_posts
-//! Orders by `hot_score` descending; stable ascending `post_id` tiebreak.
-//! Excludes entries with empty post_id.
+//! Deterministic integer-only hot/controversy ranking: no floats, saturating throughout.
 
 use crate::{VoteKind, VoteLedger};
 
-/// Recency weight constant: one day in seconds.
-/// Mirrors `RECENCY_WEIGHT` in `feed_ranking.rs`.
+/// Recency weight: one day in seconds; mirrors `RECENCY_WEIGHT` in `feed_ranking.rs`.
 pub const RECENCY_WEIGHT: u64 = 86_400;
 
 impl VoteLedger {
-    /// Returns the hot score: net tally blended with an age-decay recency term.
-    ///
-    /// - `created_at`: Unix epoch seconds when the post was created.
-    /// - `now`: current Unix epoch seconds.
-    ///
-    /// Saturating arithmetic throughout; no panics on any input combination.
+    /// Hot score: net tally blended with an age-decay recency term; saturating, no panics.
     pub fn hot_score(&self, created_at: u64, now: u64) -> i64 {
         let age_secs = now.saturating_sub(created_at);
         let recency_term = RECENCY_WEIGHT.saturating_sub(age_secs.min(RECENCY_WEIGHT));
         self.tally().saturating_add(recency_term as i64)
     }
 
-    /// Returns the controversy score: rewards near-equal up/down vote splits.
-    ///
-    /// Formula: `min(up, down) * (up + down)` — saturating.
-    ///
-    /// Properties:
-    /// - 0 when all votes are one-directional.
-    /// - Maximal when up == down for a fixed total.
-    /// - Symmetric: swapping up/down gives the same score.
+    /// Controversy score `min(up, down) * (up + down)`, saturating; 0 when one-directional.
     pub fn controversy_score(&self) -> u64 {
         let (up, down) = self
             .receipts
@@ -65,15 +27,8 @@ impl VoteLedger {
     }
 }
 
-/// Rank post entries by `hot_score` descending, with stable ascending
-/// lexicographic `post_id` tiebreak. Entries with empty post_id are excluded.
-///
-/// # Arguments
-/// - `entries`: slice of `(post_id, ledger, created_at)` tuples.
-/// - `now`: current Unix epoch seconds.
-///
-/// # Returns
-/// `Vec<String>` of post_ids in ranked order.
+/// Rank entries by `hot_score` descending, ascending `post_id` tiebreak.
+/// Entries whose `post_id` is empty or blank are excluded.
 pub fn rank_posts(entries: &[(&str, &VoteLedger, u64)], now: u64) -> Vec<String> {
     let mut ranked: Vec<(&str, i64)> = entries
         .iter()
@@ -140,8 +95,6 @@ mod tests {
         l
     }
 
-    // ── 1: hot_score net upvote raises score ──────────────────────────────────
-
     #[test]
     fn hot_score_net_upvote_raises_score() {
         let now = 1_000_000u64;
@@ -156,8 +109,6 @@ mod tests {
         );
     }
 
-    // ── 2: hot_score decay is monotonic ──────────────────────────────────────
-
     #[test]
     fn hot_score_decay_monotonic() {
         let now = 1_000_000u64;
@@ -171,14 +122,11 @@ mod tests {
         assert!(hour_old >= day_old, "hour-old post must score >= day-old");
     }
 
-    // ── 3: hot_score decay floor — ancient post recency_term = 0 ─────────────
-
     #[test]
     fn hot_score_decay_floor() {
         let now = 1_000_000u64;
         let l = ledger_with_votes("p", 3, 1); // tally = 2
 
-        // Post older than RECENCY_WEIGHT: recency_term floors at 0
         let ancient_score = l.hot_score(now - 200_000, now);
         assert_eq!(
             ancient_score,
@@ -186,8 +134,6 @@ mod tests {
             "ancient post hot_score must equal tally() only"
         );
     }
-
-    // ── 4: hot_score empty ledger at now == created_at gives RECENCY_WEIGHT ──
 
     #[test]
     fn hot_score_empty_ledger_at_zero_age() {
@@ -200,8 +146,6 @@ mod tests {
         );
     }
 
-    // ── 5: controversy_score zero when all one-directional ────────────────────
-
     #[test]
     fn controversy_score_zero_when_one_directional() {
         let all_up = ledger_with_votes("p", 5, 0);
@@ -210,11 +154,8 @@ mod tests {
         assert_eq!(all_down.controversy_score(), 0, "all-down must score 0");
     }
 
-    // ── 6: controversy_score maximal at equal split ───────────────────────────
-
     #[test]
     fn controversy_score_maximal_at_equal_split() {
-        // Total = 4 votes
         let equal = ledger_with_votes("p", 2, 2); // min=2, total=4 → 2*4=8
         let lopsided = ledger_with_votes("q", 3, 1); // min=1, total=4 → 1*4=4
         assert!(
@@ -222,8 +163,6 @@ mod tests {
             "equal split must score higher than lopsided"
         );
     }
-
-    // ── 7: controversy_score symmetric ───────────────────────────────────────
 
     #[test]
     fn controversy_score_symmetric() {
@@ -235,8 +174,6 @@ mod tests {
             "swapping up/down must give identical controversy_score"
         );
     }
-
-    // ── 8: rank_posts stable tiebreak ─────────────────────────────────────────
 
     #[test]
     fn rank_posts_deterministic_stable_tiebreak() {
@@ -261,8 +198,6 @@ mod tests {
         );
     }
 
-    // ── 9: rank_posts excludes empty post_id ──────────────────────────────────
-
     #[test]
     fn rank_posts_excludes_empty_post_id() {
         let now = 1_000_000u64;
@@ -283,8 +218,6 @@ mod tests {
         );
     }
 
-    // ── 10: rank_posts higher hot_score wins ──────────────────────────────────
-
     #[test]
     fn rank_posts_higher_hot_score_wins() {
         let now = 1_000_000u64;
@@ -301,25 +234,17 @@ mod tests {
         assert_eq!(result[0], "fresh", "fresh upvoted post must rank first");
     }
 
-    // ── 11: controversy_score no panic on large counts ────────────────────────
-
     #[test]
     fn controversy_score_no_panic_on_large_counts() {
-        // Direct computation with large values to test saturating_mul
-        // We can't easily insert u64::MAX votes via the ledger, so verify
-        // the formula directly: saturating_mul must not panic
         let large: u64 = u64::MAX / 2;
         let result = large.saturating_mul(u64::MAX); // must not panic
         assert!(result > 0, "saturating_mul of large values must not panic");
 
-        // Also verify that ledger with many votes doesn't panic
         let now = 1_000_000u64;
         let l = ledger_with_votes("p", 50, 50);
         let _ = l.controversy_score(); // must not panic
         let _ = l.hot_score(now - 1000, now); // must not panic
     }
-
-    // ── 12: rank_posts deterministic on repeated calls ────────────────────────
 
     #[test]
     fn rank_posts_deterministic_repeated_calls() {

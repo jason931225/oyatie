@@ -1,18 +1,5 @@
-//! Round-robin API-key pool with failure-count blacklist, jittered cooldown, and
-//! success-restore. Lifted from gpt-load / one-api circuit-breaker pattern.
-//!
-//! # Circuit-breaker states
-//! - `Active` — eligible; selected in round-robin order.
-//! - `Cooling { until_epoch_secs, failure_count }` — skip until cooldown expires.
-//! - `Blacklisted` — terminal error; never selected again in this process lifetime.
-//!
-//! # Parameters
-//! - Failure threshold: 3 consecutive transient failures → Cooling.
-//! - Cooldown base: 60 s + uniform jitter [0, `jitter_max_secs`).
-//! - Terminal error → immediate Blacklisted (no cooldown counter needed).
-//! - Success while Cooling → restore to Active + reset failure_count.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Round-robin API-key pool: failure-count blacklist, jittered cooldown, success-restore.
+// ADR-0083 Tier 3: `cfg(test)` exemption for unwrap/expect/panic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 // data_class: INTERNAL_ONLY throughout this module.
 
@@ -32,13 +19,10 @@ pub const DEFAULT_JITTER_MAX_SECS: u64 = 30;
 
 /// A pool of OpenAI API keys with round-robin selection and circuit-breaker logic.
 ///
-/// SECURITY: KeyPool holds secret-reference paths only, not raw key material.
-/// The caller resolves the sref_path to actual key bytes via their secret store.
+/// SECURITY: holds secret-reference paths only, never raw key material.
 pub struct KeyPool {
     entries: Vec<KeyEntry>,
-    /// Next index to try in round-robin selection.
     next_idx: usize,
-    /// Upper bound (exclusive) for jitter in seconds.
     jitter_max_secs: u64,
 }
 
@@ -59,25 +43,21 @@ impl KeyPool {
         self
     }
 
-    /// Returns `true` if the pool has at least one key.
+    /// Returns `true` when the pool holds no keys.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
-    /// Select the next eligible key by round-robin.
-    ///
-    /// Returns `Some(index)` into `entries` for the selected key, or `None` if all
-    /// keys are Blacklisted or still cooling.
+    /// Select the next eligible key by round-robin. `None` when every key is
+    /// blacklisted or still cooling.
     pub fn select(&mut self, now_epoch_secs: u64) -> Option<usize> {
         let len = self.entries.len();
         if len == 0 {
             return None;
         }
-        // Try each key at most once.
         for i in 0..len {
             let idx = (self.next_idx + i) % len;
             if self.entries[idx].status.is_eligible(now_epoch_secs) {
-                // Advance the round-robin cursor past the selected entry.
                 self.next_idx = (idx + 1) % len;
                 debug!(key_index = idx, "selected OpenAI API key");
                 return Some(idx);
@@ -88,8 +68,7 @@ impl KeyPool {
 
     /// Record the result of a call that used key at `key_index`.
     ///
-    /// `jitter_secs`: caller-provided jitter (must be in `[0, jitter_max_secs)`).
-    /// For production use, derive jitter from a CSPRNG or timestamp-based source.
+    /// `jitter_secs` must be in `[0, jitter_max_secs)`; derive it from a CSPRNG.
     pub fn record_result(
         &mut self,
         key_index: usize,
@@ -104,7 +83,6 @@ impl KeyPool {
                     info!(key_index, "OpenAI API key restored from cooling to active");
                     entry.status = KeyStatus::Active;
                 }
-                // Already Active: no state change needed.
             }
             ResponseClass::TerminalKeyInvalid | ResponseClass::TerminalQuotaExhausted => {
                 warn!(
@@ -138,7 +116,6 @@ impl KeyPool {
                         failure_count: new_count,
                     };
                 } else {
-                    // Increment failure count but stay Active until threshold.
                     entry.status = KeyStatus::Cooling {
                         until_epoch_secs: 0, // eligible immediately (0 ≤ any now)
                         failure_count: new_count,
@@ -192,7 +169,6 @@ mod tests {
         let b = p.select(1000).unwrap();
         let c = p.select(1000).unwrap();
         let d = p.select(1000).unwrap();
-        // Should cycle: a=0, b=1, c=2, d=0
         assert_eq!(a, 0);
         assert_eq!(b, 1);
         assert_eq!(c, 2);
@@ -227,7 +203,6 @@ mod tests {
                 until_epoch_secs,
                 failure_count,
             } => {
-                // cooldown = now + 60 + jitter(0) = now + 60
                 assert_eq!(*until_epoch_secs, now + 60);
                 assert_eq!(*failure_count, 3);
             }
@@ -238,7 +213,6 @@ mod tests {
     #[test]
     fn cooling_jitter_range() {
         let now = 1_000_000u64;
-        // Test with jitter = 29 (max - 1)
         let mut p = pool(&["sref://k0"]).with_jitter_max(30);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
@@ -247,9 +221,7 @@ mod tests {
             KeyStatus::Cooling {
                 until_epoch_secs, ..
             } => {
-                // cooldown = now + 60 + 29 = now + 89 (max jitter capped at jitter_max - 1 = 29)
                 assert_eq!(*until_epoch_secs, now + 89);
-                // Must be in [now+60, now+90)
                 assert!(*until_epoch_secs >= now + 60);
                 assert!(*until_epoch_secs < now + 90);
             }
@@ -261,13 +233,10 @@ mod tests {
     fn cooling_key_skipped_until_expiry() {
         let now = 1_000_000u64;
         let mut p = pool(&["sref://k0"]).with_jitter_max(0);
-        // Force into cooling immediately (threshold=3, but jitter_max=0 means until=now+60)
         p.record_result(0, ResponseClass::TransientServer, now, 0);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
-        // Key is cooling; select before expiry returns None
         assert!(p.select(now + 59).is_none());
-        // Select at expiry succeeds
         assert_eq!(p.select(now + 60), Some(0));
     }
 
@@ -278,7 +247,6 @@ mod tests {
         p.record_result(0, ResponseClass::TransientServer, now, 0);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
-        // Key is cooling; record success restores it
         p.record_result(0, ResponseClass::Success, now + 100, 0);
         assert_eq!(*p.key_status(0), KeyStatus::Active);
         assert_eq!(p.select(now + 100), Some(0));
@@ -306,7 +274,6 @@ mod tests {
         let mut p = pool(&["sref://k0"]);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
         p.record_result(0, ResponseClass::TransientServer, now, 0);
-        // 2 failures < threshold of 3; key still immediately eligible
         assert_eq!(p.select(now), Some(0));
     }
 }

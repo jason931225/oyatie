@@ -1,5 +1,4 @@
-//! Black-box tests for `validate_query`: every leg of the query — tenant,
-//! pack, period window, and limit — must be validated independently (L7).
+//! Black-box tests for `validate_query`: tenant, pack, period window, and limit.
 
 use audit_query_domain::{
     AuditQuery, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_QUERY_WINDOW_DAYS, QueryDomainError,
@@ -12,8 +11,6 @@ fn base_query() -> AuditQuery {
         ..Default::default()
     }
 }
-
-// ── tenant_id ────────────────────────────────────────────────────────────
 
 #[test]
 fn rejects_empty_tenant_id() {
@@ -35,7 +32,6 @@ fn rejects_whitespace_only_tenant_id() {
 
 #[test]
 fn rejects_invisible_only_tenant_id() {
-    // L3: a ZWSP-only tenant_id must not sneak past a bare trim check.
     let query = AuditQuery {
         tenant_id: "\u{200B}\u{FEFF}".to_string(),
         ..Default::default()
@@ -51,8 +47,6 @@ fn accepts_valid_tenant_id() {
     assert_eq!(validated.effective_limit(), DEFAULT_PAGE_SIZE);
     assert_eq!(validated.offset(), 0);
 }
-
-// ── pack (L7: a second leg of the identity tuple) ──────────────────────
 
 #[test]
 fn accepts_absent_pack() {
@@ -79,16 +73,6 @@ fn accepts_well_formed_pack() {
     let validated = validate_query(&query).expect("well-formed pack must validate");
     assert_eq!(validated.pack(), Some("pack-eu"));
 }
-
-// ── period window (L7: the third leg) ───────────────────────────────────
-//
-// `period` accepts three shapes (module docs, section (a)): a bare
-// `YYYY-MM-DD` day, a bare `YYYY-MM` month, or an explicit
-// `"<start>/<end>"` range. The bare shapes are what this capability's own
-// sibling crates actually mint as `period_id` (`sealing-domain`,
-// `emission-domain`, the OpenAPI/AsyncAPI contracts) — a caller filtering to
-// the period of a row it just paged over must be able to pass that value
-// straight through.
 
 #[test]
 fn accepts_bare_day_period_as_a_single_day_window() {
@@ -216,7 +200,6 @@ fn accepts_single_day_period() {
 
 #[test]
 fn accepts_period_exactly_at_max_window() {
-    // 2026-01-01 .. 2027-01-01 inclusive is 366 days == MAX_QUERY_WINDOW_DAYS.
     let query = AuditQuery {
         period: Some("2026-01-01/2027-01-01".to_string()),
         ..base_query()
@@ -230,7 +213,6 @@ fn accepts_period_exactly_at_max_window() {
 
 #[test]
 fn rejects_period_one_day_over_max_window() {
-    // 2026-01-01 .. 2027-01-02 inclusive is 367 days, one over the max.
     let query = AuditQuery {
         period: Some("2026-01-01/2027-01-02".to_string()),
         ..base_query()
@@ -240,8 +222,6 @@ fn rejects_period_one_day_over_max_window() {
         Err(QueryDomainError::WindowTooLarge)
     );
 }
-
-// ── limit ────────────────────────────────────────────────────────────────
 
 #[test]
 fn none_limit_falls_back_to_default_page_size() {
@@ -275,7 +255,6 @@ fn rejects_limit_over_max_page_size() {
         limit: Some(MAX_PAGE_SIZE + 1),
         ..base_query()
     };
-    // Decision: over-cap limits are REJECTED, not silently clamped.
     assert_eq!(
         validate_query(&query),
         Err(QueryDomainError::LimitExceedsMaximum {
@@ -284,13 +263,6 @@ fn rejects_limit_over_max_page_size() {
         })
     );
 }
-
-// ── page-size constants pinned to the published contract (findings #1/#7) ─
-//
-// audit/contracts/openapi/audit-chain.yaml line ~207:
-//   QueryRequest.limit: {type: integer, minimum: 1, maximum: 1000, default: 100}
-// These literal assertions exist specifically so the constants and that
-// contract line cannot drift apart silently again (per L5).
 
 #[test]
 fn max_page_size_matches_the_published_contract_maximum() {

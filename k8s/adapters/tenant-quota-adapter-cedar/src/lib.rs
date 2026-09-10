@@ -1,27 +1,6 @@
-//! Cedar RBAC adapter for managed-K8s tenant quota.
-//!
-//! This adapter wires RBAC authorization for quota admin operations using the
-//! EXISTING `identity-workload-authz-cedar-adapter` crate. It does NOT
-//! reinvent Cedar wiring — it reuses `CedarWorkloadAuthorizer` directly.
-//!
-//! ## Design (ADR-0376 / ADR-0183 / ADR-0007)
-//!
-//! - **Cedar default-deny**: with no matching `permit`, access is denied.
-//! - **Tenant-admin sets own quota within plan ceiling**: a TenantAdmin principal
-//!   can write quota for their own tenant only (Cedar same-tenant policy plus
-//!   adapter defense-in-depth guard).
-//! - **Platform sets ceilings**: PlatformOperator role can write any tenant's ceiling.
-//! - **Cross-tenant read denied**: a tenant CANNOT read another tenant's quota/usage.
-//!   Cedar enforces `principal.tenant_id == resource.tenant_id` for tenant
-//!   policies; the adapter also rejects cross-tenant non-platform requests.
-//! - **RBAC escalation mitigated**: no principal can grant themselves a higher role.
-//!
-//! ## Usage
-//!
-//! ```rust,ignore
-//! let authz = QuotaRbacAuthorizer::new_with_default_policies()?;
-//! let decision = authz.authorize_quota_write(&principal, "ten_acme")?;
-//! ```
+//! Cedar RBAC adapter for managed-K8s tenant quota: quota admin authorization
+//! layered on `iam-identity-workload-authz-cedar`'s `CedarWorkloadAuthorizer`.
+//! Cedar default-deny, plus an adapter-side cross-tenant guard (ADR-0376).
 
 // ADR-0083 Tier-3: panic-free on the request path.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
@@ -41,9 +20,7 @@ const PLATFORM_QUOTA_SCOPE: &str = "quota:platform:write";
 /// Errors from the Cedar RBAC authorizer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RbacAuthzError {
-    /// Policy compilation failed.
     PolicyBuild(String),
-    /// The request was denied by Cedar.
     Denied(String),
 }
 
@@ -58,10 +35,8 @@ impl std::fmt::Display for RbacAuthzError {
 
 impl std::error::Error for RbacAuthzError {}
 
-/// Cedar-backed RBAC authorizer for quota admin operations.
-///
-/// Wraps `CedarWorkloadAuthorizer` with quota-specific policies. Cedar
-/// default-deny guarantees that absent policies = deny.
+/// Cedar-backed RBAC authorizer for quota admin operations. Cedar default-deny
+/// means an absent policy denies.
 pub struct QuotaRbacAuthorizer {
     inner: CedarWorkloadAuthorizer,
 }
@@ -79,14 +54,6 @@ impl QuotaRbacAuthorizer {
 
     /// Build with the default quota RBAC policies (production path).
     ///
-    /// Policies implement:
-    /// - TenantAdmin can write/read quota for their own tenant.
-    /// - TenantViewer can read quota for their own tenant.
-    /// - PlatformOperator can write/read quota for any tenant.
-    ///
-    /// Tenant-role cross-tenant access is denied by Cedar policy and by the
-    /// adapter's defense-in-depth guard.
-    ///
     /// # Errors
     /// Returns [`RbacAuthzError::PolicyBuild`] if policy compilation fails.
     pub fn new_with_default_policies() -> Result<Self, RbacAuthzError> {
@@ -94,9 +61,6 @@ impl QuotaRbacAuthorizer {
     }
 
     /// Authorize a quota write operation for `target_tenant_id`.
-    ///
-    /// The principal must hold the appropriate scope for their role, AND
-    /// (for TenantAdmin) their `tenant_id` must match `target_tenant_id`.
     ///
     /// # Errors
     /// Returns [`RbacAuthzError::Denied`] if Cedar denies the request.
@@ -152,8 +116,7 @@ impl QuotaRbacAuthorizer {
         }
     }
 
-    /// Derive the Cedar scope string for an RBAC role (used when seeding workload
-    /// principals in tests or provisioning pipelines).
+    /// The Cedar scope string an RBAC role must hold.
     #[must_use]
     pub fn scope_for_role(role: &RbacRole) -> &'static str {
         match role {
@@ -166,21 +129,18 @@ impl QuotaRbacAuthorizer {
 
 fn default_quota_policies() -> Vec<Policy> {
     vec![
-        // TenantAdmin: write own-tenant quota only.
         Policy::permit("quota-write-tenant-admin")
             .when_principal(PrincipalCondition::HasScope("quota:write".into()))
             .for_action(ActionCondition::Equals("quota:Write".into()))
             .for_resource(ResourceCondition::SameTenantAsPrincipal {
                 resource_type: "QuotaRecord".into(),
             }),
-        // TenantViewer + TenantAdmin: read own-tenant quota only.
         Policy::permit("quota-read-tenant")
             .when_principal(PrincipalCondition::HasScope("quota:read".into()))
             .for_action(ActionCondition::Equals("quota:Read".into()))
             .for_resource(ResourceCondition::SameTenantAsPrincipal {
                 resource_type: "QuotaRecord".into(),
             }),
-        // PlatformOperator: write any tenant's quota (ceiling management).
         Policy::permit("quota-write-platform-operator")
             .when_principal(PrincipalCondition::HasScope(PLATFORM_QUOTA_SCOPE.into()))
             .for_action(ActionCondition::Equals("quota:Write".into()))
@@ -248,7 +208,6 @@ mod tests {
     #[test]
     fn principal_without_scope_denied_write() {
         let authz = QuotaRbacAuthorizer::new_with_default_policies().unwrap();
-        // No quota:write scope at all — Cedar default-deny kicks in.
         let principal = active_principal("ten_acme", "other:scope");
         let tenant_id = TenantId::new("ten_acme").unwrap();
         assert!(authz.authorize_quota_write(&principal, &tenant_id).is_err());

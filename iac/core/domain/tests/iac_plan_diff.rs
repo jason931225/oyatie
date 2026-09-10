@@ -1,5 +1,4 @@
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` /
-// `.expect_err()` / `.unwrap_err()` to assert invariants — Tier 3 exemption.
+// ADR-0083 Tier 3 exemption: integration tests assert with unwrap/expect/unwrap_err.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use iac_domain::{
@@ -7,16 +6,8 @@ use iac_domain::{
     OpenTofuModuleRef, PlanAction, PlanDiffEntry, compute_iac_plan_diff,
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 fn make_ref(name: &str, version: &str) -> OpenTofuModuleRef {
-    // OpenTofuModuleRef has private fields; construct via OpenTofuModuleRelease
-    // and then extract the ref, or build a CellDefinition that holds the ref.
-    // The crate only exposes OpenTofuModuleRef through OpenTofuModuleRelease::new
-    // + module_ref(), or directly via CellDefinition::module_refs().
-    // Use OpenTofuModuleRelease as the factory.
+    // OpenTofuModuleRef has no public constructor; mint one via OpenTofuModuleRelease.
     use iac_domain::OpenTofuModuleRelease;
     let source = format!(
         "git::https://git.oyatie.internal/oyatie/oyatie.git//modules/{name}?ref=v{version}"
@@ -51,11 +42,6 @@ fn topology(topology_id: &str, cells: Vec<CellDefinition>) -> CellTopologyPlan {
     plan
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-/// All-converged: desired == observed => Converged verdict, all NoChange.
 #[test]
 fn all_converged() {
     let r = make_ref("tenant-namespace", "1.0.0");
@@ -72,13 +58,11 @@ fn all_converged() {
     );
 }
 
-/// Desired-only module-ref => Create entry, HasChanges verdict.
 #[test]
 fn desired_only_module() {
     let r = make_ref("tenant-namespace", "1.0.0");
     let desired = topology("topo-1", vec![cell("cell-us-east", vec![r.clone()])]);
-    // Observed has the cell but with a different (absent) module-ref — use a
-    // second ref for observed so cell is non-empty (validated at construction).
+    // Observed needs its own ref: CellDefinition::new rejects an empty module_refs.
     let r_obs = make_ref("storage-bucket", "1.0.0");
     let observed = topology("topo-1", vec![cell("cell-us-east", vec![r_obs.clone()])]);
 
@@ -94,7 +78,6 @@ fn desired_only_module() {
     assert_eq!(creates[0].cell_id, "cell-us-east");
 }
 
-/// Observed-only module-ref => Destroy entry, HasChanges verdict.
 #[test]
 fn observed_only_module() {
     let r_des = make_ref("tenant-namespace", "1.0.0");
@@ -119,7 +102,6 @@ fn observed_only_module() {
     assert_eq!(destroys[0].module_ref, r_obs_extra);
 }
 
-/// Same ref differing version => Update entry, HasChanges verdict.
 #[test]
 fn version_update() {
     let r_v1 = make_ref("tenant-namespace", "1.0.0");
@@ -141,7 +123,6 @@ fn version_update() {
     );
 }
 
-/// Identity mismatch (topology_id differs) => IdentityMismatch verdict, empty entries.
 #[test]
 fn identity_mismatch_topology_id() {
     let r = make_ref("tenant-namespace", "1.0.0");
@@ -153,7 +134,6 @@ fn identity_mismatch_topology_id() {
     assert!(report.entries.is_empty());
 }
 
-/// Identity mismatch (region differs between topologies) => IdentityMismatch verdict.
 #[test]
 fn identity_mismatch_region() {
     // Each cell must match its own topology's region; the mismatch is at topology level.
@@ -194,7 +174,6 @@ fn identity_mismatch_region() {
     assert!(report.entries.is_empty());
 }
 
-/// Identity mismatch (per-cell tenant_id differs for same cell_id) => IdentityMismatch verdict.
 #[test]
 fn identity_mismatch_cell_tenant_id() {
     let r = make_ref("tenant-namespace", "1.0.0");
@@ -236,7 +215,6 @@ fn identity_mismatch_cell_tenant_id() {
     assert!(report.entries.is_empty());
 }
 
-/// Determinism: two calls with identical inputs produce identical results.
 #[test]
 fn determinism() {
     let r1 = make_ref("tenant-namespace", "1.0.0");
@@ -257,17 +235,13 @@ fn determinism() {
         report_a, report_b,
         "compute_iac_plan_diff must be deterministic"
     );
-    // Verify entries are in stable sorted order by checking the vec directly.
     let mut sorted = report_a.entries.clone();
     sorted.sort();
     assert_eq!(report_a.entries, sorted, "entries must already be sorted");
 }
 
-/// All PlanAction variants are exercised in a single compound scenario.
 #[test]
 fn all_action_variants() {
-    // desired: r_keep (NoChange), r_new (Create), r_upd_v2 (Update)
-    // observed: r_keep (NoChange), r_old (Destroy), r_upd_v1 (Update → becomes Update)
     let r_keep = make_ref("tenant-namespace", "1.0.0");
     let r_new = make_ref("network-policy", "1.0.0");
     let r_upd_v2 = make_ref("storage-bucket", "2.0.0");

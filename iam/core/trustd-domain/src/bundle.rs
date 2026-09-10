@@ -1,11 +1,5 @@
-//! Trust bundle: a set of trusted CA certificates plus chain verification.
-//!
-//! During a CA rotation Talos trusts *more than one* CA generation at once: the
-//! outgoing root (so existing node certs keep validating) and the incoming root
-//! (so newly issued certs validate). A worker verifying a peer certificate
-//! checks it against this bundle, not against a single root. This module models
-//! that trust store and the leaf-verification it performs, optionally consulting
-//! a [`crate::crl::RevocationList`].
+//! Trust bundle: the trusted CA set a leaf is verified against. A CA rotation
+//! trusts more than one generation at once, so verification asks the whole set.
 
 use crate::certificate::{CertUsage, Certificate};
 use crate::crl::RevocationList;
@@ -14,15 +8,12 @@ use crate::signer::SigningBackend;
 use crate::x509::PEMEncoded;
 use std::collections::BTreeMap;
 
-/// A trusted CA, tracked alongside the backend able to verify its signatures.
 struct TrustAnchor<S: SigningBackend> {
     cert: Certificate,
     signer: S,
 }
 
-/// A set of trusted CA roots indexed by subject DN string. Verification of a
-/// leaf succeeds when *any* anchor both names the leaf's issuer and validates
-/// its signature.
+/// A set of trusted CA roots indexed by subject DN string.
 pub struct TrustBundle<S: SigningBackend> {
     anchors: BTreeMap<String, TrustAnchor<S>>,
 }
@@ -41,9 +32,7 @@ impl<S: SigningBackend> TrustBundle<S> {
         Self::default()
     }
 
-    /// Add a trusted CA anchor. The certificate must be a CA cert; the signer is
-    /// the verifier for certificates issued by that CA. Returns an error if the
-    /// supplied certificate is not a CA.
+    /// Add a trusted CA anchor; refuses a certificate that is not a CA.
     pub fn add_anchor(&mut self, ca_cert: Certificate, signer: S) -> Result<()> {
         if !ca_cert.is_ca() {
             return Err(TrustError::invalid("trust anchor is not a CA certificate"));
@@ -80,16 +69,8 @@ impl<S: SigningBackend> TrustBundle<S> {
         self.anchors.values().map(|a| a.cert.to_pem()).collect()
     }
 
-    /// The SubjectPublicKeyInfo DER of every trusted CA anchor (G002 slice-1b-i).
-    ///
-    /// For a real-crypto bundle (anchored on certificates whose `public_key_der`
-    /// is a real ECDSA SubjectPublicKeyInfo), these are the public keys a
-    /// real-DER verifier checks a presented leaf's signature against. The
-    /// adapter's `x509-parser` verify path consults this set: a leaf is trusted
-    /// only when its real signature verifies under one of these anchors. The
-    /// trustd shape-model in-domain verification continues to use
-    /// [`TrustBundle::verify_leaf`] and the [`SigningBackend`]; this accessor adds
-    /// the real-DER seam without changing either.
+    /// The SubjectPublicKeyInfo DER of every trusted CA anchor: the key set the
+    /// adapter's real-DER verifier checks a presented leaf's signature against.
     pub fn trusted_ca_spki_ders(&self) -> Vec<Vec<u8>> {
         self.anchors
             .values()
@@ -97,22 +78,18 @@ impl<S: SigningBackend> TrustBundle<S> {
             .collect()
     }
 
-    /// The full trust-anchor certificates (subject DN, validity, real SPKI) the
-    /// adapter materialises into real CA DER for chain verification. Returned in a
-    /// stable order (BTreeMap by subject DN).
+    /// The trust-anchor certificates, in stable subject-DN order.
     pub fn anchor_certificates(&self) -> Vec<&Certificate> {
         self.anchors.values().map(|a| &a.cert).collect()
     }
 
-    /// Remove a CA anchor by subject DN string (used to retire an old CA
-    /// generation once all its certs have rotated). Returns whether one existed.
+    /// Remove a CA anchor by subject DN; returns whether one existed.
     pub fn remove_anchor(&mut self, subject_rfc: &str) -> bool {
         self.anchors.remove(subject_rfc).is_some()
     }
 
-    /// Verify a leaf certificate against the bundle at time `now`: it must be
-    /// structurally valid, currently within its validity window, issued by a
-    /// trusted anchor, and carry a signature that anchor's backend accepts.
+    /// Verify a leaf against the bundle at `now`: structurally valid, inside its
+    /// validity window, and issued by an unexpired trusted anchor that signed it.
     pub fn verify_leaf(&self, leaf: &Certificate, now: u64) -> Result<()> {
         leaf.validate()?;
         if !leaf.is_valid_at(now) {
@@ -125,7 +102,6 @@ impl<S: SigningBackend> TrustBundle<S> {
             .anchors
             .get(&issuer_key)
             .ok_or_else(|| TrustError::verification_failed("no trusted CA matches issuer"))?;
-        // The anchoring CA must itself still be valid.
         if anchor.cert.validity.is_expired(now) {
             return Err(TrustError::expired("anchoring CA certificate has expired"));
         }
@@ -137,9 +113,7 @@ impl<S: SigningBackend> TrustBundle<S> {
         Ok(())
     }
 
-    /// Verify a leaf while also rejecting revoked serials. Combines chain
-    /// validation with a [`RevocationList`] check, matching what trustd does for
-    /// a presented client certificate.
+    /// Verify a leaf and additionally reject a serial listed in `crl`.
     pub fn verify_leaf_with_crl(
         &self,
         leaf: &Certificate,
@@ -150,9 +124,7 @@ impl<S: SigningBackend> TrustBundle<S> {
         self.verify_leaf(leaf, now)
     }
 
-    /// Require that a verified leaf carries a particular usage (e.g. a server
-    /// endpoint must present a [`CertUsage::ServerAuth`] cert). Verifies the
-    /// chain first.
+    /// Verify the chain, then require the leaf to carry `expected` usage.
     pub fn verify_leaf_usage(
         &self,
         leaf: &Certificate,
@@ -259,7 +231,6 @@ mod tests {
         assert!(bundle.verify_leaf(&old_leaf, 2500).is_ok());
         assert!(bundle.verify_leaf(&new_leaf, 2500).is_ok());
 
-        // retire gen1: old leaf no longer verifies
         assert!(bundle.remove_anchor("CN=talos-ca-gen1"));
         assert!(bundle.verify_leaf(&old_leaf, 2500).is_err());
         assert!(bundle.verify_leaf(&new_leaf, 2500).is_ok());

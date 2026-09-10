@@ -1,19 +1,6 @@
 //! Acceptance tests for the managed-Kubernetes control-plane-host composition
-//! root (ADR-0376), grounded in the PRD + implementation-ready acceptance
-//! criteria.
-//!
-//! These drive the FULL flow through the REAL kernel + api + in-memory adapter
-//! plus the axum router over a localhost TCP socket (loopback only; no kube-rs,
-//! no network). Both tiers (hosted Kamaji and dedicated Talos spoke) are
-//! exercised end-to-end: provision then status(active) then teardown then
-//! status(deleted).
-//!
-//! Mapped acceptance criteria:
-//! AC-1 hosted-tier provision reaches `active` with an endpoint;
-//! AC-2 dedicated-tier provision reaches `active`;
-//! AC-3 teardown drains + deletes and status reflects `deleted`;
-//! AC-4 malformed cluster ref / unknown tier returns 400 (fail-closed);
-//! AC-5 healthz is mounted.
+//! root (ADR-0376): the real kernel + api + in-memory adapter behind the axum
+//! router, driven over a loopback TCP socket.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -30,13 +17,11 @@ use tokio::net::{TcpListener, TcpStream};
 
 const TEST_TOKEN: &str = "test-break-glass-secret";
 
-/// Break-glass platform-operator authz provider (the production composition).
 fn platform_authz() -> ControlPlaneAuthzProvider {
     ControlPlaneAuthzProvider::from_bearer_secret(TEST_TOKEN, "op", "ten_platform").unwrap()
 }
 
-/// A verifier that binds a NON-platform principal (no platform scope): the
-/// bearer authenticates but the PDP denies the admin action (403).
+/// Binds a NON-platform principal: the bearer authenticates, the PDP denies (403).
 fn non_admin_authz() -> ControlPlaneAuthzProvider {
     let verifier = Arc::new(
         ConfiguredBearerPrincipalVerifier::new(TEST_TOKEN, "op", "ten_acme", vec![]).unwrap(),
@@ -63,7 +48,6 @@ fn fault_authz() -> ControlPlaneAuthzProvider {
     ControlPlaneAuthzProvider::new(verifier, Arc::new(FaultAuthorizer))
 }
 
-/// Spawn the in-memory-backed router on a localhost port; return its address.
 async fn spawn_app() -> SocketAddr {
     spawn_app_with(platform_authz()).await
 }
@@ -79,13 +63,11 @@ async fn spawn_app_with(authz: ControlPlaneAuthzProvider) -> SocketAddr {
     addr
 }
 
-/// Minimal HTTP/1.1 client over a raw TCP socket (no extra dev-dep). Sends one
-/// request WITH the valid break-glass bearer and returns `(status_code, body)`.
+/// Minimal HTTP/1.1 over a raw TCP socket (no dev-dep); sends the valid bearer.
 async fn http(addr: SocketAddr, method: &str, path: &str, body: &str) -> (u16, String) {
     http_auth(addr, method, path, body, Some(TEST_TOKEN)).await
 }
 
-/// Like [`http`], but with an explicit (optional) bearer token.
 async fn http_auth(
     addr: SocketAddr,
     method: &str,
@@ -120,8 +102,7 @@ async fn http_auth(
     (status, body)
 }
 
-/// Extract the JSON string value for `key` from a flat object body (avoids a
-/// serde_json dev-dep; the bodies are small and flat).
+/// Extract a JSON string value from a flat body (avoids a serde_json dev-dep).
 fn json_str(body: &str, key: &str) -> Option<String> {
     let needle = format!("\"{key}\":\"");
     let start = body.find(&needle)? + needle.len();
@@ -142,7 +123,6 @@ async fn healthz_is_mounted() {
 async fn hosted_tier_full_lifecycle() {
     let addr = spawn_app().await;
 
-    // AC-1: provision hosted -> 201 + handle.
     let (status, body) = http(
         addr,
         "POST",
@@ -154,7 +134,6 @@ async fn hosted_tier_full_lifecycle() {
     assert_eq!(json_str(&body, "tier").as_deref(), Some("hosted_kamaji"));
     let handle = json_str(&body, "handle").expect("handle present");
 
-    // AC-1: status -> active with an endpoint.
     let ref_body = format!(
         r#"{{"tenant_id":"ten_zero","cluster_name":"dogfood-a","tier":"hosted_kamaji","handle":"{handle}"}}"#
     );
@@ -163,7 +142,6 @@ async fn hosted_tier_full_lifecycle() {
     assert_eq!(json_str(&body, "status").as_deref(), Some("active"));
     assert!(body.contains("endpoint"), "endpoint surfaced: {body}");
 
-    // AC-3: teardown -> 204, then status -> deleted.
     let (status, _body) = http(addr, "POST", "/admin/control-planes/teardown", &ref_body).await;
     assert_eq!(status, 204);
     let (status, body) = http(addr, "POST", "/admin/control-planes/status", &ref_body).await;
@@ -174,7 +152,6 @@ async fn hosted_tier_full_lifecycle() {
 #[tokio::test]
 async fn dedicated_tier_provisions_active() {
     let addr = spawn_app().await;
-    // AC-2: dedicated tier provision -> 201, status active.
     let (status, body) = http(
         addr,
         "POST",
@@ -200,7 +177,6 @@ async fn dedicated_tier_provisions_active() {
 #[tokio::test]
 async fn provision_defaults_to_hosted_tier_when_omitted() {
     let addr = spawn_app().await;
-    // tier omitted -> product default is hosted (ADR-0376).
     let (status, body) = http(
         addr,
         "POST",
@@ -215,7 +191,6 @@ async fn provision_defaults_to_hosted_tier_when_omitted() {
 #[tokio::test]
 async fn unknown_tier_is_rejected_fail_closed() {
     let addr = spawn_app().await;
-    // AC-4: unknown tier -> 400.
     let (status, body) = http(
         addr,
         "POST",
@@ -230,7 +205,6 @@ async fn unknown_tier_is_rejected_fail_closed() {
 #[tokio::test]
 async fn malformed_cluster_ref_is_rejected_fail_closed() {
     let addr = spawn_app().await;
-    // AC-4: empty tenant/cluster -> 400.
     let (status, body) = http(
         addr,
         "POST",
@@ -240,10 +214,6 @@ async fn malformed_cluster_ref_is_rejected_fail_closed() {
     .await;
     assert_eq!(status, 400, "body: {body}");
 }
-
-// ============================================================
-// AUTH-005 fail-closed fixtures (RED before this fix; GREEN after)
-// ============================================================
 
 #[tokio::test]
 async fn provision_without_bearer_returns_401() {
@@ -261,8 +231,6 @@ async fn provision_without_bearer_returns_401() {
 
 #[tokio::test]
 async fn provision_non_platform_principal_returns_403() {
-    // A valid bearer whose principal lacks the platform scope is authenticated
-    // but NOT authorized for the platform-level admin surface => 403.
     let addr = spawn_app_with(non_admin_authz()).await;
     let (status, _body) = http(
         addr,
@@ -276,7 +244,6 @@ async fn provision_non_platform_principal_returns_403() {
 
 #[tokio::test]
 async fn provision_platform_operator_returns_201() {
-    // The platform-operator break-glass bearer is authorized.
     let addr = spawn_app().await;
     let (status, body) = http(
         addr,

@@ -1,9 +1,4 @@
 //! Expressions.
-//!
-//! Two decisions live here that a naive translator gets silently wrong, and both are about the
-//! difference between what the source's syntax MEANS and what the same syntax means in the target:
-//! reading a field is a copy in Go and a move in Rust, and a struct literal zero-fills in Go and
-//! must name every field in Rust.
 
 use port_engine_api::{Declaration, TypeRef};
 use port_engine_rust_ir::RustExpr;
@@ -16,8 +11,6 @@ use crate::naming::to_snake_case;
 use crate::vocabulary::{ATTR_CALLEE, ATTR_CALLEE_KIND, ATTR_VALUE, CALLEE_KIND_METHOD};
 
 /// Where an expression appears: a value is READ, a place is WRITTEN TO.
-///
-/// The distinction is what keeps the clone rule from producing `self.total.clone() = x`.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) enum Position {
     Value,
@@ -34,10 +27,8 @@ pub(crate) fn in_position(
     position: Position,
 ) -> Result<RustExpr, TransformError> {
     match node.kind.as_str() {
-        // A literal passes through as SOURCE TEXT, which is safe only because the emitted tree is
-        // parsed and compiled. Where the two languages' lexical forms diverge — a rune literal, an
-        // imaginary literal — the pass-through fails the parse, which is the correct outcome and
-        // is why no attempt is made to normalise numbers here.
+        // A literal passes through as SOURCE TEXT: a lexical form the target does not
+        // share fails the emitted tree's parse rather than being normalised here.
         "literal" => node
             .attr(ATTR_VALUE)
             .map(|value| RustExpr::Literal(value.to_owned()))
@@ -49,8 +40,7 @@ pub(crate) fn in_position(
         "zero" => zero_value(node, cx),
         "ident" if is_receiver(node) => Ok(RustExpr::SelfValue),
         "ident" => Ok(RustExpr::Path(reference(node))),
-        // A source-level parenthesis carries no information the tree does not already have, and
-        // re-emitting it would fight the precedence the IR computes.
+        // Parentheses are dropped: the IR recomputes precedence, so re-emitting fights it.
         "paren" => expression(one_child(node, cx, "paren")?, cx),
         "binary" => binary(node, cx),
         "unary" => {
@@ -100,9 +90,7 @@ fn binary(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError>
 
 /// A field access, cloned when reading it would MOVE.
 ///
-/// The source copied; `.clone()` is what that costs in the target. In PLACE position there is no
-/// read at all, so there is nothing to clone — and cloning there would emit an assignment to a
-/// temporary, which parses and silently does nothing.
+/// In PLACE position there is no read, so cloning there would assign to a temporary.
 fn selector(
     node: &Declaration,
     cx: &Body<'_>,
@@ -123,10 +111,7 @@ fn selector(
 }
 
 /// Whether a plain read of this type moves in the target, and therefore needs a clone.
-///
-/// An absent type is NOT treated as moving. The front end records a type on every selector it can
-/// resolve, so an absent one means the expression is not a field read at all — and cloning
-/// something the engine could not identify would be a guess.
+/// An ABSENT type does NOT move: absence means this is not a resolved field read at all.
 fn moves_on_read(type_ref: &TypeRef, cx: &Body<'_>) -> bool {
     if type_ref.is_empty() {
         return false;
@@ -135,18 +120,10 @@ fn moves_on_read(type_ref: &TypeRef, cx: &Body<'_>) -> bool {
 }
 
 /// A type CONVERSION, which the source spells exactly like a call.
-///
-/// Three forms, because they are three operations. To a type the corpus declares, the target's
-/// newtype CONSTRUCTS from the value. Between numeric types the source is defined to truncate, and
-/// the target spells that as a cast — faithful, and the place `num-cast-try-from` will want
-/// revisiting once the pack can say which conversions are meant to be checked. Anything else
-/// refuses: converting between a string and a byte slice is infallible and lossy in the source and
-/// FALLIBLE in the target, which is a decision about invalid input rather than a spelling.
 fn convert(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError> {
     let operand = expression(one_child(node, cx, "convert")?, cx)?;
     let target = &node.type_ref;
 
-    // A named type the corpus declares emits as a newtype, so converting to it is construction.
     if target.kind == "named" {
         let path = cx.resolver.resolve(target, cx.owner)?;
         return Ok(RustExpr::Call {
@@ -175,11 +152,6 @@ fn convert(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError
 }
 
 /// A struct literal, with every field named.
-///
-/// Go zero-fills the fields a literal omits; the target has no such rule and rejects an incomplete
-/// literal outright. The front end therefore emits one entry per DECLARED field, and the omitted
-/// ones arrive as `zero` nodes carrying the field's type — so the target's zero is a pack answer
-/// rather than something inferred from a spelling here.
 fn composite(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError> {
     let path = cx.resolver.resolve(&node.type_ref, cx.owner).map_err(|_| {
         TransformError::MissingDatum {
@@ -205,10 +177,7 @@ fn composite(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformErr
 
 /// The target's zero for a source type the literal left out.
 ///
-/// Refuses BY NAME rather than reaching for `Default::default()`. That would compile for the types
-/// the corpus has and would silently be a different program for the ones it does not: a type whose
-/// `Default` impl is not its zero value, or one that has no `Default` at all and only fails much
-/// later, in the emitted crate, with the source declaration nowhere in the message.
+/// Refuses BY NAME rather than `Default::default()`, whose impl need not be the zero.
 fn zero_value(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError> {
     cx.resolver
         .zero_value(&node.type_ref)
@@ -225,12 +194,7 @@ fn zero_value(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformEr
         })
 }
 
-/// A call, which is a method call when its callee is a field access.
-///
-/// The source spells both as one form and distinguishes them by what the callee resolves to; the
-/// target spells them differently. A field access in callee position is a method call — a plain
-/// field holding a function is a shape the corpus does not have and that refuses rather than being
-/// silently rewritten into a method.
+/// A call, dispatched on the RECORDED callee kind rather than on the callee's syntax.
 fn call(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError> {
     let callee = node
         .children
@@ -245,20 +209,13 @@ fn call(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError> {
         .map(|arg| expression(arg, cx))
         .collect::<Result<Vec<_>, _>>()?;
 
-    // The pack answers for the callee FIRST, by identity. A call it answers for is one the target
-    // has no name of its own for — a builtin, or something from a standard library that does not
-    // come along — and emitting the source's spelling would name nothing.
     if let Some(rendered) = mapped_call(node, &args, cx)? {
         return Ok(rendered);
     }
 
-    // A call through a RECEIVER, as the type-checker saw it — not as the syntax looked. The
-    // source spells `value.Method()` and `package.Function()` the same way, and deciding by shape
-    // emitted a method call on a package name.
     if node.attr(ATTR_CALLEE_KIND) == Some(CALLEE_KIND_METHOD) {
         return Ok(RustExpr::MethodCall {
-            // The receiver of a method call is a PLACE, not a value: `x.m()` borrows `x` rather
-            // than reading it, so cloning here would call the method on a temporary.
+            // The receiver is a PLACE: `x.m()` borrows, so a clone here calls on a temporary.
             receiver: Box::new(in_position(
                 one_child(callee, cx, "selector")?,
                 cx,
@@ -269,9 +226,6 @@ fn call(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError> {
         });
     }
 
-    // A free function, named by the path its identity resolves to. A local one keeps its bare
-    // name; one from another unit is reached through that unit's emitted module, the same way a
-    // type from another unit is.
     let path = cx
         .resolver
         .function_path(node.attr(ATTR_CALLEE), cx.owner)?;
@@ -281,11 +235,7 @@ fn call(node: &Declaration, cx: &Body<'_>) -> Result<RustExpr, TransformError> {
     })
 }
 
-/// A call the pack answers for by the callee's IDENTITY, rendered from its declared template.
-///
-/// Arity is checked rather than assumed: a template that expects an argument the call does not have
-/// would leave its own placeholder in the output, which parses as nothing and would be discovered
-/// far from its cause.
+/// A call the pack answers for by the callee's IDENTITY, rendered from its template.
 fn mapped_call(
     node: &Declaration,
     args: &[RustExpr],
@@ -322,10 +272,6 @@ fn mapped_call(
 }
 
 /// An argument, as target text for a template to interpolate.
-///
-/// Only the forms whose text is unambiguous are admitted. A template is textual substitution, and
-/// substituting a compound expression into one would need parentheses this cannot see the need for —
-/// so anything else refuses rather than producing text that reassociates.
 fn render_operand(arg: &RustExpr) -> Option<String> {
     match arg {
         RustExpr::Literal(text) | RustExpr::Path(text) => Some(text.clone()),

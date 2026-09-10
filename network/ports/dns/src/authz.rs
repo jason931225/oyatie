@@ -1,57 +1,16 @@
-//! Fail-closed authorization seam for the `cloud.network.dns.zone.create` control
-//! plane (AUTH-005 / C11 class; ADR-0587).
+//! Fail-closed authorization seam for the `cloud.network.dns.zone.create` control plane.
 //!
-//! ## Why this module exists
-//!
-//! DNS-zone creation
-//! ([`crate::create_cloud_network_dns_zone_from_api`]) is a MUTATING
-//! multi-tenant control plane. Before this seam the only "authz" was the
-//! request-supplied `CloudNetworkDnsApiAuthorization` blob, whose
-//! `allowed_surfaces` list the boundary merely cross-checked for internal
-//! consistency. An attacker who can reach the call sets
-//! `allowed_surfaces = ["cloud.network.dns.zone.create"]` (with a matching
-//! self-attested `tenant_id` / `principal_id`) and the request is accepted — an
-//! unauthenticated control plane (the AUTH-005 class the founder mandate
-//! requires to be impossible to ship).
-//!
-//! This module closes that gap by mirroring the proven fail-closed doctrine in
-//! `iam/ports/policy-cedar-api/src/authz.rs` (#815) and the workload-principal
-//! lifecycle fix (#816):
-//!
-//! 1. A real principal is VERIFIED from a credential the caller cannot forge — a
-//!    bearer token compared in constant time against a configured secret (the
-//!    [`PrincipalVerifier`] port; an mTLS/SPIFFE peer-SVID verifier is a drop-in
-//!    alternate adapter). The request-supplied principal id is NEVER the source
-//!    of truth; it is only ever a cross-check input against the verified
-//!    identity.
-//! 2. The verified principal is AUTHORIZED for
-//!    `action = cloud.network.dns.zone.create` on the TARGET `{tenant, dns_zone}`
-//!    via a PDP [`DnsZoneCreateAuthorizer`] port (`ensure_authorized`). The target
-//!    tenant is derived from the trusted request body (already cross-checked
-//!    equal to the verified principal's tenant), so a cross-tenant action is
-//!    deniable AT THE PDP.
-//! 3. The boundary REFUSES TO SERVE without both ports configured (no
-//!    default-allow fallback): [`create_cloud_network_dns_zone_from_api`]
-//!    takes a required `&CloudNetworkDnsAuthzProvider`.
-//!
-//! ## Clean architecture (ADR-0131 / ports-for-owned-stack doctrine)
-//!
-//! [`PrincipalVerifier`] and [`DnsZoneCreateAuthorizer`] are PORTS owned by this
-//! boundary crate. The concrete cloud-iam PDP client and the bearer/SVID
-//! credential store are ADAPTERS that live OUTSIDE this crate (the owned W5
-//! destination). The port shapes model that destination so they do not change at
-//! cutover; transient infra is absorbed by the adapter.
+//! A caller credential is verified into a [`VerifiedPrincipal`] by a [`PrincipalVerifier`]
+//! port; that principal is then authorized for the action against the TARGET `{tenant,
+//! resource}` by a [`DnsZoneCreateAuthorizer`] port. The request-supplied principal id is never the source of
+//! truth. Both ports are required: there is no default-allow fallback and no `Default` impl.
+//! The ports are owned here; the PDP client and the credential store are adapters outside.
 
-// ADR-0083 Tier 3: production code stays panic-free.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 /// The credential a caller presents to prove a real principal identity.
 ///
-/// Today this is a bearer token (constant-time compared by
-/// [`ConfiguredBearerPrincipalVerifier`]); an mTLS/SPIFFE peer-SVID adapter is a
-/// drop-in alternate that consumes a verified peer leaf instead. The
-/// request-supplied principal id travels alongside as a CROSS-CHECK only — never
-/// as proof of identity.
+/// The request-supplied principal id travels alongside as a CROSS-CHECK only, never as proof.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CallerCredential {
     /// Raw `Authorization` header value (e.g. `"Bearer abc..."`), if present.
@@ -64,24 +23,9 @@ pub struct CallerCredential {
 
 /// A principal whose identity has been verified from a caller credential.
 ///
-/// ## Type-level defense-in-depth (NOT a cryptographic guarantee)
-///
-/// The fields are **private**; there is no public constructor — external crates
-/// cannot build a `VerifiedPrincipal` by struct literal or any public API.
-/// [`VerifiedPrincipal::new`] is `pub(crate)`, callable only by
-/// [`PrincipalVerifier`] implementations inside this crate. External crates must
-/// obtain one by running a real [`PrincipalVerifier`] (e.g.
-/// [`ConfiguredBearerPrincipalVerifier`]).
-///
-/// **Limits of this guarantee:** this is *structural* defense-in-depth, not a
-/// cryptographic proof. It prevents accidental struct-literal forging and proves
-/// that *some* `PrincipalVerifier` ran. The real security guarantee comes from
-/// the combination of: (1) verifying the credential before any mutation, (2) the
-/// PDP authorization decision against the target resource, and (3) the active
-/// cross-check in [`crate::create_cloud_network_dns_zone_from_api`].
-///
-/// Within the same crate, tests use the `#[cfg(test)]` constructor
-/// [`VerifiedPrincipal::new_for_test`] to mint tokens without a real credential.
+/// Fields are private with no public constructor, so an external crate cannot forge one by
+/// struct literal. That is STRUCTURAL defense-in-depth, not a cryptographic proof: it shows
+/// only that some [`PrincipalVerifier`] ran.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerifiedPrincipal {
     principal_id: String, // data_class: INTERNAL_ONLY — private: see unforgeability note
@@ -89,8 +33,8 @@ pub struct VerifiedPrincipal {
 }
 
 impl VerifiedPrincipal {
-    /// Mint a verified principal. **`pub(crate)` only** — callers outside this
-    /// crate cannot call this; they must go through a [`PrincipalVerifier`].
+    /// Mint a verified principal; callers outside this crate must go through a
+    /// [`PrincipalVerifier`].
     pub(crate) fn new(principal_id: impl Into<String>, tenant_id: impl Into<String>) -> Self {
         Self {
             principal_id: principal_id.into(),
@@ -111,7 +55,6 @@ impl VerifiedPrincipal {
     }
 
     /// Test-only constructor that mints a token without a real credential.
-    /// Only available inside this crate under `#[cfg(test)]`.
     #[cfg(test)]
     pub(crate) fn new_for_test(
         principal_id: impl Into<String>,
@@ -127,9 +70,8 @@ impl VerifiedPrincipal {
 pub enum PrincipalVerificationError {
     /// No credential was presented (no `Authorization` header).
     MissingCredential,
-    /// A credential was presented but did not verify (bad bearer, untrusted
-    /// SVID, expired, …). Deliberately opaque so probing cannot distinguish
-    /// "wrong token" from "no such principal".
+    /// A credential was presented but did not verify. Deliberately opaque, so probing cannot
+    /// distinguish "wrong token" from "no such principal".
     InvalidCredential,
 }
 
@@ -144,32 +86,26 @@ pub enum DnsZoneCreateAuthorizationError {
 }
 
 /// The resource a DNS-zone-create decision is made against: the TARGET
-/// tenant and DNS-zone id, derived from the trusted request body (already
-/// cross-checked equal to the verified principal's tenant). The tenant axis is
-/// asserted by the authorizer — a verified principal alone never grants the
-/// tenant. Presenting the TARGET tenant (not a flattened caller tenant) is what
-/// makes a cross-tenant create deniable at the PDP (no IDOR).
+/// tenant and resource id, derived from the trusted request body (already cross-checked equal
+/// to the verified principal's tenant). Presenting the TARGET tenant rather than a flattened
+/// caller tenant is what makes a cross-tenant create deniable at the PDP.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DnsZoneCreateResource {
     /// The tenant whose catalog the DNS zone lands in (trusted source).
     pub tenant_id: String, // data_class: INTERNAL_ONLY
-    /// The DNS zone resource id being created (from the path/body, already bound
-    /// equal).
+    /// The DNS zone resource id being created, already bound equal to the request body.
     pub dns_zone_id: String, // data_class: INTERNAL_ONLY
 }
 
 /// PORT: verify a caller credential into a [`VerifiedPrincipal`].
 ///
-/// Adapters: a configured-bearer verifier (this crate's
-/// [`ConfiguredBearerPrincipalVerifier`]) or a cloud-iam mTLS/SPIFFE peer-SVID
-/// verifier (the W5 destination). The verifier — not the headers — is the source
-/// of truth for caller identity.
+/// The verifier, never the headers, is the source of truth for caller identity.
 pub trait PrincipalVerifier: Send + Sync {
     /// Verify `credential` and return the authoritative principal, or refuse.
     ///
     /// # Errors
-    /// [`PrincipalVerificationError`] when no credential is presented or it does
-    /// not verify (fail-closed: the caller MUST treat this as 401).
+    /// [`PrincipalVerificationError`] when no credential is presented or it does not verify;
+    /// fail-closed, so the caller MUST treat this as 401.
     fn verify_principal(
         &self,
         credential: &CallerCredential,
@@ -178,31 +114,15 @@ pub trait PrincipalVerifier: Send + Sync {
 
 /// PORT: decide whether `principal` may create the DNS zone `resource`.
 ///
-/// The decision is
-/// `decide(principal, action = cloud.network.dns.zone.create, resource)`. Adapter: the
-/// cloud-iam PDP client (the owned W5 destination). The default posture is deny;
-/// any refusal is treated as deny (fail-closed).
-///
-/// ## Adapter implementation contract (MUST follow; enforcement is by convention)
-///
-/// 1. **Map every internal fault to `Err(Refused)`.** Network errors, timeouts,
-///    parse failures, and unavailability MUST all return
-///    `Err(DnsZoneCreateAuthorizationError::Refused)` so the caller can map them to
-///    HTTP 403 (fail-closed). Never propagate an internal error as `Ok(())`.
-/// 2. **Enforce a deadline.** A hung PDP hangs the caller. Adapters MUST enforce
-///    their own deadline and map expiry to `Err(Refused)`.
-/// 3. **Do not panic.** The release profile uses `panic = "abort"`, so a panic
-///    in production terminates the process rather than being catchable. Adapters
-///    MUST NOT panic — use `Err(Refused)` for every recoverable and
-///    unrecoverable fault. (Do not rely on `catch_unwind` for production fault
-///    isolation; it is defeated by `panic = "abort"`.)
+/// Default posture is deny. An adapter MUST map every internal fault — network error, timeout,
+/// parse failure, unavailability, expiry — to `Err(DnsZoneCreateAuthorizationError::Refused)`, MUST enforce its own
+/// deadline, and MUST NOT panic: the release profile uses `panic = "abort"`, so `catch_unwind`
+/// is not fault isolation here.
 pub trait DnsZoneCreateAuthorizer: Send + Sync {
     /// Authorize `principal` to create the DNS zone `resource`, or refuse.
     ///
     /// # Errors
-    /// [`DnsZoneCreateAuthorizationError`] on an explicit deny or any PDP fault
-    /// (timeout, network, unavailability — all MUST be `Refused`; fail-closed:
-    /// the caller maps this to HTTP 403).
+    /// [`DnsZoneCreateAuthorizationError`] on an explicit deny or any PDP fault; the caller maps this to 403.
     fn ensure_authorized(
         &self,
         principal: &VerifiedPrincipal,
@@ -210,17 +130,14 @@ pub trait DnsZoneCreateAuthorizer: Send + Sync {
     ) -> Result<(), DnsZoneCreateAuthorizationError>;
 }
 
-/// The authz provider the boundary depends on: a principal verifier PORT plus an
-/// DNS-zone-create authorizer PORT. The boundary REFUSES to serve without one
-/// configured (no default-allow fallback) — there is no `Default` impl.
+/// The authz provider the boundary depends on: a [`PrincipalVerifier`] port plus a [`DnsZoneCreateAuthorizer`]
+/// port. There is no `Default` impl: the boundary refuses to serve without both configured.
 pub struct CloudNetworkDnsAuthzProvider {
     verifier: std::sync::Arc<dyn PrincipalVerifier>, // data_class: INTERNAL_ONLY
     authorizer: std::sync::Arc<dyn DnsZoneCreateAuthorizer>, // data_class: INTERNAL_ONLY
 }
 
 impl CloudNetworkDnsAuthzProvider {
-    /// Assemble the provider from a principal verifier and a DNS-zone-create
-    /// authorizer.
     #[must_use]
     pub fn new(
         verifier: std::sync::Arc<dyn PrincipalVerifier>,
@@ -232,11 +149,10 @@ impl CloudNetworkDnsAuthzProvider {
         }
     }
 
-    /// Verify the caller principal via the [`PrincipalVerifier`] port. The
-    /// headers are never trusted as identity.
+    /// Verify the caller principal via the [`PrincipalVerifier`] port; headers are never trusted as identity.
     ///
     /// # Errors
-    /// [`PrincipalVerificationError`] — caller maps to HTTP 401.
+    /// [`PrincipalVerificationError`] — caller maps to 401.
     pub fn verify_principal(
         &self,
         credential: &CallerCredential,
@@ -244,11 +160,10 @@ impl CloudNetworkDnsAuthzProvider {
         self.verifier.verify_principal(credential)
     }
 
-    /// Authorize the verified principal for the DNS-zone-create resource via the PDP
-    /// port. Default-deny / fail-closed.
+    /// Authorize the verified principal for the DNS-zone-create resource via the PDP port; default-deny/fail-closed.
     ///
     /// # Errors
-    /// [`DnsZoneCreateAuthorizationError`] — caller maps to HTTP 403.
+    /// [`DnsZoneCreateAuthorizationError`] — caller maps to 403.
     pub fn ensure_authorized(
         &self,
         principal: &VerifiedPrincipal,
@@ -259,13 +174,10 @@ impl CloudNetworkDnsAuthzProvider {
 }
 
 /// Constant-time byte comparison (no early-exit) so a bearer compare cannot be
-/// timing-probed. Mirrors `iam/ports/policy-cedar-api/src/authz.rs` — NEVER use
-/// a naive `==` on secret material.
+/// timing-probed. NEVER use a naive `==` on secret material.
 ///
-/// **Residual:** the length of both inputs is visible from the XOR seed
-/// (`a.len() ^ b.len()`). This is the accepted repo-wide residual; bearer tokens
-/// are fixed-length secrets. Use a MAC (HMAC-SHA256) if length-hiding is
-/// required.
+/// Residual: the length of both inputs is visible from the XOR seed. Accepted here because
+/// bearer tokens are fixed-length; use a MAC if length-hiding is required.
 #[must_use]
 pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     let max_len = a.len().max(b.len());
@@ -282,16 +194,9 @@ pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 /// constant-time compare against a configured secret, then binds the principal
 /// identity from the configured mapping (NOT from the caller headers).
 ///
-/// ## ⚠ BREAK-GLASS ONLY — NOT multi-tenant production
-///
-/// This adapter binds ONE static `(principal_id, tenant_id)` pair to a single
-/// shared secret. It is suitable only as a single-principal break-glass
-/// credential or for integration tests. The production W5 adapter is the
-/// cloud-iam mTLS/SPIFFE peer-SVID verifier, which derives the principal and
-/// tenant from the verified peer certificate, not from a configured mapping.
-///
-/// Construction REFUSES an empty bearer secret or bound identity so a provider
-/// that cannot prove a credential root can never authenticate a caller.
+/// BREAK-GLASS ONLY, not multi-tenant production: it binds ONE static `(principal_id,
+/// tenant_id)` pair to a single shared secret. Construction REFUSES an empty secret or bound
+/// identity, so a process that cannot prove a credential root can never authenticate.
 pub struct ConfiguredBearerPrincipalVerifier {
     bearer_secret: String,      // data_class: SECRET
     bound_principal_id: String, // data_class: INTERNAL_ONLY
@@ -299,8 +204,7 @@ pub struct ConfiguredBearerPrincipalVerifier {
 }
 
 impl ConfiguredBearerPrincipalVerifier {
-    /// Construct, REFUSING an empty bearer secret or empty bound identity. A
-    /// process that cannot prove a credential root must never authenticate.
+    /// Construct, REFUSING an empty bearer secret or empty bound identity.
     ///
     /// # Errors
     /// [`AuthzProviderConfigError`] when the secret or bound identity is empty.

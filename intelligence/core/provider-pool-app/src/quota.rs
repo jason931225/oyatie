@@ -1,28 +1,8 @@
-//! Per-AGENT-TOKEN reserve-then-reconcile quota.
-//!
-//! Implements the fairness/safety property that prevents one swarm agent from
-//! draining the shared provider subscription pool:
-//!
-//! 1. **Estimate** prompt_tokens + max_tokens for the incoming request.
-//! 2. **Reserve** the estimate against the agent/tenant's remaining budget
-//!    (atomic: remaining >= estimate → deduct; else → `QuotaError::BudgetExceeded`).
-//! 3. **Skip reserve** when headroom is ample (> [`QUOTA_AMPLE_THRESHOLD_PCT`]
-//!    of budget remaining) to avoid hot-path writes.
-//! 4. **Reconcile** on response: replace estimate with actual tokens consumed;
-//!    credit back over-reserve or debit extra consumption (floor at 0).
-//!
-//! All quota state is keyed on `(TenantId, AgentToken)` — NOT source IP — so
-//! NAT-fleet agents are correctly attributed.
-//!
-//! The in-memory adapter ([`InMemoryAgentQuotaStore`]) is the single-node
-//! bring-up reference. A Valkey-backed adapter can satisfy the same port in
-//! production without any caller change.
-//!
-//! data_class annotations follow the Oyatie catalog:
-//! - `AgentToken` → TENANT_SCOPED (identifies an agent within a tenant)
-//! - budget/remaining counters → INTERNAL_ONLY
-//!
-//! ADR-0083 Tier 3: panic-free in production code; tests use `unwrap`/`expect`.
+//! Per-AGENT-TOKEN reserve-then-reconcile quota: estimate prompt + max tokens,
+//! reserve that estimate against the agent's remaining budget, skip the reserve
+//! write when headroom exceeds [`QUOTA_AMPLE_THRESHOLD_PCT`], then reconcile the
+//! actual usage on response. State is keyed on `(TenantId, AgentToken)`, NOT
+//! source IP, so NAT-fleet agents are correctly attributed.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -30,16 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{RepositoryError, TenantId};
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Identity
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// Opaque per-agent identity token. Carries no credential material.
-///
-/// Keyed on `(TenantId, AgentToken)` in the quota store — two agents with the
-/// same string value but different `TenantId`s are completely isolated.
-///
-/// data_class: TENANT_SCOPED
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct AgentToken(pub String); // data_class: TENANT_SCOPED
 
@@ -49,13 +20,7 @@ impl fmt::Display for AgentToken {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Value types
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// Budget configuration for one `(TenantId, AgentToken)` pair.
-///
-/// data_class: INTERNAL_ONLY
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AgentQuotaBudget {
     /// Total token budget for the current window.
@@ -65,8 +30,6 @@ pub struct AgentQuotaBudget {
 }
 
 /// Snapshot of the current quota state for one `(TenantId, AgentToken)` pair.
-///
-/// data_class: INTERNAL_ONLY
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AgentQuotaSnapshot {
     /// Total budget for the window.
@@ -77,13 +40,8 @@ pub struct AgentQuotaSnapshot {
     pub window_reset_unix_ms: u64, // data_class: INTERNAL_ONLY
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Error
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Typed failure from a quota store operation.
-///
-/// data_class: INTERNAL_ONLY — detail fields must never echo agent payload.
+/// Typed failure from a quota store operation. data_class: INTERNAL_ONLY —
+/// detail fields must never echo agent payload.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum QuotaError {
     /// The agent's remaining budget is insufficient for the requested reserve.
@@ -118,44 +76,26 @@ impl fmt::Display for QuotaError {
 
 impl std::error::Error for QuotaError {}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Port
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Port for per-AGENT-TOKEN token-budget accounting.
-///
-/// Keyed on `(TenantId, AgentToken)`. Two agents with the same token value but
-/// different `TenantId`s are completely isolated — the store MUST enforce this.
-///
-/// Production adapter: Valkey-backed CAS (future slice).
-/// Reference adapter: [`InMemoryAgentQuotaStore`].
+/// Port for per-AGENT-TOKEN token-budget accounting, keyed on
+/// `(TenantId, AgentToken)`. Two agents holding the same token value in
+/// different tenants MUST be isolated by the implementation.
 pub trait AgentQuotaStore: Send + Sync {
-    /// Return the current budget snapshot for `(tenant_id, agent)`.
-    ///
-    /// If no budget has been configured for this pair, return a snapshot with
-    /// `budget_tokens = 0` and `remaining_tokens = 0` (treat as unlimited when
-    /// the caller is the dispatch path — the caller is responsible for
-    /// interpreting an absent entry as "no quota configured").
+    /// Return the current budget snapshot for `(tenant_id, agent)`; an
+    /// unconfigured pair yields an all-zero snapshot the caller must interpret.
     ///
     /// # Errors
-    /// Returns [`QuotaError::Repository`] on store failure.
+    /// [`RepositoryError`] on store failure.
     fn snapshot(
         &self,
         tenant_id: &TenantId,
         agent: &AgentToken,
     ) -> Result<AgentQuotaSnapshot, RepositoryError>;
 
-    /// Atomically reserve `tokens` from the agent's remaining budget.
-    ///
-    /// If `remaining >= tokens`, deducts `tokens` from `remaining` and returns
-    /// `Ok(())`.
-    ///
-    /// If `remaining < tokens`, returns
-    /// `Err(QuotaError::BudgetExceeded { agent, requested, remaining })` without
-    /// mutating the store.
+    /// Atomically reserve `tokens` from the agent's remaining budget, or refuse
+    /// without mutating the store.
     ///
     /// # Errors
-    /// Returns [`QuotaError::BudgetExceeded`] when insufficient budget, or
+    /// [`QuotaError::BudgetExceeded`] when `remaining < tokens`;
     /// [`QuotaError::Repository`] on store failure.
     fn reserve(
         &mut self,
@@ -165,21 +105,12 @@ pub trait AgentQuotaStore: Send + Sync {
     ) -> Result<(), QuotaError>;
 
     /// Reconcile a previous reserve: replace the reserved `estimate` with
-    /// `actual_used`.
-    ///
-    /// Semantics:
-    /// - If `actual_used < estimate`: credit back `estimate - actual_used` to
-    ///   `remaining` (cap at `budget_tokens`).
-    /// - If `actual_used > estimate`: debit the extra `actual_used - estimate`
-    ///   from `remaining` (floor at 0).
-    /// - If equal: no-op on `remaining`.
-    ///
-    /// When the reserve was skipped (skip-when-ample), `estimate` is 0 and
-    /// `actual_used` is the real usage. The store debits `actual_used` from
-    /// `remaining` (floor at 0).
+    /// `actual_used`, crediting an over-reserve back (capped at `budget_tokens`)
+    /// or debiting the excess (floored at 0). A skipped reserve passes
+    /// `estimate = 0`, so the whole of `actual_used` is debited.
     ///
     /// # Errors
-    /// Returns [`RepositoryError`] on store failure.
+    /// [`RepositoryError`] on store failure.
     fn reconcile(
         &mut self,
         tenant_id: &TenantId,
@@ -189,45 +120,21 @@ pub trait AgentQuotaStore: Send + Sync {
     ) -> Result<(), RepositoryError>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Skip-when-ample
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Fraction of budget that must be remaining for the reserve write to be
-/// skipped on the hot path.
-///
-/// When `remaining_tokens * 100 / budget_tokens > QUOTA_AMPLE_THRESHOLD_PCT`,
-/// [`should_skip_reserve`] returns `true` and the caller skips the reserve
-/// write. Reconcile always runs after the response.
-///
-/// Value: 80 (i.e. >80% remaining → skip reserve).
-/// data_class: INTERNAL_ONLY
+/// Fraction of budget that must remain for [`should_skip_reserve`] to skip the
+/// hot-path reserve write. Reconcile still always runs.
 pub const QUOTA_AMPLE_THRESHOLD_PCT: u64 = 80;
 
-/// Return `true` when the agent's remaining budget is ample enough to skip the
-/// reserve write.
-///
-/// Guard against division by zero: when `budget_tokens == 0`, returns `false`
-/// (no skip — quota is fully exhausted or unconfigured).
-///
-/// # Hot-path intent
-/// The caller should only skip the *reserve* step, not the *reconcile* step.
-/// Reconcile always runs on success so actual usage is accurately tracked.
+/// Whether the agent's remaining budget is ample enough to skip the reserve
+/// write. A zero budget never skips.
 #[must_use]
 pub fn should_skip_reserve(snap: &AgentQuotaSnapshot) -> bool {
     if snap.budget_tokens == 0 {
         return false;
     }
-    // remaining_pct = remaining * 100 / budget (integer, truncated).
     let remaining_pct = snap.remaining_tokens.saturating_mul(100) / snap.budget_tokens;
     remaining_pct > QUOTA_AMPLE_THRESHOLD_PCT
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// In-memory reference adapter
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Internal per-entry state.
 #[derive(Clone, Debug)]
 struct QuotaEntry {
     budget_tokens: u64,        // data_class: INTERNAL_ONLY
@@ -235,14 +142,8 @@ struct QuotaEntry {
     window_reset_unix_ms: u64, // data_class: INTERNAL_ONLY
 }
 
-/// In-memory [`AgentQuotaStore`] backed by a `BTreeMap` keyed by
-/// `(TenantId, AgentToken)`.
-///
-/// Reference adapter for tests and single-node bring-up. Production swaps in
-/// a Valkey-backed adapter behind the same port.
-///
-/// Interior mutability is `Arc<Mutex<_>>` so the store can be cloned cheaply
-/// across test helper boundaries while sharing state.
+/// In-memory [`AgentQuotaStore`] reference adapter for tests and single-node
+/// bring-up. Interior mutability is `Arc<Mutex<_>>` so clones share state.
 #[derive(Clone, Debug, Default)]
 pub struct InMemoryAgentQuotaStore {
     entries: Arc<Mutex<BTreeMap<(String, String), QuotaEntry>>>,
@@ -256,10 +157,8 @@ impl InMemoryAgentQuotaStore {
         Self::default()
     }
 
-    /// Seed (or replace) the budget for `(tenant_id, agent)`.
-    ///
-    /// Must be called before [`AgentQuotaStore::reserve`] for a given pair.
-    /// The initial `remaining_tokens` equals `budget.budget_tokens`.
+    /// Seed (or replace) the budget for `(tenant_id, agent)`. Must be called
+    /// before [`AgentQuotaStore::reserve`]; `remaining_tokens` starts at budget.
     pub fn set_budget(&mut self, tenant_id: TenantId, agent: AgentToken, budget: AgentQuotaBudget) {
         if let Ok(mut guard) = self.entries.lock() {
             guard.insert(
@@ -291,8 +190,6 @@ impl AgentQuotaStore for InMemoryAgentQuotaStore {
                 remaining_tokens: entry.remaining_tokens,
                 window_reset_unix_ms: entry.window_reset_unix_ms,
             }),
-            // No entry → unlimited / unconfigured; return zeros so callers can
-            // detect the absence.
             None => Ok(AgentQuotaSnapshot {
                 budget_tokens: 0,
                 remaining_tokens: 0,
@@ -340,24 +237,19 @@ impl AgentQuotaStore for InMemoryAgentQuotaStore {
         let key = (tenant_id.0.clone(), agent.0.clone());
         let entry = match guard.get_mut(&key) {
             Some(e) => e,
-            // No entry → reconcile is a no-op (quota not configured for this agent).
             None => return Ok(()),
         };
 
-        // Compute net delta: positive = credit back, negative = extra debit.
         if actual_used < estimate {
-            // Over-reserved: credit back the difference, capped at budget.
             let credit = estimate - actual_used;
             entry.remaining_tokens = entry
                 .remaining_tokens
                 .saturating_add(credit)
                 .min(entry.budget_tokens);
         } else if actual_used > estimate {
-            // Under-reserved: debit the extra, floor at 0.
             let extra = actual_used - estimate;
             entry.remaining_tokens = entry.remaining_tokens.saturating_sub(extra);
         }
-        // If equal: no-op.
         Ok(())
     }
 }

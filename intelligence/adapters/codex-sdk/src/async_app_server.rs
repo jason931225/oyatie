@@ -1,8 +1,6 @@
 //! Optional Tokio-backed async wrappers for the app-server API.
 //!
-//! The underlying app-server transport is blocking stdio. These wrappers use
-//! `tokio::task::spawn_blocking` so callers can use async Rust without blocking
-//! Tokio worker threads. Source: <https://docs.rs/tokio/latest/tokio/task/index.html>
+//! The transport is blocking stdio; async methods offload it with `tokio::task::spawn_blocking`.
 
 use serde_json::Value;
 
@@ -35,7 +33,6 @@ impl AsyncAppCodex {
         Ok(Self { inner })
     }
 
-    /// Initialization metadata returned by the app-server.
     pub fn metadata(&self) -> &InitializeResponse {
         self.inner.metadata()
     }
@@ -46,7 +43,6 @@ impl AsyncAppCodex {
         let _ = tokio::task::spawn_blocking(move || inner.close()).await;
     }
 
-    /// Authenticate with an API key.
     pub async fn login_api_key(&self, api_key: impl Into<String>) -> Result<()> {
         let inner = self.inner.clone();
         let api_key = api_key.into();
@@ -60,39 +56,33 @@ impl AsyncAppCodex {
         Ok(AsyncAppLoginHandle { inner: handle })
     }
 
-    /// Start device-code ChatGPT login and return a routed async login handle.
     pub async fn login_chatgpt_device_code(&self) -> Result<AsyncAppLoginHandle> {
         let inner = self.inner.clone();
         let handle = blocking_result(move || inner.login_chatgpt_device_code()).await?;
         Ok(AsyncAppLoginHandle { inner: handle })
     }
 
-    /// Read the current account state.
     pub async fn account(&self, refresh_token: bool) -> Result<Value> {
         let inner = self.inner.clone();
         blocking_result(move || inner.account(refresh_token)).await
     }
 
-    /// Clear the current account session.
     pub async fn logout(&self) -> Result<()> {
         let inner = self.inner.clone();
         blocking_result(move || inner.logout()).await
     }
 
-    /// Create a new Codex conversation thread.
     pub async fn thread_start(&self, params: Option<Value>) -> Result<AsyncAppThread> {
         let inner = self.inner.clone();
         let thread = blocking_result(move || inner.thread_start(params)).await?;
         Ok(AsyncAppThread { inner: thread })
     }
 
-    /// List saved conversation threads.
     pub async fn thread_list(&self, params: Option<Value>) -> Result<Value> {
         let inner = self.inner.clone();
         blocking_result(move || inner.thread_list(params)).await
     }
 
-    /// Resume an existing conversation thread by ID.
     pub async fn thread_resume(
         &self,
         thread_id: impl Into<String>,
@@ -104,7 +94,6 @@ impl AsyncAppCodex {
         Ok(AsyncAppThread { inner: thread })
     }
 
-    /// Create a new thread from an existing thread.
     pub async fn thread_fork(
         &self,
         thread_id: impl Into<String>,
@@ -116,14 +105,12 @@ impl AsyncAppCodex {
         Ok(AsyncAppThread { inner: thread })
     }
 
-    /// Archive a conversation thread.
     pub async fn thread_archive(&self, thread_id: impl Into<String>) -> Result<Value> {
         let inner = self.inner.clone();
         let thread_id = thread_id.into();
         blocking_result(move || inner.thread_archive(thread_id)).await
     }
 
-    /// Unarchive a conversation thread and return its handle.
     pub async fn thread_unarchive(&self, thread_id: impl Into<String>) -> Result<AsyncAppThread> {
         let inner = self.inner.clone();
         let thread_id = thread_id.into();
@@ -131,7 +118,6 @@ impl AsyncAppCodex {
         Ok(AsyncAppThread { inner: thread })
     }
 
-    /// List available models.
     pub async fn models(&self, include_hidden: bool) -> Result<Value> {
         let inner = self.inner.clone();
         blocking_result(move || inner.models(include_hidden)).await
@@ -167,7 +153,6 @@ impl AsyncAppLoginHandle {
         blocking_result(move || inner.wait()).await
     }
 
-    /// Cancel this login attempt.
     pub async fn cancel(&self) -> Result<Value> {
         let inner = self.inner.clone();
         blocking_result(move || inner.cancel()).await
@@ -252,7 +237,6 @@ impl AsyncAppTurnHandle {
         blocking_result(move || inner.interrupt()).await
     }
 
-    /// Return an async notification stream helper for this turn.
     pub fn stream(&self) -> AsyncAppTurnStream {
         AsyncAppTurnStream {
             inner: self.inner.clone(),

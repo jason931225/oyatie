@@ -1,15 +1,7 @@
-//! Coverage for `validate_period_id` and `period_id_from_rfc3339`: this
-//! crate's `YYYY-MM-DD` UTC-calendar-day period convention, boundary
-//! instants (period start/end), offset normalization (a single instant must
-//! derive the same period id no matter which RFC3339 offset it is spelled
-//! with), and malformed input.
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` to assert
-// invariants — Tier 3 exemption.
+//! Coverage for `validate_period_id` and `period_id_from_rfc3339`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use audit_emission_domain::{EmissionDomainError, period_id_from_rfc3339, validate_period_id};
-
-// ── validate_period_id ──────────────────────────────────────────────────
 
 #[test]
 fn well_formed_period_id_is_accepted() {
@@ -34,14 +26,12 @@ fn leap_day_is_rejected_in_a_non_leap_year() {
 
 #[test]
 fn century_non_leap_year_rejects_feb_29() {
-    // 1900 is divisible by 4 and by 100 but not by 400: not a leap year.
     let err = validate_period_id("1900-02-29").unwrap_err();
     assert!(matches!(err, EmissionDomainError::MalformedPeriod { .. }));
 }
 
 #[test]
 fn quad_century_year_accepts_feb_29() {
-    // 2000 is divisible by 400: a leap year.
     validate_period_id("2000-02-29").expect("2000 is a leap year");
 }
 
@@ -109,8 +99,6 @@ fn day_thirty_in_april_is_accepted() {
     validate_period_id("2026-04-30").expect("April has 30 days");
 }
 
-// ── period_id_from_rfc3339: boundary instants ───────────────────────────
-
 #[test]
 fn period_start_instant_derives_the_period() {
     assert_eq!(
@@ -145,7 +133,6 @@ fn fractional_seconds_are_accepted() {
 
 #[test]
 fn positive_offset_within_the_same_utc_day_is_accepted() {
-    // 23:59:59+09:00 is 14:59:59Z the same day: no boundary crossed.
     assert_eq!(
         period_id_from_rfc3339("2026-02-20T23:59:59+09:00").expect("valid timestamp"),
         "2026-02-20"
@@ -154,7 +141,6 @@ fn positive_offset_within_the_same_utc_day_is_accepted() {
 
 #[test]
 fn negative_offset_within_the_same_utc_day_is_accepted() {
-    // 00:00:00-05:00 is 05:00:00Z the same day: no boundary crossed.
     assert_eq!(
         period_id_from_rfc3339("2026-02-20T00:00:00-05:00").expect("valid timestamp"),
         "2026-02-20"
@@ -163,8 +149,6 @@ fn negative_offset_within_the_same_utc_day_is_accepted() {
 
 #[test]
 fn positive_offset_that_crosses_midnight_shifts_to_the_previous_utc_day() {
-    // 2026-02-21T00:30:00+09:00 is the same instant as 2026-02-20T15:30:00Z:
-    // the local calendar date is one day ahead of the UTC calendar date.
     assert_eq!(
         period_id_from_rfc3339("2026-02-21T00:30:00+09:00").expect("valid timestamp"),
         "2026-02-20"
@@ -173,8 +157,6 @@ fn positive_offset_that_crosses_midnight_shifts_to_the_previous_utc_day() {
 
 #[test]
 fn negative_offset_that_crosses_midnight_shifts_to_the_next_utc_day() {
-    // 2026-02-20T21:00:00-05:00 is the same instant as 2026-02-21T02:00:00Z:
-    // the local calendar date is one day behind the UTC calendar date.
     assert_eq!(
         period_id_from_rfc3339("2026-02-20T21:00:00-05:00").expect("valid timestamp"),
         "2026-02-21"
@@ -195,7 +177,6 @@ fn same_instant_different_offset_spellings_yield_the_same_period_id() {
 
 #[test]
 fn positive_offset_crossing_a_year_boundary_shifts_the_period_id() {
-    // 2027-01-01T00:30:00+09:00 is the same instant as 2026-12-31T15:30:00Z.
     assert_eq!(
         period_id_from_rfc3339("2027-01-01T00:30:00+09:00").expect("valid timestamp"),
         "2026-12-31"
@@ -204,7 +185,6 @@ fn positive_offset_crossing_a_year_boundary_shifts_the_period_id() {
 
 #[test]
 fn negative_offset_crossing_a_year_boundary_shifts_the_period_id() {
-    // 2026-12-31T20:00:00-05:00 is the same instant as 2027-01-01T01:00:00Z.
     assert_eq!(
         period_id_from_rfc3339("2026-12-31T20:00:00-05:00").expect("valid timestamp"),
         "2027-01-01"
@@ -213,8 +193,6 @@ fn negative_offset_crossing_a_year_boundary_shifts_the_period_id() {
 
 #[test]
 fn negative_offset_crossing_a_month_boundary_shifts_the_period_id() {
-    // 2026 is not a leap year, so February has 28 days: 2026-02-28T23:00:00
-    // -05:00 is the same instant as 2026-03-01T04:00:00Z.
     assert_eq!(
         period_id_from_rfc3339("2026-02-28T23:00:00-05:00").expect("valid timestamp"),
         "2026-03-01"
@@ -225,8 +203,6 @@ fn negative_offset_crossing_a_month_boundary_shifts_the_period_id() {
 fn leap_second_value_sixty_is_tolerated() {
     period_id_from_rfc3339("2026-02-20T23:59:60Z").expect("leap second must be tolerated");
 }
-
-// ── period_id_from_rfc3339: malformed input ─────────────────────────────
 
 #[test]
 fn missing_time_separator_is_rejected() {

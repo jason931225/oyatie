@@ -1,5 +1,3 @@
-//! The loaded pack: validation on the way in, and the seam impls on the way out.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use port_engine_api::{
@@ -62,7 +60,6 @@ impl LoadedRulePack {
             source: doc.pair.source,
             target: doc.pair.target,
         };
-        // Fail closed on ambiguous pair before we ever plan.
         pair.slug().map_err(RulepackError::Pair)?;
 
         if doc.rules.is_empty() {
@@ -113,9 +110,6 @@ impl LoadedRulePack {
                     field: "rules(duplicate)",
                 });
             }
-            // Every field the wire shape carries must either drive behaviour or be refused.
-            // These two carry no implementation, so a pack declaring them is told so rather than
-            // loading green and receiving nothing.
             if !rule.required_diagnostics.is_empty() {
                 return Err(RulepackError::UnimplementedSemantics {
                     rule: rule.id,
@@ -134,10 +128,6 @@ impl LoadedRulePack {
                     policy: rule.conflict,
                 });
             }
-            // Declaration order IS the transform order — `port_engine_kernel::plan` refuses a
-            // unit whose rules arrive out of declared position. `precedence` therefore has to
-            // agree with it or the pack states an order that nothing obeys, and a reviewer
-            // reading the precedences would be reading a fiction.
             if let Some(previous) = previous_precedence.filter(|p| rule.precedence <= *p) {
                 return Err(RulepackError::PrecedenceDisagreesWithOrder {
                     rule: rule.id,
@@ -224,8 +214,7 @@ impl LoadedRulePack {
             &loaded_rules,
         )?;
 
-        // Digest the embedded bytes exactly — whitespace is part of the identity until a
-        // canonicalizer lands with the forever specs/port-rules materializer.
+        // Digest the embedded bytes EXACTLY: whitespace is part of the pack identity.
         let digest = digest_bytes(json.as_bytes());
         Ok(Self {
             pair,
@@ -267,7 +256,6 @@ impl LoadedRulePack {
         &self.deferred_kinds
     }
 
-    /// Borrow the language pair.
     #[must_use]
     pub fn language_pair(&self) -> &LanguagePair {
         &self.pair
@@ -293,7 +281,6 @@ impl LoadedRulePack {
             .sum()
     }
 
-    /// Look up a loaded rule by id.
     #[must_use]
     pub fn rule(&self, id: &RuleId) -> Option<&LoadedRule> {
         self.loaded_rules.iter().find(|r| &r.id == id)
