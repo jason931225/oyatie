@@ -292,6 +292,7 @@ fn a_mention_under_any_root_this_repository_could_define_forwards() {
         "pub trait CellStore {}\nimpl<T: my_crate::CellStore> CellStore for Arc<T> {}\n",
         "pub trait Service {}\nimpl<S> Service for TowerAdapter<S>\nwhere\n    S: tower::Service<Request>,\n{\n}\n",
         "pub trait Write {}\nimpl<W: my_std::io::Write> Write for LogSink<W> {}\n",
+        "pub trait Write {}\nimpl<W: stdx::io::Write> Write for LogSink<W> {}\n",
         "pub trait Cell_Store {}\nimpl<T: Cell_Store> Cell_Store for Arc<T> {}\n",
     ] {
         assert_eq!(refusals(&[added(PORT, port)]).len(), 1, "{port:?}");
