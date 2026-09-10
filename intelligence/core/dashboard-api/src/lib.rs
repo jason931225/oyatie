@@ -1,33 +1,17 @@
-//! M02-P02-IP-001 — Read-only REST API surface (request/response shapes).
-//!
-//! No HTTP server here — just the typed shapes for the read-only endpoints.
-//! The HTTP runtime adapter (a separate crate per ADR-0090) plugs these in.
-//!
-//! Write methods are rejected at the type level: the only constructible
-//! `HttpMethod` value is `Get`. Constructing `Post`/`Put`/`Delete` requires
-//! reaching for the `RejectedWriteMethod` enum, whose existence is the
-//! negative test surface for "write methods fail closed".
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Typed request/response shapes for the read-only dashboard endpoints. The
+//! HTTP runtime lives in a separate adapter crate (ADR-0090).
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use intelligence_dashboard_kernel::{AccountHealthView, RoutingView, SessionView, UsageView};
 
-// ── HTTP method (read-only at type level) ────────────────────────────────────
-
-/// The single HTTP method this surface accepts.
-/// There is no constructor here for `Post`/`Put`/`Delete`/`Patch`; those
-/// only appear inside `RejectedWriteMethod` so that any "accepts a method"
-/// API only sees `Get`.
+/// One variant, so no API on this surface can be handed a write method.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HttpMethod {
     Get,
 }
 
-/// The set of write methods that this surface MUST reject with 405.
-///
-/// This type intentionally has NO `From<HttpMethod>` impl. There is no
-/// path from `HttpMethod` to `RejectedWriteMethod` and vice versa.
+/// Deliberately disjoint from [`HttpMethod`]: no conversion exists in either
+/// direction, so a rejected method can never become an accepted one.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RejectedWriteMethod {
     Post,
@@ -47,8 +31,6 @@ impl RejectedWriteMethod {
     }
 }
 
-// ── Request shape ────────────────────────────────────────────────────────────
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReadOnlyRequest {
     method: HttpMethod,
@@ -56,7 +38,6 @@ pub struct ReadOnlyRequest {
 }
 
 impl ReadOnlyRequest {
-    /// Only entry point. Method is fixed to `Get`.
     pub fn new_get(path: impl Into<String>) -> Self {
         Self {
             method: HttpMethod::Get,
@@ -72,17 +53,15 @@ impl ReadOnlyRequest {
     }
 }
 
-// ── Response shapes (per surface) ────────────────────────────────────────────
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountHealthResponse {
-    pub status: u16,             // always 200
+    pub status: u16,
     pub view: AccountHealthView, // data_class: INTERNAL_ONLY
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountHealthListResponse {
-    pub status: u16,                   // always 200
+    pub status: u16,
     pub views: Vec<AccountHealthView>, // data_class: INTERNAL_ONLY
 }
 
@@ -104,14 +83,11 @@ pub struct RoutingResponse {
     pub view: RoutingView, // data_class: INTERNAL_ONLY
 }
 
-// ── Write-rejection response ─────────────────────────────────────────────────
-
-/// HTTP 405 Method Not Allowed with audit event tag.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MethodNotAllowedResponse {
-    pub status: u16,                          // always 405
-    pub allow_header: &'static str,           // "GET"
-    pub audit_event: &'static str,            // "forbidden_write_attempt"
+    pub status: u16,
+    pub allow_header: &'static str,
+    pub audit_event: &'static str,
     pub rejected_method: RejectedWriteMethod, // data_class: INTERNAL_ONLY
 }
 
@@ -125,8 +101,6 @@ impl MethodNotAllowedResponse {
         }
     }
 }
-
-// ── Surface enumeration (the endpoint catalog) ───────────────────────────────
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReadOnlyEndpoint {
@@ -148,8 +122,6 @@ impl ReadOnlyEndpoint {
         }
     }
 }
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -249,10 +221,6 @@ mod tests {
         assert_eq!(ReadOnlyEndpoint::Routing.path(), "/v1/routing/explain");
     }
 
-    /// Negative test: write methods are rejected fail-closed at the type
-    /// boundary. We cannot construct a `ReadOnlyRequest` with a non-Get
-    /// method (no constructor exists). Any POST/PUT/DELETE/PATCH input
-    /// must be mapped to `RejectedWriteMethod` which produces a 405.
     #[test]
     fn negative_write_methods_rejected_at_type_level() {
         for m in [
@@ -268,7 +236,6 @@ mod tests {
             assert_eq!(r.rejected_method, m);
             assert!(!m.as_str().is_empty());
         }
-        // Confirm HttpMethod has exactly one variant constructible here.
         let only = HttpMethod::Get;
         assert_eq!(only, HttpMethod::Get);
     }

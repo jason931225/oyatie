@@ -1,33 +1,5 @@
-//! Valkey Stream EventSink adapter for the intelligence-app OAuth subscription pool
-//! (ADR-0384 Path B, Stage-7 D6 production seam).
-//!
-//! Implements [`EventSink`] from `intelligence-kernel` by
-//! emitting [`LlmGatewayEvent`] to the Valkey Stream key
-//! `intelligence-app-receipts:<tenant_id>` via `XADD`.
-//!
-//! Valkey is a Redis-protocol-compatible fork; the `redis` crate connects to
-//! it without modification.
-//!
-//! ## Stream key shape
-//!
-//! `intelligence-app-receipts:<tenant_id>`  (one stream per tenant)
-//!
-//! ## XADD field mapping
-//!
-//! Each [`LlmGatewayEvent`] maps to a flat XADD field list:
-//! `request_id`, `tenant_id`, `agent_id`, `seat_id`, `provider`, `model`,
-//! `prompt_tokens`, `completion_tokens`, `ms_latency`, `status`,
-//! `timestamp_unix_ms`.
-//!
-//! ## non_claims
-//!
-//! - emit is best-effort: transport failures are logged via `tracing::warn`
-//!   and never propagate to the caller (D6 non-fatal contract).
-//! - no consumer-group management or MAXLEN trimming (Stage-8 follow-up).
-//! - no automatic reconnect beyond what the `redis` crate provides.
-//! - no TLS client-certificate authentication (operator supplies `rediss://` URL).
-//!
-//! ADR-0083 Tier-3 panic-free: no `unwrap`, `expect`, or `panic!` outside tests.
+//! Valkey Stream [`EventSink`] for the intelligence-app subscription pool
+//! (ADR-0384 Path B, D6). One append-only receipt stream per tenant.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -38,17 +10,13 @@ use intelligence_kernel::{EventSink, LlmGatewayEvent};
 use redis::Commands;
 use tracing::warn;
 
-// ---------------------------------------------------------------------------
-// Stream key helper
-// ---------------------------------------------------------------------------
+/// Valkey generates the entry id, which is what an append-only receipt log
+/// wants; a caller-chosen id would have to be monotonic and unique.
+const AUTO_GENERATED_ENTRY_ID: &str = "*";
 
 fn stream_key(tenant_id: &str) -> String {
     format!("intelligence-app-receipts:{tenant_id}")
 }
-
-// ---------------------------------------------------------------------------
-// Error type
-// ---------------------------------------------------------------------------
 
 /// Errors raised during event emission. Non-fatal per D6 contract.
 #[derive(Debug)]
@@ -68,15 +36,10 @@ impl fmt::Display for ValkeySinkError {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ValkeyEventSink
-// ---------------------------------------------------------------------------
-
 /// [`EventSink`] backed by a Valkey Stream via XADD.
 ///
-/// Wraps a `redis::Connection` behind a `Mutex` so the sync trait method can
-/// issue commands without an async runtime. The mutex is uncontended in the
-/// common case (one emitter per service instance).
+/// The `Mutex` is what lets the `&self` trait method borrow the connection
+/// mutably; it is uncontended at one emitter per service instance.
 pub struct ValkeyEventSink {
     conn: Mutex<redis::Connection>, // data_class: INTERNAL_ONLY
 }
@@ -88,11 +51,9 @@ impl fmt::Debug for ValkeyEventSink {
 }
 
 impl ValkeyEventSink {
-    /// Connect to Valkey at `url` (e.g. `redis://valkey.svc:6379` or
-    /// `rediss://valkey.svc:6380` for TLS).
-    ///
-    /// Returns an error if the initial connection fails so the composition
-    /// root can surface it at start-up.
+    /// Connect to Valkey at `url`; `rediss://` selects TLS. Fails eagerly so
+    /// the composition root surfaces a bad endpoint at start-up rather than
+    /// on the first swallowed emit.
     pub fn connect(url: &str) -> Result<Self, ValkeySinkError> {
         let client =
             redis::Client::open(url).map_err(|e| ValkeySinkError::Connection(e.to_string()))?;
@@ -104,7 +65,6 @@ impl ValkeyEventSink {
         })
     }
 
-    /// Emit one event, returning a typed error for test assertions.
     fn try_emit(&self, event: &LlmGatewayEvent) -> Result<(), ValkeySinkError> {
         let key = stream_key(event.tenant_id.as_str());
 
@@ -127,10 +87,8 @@ impl ValkeyEventSink {
             .lock()
             .map_err(|_| ValkeySinkError::Connection("mutex poisoned".to_string()))?;
 
-        // XADD <key> * <field> <value> ...
-        // The auto-generated stream ID "*" is what we want for append-only receipts.
         let _: redis::Value = conn
-            .xadd(&key, "*", &fields)
+            .xadd(&key, AUTO_GENERATED_ENTRY_ID, &fields)
             .map_err(|e| ValkeySinkError::Xadd(e.to_string()))?;
 
         Ok(())
@@ -138,8 +96,8 @@ impl ValkeyEventSink {
 }
 
 impl EventSink for ValkeyEventSink {
-    /// Emit one event to Valkey Stream. Errors are logged via `tracing::warn`
-    /// and swallowed per the D6 non-fatal contract.
+    /// A transport failure is logged and swallowed: the D6 contract is that a
+    /// receipt never fails the request that produced it.
     fn emit(&self, event: LlmGatewayEvent) {
         if let Err(e) = self.try_emit(&event) {
             warn!(
@@ -150,10 +108,6 @@ impl EventSink for ValkeyEventSink {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -192,8 +146,7 @@ mod tests {
 
     #[test]
     fn connect_fails_on_unreachable_host() {
-        // Port 1 is reserved and never has a listener; this exercises the
-        // connection-refused path without requiring a live Valkey instance.
+        // A privileged port nothing in the test environment binds.
         let result = ValkeyEventSink::connect("redis://127.0.0.1:1");
         assert!(
             matches!(result, Err(ValkeySinkError::Connection(_))),
@@ -213,9 +166,11 @@ mod tests {
         assert!(e.to_string().contains("valkey XADD error"));
     }
 
+    /// `try_emit` renders `status` through `Debug`; a variant without a
+    /// distinct repr would collapse two outcomes into one receipt field.
     #[test]
-    fn event_status_variants_all_have_debug_repr() {
-        // Ensures the format!("{:?}", status) call in try_emit works for all variants.
+    fn event_status_variants_have_distinct_debug_reprs() {
+        let mut seen = std::collections::HashSet::new();
         for status in [
             EventStatus::Ok,
             EventStatus::UpstreamError,
@@ -225,12 +180,10 @@ mod tests {
         ] {
             let mut ev = test_event();
             ev.status = status;
-            // We can't call try_emit without a live Valkey, but we can verify
-            // the fields build without panic by exercising stream_key + field list.
-            let key = stream_key(ev.tenant_id.as_str());
-            assert!(!key.is_empty());
-            let status_str = format!("{:?}", ev.status);
-            assert!(!status_str.is_empty());
+            assert!(
+                seen.insert(format!("{:?}", ev.status)),
+                "duplicate Debug repr for {status:?}"
+            );
         }
     }
 }

@@ -1,24 +1,11 @@
 //! Session pinning (pure kernel) for prompt-cache preservation.
 //!
-//! Rotating the upstream seat mid-conversation forces the provider to re-create
-//! its prompt cache, costing 5-10x on the first turn after the switch. To avoid
-//! that, the gateway pins a logical *session* to one seat for a bounded TTL and
-//! only rebinds on failover (e.g. a 429 cooldown on the pinned seat — handled by
-//! [`crate::SubscriptionPool`] which drops the sticky binding on any non-Ok
-//! outcome).
+//! Rotating the upstream seat mid-conversation makes the provider rebuild its
+//! prompt cache from scratch, so the gateway pins a logical session to one
+//! seat and rebinds only on failover.
 //!
-//! This module owns the two pure derivations the rest of the pool needs:
-//!
-//! 1. [`derive_sticky_key`] — the **dual-format** affinity-key extractor. A
-//!    request either carries the client's own wire session id (authoritative,
-//!    stable for the whole conversation) or, when it does not, we derive a
-//!    privacy-preserving fingerprint from the first user message. We never store
-//!    or echo raw prompt content or raw wire ids.
-//! 2. [`prompt_cache_key`] — the `tenant::provider::session::model` cache key
-//!    the proxy layer uses to address the upstream prompt cache.
-//!
-//! Both are deterministic and side-effect free so they can be proptested and so
-//! two gateway replicas pin identical sessions to identical keys.
+//! Every derivation here is deterministic and side-effect free, so two gateway
+//! replicas derive identical keys for identical requests.
 
 use std::fmt::Write as _;
 
@@ -29,24 +16,17 @@ use crate::{Provider, TenantId};
 /// Namespace prefix for keys derived from a client-supplied wire session id.
 const WIRE_SESSION_PREFIX: &str = "wsid:";
 /// Namespace prefix for keys derived from a first-user-message fingerprint.
-/// Kept identical to the legacy [`crate::privacy_preserving_sticky_key`] prefix
-/// and width; the hash algorithm is SHA-256.
 const MESSAGE_PREFIX: &str = "sticky:";
 
-/// Width (in lowercase hex chars) of the message fingerprint. 16 hex chars =
-/// 64 bits — matches the historical key width and the brief's `sha256(..)[:16]`.
-// ponytail: 64-bit fingerprint; widen to 32 hex (128 bit) if cross-tenant
-// cache-key collisions ever become a real adversarial concern.
+/// Width in lowercase hex chars, so 64 bits of the digest survive.
 const FINGERPRINT_HEX_LEN: usize = 16;
+const _: () = assert!(FINGERPRINT_HEX_LEN.is_multiple_of(2));
 
-/// Derive a stable, privacy-preserving sticky-affinity key from whatever
-/// session signal the request carries. Returns `None` only when neither a
-/// usable wire session id nor a first user message is available — the caller
-/// then leases without pinning.
+/// Derive a sticky-affinity key from whatever session signal the request
+/// carries; `None` means the caller leases without pinning.
 ///
-/// Precedence: a non-blank wire session id always wins, because it is stable
-/// across every turn of the conversation (the message fingerprint only matches
-/// requests whose *first* message is byte-identical).
+/// A non-blank wire session id wins because it is stable across every turn,
+/// where the fingerprint only matches a byte-identical first message.
 pub fn derive_sticky_key(
     wire_session_id: Option<&str>,
     first_user_message: Option<&str>,
@@ -63,7 +43,6 @@ pub fn derive_sticky_key(
     first_user_message.map(message_sticky_key)
 }
 
-/// Build the message-derived sticky key: `sticky:<sha256(message)[:16 hex]>`.
 /// Raw prompt content never appears in the output.
 pub(crate) fn message_sticky_key(first_user_message: &str) -> String {
     format!(
@@ -79,16 +58,14 @@ fn message_fingerprint(first_user_message: &str) -> String {
         if hex.len() >= FINGERPRINT_HEX_LEN {
             break;
         }
-        // Two hex chars per byte; FINGERPRINT_HEX_LEN is even so this lands
-        // exactly on the boundary.
         hex.push_str(&format!("{byte:02x}"));
     }
     hex
 }
 
-/// Address the upstream prompt cache for a pinned session:
-/// `tenant::provider::session::model`. The tenant segment makes the helper safe
-/// for shared cache infrastructure; TTL stays caller-supplied at the pool seam.
+/// Address the upstream prompt cache for a pinned session. The tenant is part
+/// of the key, so shared cache infrastructure cannot serve one tenant's cached
+/// prefix to another.
 pub fn prompt_cache_key(
     tenant_id: &TenantId,
     provider: Provider,
@@ -111,6 +88,8 @@ pub fn prompt_cache_key(
     key
 }
 
+/// Length-prefixes each segment, so a value containing the delimiter cannot
+/// forge a different key.
 fn push_segment(key: &mut String, tag: char, value: &str) {
     let _ = write!(key, "{tag}{}:{value}", value.len());
 }

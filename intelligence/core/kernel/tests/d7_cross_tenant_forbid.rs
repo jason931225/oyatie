@@ -1,14 +1,7 @@
-//! D7 — per-tenant owned policy-engine isolation contract (deny-wins).
+//! Per-tenant isolation contract: the kernel must consult the gate before
+//! it hands back a seat, and a `Forbid` must survive any number of allows.
 //!
-//! These tests use a fake `AuthzGate` that simulates owned policy-engine
-//! deny-wins semantics: cross-tenant requests are forbidden no matter how many
-//! allow rules apply. Concrete policy engines live behind transient adapter
-//! crates and have their own adversarial test corpus.
-//!
-//! Stage-4 RED: tests fail because `SubscriptionPool::select` returns
-//! `NotYetImplemented` and never even consults the gate.
-//! Stage-5 GREEN: kernel MUST consult the gate before returning a SeatId and
-//! MUST return `ForbiddenByPolicy` on `AuthzDecision::Forbid`.
+//! The gate here is a double; a concrete policy engine has its own corpus.
 use std::cell::RefCell;
 use std::time::Instant;
 
@@ -18,8 +11,7 @@ use intelligence_kernel::{
     TenantId,
 };
 
-/// A gate that records every request it sees and forbids cross-tenant access.
-/// `deny_wins` mirrors the owned policy-engine default-deny semantics.
+/// Records every request it sees, and forbids across tenants.
 struct PolicyEngineLikeGate {
     requests: RefCell<Vec<(String, String)>>,
 }
@@ -95,12 +87,9 @@ fn same_tenant_select_consults_gate_and_succeeds() {
 
 #[test]
 fn select_with_foreign_principal_tenant_is_forbidden_by_gate() {
-    // AUTH-005 increment-3 seam: the pool belongs to t-acme, but the caller's
-    // SERVER-VERIFIED principal tenant is t-evil. The kernel must forward that
-    // principal tenant to the gate (principal=t-evil vs resource=t-acme), and
-    // the deny-wins gate forbids. This is the defense-in-depth backstop that
-    // catches a cross-tenant pool mis-route. Un-writable before the
-    // `principal_tenant` arg existed — its compilation + Forbid prove the seam.
+    // The pool is t-acme's; the caller's server-verified principal is t-evil.
+    // The kernel must carry the principal tenant through to the gate, or a
+    // cross-tenant pool mis-route reaches the gate looking legitimate.
     let mut pool = SubscriptionPool::new(
         tenant("t-acme"),
         Provider::Anthropic,
@@ -120,10 +109,8 @@ fn select_with_foreign_principal_tenant_is_forbidden_by_gate() {
 
 #[test]
 fn cross_tenant_pool_rejects_select_for_foreign_tenant_principal() {
-    // The pool belongs to t-acme. A request whose principal_tenant is t-evil
-    // must be forbidden. In practice the REST adapter is what builds the
-    // AuthzRequest, but the kernel-level contract is: the gate's verdict is
-    // authoritative.
+    // The REST adapter builds the real AuthzRequest; the kernel contract
+    // asserted here is only that the gate's verdict is final.
     let mut pool = SubscriptionPool::new(
         tenant("t-acme"),
         Provider::Anthropic,
@@ -169,7 +156,7 @@ fn deny_wins_even_when_pool_has_capacity() {
     }
 
     let now = Instant::now();
-    // Even though 5 seats are Active, a Forbid decision wins.
+    // A Forbid outranks any number of eligible seats.
     assert_eq!(
         pool.select(&tenant("t-acme"), &agent("agent-1"), &AlwaysForbid, now),
         Err(SubscriptionPoolError::ForbiddenByPolicy)
@@ -178,9 +165,8 @@ fn deny_wins_even_when_pool_has_capacity() {
 
 #[test]
 fn adding_seat_with_wrong_tenant_is_rejected() {
-    // A pool belongs to exactly one tenant. Attempting to plant a seat from
-    // a different tenant into the pool is a programmer error and a tenant-
-    // isolation violation at the data plane — the kernel MUST refuse.
+    // A pool holds exactly one tenant, so a foreign seat in it would be a
+    // data-plane isolation breach that no gate is consulted about.
     let mut pool = SubscriptionPool::new(
         tenant("t-acme"),
         Provider::Anthropic,

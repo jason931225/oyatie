@@ -1,21 +1,7 @@
 //! Seat enrollment via PKCE OAuth flow.
 //!
-//! Wires the pure `intelligence-oauth-subscription-kernel` PKCE primitives
-//! into a runtime path. Two variants:
-//!
-//!   - `EnrollmentPath::LocalhostCallback` — binds a Tokio TCP listener on the
-//!     loopback port specified by the kernel's `OAuthLoopbackServer`, waits for
-//!     the browser redirect, extracts `code` + `state` from the query string.
-//!   - `EnrollmentPath::ManualPaste` — presents the authorization URL to the
-//!     caller; the caller supplies the full redirect URL (e.g. copy-pasted from
-//!     the browser address bar) as a `String`. Useful in headless/CI contexts.
-//!
-//! In both cases the adapter calls `OAuthTokenClient::exchange()` with the code
-//! and PKCE verifier, then stores the resulting tokens via `CredentialStorePort`.
-//!
-//! NOTE: This module provides the enrollment value types and helpers; the actual
-//! runtime binding (TCP listen, reading stdin) is the responsibility of the
-//! caller — kept here so the pure logic stays hermetically testable.
+//! Binding the loopback listener and reading the redirect back are the
+//! caller's, so everything here stays hermetically testable.
 // data_class: INTERNAL_ONLY throughout this module.
 
 use intelligence_account_domain::ProviderFamily;
@@ -28,7 +14,6 @@ use crate::oauth_client::OAuthTokenClient;
 use crate::ports::{CredentialStorePort, SeatId, TokenBytes};
 use crate::token_state::SeatTokenState;
 
-/// Error types for enrollment.
 #[derive(Debug)]
 pub enum EnrollmentError {
     PkceError(intelligence_oauth_subscription_kernel::OAuthError),
@@ -52,7 +37,6 @@ impl std::fmt::Display for EnrollmentError {
     }
 }
 
-/// Parsed callback query parameters.
 // data_class: INTERNAL_ONLY
 #[derive(Debug, Clone)]
 pub struct CallbackParams {
@@ -60,9 +44,7 @@ pub struct CallbackParams {
     pub state: String, // data_class: INTERNAL_ONLY
 }
 
-/// Parse `code` and `state` from a callback redirect URI query string.
-/// Accepts either the full URL (`http://localhost:35593/callback?code=X&state=Y`)
-/// or just the query string (`code=X&state=Y`).
+/// Accepts either a full redirect URL or a bare query string.
 pub fn parse_callback(url_or_query: &str) -> Result<CallbackParams, EnrollmentError> {
     let query = if let Some(pos) = url_or_query.find('?') {
         &url_or_query[pos + 1..]
@@ -92,8 +74,8 @@ pub fn parse_callback(url_or_query: &str) -> Result<CallbackParams, EnrollmentEr
     Ok(CallbackParams { code, state })
 }
 
-/// Build the enrollment flow from a pre-generated PKCE verifier and state nonce.
-/// Returns the `(flow, authorization_url)` pair for the caller to present to the browser.
+/// The verifier is consumed here and appears on neither return value, and
+/// [`complete_enrollment`] has no parameter to receive one.
 pub fn build_enrollment_flow(
     verifier: PkceVerifier,
     state_nonce: String,
@@ -111,8 +93,6 @@ pub fn build_enrollment_flow(
     Ok((flow, url))
 }
 
-/// Complete enrollment: exchange the authorization code for tokens, persist them.
-/// Returns the `SeatTokenState` on success.
 pub async fn complete_enrollment(
     seat_id: &SeatId,
     flow: &SubscriptionOAuthFlow,
@@ -153,22 +133,15 @@ pub async fn complete_enrollment(
     Ok(state)
 }
 
-/// Internal helper: reconstruct the verifier string from the challenge.
-/// In real usage, the verifier is carried separately by the caller; this is a
-/// placeholder for the test path where the verifier is not round-tripped through
-/// the challenge. The real adapter wires the verifier through the flow struct's
-/// enrollment context (held by the caller between steps 1 and 2).
-///
-/// NOTE: This function is only used by tests that supply a known verifier.
-/// Production callers pass the verifier directly from their enrollment context.
+/// Always empty: a verifier cannot be recovered from its challenge. Every
+/// [`complete_enrollment`] therefore exchanges with no PKCE proof, which an
+/// authorization server that enforces PKCE will reject.
 fn pkce_verifier_str_from_challenge(_challenge: &PkceChallenge) -> String {
-    // In tests this is overridden; in production the caller holds the verifier.
-    // Returning empty string here causes exchange() to send an empty verifier,
-    // which the mock server accepts (it doesn't validate PKCE in unit tests).
     String::new()
 }
 
-/// Minimal percent-decode for callback query values.
+/// Each escaped byte becomes the `char` of that code point, so percent-encoded
+/// multi-byte UTF-8 comes back as Latin-1 mojibake rather than the character.
 fn percent_decode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let bytes = s.as_bytes();
@@ -254,7 +227,6 @@ mod tests {
             PkceVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_owned()).unwrap();
         let loopback = OAuthLoopbackServer::default_claude();
         let (flow, _) = build_enrollment_flow(verifier, "correct-nonce".into(), loopback).unwrap();
-        // Simulate wrong state in callback.
         let params = parse_callback("code=c&state=wrong-nonce").unwrap();
         assert_ne!(params.state, flow.state_nonce);
     }

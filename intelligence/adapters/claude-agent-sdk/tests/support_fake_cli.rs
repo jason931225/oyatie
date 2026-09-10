@@ -1,17 +1,9 @@
-//! In-process hermetic fake Claude Code CLI for the claude-agent-sdk tests.
+//! In-process fake CLI for the agent-SDK tests: no subprocess, no network.
 //!
-//! Replaces the previous `python3`-subprocess fake CLI (a `cli_path` pointed at a
-//! generated `*.py` script) with an in-process Rust fake driven through the SDK's
-//! `spawn_claude_code_process` hook. This removes the python3 runtime dependency,
-//! removes the on-disk script + chmod dance, removes wall-clock deadline
-//! flakiness, and makes the tests fully hermetic (no subprocess, no network) —
-//! the same dev-cli precedent that replaced shell with an in-process Rust fake.
-//!
-//! The SDK and fake speak newline-delimited JSON over a `tokio::io::duplex` pair:
-//! the SDK writes control/user envelopes to its stdin (which the fake reads) and
-//! reads responses from its stdout (which the fake writes). A fake "script" is an
-//! async closure `(FakeReader, FakeWriter) -> ()` that runs the exact
-//! read/assert/respond sequence the old python script performed.
+//! The SDK and the fake speak newline-delimited JSON over a `tokio::io::duplex`
+//! pair — the SDK writes envelopes to its stdin, which the fake reads, and reads
+//! responses from its stdout, which the fake writes. A script is an async
+//! closure running one canned read/assert/respond sequence.
 #![allow(dead_code)]
 
 use std::future::Future;
@@ -27,8 +19,7 @@ pub type FakeReader = BufReader<ReadHalf<tokio::io::DuplexStream>>;
 /// Writer half the fake script uses to emit JSONL the SDK reads from its stdout.
 pub type FakeWriter = WriteHalf<tokio::io::DuplexStream>;
 
-/// Read one newline-delimited JSON value the SDK wrote. Returns `None` at EOF
-/// (the SDK closed its stdin), matching python's `for line in sys.stdin`.
+/// `None` means EOF: the SDK closed its stdin.
 pub async fn read_json_line(reader: &mut FakeReader) -> Option<Value> {
     let mut line = String::new();
     let read = reader.read_line(&mut line).await.expect("read fake stdin");
@@ -42,16 +33,13 @@ pub async fn read_json_line(reader: &mut FakeReader) -> Option<Value> {
     Some(serde_json::from_str(trimmed).expect("fake stdin line is valid JSON"))
 }
 
-/// Read one line and assert it parsed (panics at EOF), mirroring the python
-/// `json.loads(sys.stdin.readline())` calls that expect a line to be present.
+/// Panics at EOF, for the steps where a line must be present.
 pub async fn expect_json_line(reader: &mut FakeReader) -> Value {
     read_json_line(reader)
         .await
         .expect("expected a JSON line from the SDK but hit EOF")
 }
 
-/// Write one newline-delimited JSON value to the SDK's stdout (python's
-/// `print(json.dumps(...), flush=True)`).
 pub async fn write_json_line(writer: &mut FakeWriter, value: &Value) {
     let mut bytes = serde_json::to_vec(value).expect("serialize fake stdout line");
     bytes.push(b'\n');
@@ -59,10 +47,8 @@ pub async fn write_json_line(writer: &mut FakeWriter, value: &Value) {
     writer.flush().await.expect("flush fake stdout");
 }
 
-/// Build a `spawn_claude_code_process` spawner that drives the given fake CLI
-/// script in-process. The `script` receives the SDK-stdin reader + SDK-stdout
-/// writer and runs the canned protocol. `ProcessSpawnOptions` (command, args,
-/// env) are passed through so scripts can inspect env markers if needed.
+/// `ProcessSpawnOptions` reaches the script unchanged, so a script can assert
+/// on the command, args and env the SDK would have spawned with.
 pub fn fake_cli<F, Fut>(script: F) -> impl Fn(ProcessSpawnOptions) -> ProcessFuture
 where
     F: Fn(FakeReader, FakeWriter, ProcessSpawnOptions) -> Fut + Send + Sync + Clone + 'static,
@@ -98,7 +84,6 @@ where
     }
 }
 
-/// Boxed future type returned by the in-process spawner.
 pub type ProcessFuture =
     std::pin::Pin<Box<dyn Future<Output = Result<SpawnedClaudeProcess>> + Send>>;
 

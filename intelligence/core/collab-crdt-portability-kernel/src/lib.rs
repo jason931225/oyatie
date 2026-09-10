@@ -1,25 +1,13 @@
 //! ADR-0142 — CRDT portability seam trait.
 //!
-//! Vendor-neutral surface for swapping the underlying CRDT runtime (Loro
-//! today; Yrs/Automerge as candidates). Per ADR-0173 Tier I-asterisk
-//! registration of `loro-crdt` in `registry/vendor-lockin-phaseout/index.json`,
-//! the workspace MUST host this kernel trait so the vendor-lockin discipline
-//! validator can resolve the `seam_adapter_trait` reference.
-//!
-//! Adapter implementations live in sibling crates:
-//! - `collab-crdt-loro-adapter` — Loro 1.x adapter (queued).
-//! - `collab-crdt-yrs-adapter`  — Yrs Rust port (queued per ADR-0142).
-//!
-//! Kernel-tier per ADR-0083: zero production deps. Tests use stdlib only.
+//! The runtime-neutral surface a host depends on instead of a concrete CRDT
+//! library. No adapter implements it yet.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::fmt;
 
-/// Opaque document identifier the host µservice attaches to every CRDT doc.
-///
-/// The adapter does NOT mint these — the host coordinates ULID minting via
-/// `shared-ulid-id-kernel`. Kernel holds only the by-value handle.
+/// Document identifier. The adapter never mints one; the host does.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct CrdtDocId(pub String); // data_class: INTERNAL_ONLY
 
@@ -29,11 +17,9 @@ impl fmt::Display for CrdtDocId {
     }
 }
 
-/// Opaque change unit emitted from one peer + applied at another.
-///
-/// Encoded payload is adapter-defined (Loro's snapshot encoding differs from
-/// Yrs's update encoding); the host treats it as opaque bytes and signs
-/// it for audit chain emission per ADR-0145 Invariant 1.
+/// A change emitted at one peer and applied at another. The payload encoding
+/// is the adapter's; the host signs the bytes without reading them
+/// (ADR-0145 Invariant 1).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CrdtChange {
     pub doc_id: CrdtDocId, // data_class: INTERNAL_ONLY
@@ -43,11 +29,10 @@ pub struct CrdtChange {
 /// Stable error surface for adapter failures.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CrdtPortabilityError {
-    /// Encoding or wire-format mismatch (typically from cross-adapter replay).
+    /// Encoding mismatch, typically a payload replayed across adapters.
     PayloadInvalid(String),
-    /// Document handle unknown to the underlying runtime.
     UnknownDocument(CrdtDocId),
-    /// Underlying runtime returned an error string the kernel doesn't classify.
+    /// Anything the underlying runtime reported that the kernel cannot class.
     Adapter(String),
 }
 
@@ -63,27 +48,17 @@ impl fmt::Display for CrdtPortabilityError {
 
 impl std::error::Error for CrdtPortabilityError {}
 
-/// Vendor-neutral CRDT runtime trait.
-///
-/// Every concrete adapter (Loro, Yrs, Automerge) implements this trait. The
-/// host µservice (notes, sheets, slides, docs) depends on the trait, never on
-/// the concrete adapter. Per ADR-0173, this trait IS the seam.
+/// The seam a host depends on in place of a concrete CRDT runtime.
 pub trait CrdtPortabilityRuntime {
-    /// Initialise a fresh CRDT document under the given id.
     fn create_doc(&mut self, doc_id: CrdtDocId) -> Result<(), CrdtPortabilityError>;
 
-    /// Apply an incoming change to the named document.
     fn apply_change(&mut self, change: &CrdtChange) -> Result<(), CrdtPortabilityError>;
 
-    /// Emit the current state of the document as an opaque payload.
     fn snapshot(&self, doc_id: &CrdtDocId) -> Result<CrdtChange, CrdtPortabilityError>;
 }
 
-/// In-memory test stub.
-///
-/// Sufficient for kernel tests and for any host µservice that wants to write
-/// unit tests against the trait without pulling in a real adapter. Not for
-/// production use.
+/// Test double only: it appends payloads in arrival order and converges on
+/// nothing, so it satisfies the trait without being a CRDT.
 #[derive(Default)]
 pub struct InMemoryCrdtRuntime {
     docs: std::collections::BTreeMap<CrdtDocId, Vec<u8>>, // data_class: INTERNAL_ONLY

@@ -1,15 +1,8 @@
-//! D7 — cross-tenant forbid-wins adversarial corpus.
+//! Adversarial corpus for cross-tenant isolation: near-miss tenant ids that
+//! must not be treated as a match.
 //!
-//! Each test attacks the per-tenant isolation invariant via a different vector:
-//! - tenant-id mismatch with the same provider
-//! - tenant-id mismatch across providers
-//! - principal "looks like" the resource tenant but isn't byte-equal
-//! - subset/superset string matches that must NOT pass
-//!
-//! All MUST yield [`AuthzDecision::Forbid`]. The bundled policy at
-//! `intelligence/policy/intelligence-app.cedar` carries an explicit
-//! forbid rule (`intelligence-app-forbid-cross-tenant-inference`) that triggers
-//! whenever `principal.tenant_id != resource.tenant_id`.
+//! The rule under attack is `cloud-intelligence-forbid-cross-tenant-inference`
+//! in `intelligence/cedar/cloud-intelligence.cedar`.
 use intelligence_authz_cedar_adapter::CedarAuthzGate;
 use intelligence_kernel::{
     AgentId, AuthzAction, AuthzDecision, AuthzGate, AuthzRequest, Provider, TenantId,
@@ -72,7 +65,7 @@ fn cross_tenant_remains_forbidden_for_codex_provider() {
 
 #[test]
 fn near_match_substring_does_not_grant_access() {
-    // "acme" is a substring of "acme-prod" but they are different tenants.
+    // A substring match must not read as a tenant match.
     let g = gate();
     let pt = TenantId::new("acme").unwrap();
     let rt = TenantId::new("acme-prod").unwrap();
@@ -85,7 +78,6 @@ fn near_match_substring_does_not_grant_access() {
 
 #[test]
 fn case_mismatch_blocks_access() {
-    // Tenant ids are case-sensitive strings — "ACME" != "acme".
     let g = gate();
     let pt = TenantId::new("ACME").unwrap();
     let rt = TenantId::new("acme").unwrap();
@@ -98,7 +90,6 @@ fn case_mismatch_blocks_access() {
 
 #[test]
 fn whitespace_padded_principal_blocks_access() {
-    // Suffix space changes the byte-equality used by Cedar's `==`.
     let g = gate();
     let pt = TenantId::new("acme ").unwrap();
     let rt = TenantId::new("acme").unwrap();
@@ -136,11 +127,11 @@ fn many_principal_tenants_versus_target_all_forbidden() {
     }
 }
 
+/// HAZARD, pinned rather than asserted-away: the cross-tenant forbid covers
+/// only the two inference actions, so an admin action reaching a foreign
+/// tenant is allowed here. A caller that must refuse it has to add that.
 #[test]
-fn cross_tenant_refresh_token_is_admin_realm_forbid() {
-    // RefreshToken maps to RefreshKeyPool + AdminRealm. Forbidden because admin
-    // actions are realm-scoped, but the admin role itself is not implied for a
-    // foreign-tenant principal.
+fn cross_tenant_refresh_token_is_allowed_not_forbidden() {
     let g = gate();
     let pt = TenantId::new("tenant-a").unwrap();
     let rt = TenantId::new("tenant-b").unwrap();
@@ -152,14 +143,7 @@ fn cross_tenant_refresh_token_is_admin_realm_forbid() {
         resource_tenant: &rt,
         resource_provider: Provider::Anthropic,
     };
-    // The cross-realm-bound principal MAY pass realm checks (we hardcode AdminRealm
-    // for RefreshToken in v1), but the cross-tenant rule does NOT apply to admin
-    // actions per the bundled policy. To keep this test conservative we assert the
-    // overall decision is at least defined — the AdminRealm permit for
-    // RefreshKeyPool is realm-scoped and resource-tenant-agnostic, so it ALLOWS.
-    // This is documented v1 behavior and the REST adapter MUST refuse foreign-
-    // tenant admin invocations at the HTTP layer via SET-of-allowed-tenants.
-    let _ = g.decide(&request);
+    assert_eq!(g.decide(&request), AuthzDecision::Allow);
 }
 
 #[test]

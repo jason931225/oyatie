@@ -1,19 +1,9 @@
-//! Provider-CLI session driver.
+//! Provider-CLI session driver: one [`SessionDriver`] for every provider
+//! driven by spawning a vendor CLI as a subprocess, differing only in the
+//! values on [`CliDriverSpec`].
 //!
-//! ONE `SessionDriver` implementation for every provider whose account is driven by spawning a
-//! vendor CLI as a subprocess. This crate replaces the three crates
-//! `intelligence-{claude,codex,gemini}-account-adapter`, whose sources were identical apart
-//! from the five values now carried by [`CliDriverSpec`] — a triplication that made every future
-//! change to the spawn path a three-place edit and that a straight capability relocation would
-//! have carried into the new capability root unchanged.
-//!
-//! SUBPROCESS, NOT API: spawning a vendor CLI contradicts the cloud-native-API doctrine for the
-//! intelligence capability. Collapsing to one crate does not discharge that debt, it localises it:
-//! the CLI→typed-HTTP rewrite now has exactly ONE `spawn_for_message` to replace instead of three.
-//! `inject_message`/`drain_response`/`kill` remain the placeholders the three source crates
-//! shipped; they are preserved verbatim rather than silently "fixed" during a reorg.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` / `panic!()` to assert
-// invariants under the `cfg(test)` exemption.
+//! Spawning a CLI contradicts the cloud-native-API doctrine for this
+//! capability; one implementation means one `spawn_for_message` to replace.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::process::Stdio;
@@ -27,7 +17,6 @@ use intelligence_supervisor_kernel::{
 /// Everything that differs between one provider CLI and the next.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CliDriverSpec {
-    /// Provider family this CLI serves.
     pub family: ProviderFamily,
     /// Executable spawned once per message.
     pub program: &'static str,
@@ -35,17 +24,12 @@ pub struct CliDriverSpec {
     pub api_key_env: &'static str,
     /// Prefix of the synthesised session id, and of the placeholder drain payload.
     pub session_prefix: &'static str,
-    /// Whether the CLI documents an idempotency-key flag.
-    ///
-    /// Gemini does NOT (it was demoted to T2 for exactly this reason), so its invocation omits
-    /// the flag. This is a real per-provider behavioural difference and the one thing a careless
-    /// three-into-one collapse would flatten — `spec_table_preserves_per_provider_behaviour`
-    /// fails if it is ever flattened.
+    /// When false the flag is omitted, so two calls carrying the same
+    /// request id are two independent invocations.
     pub idempotency_key_flag: bool,
 }
 
 impl CliDriverSpec {
-    /// `claude-code`, keyed by `ANTHROPIC_API_KEY`; supports `anthropic-idempotency-key`.
     pub const CLAUDE: Self = Self {
         family: ProviderFamily::Claude,
         program: "claude-code",
@@ -54,7 +38,6 @@ impl CliDriverSpec {
         idempotency_key_flag: true,
     };
 
-    /// `codex`, keyed by `OPENAI_API_KEY`; supports `Idempotency-Key`.
     pub const CODEX: Self = Self {
         family: ProviderFamily::OpenAiOrCodex,
         program: "codex",
@@ -63,7 +46,6 @@ impl CliDriverSpec {
         idempotency_key_flag: true,
     };
 
-    /// `gemini`, keyed by `GOOGLE_API_KEY`; NO documented idempotency-key support (T2).
     pub const GEMINI: Self = Self {
         family: ProviderFamily::Gemini,
         program: "gemini",
@@ -96,7 +78,6 @@ impl<S> CliSessionDriver<S> {
         Self::new(CliDriverSpec::GEMINI, secrets)
     }
 
-    /// The spec this driver was built from.
     pub fn spec(&self) -> CliDriverSpec {
         self.spec
     }
@@ -139,22 +120,22 @@ impl<S: SecretStorePort + Send + Sync> SessionDriver for CliSessionDriver<S> {
         })
     }
 
+    /// Discards `_msg` and reports success; nothing reaches the child.
     fn inject_message(
         &self,
         _session: &SpawnedSession,
         _msg: &[u8],
     ) -> Result<(), SupervisorError> {
-        // Implementation for injecting subsequent messages into a live session
         Ok(())
     }
 
+    /// Returns a synthesised payload; the child's stdout is never read.
     fn drain_response(&self, _session: &SpawnedSession) -> Result<Vec<u8>, SupervisorError> {
-        // Implementation for capturing CLI output (stdout)
         Ok(format!("{} response placeholder", self.spec.session_prefix).into_bytes())
     }
 
+    /// Reports success without signalling the child, which keeps running.
     fn kill(&self, _session: &SpawnedSession) -> Result<(), SupervisorError> {
-        // Implementation for SIGTERM/SIGKILL
         Ok(())
     }
 
@@ -167,10 +148,7 @@ impl<S: SecretStorePort + Send + Sync> SessionDriver for CliSessionDriver<S> {
 mod tests {
     use super::*;
 
-    /// The collapse is only correct if the spec table still says exactly what the three separate
-    /// crates said. The failure mode this guards is a collapse that unifies the providers by
-    /// quietly picking one provider's behaviour for all three — in particular Gemini's MISSING
-    /// idempotency-key support, which is a documented T2 demotion and not an oversight.
+    /// Guards against one provider's behaviour being adopted for all three.
     #[test]
     fn spec_table_preserves_per_provider_behaviour() {
         for (spec, family, program, env, prefix, idempotent) in [
@@ -210,9 +188,8 @@ mod tests {
         }
     }
 
-    /// Every provider must map to a DISTINCT family/program/env triple: a copy-paste slip in the
-    /// spec table would otherwise route two providers at one CLI, which no per-constant assertion
-    /// above would catch on its own if the same wrong value were pasted twice.
+    /// The same wrong value pasted twice passes every per-constant assertion
+    /// above, and routes two providers at one CLI.
     #[test]
     fn specs_are_pairwise_distinct() {
         let specs = [

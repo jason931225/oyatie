@@ -1,13 +1,5 @@
-//! Chaos-lite lease storm: 100 tokio tasks hammer a 5-seat pool for up to 5 s.
-//!
-//! Each task loops doing lease + complete with a randomly-biased outcome until
-//! the deadline.  After all tasks finish the test asserts pool invariants:
-//!
-//! - seat_count == 5 (no seat lost).
-//! - No task ever held the same SeatId as another concurrent task (tracked via
-//!   a shared in-flight map; any concurrent count > 1 is a violation).
-//! - total ok_count + failure_count_all == total completed ops across all tasks
-//!   (every operation is accounted for).
+//! Chaos-lite lease storm: many tasks contend for a small seat pool, then the
+//! pool's invariants are checked against what actually happened.
 #![cfg_attr(
     test,
     allow(
@@ -28,10 +20,6 @@ use intelligence_kernel::{
     SeatOutcome, SelectionStrategy, SubscriptionId, SubscriptionPool, SubscriptionPoolError,
     SubscriptionState, TenantId,
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 struct AllowAll;
 impl AuthzGate for AllowAll {
@@ -62,8 +50,7 @@ fn make_pool(n_seats: usize) -> Arc<Mutex<SubscriptionPool>> {
     Arc::new(Mutex::new(pool))
 }
 
-/// A very cheap deterministic pseudo-random step based on a task-local counter.
-/// Produces an outcome with ~70 % Ok, ~15 % RateLimited429, ~15 % RefreshFailed.
+/// Weighted 70% Ok, 15% RateLimited429, 15% RefreshFailed.
 fn pick_outcome(seed: u64) -> SeatOutcome {
     match seed % 20 {
         0..=13 => SeatOutcome::Ok,
@@ -72,9 +59,21 @@ fn pick_outcome(seed: u64) -> SeatOutcome {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Test
-// ---------------------------------------------------------------------------
+/// A second concurrent holder of one seat is the violation this records.
+fn mark_leased(in_flight: &Mutex<HashMap<String, u32>>, seat: &str, violation: &AtomicBool) {
+    let mut map = in_flight.lock().unwrap();
+    let holders = map.entry(seat.to_string()).or_insert(0);
+    *holders += 1;
+    if *holders > 1 {
+        violation.store(true, Ordering::SeqCst);
+    }
+}
+
+fn mark_released(in_flight: &Mutex<HashMap<String, u32>>, seat: &str) {
+    let mut map = in_flight.lock().unwrap();
+    let holders = map.entry(seat.to_string()).or_insert(1);
+    *holders = holders.saturating_sub(1);
+}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn chaos_lease_storm_100_tasks_5_seats_5_seconds() {
@@ -86,13 +85,11 @@ async fn chaos_lease_storm_100_tasks_5_seats_5_seconds() {
     let gate = Arc::new(AllowAll);
     let deadline = Instant::now() + DURATION;
 
-    // Shared counters.
     let total_ok = Arc::new(AtomicU64::new(0));
     let total_failures = Arc::new(AtomicU64::new(0));
     let total_ops = Arc::new(AtomicU64::new(0));
     let violation = Arc::new(AtomicBool::new(false));
 
-    // Per-seat concurrent-holder tracking.
     let in_flight: Arc<Mutex<HashMap<String, u32>>> = Arc::new(Mutex::new(HashMap::new()));
 
     let mut handles = Vec::with_capacity(N_TASKS);
@@ -128,25 +125,9 @@ async fn chaos_lease_storm_100_tasks_5_seats_5_seconds() {
                     Ok(lease) => {
                         let seat_key = lease.seat_id().as_str().to_string();
 
-                        // Increment in-flight counter; detect violation.
-                        {
-                            let mut map = in_flight.lock().unwrap();
-                            let entry = map.entry(seat_key.clone()).or_insert(0);
-                            *entry += 1;
-                            if *entry > 1 {
-                                violation.store(true, Ordering::SeqCst);
-                            }
-                        }
-
-                        // Simulate minimal async work.
+                        mark_leased(&in_flight, &seat_key, &violation);
                         tokio::task::yield_now().await;
-
-                        // Decrement in-flight before completing.
-                        {
-                            let mut map = in_flight.lock().unwrap();
-                            let entry = map.entry(seat_key).or_insert(1);
-                            *entry = entry.saturating_sub(1);
-                        }
+                        mark_released(&in_flight, &seat_key);
 
                         local_seed = local_seed
                             .wrapping_add(1)
@@ -165,7 +146,7 @@ async fn chaos_lease_storm_100_tasks_5_seats_5_seconds() {
                         }
                     }
                     Err(SubscriptionPoolError::NoEligibleSeat) => {
-                        // All seats leased or in cooldown; yield and retry.
+                        // Every seat is leased or cooling down; retry later.
                         tokio::task::yield_now().await;
                     }
                     Err(e) => {
@@ -180,23 +161,17 @@ async fn chaos_lease_storm_100_tasks_5_seats_5_seconds() {
         h.await.unwrap();
     }
 
-    // --- Invariant assertions ---
-
-    // 1. No double-lease detected during the storm.
     assert!(
         !violation.load(Ordering::SeqCst),
         "double-lease violation detected during chaos storm"
     );
 
-    // 2. seat_count unchanged — no seat was ever removed from the map.
     assert_eq!(
         pool_ref.lock().unwrap().seat_count(),
         N_SEATS,
         "seat_count must remain {N_SEATS} after chaos storm"
     );
 
-    // 3. ok_count + failure_count == total_ops
-    //    (every completed lease is counted exactly once).
     let ok = total_ok.load(Ordering::Relaxed);
     let fail = total_failures.load(Ordering::Relaxed);
     let ops = total_ops.load(Ordering::Relaxed);
@@ -206,13 +181,11 @@ async fn chaos_lease_storm_100_tasks_5_seats_5_seconds() {
         "ok_count ({ok}) + failure_count ({fail}) must equal total_ops ({ops})"
     );
 
-    // 4. No in-flight leases remain (all tasks completed before assertion).
     let remaining: u32 = in_flight.lock().unwrap().values().sum();
     assert_eq!(
         remaining, 0,
         "all in-flight leases should be zero after task completion"
     );
 
-    // Sanity: some work was done.
     assert!(ops > 0, "at least one lease+complete cycle must have run");
 }

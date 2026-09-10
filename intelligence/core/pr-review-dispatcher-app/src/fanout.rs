@@ -1,22 +1,9 @@
 //! Reviewer-panel topology.
-//!
-//! Each facet MUST be dispatched to its own subagent / teammate session;
-//! `F-LANE-DEBATE-SUBCHECK` refuses panels where a single `reviewer_id`
-//! covers multiple facets within a single `change_id`.
-//!
-//! The dispatcher consumes per-facet `<facet>.json` findings; this module
-//! defines the closed enum of facet identifiers + their `required_when`
-//! triggers, so the dispatcher can refuse a verdict if a required facet
-//! is missing.
 
-/// 13-element F-family (critique lenses) + 2-element M-family (meta lenses)
-/// + 7-element A-family (own-policy adherence lenses).
-///
-/// Closed enum. Adding a facet REQUIRES an ADR + a memory note (the A-family
-/// closed-enum cap is RELAXED, but every addition still gets an ADR cite).
+/// One critique lens in the reviewer panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FacetId {
-    // F-family — critique lenses.
+    // Critique lenses.
     F1Linus,
     F2Hyperscaler,
     F3Adversarial,
@@ -30,11 +17,11 @@ pub enum FacetId {
     F11Observability,
     F13Migration,
 
-    // M-family — meta lenses.
+    // Meta lenses.
     M1ChallengeAssumption,
     M2ZoomedOutFit,
 
-    // A-family — own-policy adherence lenses.
+    // Own-policy adherence lenses.
     A1NamingAdherence,
     A2DocumentationAdherence,
     A3StructureAdherence,
@@ -45,8 +32,8 @@ pub enum FacetId {
 }
 
 impl FacetId {
-    /// Canonical kebab-case identifier matching
-    /// `<facet_id>` in `evidence/debate/<change_id>-<facet_id>-r1.json`.
+    /// Identifier used in the reviewer id and the evidence filename built by
+    /// [`FacetDispatch::new`].
     #[must_use]
     pub const fn slug(self) -> &'static str {
         match self {
@@ -74,8 +61,7 @@ impl FacetId {
         }
     }
 
-    /// The "always-required" baseline panel — F1..F9 per v2.2.0. Every
-    /// PR review fans out at least these nine.
+    /// The baseline subset of [`Self::full_panel_v23`].
     #[must_use]
     pub const fn baseline_always_required() -> [Self; 9] {
         [
@@ -91,9 +77,7 @@ impl FacetId {
         ]
     }
 
-    /// The full v2.3.0 panel (21 facets — 9 baseline + 3 conditional
-    /// F-additions + 2 meta + 7 A-family). Used for change classes that
-    /// trigger every facet (CC-1 kernel public API + new ADR/standard).
+    /// Every facet, for the change classes that trigger the whole panel.
     #[must_use]
     pub const fn full_panel_v23() -> [Self; 21] {
         [
@@ -122,24 +106,18 @@ impl FacetId {
     }
 }
 
-/// A request to fan out one facet to one subagent. The actual subagent
-/// runtime (which translates this into a Claude API / OMC team / Codex /
-/// Gemini invocation) is the deliberate scaffold gap documented in the
-/// crate root.
+/// A request to fan out one facet to one subagent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FacetDispatch {
     pub change_id: String,
     pub facet: FacetId,
-    /// `<tool>-<facet_id>-<change_id>` — canonical reviewer-id format.
     pub reviewer_id: String,
-    /// Path the subagent must write its r1.json finding to.
+    /// Where the subagent must write its finding.
     pub evidence_path: String,
 }
 
 impl FacetDispatch {
-    /// Build the canonical reviewer-id + evidence-path for one facet of
-    /// one change. `tool` is the subagent runtime tag
-    /// (`claude-critic`, `codex-architect`, etc.).
+    /// `tool` is the subagent runtime tag, e.g. `claude-critic`.
     #[must_use]
     pub fn new(tool: &str, facet: FacetId, change_id: &str) -> Self {
         let reviewer_id = format!("{tool}-{slug}-{change_id}", slug = facet.slug());
@@ -156,11 +134,8 @@ impl FacetDispatch {
     }
 }
 
-/// Build the full fan-out plan for one PR. Returns one `FacetDispatch`
-/// per facet in the v2.3.0 panel.
-///
-/// The plan is *deterministic* (stable ordering + stable reviewer-id
-/// format) so audit-chain replay is reproducible.
+/// Build the fan-out plan for one PR. Deterministic in both order and
+/// reviewer id, so an audit-chain replay reproduces it exactly.
 #[must_use]
 pub fn fan_out_facets(change_id: &str, tool: &str) -> Vec<FacetDispatch> {
     FacetId::full_panel_v23()
