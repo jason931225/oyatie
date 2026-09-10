@@ -1,7 +1,18 @@
-# Weekly non-blocking honesty check for the local hermetic buck2 graph.
-# Not part of the merge path. Red means BUCK/reindeer wiring rotted.
+# Weekly non-blocking honesty check for the buck2 graph, and the only lane that
+# reads or writes the shared NativeLink cache.
+#
+# Not part of the merge path. Red means BUCK/reindeer wiring rotted, or the
+# cache lane below reported something worth reading -- never that a change is
+# refused. ADR-0720 is explicit that measurement manages the rollout and does
+# not gate the merge, and that CAS alone does not overturn ADR-0716.
+#
+# This lane is the single writer on purpose. Every runner here is an ephemeral
+# GitHub image, so two runs of one commit see near-identical undeclared inputs;
+# that uniformity is what stands in for the sandbox a remote executor would
+# give, and it only holds while writes come from CI and never from a laptop.
 #
 # Authority: docs/decisions/ADR-0716-cargo-merge-path-buck2-local-hermeticity.md
+#            ADR-0720 (buck2 merge path, cache-only NativeLink)
 
 name: buck2-weekly-smoke
 
@@ -34,5 +45,99 @@ jobs:
           chmod +x /tmp/buck2
           sudo mv /tmp/buck2 /usr/local/bin/buck2
           buck2 --version
+      # The cache is an accelerator and may never be the reason a build fails.
+      # Absent secrets, an unreachable endpoint, or a malformed cert all land in
+      # the same place: no .buckconfig.local is written, buck2 builds exactly as
+      # it does today, and the run stays green. Fail-closed here would couple
+      # this repository's build to a single host's uptime.
+      #
+      # `[buck2_re_client]` is honoured only from a real buckconfig file.
+      # Measured 2026-09-10: passed via `--config-file` the same section reaches
+      # `buck2 audit config` intact and is still ignored by the RE client, which
+      # then fails the build with "No engine address". So the endpoint is
+      # written here rather than passed as an overlay flag.
+      - name: Point buck2 at the warm cache, or carry on without it
+        id: cache-config
+        env:
+          CACHE_CLIENT_CERT: ${{ secrets.OYATIE_CACHE_CLIENT_CERT }}
+          CACHE_CLIENT_KEY: ${{ secrets.OYATIE_CACHE_CLIENT_KEY }}
+          CACHE_CA_CERT: ${{ secrets.OYATIE_CACHE_CA_CERT }}
+          CACHE_ENDPOINT: cache.oyatie.dev:50051
+        run: |
+          set -uo pipefail
+          if [ -z "${CACHE_CLIENT_CERT}" ] || [ -z "${CACHE_CLIENT_KEY}" ] || [ -z "${CACHE_CA_CERT}" ]; then
+            echo "no cache credentials in this context; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/cache-creds"
+          printf '%s\n%s\n' "${CACHE_CLIENT_CERT}" "${CACHE_CLIENT_KEY}" > "${RUNNER_TEMP}/cache-creds/client.pem"
+          printf '%s\n' "${CACHE_CA_CERT}" > "${RUNNER_TEMP}/cache-creds/ca.crt"
+          # Reachability is checked before buck2 is told the endpoint exists, so
+          # an unreachable cache is a skipped feature rather than a failed build.
+          #
+          # The probe names which of the two things it found. An earlier version
+          # ran `timeout 20 bash -c ...` and printed "unreachable" when the real
+          # cause was that `timeout` is absent -- a check reporting a specific
+          # cause it had not measured. Both outcomes skip the cache; only one of
+          # them means the cache is down.
+          if ! command -v timeout >/dev/null 2>&1; then
+            echo "no timeout(1) on this runner, so reachability cannot be bounded; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! timeout 20 bash -c "cat < /dev/null > /dev/tcp/${CACHE_ENDPOINT%:*}/${CACHE_ENDPOINT##*:}" 2>/dev/null; then
+            echo "${CACHE_ENDPOINT} did not accept a connection; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cat > .buckconfig.local <<EOF
+          [buck2_re_client]
+            cas_address = ${CACHE_ENDPOINT}
+            action_cache_address = ${CACHE_ENDPOINT}
+            engine_address = ${CACHE_ENDPOINT}
+            instance_name = main
+            tls = true
+            tls_client_cert = ${RUNNER_TEMP}/cache-creds/client.pem
+            tls_ca_certs = ${RUNNER_TEMP}/cache-creds/ca.crt
+
+          [cache]
+            remote_cache_enabled = true
+            allow_cache_uploads = true
+
+          [build]
+            execution_platforms = toolchains//cache:cache-platform
+          EOF
+          # NativeLink is cache-only: it runs no scheduler and no workers. The
+          # engine address above is required by buck2's OSS client at
+          # construction -- `opts.engine_address.as_ref().context("No engine
+          # address")?` runs before CAS setup -- and is never called, because
+          # the cache platform keeps `remote_enabled = False`.
+          echo "wired=yes" >> "$GITHUB_OUTPUT"
+          echo "runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+
       - name: Hermetic workspace build
         run: buck2 build //...
+
+      # The number this lane exists to produce. ADR-0720's overturn is
+      # same-wave and needs evidence buck2 is worth the merge path; a hit rate
+      # nobody records is not that evidence.
+      #
+      # Reported, never asserted. There is no threshold here on purpose: a
+      # ratchet on a first measurement would encode today's accident as the
+      # floor.
+      - name: What the cache did
+        if: ${{ !cancelled() }}
+        run: |
+          set -uo pipefail
+          echo "cache wired: ${{ steps.cache-config.outputs.wired }}"
+          echo "runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+          buck2 log summary 2>/dev/null | grep -iE "cache|remote|network" || \
+            echo "(no cache accounting in this run's summary)"
+
+      # Credentials outlive the build otherwise: this runner is ephemeral, but
+      # a self-hosted one would not be, and the habit should not depend on that.
+      - name: Remove the credentials
+        if: ${{ always() }}
+        run: rm -rf "${RUNNER_TEMP}/cache-creds" .buckconfig.local
