@@ -1,15 +1,23 @@
-load("@prelude//toolchains:rust.bzl", "system_rust_toolchain")
+load(":rust.bzl", "hermetic_rust_toolchain", "rust_distribution")
 load("@prelude//toolchains:cxx.bzl", "system_cxx_toolchain")
 load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
 load("@prelude//toolchains:remote_test_execution.bzl", "remote_test_execution_toolchain")
 load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 
-# Rust 1.97.1 toolchain — pinned to match rust-toolchain.toml
-# rustc is resolved via rustup shim; PATH must include ~/.rustup/toolchains/1.97.1-aarch64-apple-darwin/bin
-system_rust_toolchain(
+# The compiler is a hash-pinned download, not a PATH lookup, so it is a real input to
+# every rustc action and no action shells out to rustup. The version is not configured
+# here or in rust.bzl: it is read from rust-toolchain.toml via the `<file:>` include in
+# .buckconfig, so there is one statement of it and this follows by construction.
+rust_distribution(
+    name = "rust_distribution",
+    visibility = ["PUBLIC"],
+)
+
+hermetic_rust_toolchain(
     name = "rust",
     default_edition = "2024",
+    distribution = ":rust_distribution",
     visibility = ["PUBLIC"],
 )
 
