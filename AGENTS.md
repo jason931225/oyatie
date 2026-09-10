@@ -206,10 +206,13 @@ for the wave. So, carried forward intact:
   required while buck2 legs come up beside them is the prohibited state, not a
   safe transition through it. The changeover is a swap, not an overlap.
 - **A live CAS alone does not overturn**, and its scope is cache-only.
-  `warm_reads_licensed: false` remains the admission control. A CAS and action
-  cache store blobs and are architecture-agnostic, so aarch64 capacity may
-  serve amd64 builds; remote execution is not, and stays out of scope until its
-  own record.
+  `warm_reads_licensed: false` remains the admission control, and nothing on
+  `dev` carries or reads that value -- it is a ruling awaiting a mechanism. A
+  root `specs/` path cannot be that mechanism: `specs` is a forbidden root name
+  (`pipeline/core/admission/src/layout.rs`), so the repository-layout gate
+  refuses it. A CAS and action cache store blobs and are
+  architecture-agnostic, so aarch64 capacity may serve amd64 builds; remote
+  execution is not, and stays out of scope until its own record.
 - **`manifest/reindeer` remains a cargo exception after the overturn.** The
   dependency-declarations domain is the buckifier's own bootstrap and cannot be
   buckified by the thing it produces.
@@ -218,11 +221,70 @@ Until that wave lands, cargo still produces the merge verdict, and code and
 configuration asserting so are correct rather than stale.
 
 The cache substrate exists. A NativeLink CAS serves
-`grpcs://cache.oyatie.dev:50051`, verified from a GitHub-hosted runner as well
-as locally: mTLS enforced, SHA256 and BLAKE3, action-cache writes enabled,
-Remote Execution API v2.0 through v2.3. In the substrate repository,
-`./substrate cache-creds` mints a client certificate and `./substrate
-cache-check` reports whether the endpoint is usable.
+`grpcs://cache.oyatie.dev:50051`, and has been called from a GitHub-hosted
+runner as well as locally. **mTLS is enforced**: `client_ca_file` is set on
+the listener, which is what makes the port an authorisation boundary rather
+than merely an
+encrypted one, and an anonymous RPC was measured being refused at the time a
+check existed that made one. That check was retired because it rested on an
+ad-hoc `grpcurl` install, not because its finding was wrong -- so the property
+is witnessed once and no longer re-proved on each run, which is what
+`cache-check` disclaims about itself. Do not read that disclaimer as the
+property being unearned.
+
+SHA256, BLAKE3 and Remote Execution API v2.0 through v2.3 come from that same
+retired probe, and they are `GetCapabilities` outputs -- the server describing
+itself. Carry them at that weight.
+
+The action cache is read-only on the serving instance, and that is CONFIGURED
+rather than verified: no refused write has been observed, because no client has
+attempted one. Read-only is deliberate -- a CAS entry is content-addressed and
+hash-verified, so a write can only insert the bytes its digest names, but an
+action-cache entry maps an action digest to an arbitrary result, and one
+UNAUTHENTICATED write is arbitrary code execution in every consumer.
+
+Two NativeLink configurations exist, they protect different things, and only
+the substrate's is deployed. The substrate refuses every action-cache write
+from every identity, and has no reader/writer split. Against `client_ca_file`
+alone such a split would need two CAs, because that check proves only that a
+client's chain terminates in the given CA: one CA signing both a reader and a
+writer leaves them indistinguishable to it, and possession of either
+authenticates as both. That is a limit of `client_ca_file`, not of split
+enforcement in general -- the chart splits one CA's certificates by SAN at the
+proxy, which is precisely what `client_ca_file` cannot do. This repository's
+chart is the inverse. It leaves `read_only`
+unset, and its proxy does have a reader/writer split -- one that LICENSES
+`ActionCache/UpdateActionResult` to the writer identity, a write the chart's
+own qualification suite requires to succeed.
+
+Those writes are authenticated, so the difference is policy rather than an open
+door: an absent or untrusted certificate fails the handshake, and an unknown
+identity is refused even `GetCapabilities`. What differs is WHO may write, not
+whether anyone may -- the ACE hazard above is conditioned on
+*unauthenticated*. So deploying the chart licenses action-cache writes to one
+identity; it does not carry the deployed configuration's refusal of all of
+them, and the two must not be assumed interchangeable.
+
+In the substrate repository, `./substrate cache-creds` mints a client
+certificate and `./substrate cache-check` reports whether the endpoint answers
+a TLS client that is not buck2. It probes with openssl, which accepts a SEC1
+key that rustls refuses, so it can report a usable endpoint for a credential
+that fails every build. The substrate emits PKCS8 at the source now, so a
+freshly minted credential is sound, and any key issued before that fix is SEC1
+by construction.
+
+The published `CACHE_CLIENT_KEY` Actions secret is current PKCS8, and that is
+checkable without writing anything. GitHub never returns a secret's value, but
+the provider keeps `plaintext_value` in state, so a `tofu plan` on the
+`repository` stack diffs the published secret against the live `platform`
+output. That plan reports no change to any cache secret, which is what makes
+the published key the PKCS8 one rather than the SEC1 one it would hold if it
+predated the fix.
+
+`tofu state show` REDACTS sensitive attributes, so inspecting that row shows
+neither PEM header and reads as absence. That is the instrument hiding the
+value, not the value being absent -- a plan compares it, a state row does not
+reveal it.
 
 What is recorded above is authority, not present readiness. At the time of
 writing the buck2 graph does not build cleanly, a cold build measures around
@@ -230,8 +292,25 @@ fourteen minutes, and no cache hit has been demonstrated by any client.
 `GetCapabilities` answering is not a cache hit, and neither is a green weekly
 smoke; treat "the CAS is live" and "buck2 builds are warm" as separate claims
 until a build writes to the cache and a later build on a clean tree reads from
-it. A misconfigured or unreachable cache degrades a buck2 build to local
-execution rather than failing it, so a cache outage is not a build outage.
+it.
+
+An unusable cache CONFIGURATION fails the build; it does not degrade to local
+execution. Measured three times: a `grpcs://` scheme a newer buck2 rejects, a
+daemon serving a stale RE client, and a SEC1 client key rustls cannot parse
+each produced retries at 1/2/3/4/5s and then `BUILD FAILED` -- on
+`prelude//rust/tools:rustc_cfg`, a target unrelated to the cache, with the real
+cause five screens above in a WARN. So a cache misconfiguration wears a
+build-rot costume.
+
+All three were misconfiguration against a healthy endpoint. What a correctly
+configured but UNREACHABLE cache does is unmeasured, so claim neither failure
+nor degradation for it.
+
+What makes an outage survivable today is that the root `.buckconfig` leaves the
+cache off: no lane wires buck2 to it, so no lane can fail on it. A lane that
+turns it on must decide the cache is unusable and skip it BEFORE writing any
+config -- and no such guard exists yet, so the survivability is a consequence
+of the cache being unused, not of anything defending against its absence.
 
 ## Git and protected delivery
 
