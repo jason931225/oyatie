@@ -54,7 +54,11 @@ fn run() -> Result<(), String> {
     );
     match toolchain_analysis {
         Ok(analysis) => {
-            if analysis.candidate().execution() < analysis.candidate().msrv() {
+            if !analysis
+                .candidate()
+                .execution()
+                .meets_msrv(analysis.candidate().msrv())
+            {
                 violations.push(format!(
                     "rust-toolchain.toml: execution toolchain {} is below MSRV {}",
                     analysis.candidate().execution(),

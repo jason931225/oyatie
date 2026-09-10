@@ -94,6 +94,7 @@ rust_test(
     srcs = [
         "tests/execution_toolchain_transition.rs",
         "tests/execution_toolchain_transition/analysis.rs",
+        "tests/execution_toolchain_transition/nightly_channel.rs",
         "tests/execution_toolchain_transition/patch_policy.rs",
         "tests/execution_toolchain_transition/support.rs",
     ],

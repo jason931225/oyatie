@@ -18,7 +18,7 @@ pub enum ExecutionToolchainProfile {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExecutionToolchainState {
-    execution: Version,
+    execution: ExecutionChannel,
     msrv: Version,
     profile: ExecutionToolchainProfile,
     components: BTreeSet<String>,
@@ -33,6 +33,8 @@ pub enum DeclarationRefusal {
     WrongType(&'static str, &'static str),
     Duplicate(&'static str, String),
     InvalidStableVersion(&'static str, String),
+    InvalidNightlyDate(&'static str, String),
+    FloatingNightlyChannel(&'static str, String),
     UnsupportedValue(&'static str, String),
 }
 
@@ -43,14 +45,14 @@ pub enum ExecutionToolchainAnalysisRefusal {
 }
 
 struct ParsedToolchain {
-    execution: Version,
+    execution: ExecutionChannel,
     profile: ExecutionToolchainProfile,
     components: BTreeSet<String>,
     targets: BTreeSet<String>,
 }
 
 impl ExecutionToolchainState {
-    pub fn execution(&self) -> &Version {
+    pub fn execution(&self) -> &ExecutionChannel {
         &self.execution
     }
 
@@ -109,7 +111,7 @@ fn parse_toolchain(source: &str) -> Result<ParsedToolchain, DeclarationRefusal> 
         .transpose()?
         .unwrap_or_default();
     Ok(ParsedToolchain {
-        execution: stable_version("toolchain.channel", &channel)?,
+        execution: parse_execution_channel("toolchain.channel", &channel)?,
         profile,
         components,
         targets,

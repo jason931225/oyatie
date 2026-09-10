@@ -90,7 +90,6 @@ fn invalid_toolchain_shapes_fail_analysis_with_side_and_field_context() {
         "1.98",
         "stable",
         "beta",
-        "nightly-2026-09-04",
         "custom-toolchain",
         "1.98.0-aarch64-apple-darwin",
         "1.98.0-alpha.1",
@@ -167,6 +166,10 @@ fn invalid_candidate_msrv_table_is_compact_and_fail_closed() {
         ),
         (
             "[workspace]\n[workspace.package]\nrust-version = '1.98.0+build'\n",
+            "invalid-version",
+        ),
+        (
+            "[workspace]\n[workspace.package]\nrust-version = 'nightly-2026-09-09'\n",
             "invalid-version",
         ),
         (
