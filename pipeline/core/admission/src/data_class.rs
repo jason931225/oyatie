@@ -164,17 +164,21 @@ fn annotated(body: &[&str], index: usize) -> bool {
             .is_some()
 }
 
-/// A named struct's own name, generics and any wrapped `where` clause split
-/// off it. A tuple struct is not one: its fields have no names to report, and
-/// reading its head as a named struct's would attribute the NEXT struct's
-/// fields to it.
-// ponytail: `(` before the brace rejects the head, so `struct Foo<T: Fn(u8)> {`
-// is a false negative — same uncovered class as tuple structs themselves.
+/// The name of a struct whose named body opens BELOW this line, which is the
+/// only shape the caller can attribute: it reads fields from the next line to
+/// the closing brace. A declaration that closes on its own line — `;` after a
+/// unit or tuple head, `{}`, or a one-line body — has no such body below, and
+/// a tuple struct has no field names to report at any width. Reading either
+/// would report the NEXT struct's fields under this struct's name.
+// ponytail: a one-line body `struct Tag { v: u8 }` is skipped, not parsed, and
+// `struct Foo<T: Fn(u8)> {` is rejected by the paren guard; both are silent
+// misses, never a wrong owner. Parse the head properly if either shows up.
 fn struct_head(line: &str) -> Option<&str> {
     let head = strip_visibility(line.trim_start())
         .strip_prefix("struct ")?
         .trim();
-    if head.split('{').next()?.contains('(') {
+    let declaration = head.split("//").next()?.trim_end();
+    if head.split('{').next()?.contains('(') || declaration.ends_with([';', '}']) {
         return None;
     }
     let name = head.split(['<', ' ', '{']).next()?;

@@ -276,3 +276,21 @@ fn a_paren_after_the_brace_does_not_hide_the_struct_head() {
     assert_eq!(refusals.len(), 1, "{refusals:?}");
     assert!(refusals[0].contains("Row.email"), "{}", refusals[0]);
 }
+
+#[test]
+fn a_head_that_closes_on_its_own_line_does_not_adopt_the_next_struct() {
+    for head in [
+        "pub struct Marker {}",
+        "pub struct Marker<T>;",
+        "pub struct Marker { pub v: u8 }",
+        "pub struct Marker<T>; // a marker",
+    ] {
+        let text = format!(
+            "{head}\npub struct Row {{\n    pub id: Classified<String>,\n    \
+             pub email: String,\n}}\n"
+        );
+        let refusals = holes(&text);
+        assert_eq!(refusals.len(), 1, "{head}: {refusals:?}");
+        assert!(refusals[0].contains("Row.email"), "{head}: {}", refusals[0]);
+    }
+}
