@@ -102,41 +102,75 @@ fn close_visibility(scope: &str) -> &str {
     scope.find(')').map_or(scope, |end| &scope[end + 1..])
 }
 
-/// Traits implemented for a concrete type in `contents`. A stub target is not
-/// an implementation: it is the absence of one, spelled out.
+/// Traits implemented in `contents` by something other than a stub. A header
+/// rustfmt wraps across lines is joined up to its body or `;` before it is
+/// read, so a `for`, a bound or a `where` clause on a continuation line counts.
 fn implemented_traits(contents: &[u8]) -> Vec<String> {
     let text = String::from_utf8_lossy(contents);
     let mut scanner = CommentScanner::default();
     let mut found = Vec::new();
+    let mut open: Option<String> = None;
     for raw in text.lines() {
         let line = raw.trim();
         if !matches!(scanner.classify(line), LineKind::Code) {
             continue;
         }
-        if let Some((name, target)) = implemented_trait(line)
-            && !target.starts_with(STUB_PREFIX)
-        {
-            found.push(name);
+        let header = match open.take() {
+            Some(head) => format!("{head} {line}"),
+            None if starts_impl(line) => line.to_owned(),
+            None => continue,
+        };
+        if header.contains('{') || header.ends_with(';') {
+            found.extend(implemented_trait(&header));
+        } else {
+            open = Some(header);
         }
     }
     found
 }
 
-/// The trait and target of an `impl <Trait> for <Type>` header. An inherent
-/// `impl Type {` has no `for` and implements nothing.
-fn implemented_trait(line: &str) -> Option<(String, String)> {
-    let rest = line
-        .strip_prefix("unsafe ")
-        .unwrap_or(line)
-        .strip_prefix("impl")?;
-    let rest = rest.strip_prefix('<').map_or(rest, close_generics);
-    let (head, tail) = rest.split_once(" for ")?;
-    Some((last_segment(head)?, last_segment(tail)?))
+/// An `impl` item begins here, including the bare `impl` rustfmt leaves when
+/// it wraps a long generic header.
+fn starts_impl(line: &str) -> bool {
+    let rest = line.strip_prefix("unsafe ").unwrap_or(line);
+    rest.strip_prefix("impl")
+        .is_some_and(|tail| tail.is_empty() || tail.starts_with([' ', '<']))
 }
 
-/// Skip a balanced generic parameter list so a lifetime or bound holding
-/// `for` cannot be read as the separator.
-fn close_generics(parameters: &str) -> &str {
+/// The trait an `impl <Trait> for <Type>` header implements. `None` when the
+/// header is inherent, names a standard-library trait by path, has a
+/// `NotImplemented` stub anywhere in its target type, or only forwards to
+/// types that must already implement the same trait.
+fn implemented_trait(header: &str) -> Option<String> {
+    let rest = header
+        .strip_prefix("unsafe ")
+        .unwrap_or(header)
+        .strip_prefix("impl")?;
+    let (generics, rest) = match rest.trim_start().strip_prefix('<') {
+        Some(parameters) => split_generics(parameters),
+        None => ("", rest),
+    };
+    let (signature, bounds) = rest.split_once(" where ").unwrap_or((rest, ""));
+    let (trait_path, target) = signature.split_once(" for ")?;
+    let trait_path = trait_path.trim().trim_start_matches("::");
+    if ["std::", "core::", "alloc::"]
+        .iter()
+        .any(|root| trait_path.starts_with(root))
+    {
+        return None;
+    }
+    let name = last_segment(trait_path)?;
+    let target = target.split('{').next().unwrap_or_default();
+    let stub = words(target).any(|word| word.starts_with(STUB_PREFIX));
+    let forwards = words(generics)
+        .chain(words(bounds))
+        .any(|word| word == name);
+    (!stub && !forwards).then_some(name)
+}
+
+/// Split a generic parameter list at its balancing `>`, so a lifetime or a
+/// bound holding `for` cannot be read as the separator.
+fn split_generics(parameters: &str) -> (&str, &str) {
     let mut depth = 1usize;
     for (index, byte) in parameters.bytes().enumerate() {
         match byte {
@@ -144,13 +178,18 @@ fn close_generics(parameters: &str) -> &str {
             b'>' => {
                 depth -= 1;
                 if depth == 0 {
-                    return &parameters[index + 1..];
+                    return (&parameters[..index], &parameters[index + 1..]);
                 }
             }
             _ => {}
         }
     }
-    parameters
+    (parameters, "")
+}
+
+fn words(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .filter(|word| !word.is_empty())
 }
 
 /// The bare name of a path, with generic arguments and module qualification

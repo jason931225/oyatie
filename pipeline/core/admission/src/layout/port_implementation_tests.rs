@@ -155,3 +155,75 @@ fn the_refusal_names_no_decision_identifier() {
         "{refused}"
     );
 }
+
+#[test]
+fn a_header_rustfmt_wraps_before_for_still_names_its_trait() {
+    let port = added(
+        PORT,
+        "pub trait IdentityProviderRegistrySnapshotRepository {}\n",
+    );
+    let adapter = added(
+        ADAPTER,
+        "impl IdentityProviderRegistrySnapshotRepository\n    for InMemoryIdentityProviderRegistrySnapshotRepository\n{\n}\n",
+    );
+    assert!(refusals(&[port, adapter]).is_empty());
+}
+
+#[test]
+fn a_header_whose_generics_wrap_still_names_its_trait() {
+    for header in [
+        "impl<\n    A: Send,\n    B: Send,\n> CellStore<A, B> for Postgres<A, B> {\n}\n",
+        "impl\nCellStore<\n    CandidateRequest,\n    CandidateArtifact,\n> for ReindeerCandidate {\n}\n",
+    ] {
+        let adapter = added(ADAPTER, header);
+        assert!(
+            refusals(&[added(PORT, "pub trait CellStore<A, B> {}\n"), adapter]).is_empty(),
+            "{header:?}"
+        );
+    }
+}
+
+#[test]
+fn a_stub_hidden_in_a_wrapper_or_a_wrapped_header_is_still_a_stub() {
+    for port in [
+        "pub trait CellStore {}\nimpl CellStore\n    for NotImplementedCellStore\n{\n}\n",
+        "pub trait CellStore {}\nimpl CellStore for Box<NotImplementedCellStore> {}\n",
+    ] {
+        assert_eq!(refusals(&[added(PORT, port)]).len(), 1, "{port:?}");
+    }
+}
+
+#[test]
+fn an_impl_that_only_forwards_to_other_implementers_is_not_one() {
+    for port in [
+        "pub trait CellStore {}\nimpl CellStore for NotImplementedCellStore {}\nimpl<T: CellStore + ?Sized> CellStore for std::sync::Arc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T> CellStore for Arc<T>\nwhere\n    T: CellStore + ?Sized,\n{\n}\n",
+    ] {
+        assert_eq!(refusals(&[added(PORT, port)]).len(), 1, "{port:?}");
+    }
+    let blanket = "pub trait CellStore {}\nimpl<T: CellStoreRead> CellStore for T {}\n";
+    assert!(refusals(&[added(PORT, blanket)]).is_empty());
+}
+
+#[test]
+fn a_standard_library_trait_of_the_same_name_implements_nothing() {
+    let port = added(PORT, "pub trait Error {}\n");
+    let unrelated = added(ADAPTER, "impl std::error::Error for PlacementError {}\n");
+    assert_eq!(refusals(&[port, unrelated]).len(), 1);
+}
+
+#[test]
+fn reference_slice_unit_and_macro_targets_are_implementations() {
+    for adapter in [
+        "impl CellStore for &FakeClock {}\n",
+        "impl CellStore for [u8] {}\n",
+        "impl CellStore for () {}\n",
+        "macro_rules! adapt {\n    ($t:ty) => {\n        impl CellStore for $t {}\n    };\n}\n",
+    ] {
+        let port = added(PORT, "pub trait CellStore {}\n");
+        assert!(
+            refusals(&[port, added(ADAPTER, adapter)]).is_empty(),
+            "{adapter:?}"
+        );
+    }
+}
