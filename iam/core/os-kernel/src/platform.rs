@@ -31,7 +31,9 @@ impl Platform {
         }
     }
 
-    /// The second spelling in an arm is an accepted alias, not a typo.
+    /// Where an arm carries two spellings the second is an accepted alias.
+    /// Blank input is not an alias but a default to `Unknown`, which
+    /// `NodeIdentity::validate` then refuses.
     pub fn parse(s: &str) -> Result<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "metal" | "bare-metal" => Ok(Platform::Metal),
@@ -51,13 +53,16 @@ impl Platform {
         matches!(self, Platform::Aws | Platform::Gcp | Platform::Azure)
     }
 
-    /// The complement of [`Platform::is_cloud`] for every known platform:
-    /// config arrives on a block device or ISO instead.
+    /// Config arrives on a block device or ISO instead of a metadata service.
+    ///
+    /// `Unknown` is in neither set: an unidentified platform has no known
+    /// config source, and `NodeIdentity::validate` refuses it outright. The
+    /// match is exhaustive so a new variant must be classified here.
     pub fn uses_local_config(self) -> bool {
-        matches!(
-            self,
-            Platform::Metal | Platform::Qemu | Platform::VMware | Platform::Container
-        )
+        match self {
+            Platform::Metal | Platform::Qemu | Platform::VMware | Platform::Container => true,
+            Platform::Aws | Platform::Gcp | Platform::Azure | Platform::Unknown => false,
+        }
     }
 }
 
@@ -85,6 +90,33 @@ mod tests {
         assert_eq!(Platform::parse("bare-metal").unwrap(), Platform::Metal);
         assert_eq!(Platform::parse("docker").unwrap(), Platform::Container);
         assert!(Platform::parse("heroku").is_err());
+    }
+
+    #[test]
+    fn blank_input_defaults_to_unknown() {
+        assert_eq!(Platform::parse("").unwrap(), Platform::Unknown);
+        assert_eq!(Platform::parse("   ").unwrap(), Platform::Unknown);
+    }
+
+    #[test]
+    fn every_variant_but_unknown_is_cloud_or_local_and_never_both() {
+        for platform in [
+            Platform::Metal,
+            Platform::Aws,
+            Platform::Gcp,
+            Platform::Azure,
+            Platform::Qemu,
+            Platform::VMware,
+            Platform::Container,
+        ] {
+            assert_ne!(
+                platform.is_cloud(),
+                platform.uses_local_config(),
+                "{platform}"
+            );
+        }
+        assert!(!Platform::Unknown.is_cloud());
+        assert!(!Platform::Unknown.uses_local_config());
     }
 
     #[test]

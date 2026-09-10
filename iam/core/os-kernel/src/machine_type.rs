@@ -59,8 +59,9 @@ impl core::str::FromStr for MachineType {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        // The second spelling in each arm is a historical Talos config alias,
-        // not a typo.
+        // Where an arm carries two spellings the second is a historical Talos
+        // config alias. Blank input is not an alias but a default to `Unknown`,
+        // which `NodeIdentity::validate` then refuses.
         let normalized: String = s.trim().to_ascii_lowercase();
         match normalized.as_str() {
             "init" => Ok(MachineType::Init),
@@ -108,6 +109,12 @@ mod tests {
             MachineType::Worker
         );
         assert!(MachineType::from_str("nonsense").is_err());
+    }
+
+    #[test]
+    fn blank_input_defaults_to_unknown() {
+        assert_eq!(MachineType::from_str("").unwrap(), MachineType::Unknown);
+        assert_eq!(MachineType::from_str("   ").unwrap(), MachineType::Unknown);
     }
 
     #[test]

@@ -132,9 +132,12 @@ mod tests {
     }
 
     #[test]
-    fn hashing_no_bytes_leaves_the_fnv_offset_basis() {
-        // The literal, not FNV_OFFSET: comparing the constant to itself would
-        // still pass if the constant were wrong.
+    fn fnv_1a_matches_the_published_vectors() {
+        // The literals, not FNV_OFFSET/FNV_PRIME: comparing a constant to
+        // itself would still pass if the constant were wrong. Zero bytes pin
+        // the offset basis; one byte is the shortest input that multiplies by
+        // the prime, so it is what pins the prime.
         assert_eq!(Fingerprint::of(b"").value(), 0xcbf2_9ce4_8422_2325);
+        assert_eq!(Fingerprint::of(b"a").value(), 0xaf63_dc4c_8601_ec8c);
     }
 }

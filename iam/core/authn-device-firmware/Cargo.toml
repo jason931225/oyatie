@@ -9,5 +9,3 @@ publish = false
 path = "src/lib.rs"
 
 [dependencies]
-# Phase-1: NO direct deps. OpenSK is vendored separately (tools/opensk-vendored/).
-# Phase-2 will add: opensk-vendored bridge crate + Nordic nRF52840 HAL + embedded-hal.

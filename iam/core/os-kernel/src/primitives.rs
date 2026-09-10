@@ -155,6 +155,9 @@ mod tests {
             .unwrap();
         assert_eq!(l.len(), 2);
         assert!(l.insert("bad key", "x").is_err());
+        // The charset is closed, not merely inclusive: a punctuation mark
+        // outside it is refused even though it is neither space nor control.
+        assert!(l.insert("a!b", "v").is_err());
 
         let mut sel = Labels::new();
         sel.insert("topology.kubernetes.io/zone", "us-east-1a")
