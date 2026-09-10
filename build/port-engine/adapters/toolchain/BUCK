@@ -1,6 +1,5 @@
 # Package-local corpus mirrors build/toolchains/** (dual-home) as *.txt so include_str! stays
 # hermetic under buck2 (nested files named BUCK are excluded from rust srcs globs).
-# Cell remap (.buckconfig) remains PARKED outside roots.build; this axis digests dual-home bytes.
 rust_library(
     name = "port-engine-toolchain",
     srcs = glob(["src/**/*.rs", "src/corpus/**/*.txt"]),

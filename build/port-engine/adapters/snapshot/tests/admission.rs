@@ -153,13 +153,6 @@ fn v1_preimage_moves_when_a_declaration_moves() {
 
     assert_ne!(original, after_type, "a changed type must move the digest");
     assert_ne!(original, after_flag, "a changed flag must move the digest");
-
-    // And the v0 preimage sees none of it — stated as a fact, so the reason v1 exists is
-    // checked rather than asserted in prose.
-    assert_eq!(
-        snapshot_preimage("go", &[("u", producer)]),
-        snapshot_preimage("go", &[("u", producer)])
-    );
 }
 
 /// Nesting must be unambiguous, not merely encoded. Without the explicit child arity, a node

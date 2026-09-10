@@ -8,14 +8,10 @@ use port_engine_hash::digest_bytes;
 use crate::error::EmitError;
 use crate::{CANARY_RULE_SUFFIX, GOLDEN_CANARY_RS};
 
-/// Selected canary region + bytes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CanaryArtifact {
-    /// Region id selected from the emit tree.
     pub region: RegionId,
-    /// Emitted source bytes for that region.
     pub bytes: Vec<u8>,
-    /// Content digest of [`Self::bytes`].
     pub digest: Digest,
 }
 
@@ -42,13 +38,11 @@ pub fn select_canary(emitted: &BTreeMap<RegionId, Vec<u8>>) -> Result<CanaryArti
     }
 }
 
-/// Golden canary source bytes (UTF-8).
 #[must_use]
 pub fn golden_canary_bytes() -> &'static [u8] {
     GOLDEN_CANARY_RS.as_bytes()
 }
 
-/// Digest of the embedded golden canary.
 #[must_use]
 pub fn golden_canary_digest() -> Digest {
     digest_bytes(golden_canary_bytes())

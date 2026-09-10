@@ -14,7 +14,6 @@ use crate::rule::{DeferredKind, LoadedRule, TraitReceiver};
 use crate::wire::RulepackDocument;
 use crate::{CONFLICT_REFUSE, RULEPACK_GO_RUST_V1_JSON, RULEPACK_V0_JSON};
 
-/// Loaded neutral rule pack implementing [`RulePack`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoadedRulePack {
     pub(crate) pair: LanguagePair,
@@ -49,7 +48,7 @@ impl LoadedRulePack {
     /// Load from an in-memory JSON string (test hook / future specs materializer input).
     ///
     /// # Errors
-    /// [`RulepackError`] on parse, schema, fixture, selection, undeclared-apply, or pair refusal.
+    /// Same refusals as [`Self::load_embedded`].
     pub fn load_from_str(json: &str) -> Result<Self, RulepackError> {
         let doc: RulepackDocument =
             serde_json::from_str(json).map_err(|err| RulepackError::Parse {
@@ -113,9 +112,6 @@ impl LoadedRulePack {
                     field: "rules(duplicate)",
                 });
             }
-            // Every field the wire shape carries must either drive behaviour or be refused.
-            // These two carry no implementation, so a pack declaring them is told so rather than
-            // loading green and receiving nothing.
             if !rule.required_diagnostics.is_empty() {
                 return Err(RulepackError::UnimplementedSemantics {
                     rule: rule.id,
@@ -134,10 +130,6 @@ impl LoadedRulePack {
                     policy: rule.conflict,
                 });
             }
-            // Declaration order IS the transform order — `port_engine_kernel::plan` refuses a
-            // unit whose rules arrive out of declared position. `precedence` therefore has to
-            // agree with it or the pack states an order that nothing obeys, and a reviewer
-            // reading the precedences would be reading a fiction.
             if let Some(previous) = previous_precedence.filter(|p| rule.precedence <= *p) {
                 return Err(RulepackError::PrecedenceDisagreesWithOrder {
                     rule: rule.id,
@@ -261,13 +253,11 @@ impl LoadedRulePack {
         Self::load_from_str(RULEPACK_GO_RUST_V1_JSON)
     }
 
-    /// The kinds this pack knowingly leaves untranslated, with their recorded reasons.
     #[must_use]
     pub fn deferred(&self) -> &[DeferredKind] {
         &self.deferred_kinds
     }
 
-    /// Borrow the language pair.
     #[must_use]
     pub fn language_pair(&self) -> &LanguagePair {
         &self.pair
@@ -293,7 +283,6 @@ impl LoadedRulePack {
             .sum()
     }
 
-    /// Look up a loaded rule by id.
     #[must_use]
     pub fn rule(&self, id: &RuleId) -> Option<&LoadedRule> {
         self.loaded_rules.iter().find(|r| &r.id == id)

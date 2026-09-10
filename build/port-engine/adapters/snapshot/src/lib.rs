@@ -1,12 +1,6 @@
 //! # port-engine-snapshot — bootstrap SourceModel snapshot admission.
-//!
-//! ADR-0638 D3: the bootstrap Go extractor runs **out of band only**. This adapter admits the
-//! resulting content-addressed artifact, binds it to the fleet pin, and verifies the claimed
-//! `snapshot_digest` against a stable preimage. It MUST NEVER invoke a Go toolchain (firewall
-//! inherited from `port-engine-frontend-go`).
 #![forbid(unsafe_code)]
 
-/// This crate's own sources, for the engine-identity axis assembled by the facade.
 mod sources;
 pub use sources::CRATE_SOURCES;
 
@@ -25,14 +19,10 @@ pub use admitted::AdmittedSnapshot;
 pub use error::AdmitError;
 pub use preimage::{snapshot_preimage, snapshot_preimage_v1};
 
-/// Embedded OOB bootstrap snapshot fixture (hermetic; not produced in-process).
 pub(crate) const FIXTURE_SNAPSHOT_JSON: &str = include_str!("fixture-snapshot-v0.json");
 
-/// Embedded v1 fixture: the declaration tree extracted from the hermetic Go corpus by the
-/// out-of-band bootstrap extractor. Committed rather than produced here.
 pub(crate) const FIXTURE_SNAPSHOT_V1_JSON: &str = include_str!("fixture-snapshot-v1.json");
 
-/// Embedded v1 fixture for the corpus the engine is expected to REFUSE.
 pub(crate) const FIXTURE_SNAPSHOT_REFUSED_V1_JSON: &str =
     include_str!("fixture-snapshot-refused-v1.json");
 
@@ -66,7 +56,6 @@ pub(crate) const FIXTURE_SNAPSHOT_DRIFT_BEFORE_V1_JSON: &str =
 pub(crate) const FIXTURE_SNAPSHOT_DRIFT_AFTER_V1_JSON: &str =
     include_str!("fixture-snapshot-drift-after-v1.json");
 
-/// Fail-closed readiness gate. `true` once admission is present.
 #[must_use]
 pub const fn w0_ready() -> bool {
     true

@@ -1,10 +1,7 @@
-//! ADR-0704 / W0-B: emit must refuse the corpus destination root.
+//! ADR-0637 D1: a corpus-specific branch in neutral code is a defect, so emit must refuse the
+//! corpus destination root.
 //!
-//! Scanned over the WHOLE crate. The fence used to read `include_str!("lib.rs")` alone, which was
-//! complete only while the crate was one file — a `mod other;` compiles a file the scan never
-//! reads. `port-engine-kernel` closed that hole by REFUSING `mod` at compile time; this adapter
-//! cannot, because it is modular. So the scanned set is enumerated and then PROVEN to be the whole
-//! of `src/`.
+//! Scanned over the WHOLE crate: the set is enumerated and then PROVEN to be the whole of `src/`.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -51,18 +48,27 @@ fn scanned_sources_are_the_whole_crate() {
         scanned, on_disk,
         "a source file exists that no architecture fence reads — add it to PRODUCTION_SOURCES"
     );
+
+    let embedded: BTreeSet<String> = port_engine_emit::CRATE_SOURCES
+        .iter()
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
+    assert_eq!(
+        embedded, on_disk,
+        "CRATE_SOURCES must BE the crate: the engine-identity axis hashes only what it lists, so \
+         a source missing from it is a source an engine change can move without moving the digest"
+    );
 }
 
-/// The bulk-emit hard stop, asserted over the sources rather than only over a call.
 #[test]
 fn a_production_source_refuses_the_corpus_destination() {
     let destination = ["k", "8", "s"].concat();
-    let refusing = PRODUCTION_SOURCES
-        .iter()
-        .any(|(_, source)| source.contains(&destination));
+    let under_corpus = Path::new("/tmp")
+        .join(&destination)
+        .join(port_engine_emit::EMIT_OUT_DIRNAME);
     assert!(
-        refusing,
-        "no production source mentions the `{destination}` destination — the bulk-emit refusal \
-         must be present in the code, not only in the commit message"
+        port_engine_emit::validate_emit_out_dir(&under_corpus).is_err(),
+        "a destination under `{destination}/` must be refused by the validator itself, not \
+         merely mentioned somewhere in the sources"
     );
 }

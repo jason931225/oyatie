@@ -1,19 +1,18 @@
-//! # port-engine-toolchain — receipt `toolchain_digest` binder (W0-B Slice 9).
+//! # port-engine-toolchain — receipt `toolchain_digest` binder.
 //!
-//! Digests the hermetic toolchain corpus (`build/toolchains/**` mirrored under
-//! `src/corpus/*.txt`). Filenames avoid nesting a `BUCK` path (buck2 srcs globs exclude those).
-//! Live cell remap is `.buckconfig` `toolchains = build/toolchains`; this adapter binds the
-//! corpus *bytes* so the receipt axis stays content-addressed.
+//! Digests exactly the paths [`CORPUS_PATHS`] names, mirrored under `src/corpus/*.txt`; a
+//! `build/toolchains` file absent from that array is absent from the axis. Mirror filenames avoid
+//! nesting a `BUCK` path (buck2 srcs globs exclude those). Live cell remap is `.buckconfig`
+//! `toolchains = build/toolchains`; this adapter binds the corpus *bytes* so the receipt axis
+//! stays content-addressed.
 #![forbid(unsafe_code)]
 
-/// This crate's own sources, for the engine-identity axis assembled by the facade.
 mod sources;
 pub use sources::CRATE_SOURCES;
 
 use port_engine_api::Digest;
 use port_engine_hash::digest_bytes;
 
-/// Fail-closed readiness gate. `true` once Slice 9 toolchain axis binding is present.
 pub const fn w0_ready() -> bool {
     true
 }
@@ -46,7 +45,6 @@ pub fn toolchain_preimage() -> Vec<u8> {
     out
 }
 
-/// Content digest of the toolchain corpus (`sha256:<hex>`).
 #[must_use]
 pub fn toolchain_digest() -> Digest {
     digest_bytes(&toolchain_preimage())

@@ -6,37 +6,24 @@ use port_engine_api::Digest;
 use port_engine_frontend_go::{PRODUCER_BOOTSTRAP_GO, SnapshotError};
 use port_engine_source_pin::PinError;
 
-/// Typed refusal from snapshot admission.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AdmitError {
-    /// Snapshot decode / producer validation failed.
     Snapshot(SnapshotError),
-    /// Fleet pin could not load.
     Pin(PinError),
-    /// The two extractor passes did not produce byte-identical snapshots.
     SnapshotMismatch {
-        /// SHA-256 digest of the first raw snapshot artifact.
         first: Digest,
-        /// SHA-256 digest of the second raw snapshot artifact.
         second: Digest,
     },
-    /// Claimed `snapshot_digest` does not match the stable preimage hash.
     DigestMismatch {
-        /// Digest claimed in the artifact.
         claimed: String,
-        /// Digest computed from the admission preimage.
         computed: String,
     },
-    /// Snapshot language is not the bootstrap Go pair source.
     Language {
-        /// Language found on the artifact.
         actual: String,
     },
-    /// A producer is not authorized during bootstrap admission.
     ProducerNotAuthorized {
         /// Unit whose producer is premature.
         unit: String,
-        /// Producer identity found on the artifact.
         actual: String,
     },
 }

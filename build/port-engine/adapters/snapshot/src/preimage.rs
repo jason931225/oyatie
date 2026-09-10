@@ -10,10 +10,6 @@ use port_engine_api::{Declaration, TypeRef};
 
 /// Stable admission preimage: length-prefixed language, then each length-prefixed unit and
 /// producer in model order.
-///
-/// Decimal byte lengths followed by `:` make the encoding injective even when a field contains a
-/// delimiter. The digest therefore covers language + package→producer mapping without relying on
-/// JSON canonicalization or cross-crate character restrictions.
 #[must_use]
 pub fn snapshot_preimage(language: &str, units_and_producers: &[(&str, &str)]) -> Vec<u8> {
     let mut out = Vec::new();
@@ -33,13 +29,6 @@ fn push_field(out: &mut Vec<u8>, value: &str) {
 
 /// Stable admission preimage for a v1 artifact, which carries declarations.
 ///
-/// The v0 preimage covers language plus the package→producer map, and nothing else. Digesting a
-/// v1 artifact with it would leave the entire declaration tree OUTSIDE the identity: rename a
-/// field, add a method, change a parameter type, and `snapshot_digest` would not move. The
-/// receipt would then find the emitted bytes changed with all six axes unchanged and classify a
-/// perfectly well-explained change as `Unexplained` — or, worse, an emit that happened not to
-/// change would be blessed as reproducible over a corpus that did.
-///
 /// The encoding is the same shape as v0's — decimal length prefixes with a `:` — extended with an
 /// explicit child arity per node:
 ///
@@ -52,7 +41,7 @@ fn push_field(out: &mut Vec<u8>, value: &str) {
 /// is mirrored byte-for-byte by the Go extractor's `encodeNode`. That duplication is deliberate:
 /// the alternative is trusting the digest the extractor claims, which would let a front-end defect
 /// enter the engine carrying a self-consistent receipt. Drift between the two implementations
-/// surfaces here as [`AdmitError::DigestMismatch`].
+/// surfaces here as [`crate::AdmitError::DigestMismatch`].
 #[must_use]
 pub fn snapshot_preimage_v1(
     language: &str,
@@ -75,10 +64,6 @@ pub fn snapshot_preimage_v1(
 }
 
 /// The type TREE, mirrored by the extractor's `encodeType`.
-///
-/// Leaving it out would put every type OUTSIDE the snapshot identity: change a field's type and
-/// `snapshot_digest` would not move, so the receipt would find the emitted bytes changed with all
-/// six axes held and call a fully explainable change `Unexplained`.
 ///
 /// A present/absent marker leads, so a declaration with no type and one whose type is an empty
 /// node cannot encode identically.

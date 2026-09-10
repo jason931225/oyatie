@@ -12,7 +12,6 @@ rust_library(
     ],
 )
 
-# Loading a well-formed pack: the fixture gate, the digest, and the seams.
 rust_test(
     name = "port-engine-rulepack-load",
     srcs = glob(["tests/load.rs", "tests/common/**/*.rs", "src/**/*.json"]),
@@ -29,7 +28,6 @@ rust_test(
     ],
 )
 
-# Everything the loader refuses, including every once-dropped field.
 rust_test(
     name = "port-engine-rulepack-refusals",
     srcs = glob(["tests/refusals.rs", "tests/common/**/*.rs", "src/**/*.json"]),

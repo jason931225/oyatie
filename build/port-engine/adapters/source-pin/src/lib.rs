@@ -1,11 +1,6 @@
-//! # port-engine-source-pin — upstream pin and license verification (W0-B Slice 3).
-//!
-//! ADR-0638 D3: binds `specs/k8s-port/upstream-pin.json`, verifies Apache-2.0 licensing, and
-//! records canonical pin / snapshot digest binding. The bootstrap Go extractor runs **out of band**
-//! only — never from `verify()`. Slice 3 lands the pin loader; extractor admission is Slice 3+.
+//! # port-engine-source-pin — upstream pin and license verification.
 #![forbid(unsafe_code)]
 
-/// This crate's own sources, for the engine-identity axis assembled by the facade.
 mod sources;
 pub use sources::CRATE_SOURCES;
 
@@ -16,7 +11,6 @@ use serde::Deserialize;
 /// Embedded fleet pin (package-local mirror of `specs/k8s-port/upstream-pin.json` for buck2 hermeticity).
 const UPSTREAM_PIN_JSON: &str = include_str!("upstream-pin.json");
 
-/// Fail-closed readiness gate. `true` once Slice 3 pin loader is present.
 pub const fn w0_ready() -> bool {
     true
 }
@@ -24,13 +18,10 @@ pub const fn w0_ready() -> bool {
 /// Canonical upstream pin fields from `upstream-pin.json#pin`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UpstreamPin {
-    /// Annotated tag object hash.
     pub annotated_tag_object: String,
-    /// Peeled commit at the tag.
     pub peeled_commit: String,
-    /// Upstream repository URL.
     pub repository: String,
-    /// SPDX license id (must be Apache-2.0).
+    /// SPDX license id; [`load_from_str`] refuses anything but `Apache-2.0`.
     pub source_license: String,
     /// Human-readable tag (e.g. `v1.36.1`).
     pub tag: String,
@@ -39,19 +30,14 @@ pub struct UpstreamPin {
 /// Typed refusal from pin loading or license verification.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PinError {
-    /// JSON could not be parsed.
     Parse {
         /// Parser detail (no path — adapter receives bytes only).
         detail: String,
     },
-    /// Required field missing or wrong type.
     Schema {
-        /// Which field failed.
         field: &'static str,
     },
-    /// License is not the fleet-mandated Apache-2.0.
     LicenseMismatch {
-        /// License string found in the document.
         actual: String,
     },
 }
@@ -95,7 +81,7 @@ pub fn load_embedded() -> Result<UpstreamPin, PinError> {
 /// Load and verify pin JSON from an in-memory string (test hook and future adapter input).
 ///
 /// # Errors
-/// [`PinError`] on parse failure, schema violation, or non-Apache license.
+/// Same refusals as [`load_embedded`].
 pub fn load_from_str(json: &str) -> Result<UpstreamPin, PinError> {
     let doc: PinDocument = serde_json::from_str(json).map_err(|err| PinError::Parse {
         detail: err.to_string(),

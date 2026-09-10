@@ -130,9 +130,6 @@ fn refuses_unknown_schema_version() {
     assert_eq!(err, SnapshotError::UnknownSchemaVersion { actual: 9 });
 }
 
-/// v1 is refused rather than half-decoded. It carried types as flat SPELLINGS, which cannot answer
-/// what v2 asks — there is no structure and no package qualification in it — and treating each
-/// spelling as an opaque name would reinstate exactly the flat-table resolution v2 replaced.
 #[test]
 fn refuses_the_superseded_flat_type_version() {
     let json = r#"{"schema_version":1,"language":"go","snapshot_digest":"d","packages":[]}"#;
@@ -145,9 +142,6 @@ fn refuses_the_superseded_flat_type_version() {
     );
 }
 
-/// A v0 envelope carrying declarations is a version lie: the field says the payload has no
-/// declarations while the payload has them. Accepting it would leave every later reader
-/// guessing which of the two to believe, and the digest rule is selected by version.
 #[test]
 fn refuses_v0_envelope_carrying_declarations() {
     let json = format!(

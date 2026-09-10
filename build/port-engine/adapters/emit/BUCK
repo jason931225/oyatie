@@ -10,7 +10,6 @@ rust_library(
     ],
 )
 
-# Canary selection, golden compare, and every materialize destination refusal.
 rust_test(
     name = "port-engine-emit-canary",
     srcs = glob(["tests/emit.rs", "src/**/*.txt"]),

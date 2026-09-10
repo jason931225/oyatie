@@ -17,12 +17,11 @@ import (
 // An interface embedding an interface becomes a SUPERTRAIT. That is the census's own reading
 // (`census/interfaces.md` §6: "Rust supertraits (`trait A: B`) map this directly"), and it is
 // faithful: a type satisfying the outer interface satisfies the embedded one in both languages.
-// 87.3% of embedding interfaces embed exactly one.
 //
 // A struct embedding a struct becomes FORWARDING METHODS. §11 item 7 records this as a gap the
 // census could not close — its instrument recorded a method only from a declaration with a
-// receiver, so 2,747 CORE struct types have method sets larger than it measured and 479 of them
-// look like they have no methods at all. go/types closes it exactly, and this is where.
+// receiver, so struct types have method sets larger than it measured and some look like they have
+// no methods at all. go/types closes it exactly, and this is where.
 
 // interfaceEmbeds records the interfaces an interface embeds, for the target's supertrait list.
 func interfaceEmbeds(iface *types.Interface, ctx *extractCtx) []node {
@@ -125,11 +124,8 @@ func fieldPath(named *types.Named, indices []int) (string, bool) {
 	return strings.Join(parts, "."), true
 }
 
-// embeddedInterfaces reports the interfaces an interface embeds, transitively.
-//
-// Satisfying an interface satisfies everything it embeds — the Go compiler checks that, and the
-// target needs it written down: a supertrait is a REQUIREMENT, so `impl Job for Driver` does not
-// compile unless `Runner` and `Describer` are implemented too.
+// embeddedInterfaces reports the interfaces an interface embeds, transitively. See satisfy.go on
+// why a supertrait is a requirement rather than a copied method set.
 func embeddedInterfaces(named *types.Named, seen map[string]bool) []*types.Named {
 	iface, ok := named.Underlying().(*types.Interface)
 	if !ok {

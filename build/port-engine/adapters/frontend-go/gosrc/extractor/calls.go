@@ -48,10 +48,6 @@ func conversionTarget(call *ast.CallExpr, ctx *extractCtx) *typeNode {
 }
 
 // calleeIsMethod reports whether a call goes through a RECEIVER.
-//
-// Syntax cannot answer this: `value.Method()` and `package.Function()` are the same shape, and only
-// the type-checker knows which name is a package. Deciding by syntax is what made a cross-package
-// call emit a method call on a binding that does not exist.
 func calleeIsMethod(fun ast.Expr, ctx *extractCtx) bool {
 	selector, ok := fun.(*ast.SelectorExpr)
 	if !ok {

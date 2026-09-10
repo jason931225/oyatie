@@ -1,10 +1,6 @@
 //! ADR-0638 D3: the admission path must never invoke a Go toolchain.
 //!
-//! Scanned over the WHOLE crate. The fence used to read `include_str!("lib.rs")` alone, which was
-//! complete only while the crate was one file — a `mod other;` compiles a file the scan never
-//! reads. `port-engine-kernel` closed that hole by REFUSING `mod` at compile time; this adapter
-//! cannot, because it is modular. So the scanned set is enumerated and then PROVEN to be the whole
-//! of `src/`.
+//! Scanned over the WHOLE crate: the set is enumerated and then PROVEN to be the whole of `src/`.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -51,6 +47,16 @@ fn scanned_sources_are_the_whole_crate() {
     assert_eq!(
         scanned, on_disk,
         "a source file exists that no architecture fence reads — add it to PRODUCTION_SOURCES"
+    );
+
+    let embedded: BTreeSet<String> = port_engine_snapshot::CRATE_SOURCES
+        .iter()
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
+    assert_eq!(
+        embedded, on_disk,
+        "CRATE_SOURCES must BE the crate: the engine-identity axis hashes only what it lists, so \
+         a source missing from it is a source an engine change can move without moving the digest"
     );
 }
 
