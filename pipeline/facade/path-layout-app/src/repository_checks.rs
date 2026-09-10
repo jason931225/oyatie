@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use pipeline_admission::layout::{ChangedSource, port_implementation_violations};
 use pipeline_admission::{
     ALLOWED_ROOT_DIRS, APP_PRODUCT_DIRS, BUILD_ROOT_DIRS, CARGO_CONFIG_PATHS,
     cargo_config_violations, comment_run_violations, file_budget_violations, is_capability_root,
@@ -130,40 +129,6 @@ pub(super) fn live_candidate_violations(
         }
     }
     Ok(violations)
-}
-
-/// Every changed Rust source with its head bytes and the base bytes it
-/// replaced. An exact rename reads its base at the source path; a deletion
-/// contributes base bytes and an empty head, so a moved port is inherited.
-pub(super) fn changed_port_violations(
-    repository: &impl RepositoryRead,
-    merge_base: &str,
-    head: &str,
-    occupied: &BTreeSet<String>,
-    exact_rename_sources: &BTreeMap<String, String>,
-) -> Result<Vec<String>, String> {
-    let mut sources = Vec::new();
-    for path in occupied.iter().filter(|path| path.ends_with(".rs")) {
-        let head_bytes = match regular_blob(repository.entry_kind(head, path)?) {
-            true => repository.blob_bytes(head, path)?,
-            false => Vec::new(),
-        };
-        let origin = exact_rename_sources.get(path).unwrap_or(path);
-        let base_bytes = match regular_blob(repository.entry_kind(merge_base, origin)?) {
-            true => Some(repository.blob_bytes(merge_base, origin)?),
-            false => None,
-        };
-        sources.push((path, head_bytes, base_bytes));
-    }
-    let changed: Vec<ChangedSource<'_>> = sources
-        .iter()
-        .map(|(path, head, base)| ChangedSource {
-            path,
-            head,
-            base: base.as_deref(),
-        })
-        .collect();
-    Ok(port_implementation_violations(&changed))
 }
 
 pub(super) fn regular_blob(kind: Option<RepositoryEntryKind>) -> bool {

@@ -1,10 +1,11 @@
 //! Event-independent changed-path repository-layout admission facade.
 //! Provenance: ADR-0719 repository-layout decision (D-8).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
 
 use dependency_declarations_reconcile::analyze_execution_toolchain_transition;
+use pipeline_admission::layout::{ChangedSource, port_implementation_violations};
 use pipeline_admission::{
     base_admission_violations, cargo_entrypoints, cargo_manifest_for_crate_path,
     cargo_manifest_violations, changed_layout_violations, draft_dependency_violations,
@@ -18,7 +19,7 @@ use pipeline_repository_git_draft::GitRepository;
 mod repository_checks;
 
 use repository_checks::{
-    changed_port_violations, live_candidate_violations, owner_tree_state, regular_blob,
+    live_candidate_violations, owner_tree_state, regular_blob,
     reject_indirect_dependency_components, repository_cargo_config_violations,
 };
 
@@ -216,6 +217,40 @@ fn run() -> Result<(), String> {
             violations.join("\n")
         ))
     }
+}
+
+/// Every changed Rust source with its head bytes and the base bytes it
+/// replaced. An exact rename reads its base at the source path; a deletion
+/// contributes base bytes and an empty head, so a moved port is inherited.
+fn changed_port_violations(
+    repository: &impl RepositoryRead,
+    merge_base: &str,
+    head: &str,
+    occupied: &BTreeSet<String>,
+    exact_rename_sources: &BTreeMap<String, String>,
+) -> Result<Vec<String>, String> {
+    let mut sources = Vec::new();
+    for path in occupied.iter().filter(|path| path.ends_with(".rs")) {
+        let head_bytes = match regular_blob(repository.entry_kind(head, path)?) {
+            true => repository.blob_bytes(head, path)?,
+            false => Vec::new(),
+        };
+        let origin = exact_rename_sources.get(path).unwrap_or(path);
+        let base_bytes = match regular_blob(repository.entry_kind(merge_base, origin)?) {
+            true => Some(repository.blob_bytes(merge_base, origin)?),
+            false => None,
+        };
+        sources.push((path, head_bytes, base_bytes));
+    }
+    let changed: Vec<ChangedSource<'_>> = sources
+        .iter()
+        .map(|(path, head, base)| ChangedSource {
+            path,
+            head,
+            base: base.as_deref(),
+        })
+        .collect();
+    Ok(port_implementation_violations(&changed))
 }
 
 fn required_shas() -> Result<(String, String), String> {
