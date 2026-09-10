@@ -130,9 +130,6 @@ fn many_principal_tenants_versus_target_all_forbidden() {
     );
 }
 
-/// HAZARD, pinned rather than asserted-away: the cross-tenant forbid covers
-/// only the two inference actions, so an admin action reaching a foreign
-/// tenant is allowed here. A caller that must refuse it has to add that.
 #[test]
 fn cross_tenant_refresh_token_is_forbidden() {
     // RefreshToken maps to RefreshKeyPool + AdminRealm. The AdminRealm permit is
