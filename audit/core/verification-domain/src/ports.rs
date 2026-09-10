@@ -1,8 +1,8 @@
 //! Port traits this crate calls to verify a sealed period.
 //!
 //! `audit-verification-domain` depends only on `audit-chain-domain` and
-//! `audit-verification-api` (see the crate doc for why) — it may NOT depend
-//! on `audit_verification_kernel`, the port-only crate that already declares
+//! `audit-verification-api` — it may NOT depend on
+//! `audit_verification_kernel`, the port-only crate that already declares
 //! `RootRegistry`, `KeyResolver`, and `MerkleVerifier`. Three of the four
 //! traits below are this crate's OWN declarations of those equivalent
 //! shapes, written independently so this crate never needs the dependency

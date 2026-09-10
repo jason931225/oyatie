@@ -1,22 +1,10 @@
-//! Audit-chain sealing domain: seal-record construction, `SealStatus`
-//! lifecycle transitions, and `PackEpoch` signing-key coverage checks.
+//! Audit-chain sealing domain: the write side of what
+//! `audit-verification-domain` later checks.
 //!
 //! ## What this crate owns
 //!
-//! The pure (I/O-free) `core/*-domain` crate for the sealing capability. It
-//! reimplements neither crate it sits on: `audit_chain_domain` supplies the
-//! RFC 6962 §2.1 Merkle math, wrapped behind the `MerkleEngine` port
-//! ([`merkle_engine::MerkleTreeEngine`]) rather than re-derived here, and
-//! `audit_sealing_kernel` supplies the `SigningKeyRef` / `PackEpoch` /
-//! `SealStatus` / `SealRecord` types plus the five trait ports this crate's
-//! callers compose against.
-//!
-//! No PKCS#11, S3, Postgres, Mimir or HTTP call happens here; each belongs
-//! behind `SignerPort` / `RootPublisher` / `IndexWriter` /
-//! `ObjectStoreWriter`, none of which `audit/` implements yet. Every function
-//! here is pure, or validates a typed attestation the caller supplies
-//! ([`seal_record::PriorPeriod`]): a pure domain crate has no read path of
-//! its own to confirm what happened before.
+//! A [`SealRecord`]'s construction (`seal_record`), its [`SealStatus`]
+//! lifecycle (`status`), and its signing-key authorization (`epoch`).
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![allow(dead_code)]
 
