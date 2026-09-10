@@ -1,16 +1,10 @@
 //! Rollup-verdict aggregation for the reviewer panel.
-//!
-//! Inputs: zero-or-more per-facet finding JSON blobs from the subagent
-//! panel. Output: a single APPROVE / CHANGES_REQUESTED / REJECT verdict
-//! per [`Verdict`] + a rollup JSON that the GitHub Check Run + the
-//! merge-queue admission log consume.
 
 use std::collections::BTreeMap;
 
 use crate::fanout::FacetId;
 
-/// Per-facet recommendation from one subagent. Contains only the
-/// fields the rollup needs to make a verdict.
+/// Per-facet recommendation from one subagent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FacetFinding {
     pub facet: FacetId,
@@ -18,21 +12,15 @@ pub struct FacetFinding {
     pub recommendation: FacetRecommendation,
 }
 
-/// What one facet's subagent recommends. Matches the
-/// `final_recommendation` enum in the reviewer-panel spec.
+/// What one facet's subagent recommends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FacetRecommendation {
     Approve,
-    /// Reviewer requests specific changes; fix-loop should pick them up.
     ChangesRequested,
-    /// Reviewer rejects outright; PR should not be re-tried automatically.
     Reject,
 }
 
-/// PR-level verdict. Order matters — `Reject` dominates
-/// `ChangesRequested` dominates `Approve` per the conservative-merge
-/// posture (`feedback_quality_performance_scalability_bar`: industry-leader
-/// quality bar requires real review).
+/// PR-level verdict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verdict {
     Approve,
@@ -41,8 +29,8 @@ pub enum Verdict {
 }
 
 impl Verdict {
-    /// Canonical kebab-case label for the GitHub Check Run conclusion
-    /// and the merge-queue admission event payload.
+    /// Written verbatim into the rollup JSON, so a rename changes a
+    /// consumed wire value.
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
@@ -52,10 +40,8 @@ impl Verdict {
         }
     }
 
-    /// Event name emitted into
-    /// `registry/merge-queue-admission-log.json`.
-    /// APPROVE → admission; ChangesRequested / Reject → fix-requested
-    /// (consumed by IP-005 fix-loop).
+    /// Written verbatim into the admission log, so a rename changes a
+    /// consumed wire value.
     #[must_use]
     pub const fn admission_event(self) -> &'static str {
         match self {
@@ -67,17 +53,9 @@ impl Verdict {
 
 /// Roll a set of per-facet findings up to one PR-level verdict.
 ///
-/// Rules:
-/// 1. Any `Reject` ⇒ `Reject`.
-/// 2. Otherwise, any `ChangesRequested` ⇒ `ChangesRequested`.
-/// 3. Otherwise, all `Approve` ⇒ `Approve`.
-/// 4. Empty findings input ⇒ deliberate-scaffold-pending `Approve` with
-///    `subagent_runtime_pending = true` (caller MUST surface this flag
-///    in the rollup JSON; the verdict alone is insufficient signal).
-///
-/// The dispatcher's caller is responsible for verifying every required
-/// facet has produced a finding before invoking this rollup — that
-/// completeness check is `audit_panel_completeness` below.
+/// Hazard: an empty slice yields `Approve`, because no facet objected. That
+/// is not the same as a reviewed approval — call
+/// [`audit_panel_completeness`] first and refuse an incomplete panel.
 #[must_use]
 pub fn rollup_verdict(findings: &[FacetFinding]) -> Verdict {
     let mut has_change_request = false;
@@ -113,10 +91,8 @@ impl PanelCompletenessReport {
 
 /// Audit the realized panel against the required facet set.
 ///
-/// Per `feedback_consensus_debate_spectrum_lens_subagents` no single
-/// `reviewer_id` may appear across multiple facets — that would indicate
-/// a single agent wearing all facets, which is the bias-collapse failure
-/// mode the lane refuses.
+/// A `reviewer_id` shared across facets means one agent wore every lens, so
+/// the lenses were never independent; the panel is reported incomplete.
 #[must_use]
 pub fn audit_panel_completeness(
     required: &[FacetId],
@@ -131,26 +107,27 @@ pub fn audit_panel_completeness(
         .filter(|facet| !present_set.contains(facet))
         .collect();
 
-    // Detect any reviewer_id used across more than one facet.
-    let mut reviewer_id_to_facets: BTreeMap<String, std::collections::BTreeSet<FacetId>> =
-        BTreeMap::new();
-    for finding in findings {
-        reviewer_id_to_facets
-            .entry(finding.reviewer_id.clone())
-            .or_default()
-            .insert(finding.facet);
-    }
-    let duplicate_reviewer_ids: Vec<String> = reviewer_id_to_facets
-        .into_iter()
-        .filter_map(|(id, facets)| if facets.len() > 1 { Some(id) } else { None })
-        .collect();
-
     PanelCompletenessReport {
         required: required.to_vec(),
         present: present_set.into_iter().collect(),
         missing,
-        duplicate_reviewer_ids,
+        duplicate_reviewer_ids: reviewer_ids_spanning_multiple_facets(findings),
     }
+}
+
+fn reviewer_ids_spanning_multiple_facets(findings: &[FacetFinding]) -> Vec<String> {
+    let mut facets_by_reviewer: BTreeMap<String, std::collections::BTreeSet<FacetId>> =
+        BTreeMap::new();
+    for finding in findings {
+        facets_by_reviewer
+            .entry(finding.reviewer_id.clone())
+            .or_default()
+            .insert(finding.facet);
+    }
+    facets_by_reviewer
+        .into_iter()
+        .filter_map(|(id, facets)| (facets.len() > 1).then_some(id))
+        .collect()
 }
 
 #[cfg(test)]
@@ -183,10 +160,6 @@ mod tests {
 
     #[test]
     fn empty_findings_default_to_approve() {
-        // Deliberate-scaffold posture: until the subagent runtime lands,
-        // zero findings = APPROVE with the pending flag surfaced by the
-        // caller. The verdict alone is correct; the pending-flag is the
-        // caller's responsibility.
         assert_eq!(rollup_verdict(&[]), Verdict::Approve);
     }
 
@@ -245,7 +218,6 @@ mod tests {
 
     #[test]
     fn completeness_report_detects_reviewer_id_duplicated_across_facets() {
-        // Bias-collapse: same reviewer running F1 and F2. The lane rejects.
         let findings = vec![
             FacetFinding {
                 facet: FacetId::F1Linus,

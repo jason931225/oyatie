@@ -1,26 +1,17 @@
-//! M02-P04-IP-001 — REST transport kernel.
-//!
-//! Defines the canonical `UseCaseRequest`/`UseCaseResponse` traits + the
-//! canonical `AuditEvent` shape that every transport (REST/SSE/WebSocket)
-//! MUST project byte-identically (modulo transport metadata).
-//!
-//! Boundary: no I/O, std-only.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! The request/response envelopes and the audit event that every transport
+//! must project byte-identically.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::collections::BTreeMap;
 
-// ── Canonical use-case ports (shared across transports) ────────────────────
-
-/// Canonical request envelope projected by every transport.
+/// Request envelope projected by every transport.
 pub trait UseCaseRequest {
     fn use_case_id(&self) -> &str;
     fn tenant_id(&self) -> &str;
     fn payload(&self) -> &BTreeMap<String, String>;
 }
 
-/// Canonical response envelope projected by every transport.
+/// Response envelope projected by every transport.
 pub trait UseCaseResponse {
     fn use_case_id(&self) -> &str;
     fn status(&self) -> ResponseStatus;
@@ -35,11 +26,8 @@ pub enum ResponseStatus {
     Error,
 }
 
-/// Canonical audit event — byte-identical across transports.
-///
-/// `transport` is the ONLY field that differs per transport. The audit-
-/// parity invariant (M02-P04 acceptance) asserts equality of all OTHER
-/// fields after constructing the event from each transport adapter.
+/// Carries no transport field, so two events built from the same request
+/// through different transports are `Eq` or the parity contract is broken.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuditEvent {
     pub use_case_id: String,                      // data_class: INTERNAL_ONLY
@@ -49,9 +37,8 @@ pub struct AuditEvent {
 }
 
 impl AuditEvent {
-    /// Construct the canonical audit event from any `UseCaseRequest` +
-    /// `UseCaseResponse` pair. The canonical_payload is sorted (BTree
-    /// ordering) to guarantee byte-identical encoding across transports.
+    /// Sorts `canonical_payload`, so two transports that build the payload in
+    /// different orders still encode to the same bytes.
     pub fn canonical<Req: UseCaseRequest, Res: UseCaseResponse>(req: &Req, res: &Res) -> Self {
         let mut payload: Vec<(String, String)> = req
             .payload()
@@ -67,7 +54,6 @@ impl AuditEvent {
         }
     }
 
-    /// Canonical byte encoding — stable across transports.
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut s = String::new();
         s.push_str("use_case_id=");
@@ -91,8 +77,6 @@ impl AuditEvent {
         s.into_bytes()
     }
 }
-
-// ── REST-specific request/response shape ────────────────────────────────────
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RestRequest {
@@ -135,8 +119,8 @@ impl UseCaseResponse for RestResponse {
     }
 }
 
-/// Canonical fixture builder — every transport adapter constructs a request
-/// using this fixture so the audit-parity test is deterministic.
+/// Shared by every transport's parity test, so a difference between two
+/// transports' events comes from the transport and not from its input.
 pub fn fixture_request_payload() -> BTreeMap<String, String> {
     let mut m = BTreeMap::new();
     m.insert("account_id".into(), "acct-001".into());

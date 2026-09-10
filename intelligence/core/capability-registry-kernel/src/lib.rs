@@ -1,11 +1,5 @@
-//! M02-P05-IP-001 — Capability registry kernel.
-//!
-//! Neutral value types describing a published capability and its
-//! autonomy classification. No I/O, no provider-specific deps.
-//!
-//! M02b-P17 delta-1: adds `status` module with `CapabilityStatus`.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Value types describing a published capability and its autonomy
+//! classification.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod registry_view;
@@ -32,8 +26,8 @@ impl fmt::Display for CapabilityId {
     }
 }
 
-/// Reference to an evidence record emitted at invocation time.
-/// data_class: INTERNAL_ONLY (id only, payload lives in evidence store).
+/// The id only; the payload stays in the evidence store.
+// data_class: INTERNAL_ONLY
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct EvidenceRef {
     pub evidence_id: String,         // data_class: INTERNAL_ONLY
@@ -55,17 +49,17 @@ impl EvidenceRef {
     }
 }
 
-/// Autonomy classification for a capability (ADR-0003 + M02-P05-IP-002).
-/// T4 is disabled by default for actuation surfaces.
+/// Autonomy classification for a capability (ADR-0003). Nothing in this
+/// kernel enforces the tier; it records what a capability is allowed to be.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum AutonomyTier {
-    /// Read-only; never mutates state.
+    /// Never mutates state.
     T1Read = 1,
-    /// Suggests an action; never executes.
+    /// Proposes, never executes.
     T2Suggest = 2,
-    /// Proposes and acts within bounded scope after explicit grant.
+    /// Acts within a bounded scope, after an explicit grant.
     T3PropAct = 3,
-    /// Direct actuation. **Disabled by default**; requires explicit policy.
+    /// Direct actuation, off unless policy turns it on.
     T4Actuate = 4,
 }
 
@@ -112,10 +106,7 @@ impl TryFrom<&str> for AutonomyTier {
     }
 }
 
-/// Published capability descriptor.
-/// `evidence_emit_required` mirrors ADR-0003 audit-chain requirement.
-/// `owner_capability_id` allows capability composition (parent owns child).
-/// `status` tracks the publication lifecycle (Active by default).
+/// `owner_capability_id` is what composes capabilities: a parent owns a child.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Capability {
     pub id: CapabilityId,                          // data_class: INTERNAL_ONLY
@@ -123,9 +114,7 @@ pub struct Capability {
     pub autonomy_tier: AutonomyTier,               // data_class: INTERNAL_ONLY
     pub evidence_emit_required: bool,              // data_class: INTERNAL_ONLY
     pub owner_capability_id: Option<CapabilityId>, // data_class: INTERNAL_ONLY
-    /// Publication lifecycle state; starts `Active` and transitions via
-    /// [`Capability::transition_status`].  Autonomy tier is **never** affected.
-    pub status: CapabilityStatus, // data_class: INTERNAL_ONLY
+    pub status: CapabilityStatus,                  // data_class: INTERNAL_ONLY
 }
 
 impl Capability {
@@ -150,11 +139,7 @@ impl Capability {
         self
     }
 
-    /// Attempt a lifecycle status transition.
-    ///
-    /// On success, `self.status` is updated and `Ok(())` is returned.
-    /// On failure, `self.status` is **not** mutated and the error is returned.
-    /// `autonomy_tier` is never modified by this method.
+    /// A rejected transition leaves `self` untouched.
     pub fn transition_status(
         &mut self,
         next: CapabilityStatus,

@@ -1,28 +1,20 @@
-//! M02-P02-IP-003 — Dry-run (what-if) kernel.
+//! Dry-run (what-if) kernel: an input describes a counterfactual world and
+//! the output projects the decision it would produce.
 //!
-//! Hypothetical analysis only. Inputs describe a counterfactual world
-//! (e.g. "what if we changed the route?" / "what if the budget were X?")
-//! and outputs are projections of the resulting routing/budget decision.
-//!
-//! Read-only invariant: no port in this crate mutates external state.
-//! The `DryRunOnly` marker trait has only a `&self` evaluator.
+//! Nothing here mutates external state, and [`DryRunOnly`] takes `&self`, so
+//! no implementation can acquire the means to.
 
 use intelligence_account_domain::{AccountId, ProviderFamily, RouteExplanation};
 use intelligence_dashboard_kernel::RoutingView;
 
-// ── Marker ───────────────────────────────────────────────────────────────────
-
-/// Marker trait for dry-run analyses. The evaluator must be `&self`.
+/// Marker trait for dry-run analyses.
 pub trait DryRunOnly {
     type Outcome;
     fn evaluate(&self) -> Self::Outcome;
 }
 
-// ── WhatIfRouteChange ────────────────────────────────────────────────────────
-
-/// Hypothetical route change: "what would the route be if X provider/account
-/// were chosen?" Produces a `RoutingView` projection; never touches the
-/// actual route store.
+/// What the route would be, had this provider and account been chosen. The
+/// live route store is not consulted or written.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WhatIfRouteChange {
     pub current: RouteExplanation,         // data_class: INTERNAL_ONLY
@@ -60,10 +52,8 @@ impl DryRunOnly for WhatIfRouteChange {
     }
 }
 
-// ── WhatIfBudgetChange ───────────────────────────────────────────────────────
-
-/// Hypothetical budget change: "if the budget were `proposed_limit_micros`
-/// instead of `current_limit_micros`, would `projected_spend_micros` fit?"
+/// Whether `projected_spend_micros` would fit under `proposed_limit_micros`
+/// as well as under `current_limit_micros`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WhatIfBudgetChange {
     pub account_id: AccountId,       // data_class: INTERNAL_ONLY
@@ -102,10 +92,7 @@ impl DryRunOnly for WhatIfBudgetChange {
     }
 }
 
-// ── WhatIfPolicyChange ───────────────────────────────────────────────────────
-
-/// Hypothetical policy change: "if policy rule were swapped, would the
-/// routing decision change?"
+/// Whether swapping the policy would change the routing decision.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WhatIfPolicyChange {
     pub current_policy: String,               // data_class: INTERNAL_ONLY
@@ -139,8 +126,6 @@ impl DryRunOnly for WhatIfPolicyChange {
         }
     }
 }
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -266,10 +251,6 @@ mod tests {
         assert!(!out.policy_changes_route);
     }
 
-    /// Negative test: the `DryRunOnly` trait evaluator is `&self` — no
-    /// `&mut self` path exists. The evaluators only construct
-    /// projection structs; they cannot mutate any external state because
-    /// they hold no mutable references to anything.
     #[test]
     fn negative_dry_run_evaluator_is_immutable() {
         let wb = WhatIfBudgetChange {
@@ -278,8 +259,6 @@ mod tests {
             proposed_limit_micros: 2,
             projected_spend_micros: 0,
         };
-        // Multiple immutable calls must return identical results — proof
-        // that no internal state mutates.
         let a = wb.evaluate();
         let b = wb.evaluate();
         assert_eq!(a, b);

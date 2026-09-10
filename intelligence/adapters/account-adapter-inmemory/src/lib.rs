@@ -1,20 +1,7 @@
-//! M02-P00-IP-003 — In-memory SecretStorePort adapter.
+//! In-memory `SecretStorePort`.
 //!
-//! SECURITY: NOT FOR PRODUCTION. Volatile, in-process HashMap. Lifetime is the
-//! process; restart loses every secret. Use only for tests, local dev, and
-//! deterministic CI fixtures. Production secret storage is the planned OpenBao
-//! HSM backend (ADR-0043 + masterplan M02-P06 secrets µservice); when that
-//! adapter ships, every consumer of `InMemorySecretStoreAdapter` migrates per
-//! the SecretStorePort substitution scenario (provider-agnostic adapter swap).
-//!
-//! Renamed 2026-05-15 from `OpenBaoAdapter` (which lied about its backend) per
-//! the Linus-mode audit. The previous implementation also keyed the map on
-//! `format!("{sref:?}")`, which — because `SecretReference::Debug` is redacted
-//! to a constant `SecretReference(sref://[REDACTED])` for every reference —
-//! caused silent collisions across distinct secrets. The bug is fixed here by
-//! keying the map on `SecretReference` directly (`Hash` derived in the kernel).
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! NOT FOR PRODUCTION: an in-process map whose lifetime is the process, with
+//! no encryption at rest and no persistence across a restart.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::collections::HashMap;
@@ -179,13 +166,8 @@ mod tests {
 
     #[test]
     fn two_distinct_secrets_do_not_collide() {
-        // Regression for pre-2026-05-15 silent-collision bug. The previous
-        // `OpenBaoAdapter` keyed its HashMap on `format!("{sref:?}")`, but
-        // `SecretReference::Debug` is redacted to a constant string for every
-        // reference, so every put() overwrote the previous one and every get()
-        // returned the most-recently-stored material regardless of which sref
-        // was requested. None of the prior tests exercised more than one secret
-        // at a time, so the bug was invisible.
+        // Two secrets at once: `SecretReference::Debug` redacts to the same
+        // string for every reference, so any map keyed on it collapses them.
         let mut a = InMemorySecretStoreAdapter::new();
         let aws = sref("sref://openbao/aws-prod-key");
         let gemini = sref("sref://openbao/gemini-prod-key");
@@ -205,7 +187,6 @@ mod tests {
 
     #[test]
     fn delete_one_does_not_affect_another() {
-        // Companion regression: deleting one sref must not affect a different sref.
         let mut a = InMemorySecretStoreAdapter::new();
         let kept = sref("sref://openbao/kept");
         let dropped = sref("sref://openbao/dropped");

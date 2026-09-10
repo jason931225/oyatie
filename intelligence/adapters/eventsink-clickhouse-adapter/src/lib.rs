@@ -1,32 +1,7 @@
-//! ClickHouse EventSink adapter for the intelligence-app OAuth subscription pool
-//! (ADR-0384 Path B, Stage-7 D6 production seam).
+//! ClickHouse [`EventSink`] for the intelligence-app subscription pool
+//! (ADR-0384 Path B, D6). One row per gateway event, one table per tenant.
 //!
-//! Implements [`EventSink`] from `intelligence-kernel` by
-//! INSERTing [`LlmGatewayEvent`] rows into the `intelligence_app_receipts`
-//! table in the caller's per-tenant ClickHouse database via the shared
-//! [`shared_olap_clickhouse_adapter::ClickHouseOlapClient`] (ADR-0193).
-//!
-//! ## Insert shape
-//!
-//! Each [`LlmGatewayEvent`] maps to one row:
-//!
-//! ```text
-//! INSERT INTO tenant_{tenant_id}.intelligence_app_receipts
-//!   (request_id, tenant_id, agent_id, seat_id, provider, model,
-//!    prompt_tokens, completion_tokens, ms_latency, status, timestamp_unix_ms)
-//! VALUES (...)
-//! ```
-//!
-//! ## non_claims
-//!
-//! - emit is best-effort: failures are logged via `tracing::warn` but never
-//!   propagate to the caller (D6 non-fatal contract).
-//! - no batching / coalescing (Stage-8 follow-up).
-//! - no DDL bootstrap: the `intelligence_app_receipts` table must exist
-//!   before the adapter is used (Stage-7 admin runbook item).
-//! - no retry: transient ClickHouse errors are logged and dropped.
-//!
-//! ADR-0083 Tier-3 panic-free: no `unwrap`, `expect`, or `panic!` outside tests.
+//! The adapter never issues DDL: the receipts table must already exist.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -40,15 +15,7 @@ use shared_olap_client_kernel::{
 };
 use tracing::warn;
 
-// ---------------------------------------------------------------------------
-// Table constant
-// ---------------------------------------------------------------------------
-
 const TABLE: &str = "intelligence_app_receipts";
-
-// ---------------------------------------------------------------------------
-// Error type
-// ---------------------------------------------------------------------------
 
 /// Errors raised during event emission. Non-fatal per D6 contract.
 #[derive(Debug)]
@@ -68,15 +35,10 @@ impl fmt::Display for ClickHouseSinkError {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ClickHouseEventSink
-// ---------------------------------------------------------------------------
-
-/// [`EventSink`] backed by ClickHouse 26.3 LTS.
+/// [`EventSink`] backed by ClickHouse.
 ///
-/// Wraps a [`ClickHouseOlapClient`] behind a `Mutex` so the sync trait method
-/// can mutably borrow the client. The mutex is uncontended in the common case
-/// (one emitter per service instance).
+/// The `Mutex` is what lets the `&self` trait method borrow the client
+/// mutably; it is uncontended at one emitter per service instance.
 pub struct ClickHouseEventSink {
     client: Mutex<ClickHouseOlapClient>, // data_class: INTERNAL_ONLY
 }
@@ -89,14 +51,12 @@ impl fmt::Debug for ClickHouseEventSink {
 }
 
 impl ClickHouseEventSink {
-    /// Construct from a [`ClickHouseConfig`].
     pub fn new(config: ClickHouseConfig) -> Self {
         Self {
             client: Mutex::new(ClickHouseOlapClient::new(config)),
         }
     }
 
-    /// Emit one event, returning a typed error for test assertions.
     fn try_emit(&self, event: &LlmGatewayEvent) -> Result<(), ClickHouseSinkError> {
         let tenant_id = TenantId::try_new(event.tenant_id.as_str())
             .map_err(|e| ClickHouseSinkError::RowBuild(format!("tenant_id invalid: {e:?}")))?;
@@ -106,34 +66,7 @@ impl ClickHouseEventSink {
 
         let target = QualifiedTable::new(tenant_id, table);
 
-        // Column order must match the row values order below.
-        let columns = vec![
-            "request_id".to_string(),
-            "tenant_id".to_string(),
-            "agent_id".to_string(),
-            "seat_id".to_string(),
-            "provider".to_string(),
-            "model".to_string(),
-            "prompt_tokens".to_string(),
-            "completion_tokens".to_string(),
-            "ms_latency".to_string(),
-            "status".to_string(),
-            "timestamp_unix_ms".to_string(),
-        ];
-
-        let row = vec![
-            Value::String(event.request_id.clone()),
-            Value::String(event.tenant_id.as_str().to_string()),
-            Value::String(event.agent_id.as_str().to_string()),
-            Value::String(event.seat_id.as_str().to_string()),
-            Value::String(event.provider.to_string()),
-            Value::String(event.model.clone()),
-            Value::UInt(event.prompt_tokens),
-            Value::UInt(event.completion_tokens),
-            Value::UInt(event.ms_latency),
-            Value::String(format!("{:?}", event.status)),
-            Value::UInt(event.timestamp_unix_ms),
-        ];
+        let (columns, row): (Vec<String>, Vec<Value>) = receipt_row(event).into_iter().unzip();
 
         let batch = InsertBatch {
             target,
@@ -154,9 +87,35 @@ impl ClickHouseEventSink {
     }
 }
 
+/// Pair each column with its value so the two can never be reordered apart.
+fn receipt_row(event: &LlmGatewayEvent) -> Vec<(String, Value)> {
+    vec![
+        ("request_id", Value::String(event.request_id.clone())),
+        (
+            "tenant_id",
+            Value::String(event.tenant_id.as_str().to_string()),
+        ),
+        (
+            "agent_id",
+            Value::String(event.agent_id.as_str().to_string()),
+        ),
+        ("seat_id", Value::String(event.seat_id.as_str().to_string())),
+        ("provider", Value::String(event.provider.to_string())),
+        ("model", Value::String(event.model.clone())),
+        ("prompt_tokens", Value::UInt(event.prompt_tokens)),
+        ("completion_tokens", Value::UInt(event.completion_tokens)),
+        ("ms_latency", Value::UInt(event.ms_latency)),
+        ("status", Value::String(format!("{:?}", event.status))),
+        ("timestamp_unix_ms", Value::UInt(event.timestamp_unix_ms)),
+    ]
+    .into_iter()
+    .map(|(column, value)| (column.to_string(), value))
+    .collect()
+}
+
 impl EventSink for ClickHouseEventSink {
-    /// Emit one event to ClickHouse. Errors are logged via `tracing::warn` and
-    /// swallowed per the D6 non-fatal contract.
+    /// A failed insert is logged and swallowed: the D6 contract is that a
+    /// receipt never fails the request that produced it.
     fn emit(&self, event: LlmGatewayEvent) {
         if let Err(e) = self.try_emit(&event) {
             warn!(
@@ -167,10 +126,6 @@ impl EventSink for ClickHouseEventSink {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -208,18 +163,14 @@ mod tests {
 
     #[test]
     fn emit_non_fatal_on_clickhouse_error() {
-        // ClickHouseOlapClient.insert() returns AdapterError (IP-003 deferred).
-        // emit() must not panic; the error is swallowed per D6 contract.
         let sink = ClickHouseEventSink::new(test_config());
-        sink.emit(test_event()); // must not panic
+        sink.emit(test_event());
     }
 
     #[test]
     fn try_emit_returns_insert_error_on_deferred_backend() {
         let sink = ClickHouseEventSink::new(test_config());
         let result = sink.try_emit(&test_event());
-        // The ClickHouse adapter is plan-only (IP-003); it always returns
-        // AdapterError, which we map to ClickHouseSinkError::Insert.
         assert!(
             matches!(result, Err(ClickHouseSinkError::Insert(_))),
             "expected Insert error from deferred backend, got: {result:?}"
@@ -230,17 +181,40 @@ mod tests {
     fn try_emit_error_on_invalid_tenant_id() {
         let sink = ClickHouseEventSink::new(test_config());
         let mut event = test_event();
-        // Force an invalid tenant_id by constructing a kernel TenantId we
-        // can't create with an empty string, so we patch via a wrapper:
-        // instead build an event with a valid kernel TenantId but inject a
-        // tenant whose shared-olap-client-kernel TenantId::try_new would
-        // reject (the olap kernel disallows chars beyond alphanumeric/-/_).
-        event.tenant_id = KernelTenantId::new("tenant a").unwrap(); // space is invalid for olap kernel
+        // The kernel tenant id admits a space; the olap tenant id does not.
+        event.tenant_id = KernelTenantId::new("tenant a").unwrap();
         let result = sink.try_emit(&event);
         assert!(
             matches!(result, Err(ClickHouseSinkError::RowBuild(_))),
             "expected RowBuild error for invalid tenant_id, got: {result:?}"
         );
+    }
+
+    #[test]
+    fn receipt_row_pairs_every_column_with_its_own_value() {
+        let row = receipt_row(&test_event());
+        let columns: Vec<&str> = row.iter().map(|(column, _)| column.as_str()).collect();
+        assert_eq!(
+            columns,
+            [
+                "request_id",
+                "tenant_id",
+                "agent_id",
+                "seat_id",
+                "provider",
+                "model",
+                "prompt_tokens",
+                "completion_tokens",
+                "ms_latency",
+                "status",
+                "timestamp_unix_ms",
+            ]
+        );
+        assert_eq!(row[0].1, Value::String("req-001".to_string()));
+        assert_eq!(row[6].1, Value::UInt(100));
+        assert_eq!(row[7].1, Value::UInt(50));
+        assert_eq!(row[8].1, Value::UInt(320));
+        assert_eq!(row[10].1, Value::UInt(1_700_000_000_000));
     }
 
     #[test]
@@ -255,7 +229,7 @@ mod tests {
         ] {
             let mut ev = test_event();
             ev.status = status;
-            sink.emit(ev); // must not panic
+            sink.emit(ev);
         }
     }
 }

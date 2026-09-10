@@ -6,9 +6,7 @@ use super::{
     url_encode,
 };
 
-/// Canonical scope set for Claude.ai subscription OAuth — matches ccproxy-api
-/// `oauth_claude` default (`org:create_api_key`, `user:profile`,
-/// `user:inference`).
+/// Canonical scope set for subscription OAuth.
 pub fn anthropic_subscription_scopes() -> Vec<String> {
     vec![
         "org:create_api_key".into(),
@@ -20,14 +18,9 @@ pub fn anthropic_subscription_scopes() -> Vec<String> {
 pub const ANTHROPIC_AUTHORIZATION_ENDPOINT: &str = "https://claude.ai/oauth/authorize";
 pub const ANTHROPIC_TOKEN_ENDPOINT: &str = "https://console.anthropic.com/v1/oauth/token";
 
-/// Pure entry point. Builds the `SubscriptionOAuthFlow` from the capture
-/// request. No I/O — the runtime adapter is responsible for opening the
-/// browser, listening on the loopback, exchanging the code, wrapping the
-/// resulting token in `secrecy::SecretString` and writing it through
-/// `SecretStorePort` to obtain the `SecretReference`.
-///
-/// Linus good-taste: `ApiKeyImport` is a single variant on the same entry
-/// point; the surface is one function, no parallel `import_api_key` helper.
+/// Builds the flow record only. Opening the browser, listening on the
+/// loopback, exchanging the code and minting the `SecretReference` are the
+/// runtime adapter's, so no raw token is ever in scope here.
 pub fn capture_subscription_token(
     req: &SubscriptionTokenCaptureRequest,
 ) -> Result<SubscriptionOAuthFlow, OAuthError> {
@@ -35,8 +28,7 @@ pub fn capture_subscription_token(
         return Err(OAuthError::EmptyStateNonce);
     }
     let loopback = &req.loopback;
-    // Per OAuth spec & ccproxy-api: loopback ports below 1024 are privileged
-    // and reserved.
+    // Ports below 1024 are privileged and cannot be bound unprivileged.
     if loopback.port < 1024 {
         return Err(OAuthError::LoopbackPortReserved);
     }
@@ -52,14 +44,9 @@ pub fn capture_subscription_token(
             "https://auth.openai.com/oauth/token".to_owned(),
             vec!["openid".into(), "profile".into(), "offline_access".into()],
         ),
-        FlowKind::ApiKeyImport => (
-            // ApiKeyImport: no upstream endpoint — operator supplies the key
-            // directly. Empty endpoints are valid for this variant; the
-            // adapter skips the browser handshake.
-            String::new(),
-            String::new(),
-            vec!["import".into()],
-        ),
+        // No upstream endpoint: the operator supplies the key, so the empty
+        // endpoints below are the intended value and skip the checks after.
+        FlowKind::ApiKeyImport => (String::new(), String::new(), vec!["import".into()]),
     };
     if req.flow_kind != FlowKind::ApiKeyImport {
         if auth_ep.is_empty() {
@@ -84,12 +71,10 @@ pub fn capture_subscription_token(
     })
 }
 
-/// Build the authorization URL the browser will navigate to. Returns the URL
-/// with PKCE challenge, state nonce, scopes, and the loopback redirect URI.
+/// Build the authorization URL the browser will navigate to.
 pub fn build_authorization_url(flow: &SubscriptionOAuthFlow) -> Result<String, OAuthError> {
     if flow.flow_kind == FlowKind::ApiKeyImport {
-        // ApiKeyImport has no browser step — the URL surface degenerates to
-        // the empty string per Linus row.
+        // No browser step, so there is no URL to navigate to.
         return Ok(String::new());
     }
     if flow.authorization_endpoint.is_empty() {
@@ -107,9 +92,8 @@ pub fn build_authorization_url(flow: &SubscriptionOAuthFlow) -> Result<String, O
     Ok(url)
 }
 
-/// Wrap a successful capture result. The raw token never enters this kernel —
-/// the caller supplies a pre-issued `SecretReference` that was minted by the
-/// secrets store adapter from a `secrecy::SecretString` in transit.
+/// The caller supplies an already-minted `SecretReference`; a raw token has
+/// no parameter to arrive through.
 pub fn record_capture(
     sref: SecretReference,
     flow_kind: FlowKind,

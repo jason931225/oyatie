@@ -1,18 +1,4 @@
-//! Proptest invariants for the SC8 overage-guard state machine.
-//!
-//! Properties that must hold for all inputs:
-//!
-//! 1. Classification totality: the four allow-listed buckets → `Allowed`;
-//!    none/empty/whitespace/`unknown` → `Transient`; every other non-empty
-//!    token → `Overage`.
-//! 2. Warn mode never halts; Enforce mode halts iff the bucket is an overage.
-//! 3. Transient/allowed claims never halt in either mode.
-//! 4. A halted seat (with a finite horizon) is ineligible strictly before
-//!    `resume_at` and eligible at/after it (cooldown-resume).
-//! 5. admin-resume turns any halted seat Active and immediately eligible.
-//! 6. Codex `usage_limit_reached` always halts; every other error.type
-//!    (including the transient `rate_limit_error`) never halts.
-//! 7. Applying a `Continue`/`Warn` decision never mutates seat state.
+//! Proptest invariants for the overage-guard state machine.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::sync::{Arc, Mutex};
@@ -59,7 +45,6 @@ fn arc_pool_one_active() -> (Arc<Mutex<SubscriptionPool>>, SeatId) {
 }
 
 proptest! {
-    // Property 1: classification totality + allow-list correctness.
     #[test]
     fn classification_is_total_and_correct(s in ".{0,40}") {
         let lowered = s.trim().to_ascii_lowercase();
@@ -77,7 +62,6 @@ proptest! {
         }
     }
 
-    // Property 2 + 3: mode semantics for any header.
     #[test]
     fn mode_semantics_hold(s in ".{0,40}", enforce in any::<bool>()) {
         let now = Instant::now();
@@ -99,7 +83,6 @@ proptest! {
         }
     }
 
-    // Property 4: cooldown-resume boundary for a finite horizon.
     #[test]
     fn halted_seat_resumes_exactly_at_horizon(secs in 1u64..7200) {
         let (pool, sid) = arc_pool_one_active();
@@ -111,19 +94,15 @@ proptest! {
         let halted = pool.lock().unwrap().apply_overage_decision(&sid, &decision, now).unwrap();
         prop_assert!(halted);
 
-        // Strictly before the horizon: ineligible.
         let p = pool.lock().unwrap();
         prop_assert!(!p.has_eligible_seat(now));
         prop_assert!(!p.has_eligible_seat(now + horizon - Duration::from_nanos(1)));
-        // At/after the horizon: eligible (cooldown-resume).
         prop_assert!(p.has_eligible_seat(now + horizon));
         prop_assert!(p.has_eligible_seat(now + horizon + Duration::from_secs(1)));
-        // Status projection reports halted while in the Halted state.
         let state = p.redacted_seat_statuses(now)[0].state;
         prop_assert_eq!(state, "halted");
     }
 
-    // Property 5: admin-resume always reactivates a halted seat.
     #[test]
     fn admin_resume_reactivates_halted_seat(secs in 1u64..7200) {
         let (pool, sid) = arc_pool_one_active();
@@ -136,13 +115,11 @@ proptest! {
         prop_assert!(!p.has_eligible_seat(now));
         let resumed = p.admin_resume(&sid).unwrap();
         prop_assert!(resumed);
-        // Immediately eligible after admin-resume, ahead of the cooldown horizon.
         prop_assert!(p.has_eligible_seat(now));
-        // Idempotent: resuming a non-halted seat is a no-op.
+        // A second resume returns false: nothing was halted to resume.
         prop_assert!(!p.admin_resume(&sid).unwrap());
     }
 
-    // Property 6: Codex error classification — only usage_limit_reached halts.
     #[test]
     fn codex_only_usage_limit_reached_halts(et in "[a-z_]{1,30}", hint in proptest::option::of(0u64..3600)) {
         let now = Instant::now();
@@ -164,13 +141,10 @@ proptest! {
         }
     }
 
-    // Property 7: non-halt decisions never mutate seat state.
     #[test]
     fn continue_and_warn_never_mutate_state(s in ".{0,40}") {
         let (pool, sid) = arc_pool_one_active();
         let now = Instant::now();
-        // Warn mode: an overage yields Warn, anything else yields Continue —
-        // neither is a halt, so the seat must remain Active and eligible.
         let decision = evaluate_representative_claim(OverageGuardPolicy::warn(), Some(&s), now);
         prop_assume!(!decision.is_halt());
         let halted = pool.lock().unwrap().apply_overage_decision(&sid, &decision, now).unwrap();
@@ -178,10 +152,6 @@ proptest! {
         prop_assert!(pool.lock().unwrap().has_eligible_seat(now));
     }
 }
-
-// ---------------------------------------------------------------------------
-// Concrete regression cases that pin the exact contract.
-// ---------------------------------------------------------------------------
 
 #[test]
 fn allowed_bucket_round_trips_through_as_str() {
@@ -237,7 +207,7 @@ fn warn_mode_keeps_overage_seat_serving() {
     assert!(!p.apply_overage_decision(&sid, &decision, now).unwrap());
     assert!(p.has_eligible_seat(now));
     assert_eq!(p.redacted_seat_statuses(now)[0].state, "active");
-    // The warn carries the offending bucket for the event the adapter emits.
+    // The bucket rides on the warn, for the event the adapter emits.
     assert!(matches!(
         decision,
         GuardDecision::Warn {

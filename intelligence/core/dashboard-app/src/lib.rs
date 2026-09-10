@@ -1,15 +1,5 @@
-//! M02-P02-IP-001 — Dashboard app: read-only use-case orchestrators.
-//!
-//! Use-cases here orchestrate the kernel projections. NO write paths exist
-//! anywhere in this crate; the contract is enforced by the use-case enum
-//! `ReadOnlyOutcome` whose variants are all projection types — there is
-//! deliberately no `Mutate` variant.
-//!
-//! Architectural rule (ADR-0056 12-layer): the application layer composes
-//! kernel ports/views. Adapters supply data via ports; we do not call I/O
-//! here.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Read-only dashboard use-cases. Every one of them returns a projection,
+//! because [`ReadOnlyOutcome`] has no variant that could carry anything else.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use intelligence_account_domain::{
@@ -19,11 +9,8 @@ use intelligence_dashboard_kernel::{
     AccountHealthView, ReadOnlyProjection, RoutingView, SessionView, UsageView,
 };
 
-// ── Read-only outcome ────────────────────────────────────────────────────────
-
-/// Outcome of any use-case in this crate. All variants are kernel projections.
-/// There is intentionally no `Mutate` variant; introducing one is a contract
-/// breach surfaced by `negative_no_mutate_variant`.
+/// Adding a variant that is not a projection breaks
+/// `negative_no_mutate_variant`, which matches this enum exhaustively.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReadOnlyOutcome {
     AccountHealth(AccountHealthView),
@@ -45,8 +32,6 @@ impl ReadOnlyOutcome {
     }
 }
 
-// ── Use-case: ListAccountHealth ──────────────────────────────────────────────
-
 #[derive(Clone, Debug)]
 pub struct ListAccountHealth;
 
@@ -64,8 +49,6 @@ impl ListAccountHealth {
         ReadOnlyOutcome::AccountHealthList(out)
     }
 }
-
-// ── Use-case: GetUsageWindow ─────────────────────────────────────────────────
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UsageWindowQuery {
@@ -95,8 +78,6 @@ impl GetUsageWindow {
     }
 }
 
-// ── Use-case: ExplainRoute ───────────────────────────────────────────────────
-
 #[derive(Clone, Debug)]
 pub struct ExplainRoute;
 
@@ -106,8 +87,6 @@ impl ExplainRoute {
     }
 }
 
-// ── Use-case: GetSession ─────────────────────────────────────────────────────
-
 #[derive(Clone, Debug)]
 pub struct GetSession;
 
@@ -116,8 +95,6 @@ impl GetSession {
         ReadOnlyOutcome::Session(view)
     }
 }
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -227,10 +204,8 @@ mod tests {
         }
     }
 
-    /// Negative test: `ReadOnlyOutcome` enum has no `Mutate` variant.
-    /// We exhaustively match every variant. If a new variant is added that
-    /// represents mutation, this match will not compile-fail but the test
-    /// will fail at the assertion below — and the enum is open to scrutiny.
+    /// The exhaustive match below is the guard: a new variant stops this
+    /// file compiling until someone has classified it.
     #[test]
     fn negative_no_mutate_variant() {
         let a = active("a1", ProviderFamily::Claude);
@@ -241,7 +216,6 @@ mod tests {
             last_check_at_epoch_secs: 0,
         };
         let out = ListAccountHealth::execute(&[&a], &[&h]);
-        // Every variant we know is read-only.
         let is_readonly = match out {
             ReadOnlyOutcome::AccountHealth(_)
             | ReadOnlyOutcome::AccountHealthList(_)
