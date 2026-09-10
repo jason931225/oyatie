@@ -11,7 +11,9 @@ pub struct ToolchainPin {
     pub line: usize,
     pub key: &'static str,
     pub job: String,
-    pub value: String,
+    pub step: usize,
+    /// `None` when the key is named but its value is not on this line.
+    pub value: Option<String>,
 }
 
 impl ToolchainPin {
@@ -34,6 +36,11 @@ pub fn declared_channel(declaration: &str) -> Result<String, String> {
         .filter(|channel| !channel.is_empty())
         .map(str::to_owned)
         .ok_or_else(|| "rust-toolchain.toml declares no toolchain.channel".to_owned())
+}
+
+/// YAML structure only; values keep their `#` because a channel may not.
+fn without_comment(line: &str) -> &str {
+    line.split('#').next().unwrap_or(line).trim_end()
 }
 
 fn job_named_by(line: &str) -> Option<&str> {
@@ -65,22 +72,25 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
     let mut pins = Vec::new();
     let mut job = String::new();
     let mut reached_jobs = false;
+    let mut step = 0;
     for (index, line) in contents.lines().enumerate() {
         if line.trim_start().starts_with('#') {
             continue;
         }
-        if line == "jobs:" {
+        let structure = without_comment(line);
+        if structure == "jobs:" {
             reached_jobs = true;
             continue;
         }
-        if reached_jobs && let Some(name) = job_named_by(line) {
+        if reached_jobs && let Some(name) = job_named_by(structure) {
             job = name.to_owned();
+        }
+        let item = structure.trim_start();
+        if item == "-" || item.starts_with("- ") {
+            step += 1;
         }
         for key in TOOLCHAIN_PIN_KEYS {
             let Some(at) = line.find(key) else {
-                continue;
-            };
-            let Some(value) = pin_value(&line[at + key.len()..]) else {
                 continue;
             };
             pins.push(ToolchainPin {
@@ -88,15 +98,21 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
                 line: index + 1,
                 key,
                 job: job.clone(),
-                value,
+                step,
+                value: pin_value(&line[at + key.len()..]),
             });
         }
     }
     pins
 }
 
+/// Only an install in the very next step replaces this one unused. Any step
+/// in between may have run cargo on the earlier compiler.
 fn supersedes(later: &ToolchainPin, earlier: &ToolchainPin) -> bool {
-    later.key == earlier.key && later.workflow == earlier.workflow && later.job == earlier.job
+    later.key == earlier.key
+        && later.workflow == earlier.workflow
+        && later.job == earlier.job
+        && later.step == earlier.step + 1
 }
 
 /// Pins that disagree with the declared channel, named by file and line. A
@@ -105,14 +121,22 @@ fn supersedes(later: &ToolchainPin, earlier: &ToolchainPin) -> bool {
 pub fn execution_channel_violations(channel: &str, pins: &[ToolchainPin]) -> Vec<String> {
     let mut violations = Vec::new();
     for (index, pin) in pins.iter().enumerate() {
+        let Some(value) = pin.value.as_deref() else {
+            violations.push(format!(
+                "{}:{}: job `{}` names {} with no value this scanner can read; a pin it \
+                 cannot resolve is not a pin it may ignore",
+                pin.workflow, pin.line, pin.job, pin.key
+            ));
+            continue;
+        };
         let shadowed =
             pin.can_be_shadowed() && pins[index + 1..].iter().any(|later| supersedes(later, pin));
-        if shadowed || pin.value == channel {
+        if shadowed || value == channel {
             continue;
         }
         violations.push(format!(
             "{}:{}: job `{}` pins {} {:?}; rust-toolchain.toml declares the channel {:?}",
-            pin.workflow, pin.line, pin.job, pin.key, pin.value, channel
+            pin.workflow, pin.line, pin.job, pin.key, value, channel
         ));
     }
     violations

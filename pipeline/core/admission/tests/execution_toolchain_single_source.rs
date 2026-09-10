@@ -127,7 +127,11 @@ fn a_deny_action_rust_version_is_never_shadowed() {
 fn a_dated_nightly_is_a_channel_the_gate_can_carry() {
     let workflow = "jobs:\n  test:\n    steps:\n      - with: { toolchain: nightly-2026-09-09 }\n";
     let pins = workflow_toolchain_pins("t.yml", workflow);
-    assert_eq!(pins[0].value, "nightly-2026-09-09", "{pins:?}");
+    assert_eq!(
+        pins[0].value.as_deref(),
+        Some("nightly-2026-09-09"),
+        "{pins:?}"
+    );
     assert!(execution_channel_violations("nightly-2026-09-09", &pins).is_empty());
     assert_eq!(
         execution_channel_violations("1.98.0", &pins).len(),
@@ -145,5 +149,68 @@ fn a_declaration_without_a_channel_is_refused() {
         declared_channel("[toolchain]\nchannel = \"nightly-2026-09-09\"\n")
             .expect("declared channel"),
         "nightly-2026-09-09"
+    );
+}
+
+/// A block-style pin resolves in GitHub's YAML and is invisible to a
+/// line-scanner; skipping it would let any channel through unjudged.
+#[test]
+fn a_pin_whose_value_the_scanner_cannot_read_is_itself_a_violation() {
+    let workflow = concat!(
+        "jobs:\n  layout:\n    steps:\n      - uses: install\n",
+        "        with:\n          toolchain:\n            \"1.42.0\"\n",
+    );
+    let violations = execution_channel_violations(
+        "1.98.0",
+        &workflow_toolchain_pins("presubmit.yml", workflow),
+    );
+    assert!(
+        violations
+            .iter()
+            .any(|line| line.starts_with("presubmit.yml:6:")),
+        "a pin the scanner cannot resolve must be refused, not skipped: {violations:?}"
+    );
+}
+
+#[test]
+fn an_inline_comment_on_the_jobs_key_does_not_erase_job_attribution() {
+    let workflow =
+        "jobs: # every job\n  lint:\n    steps:\n      - with: { toolchain: \"1.97.0\" }\n";
+    let pins = workflow_toolchain_pins("p.yml", workflow);
+    assert_eq!(
+        pins.iter().map(|pin| pin.job.as_str()).collect::<Vec<_>>(),
+        ["lint"],
+        "{pins:?}"
+    );
+}
+
+#[test]
+fn a_trailing_space_after_a_job_name_does_not_shift_attribution() {
+    let workflow =
+        "jobs:\n  live-postgres: \n    steps:\n      - with: { toolchain: \"1.97.0\" }\n";
+    let pins = workflow_toolchain_pins("l.yml", workflow);
+    assert_eq!(
+        pins.iter().map(|pin| pin.job.as_str()).collect::<Vec<_>>(),
+        ["live-postgres"],
+        "{pins:?}"
+    );
+}
+
+/// An install is only superseded if nothing ran between it and its
+/// replacement; work done on the earlier compiler is what the exemption
+/// would otherwise hide.
+#[test]
+fn an_install_that_ran_work_before_being_replaced_is_still_judged() {
+    let workflow = concat!(
+        "jobs:\n  qualify:\n    steps:\n",
+        "      - with: { toolchain: \"1.42.0\" }\n",
+        "      - run: cargo build\n",
+        "      - with: { toolchain: \"1.98.0\" }\n",
+    );
+    let violations =
+        execution_channel_violations("1.98.0", &workflow_toolchain_pins("p.yml", workflow));
+    assert!(
+        violations.iter().any(|line| line.contains("1.42.0")),
+        "an install used before replacement must be judged: {violations:?}"
     );
 }
