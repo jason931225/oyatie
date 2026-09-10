@@ -5,7 +5,7 @@ version.workspace = true
 rust-version.workspace = true
 publish = false
 license = "Apache-2.0"
-description = "Sidecar controller binary: consumes tenancy lifecycle events and reconciles per-tenant ClickHouse state (database creation, row-level policies, quota bindings). Controller-pattern per Kubernetes operator doctrine."
+description = "Tenant bootstrap controller: creates the per-tenant OLAP database on tenant-created and drops it on tenant-deleted; suspended and reactivated return Unimplemented (IP-002). The binary wires the ClickHouse adapter; the event consumer is not yet wired."
 
 [package.metadata.oyatie]
 microservice = "analytics"
