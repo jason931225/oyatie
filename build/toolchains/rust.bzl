@@ -155,11 +155,14 @@ def _hermetic_rust_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
         ),
     ]
 
-# Attr surface deliberately mirrors prelude `system_rust_toolchain`, plus `distribution`,
-# so swapping the two is a one-line change in BUCK. `.buckconfig` takes the prelude bundled,
-# so "the prelude" is whichever buck2 runs: these defaults mirror the buck2 pinned in
-# .github/workflows/buck2-weekly-smoke.yml and need re-checking when that pin moves.
-# `nightly_features` already defaults the other way in a later prelude.
+# Attr names mirror prelude `system_rust_toolchain`, plus a required `distribution`, so the
+# delta between this rule and the one it replaces stays reviewable. Not a drop-in swap:
+# `distribution` is unknown to `system_rust_toolchain`, and `rustc_target_triple` defaults to
+# RUST_TARGET_TRIPLE above rather than the prelude's host matrix. The remaining defaults match
+# `system_rust_toolchain` in the buck2 pinned at .github/workflows/buck2-weekly-smoke.yml —
+# `.buckconfig` takes the prelude bundled, so that pin is the only statement of which prelude
+# runs. Re-check when it moves: `nightly_features` already defaults the other way in a later
+# prelude.
 hermetic_rust_toolchain = rule(
     impl = _hermetic_rust_toolchain_impl,
     attrs = {
