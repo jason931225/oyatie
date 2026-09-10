@@ -2,7 +2,14 @@
 //! every toolchain-naming workflow input is checked against it.
 
 /// Inputs by which a hosted action is told which Rust toolchain to use.
-pub const TOOLCHAIN_PIN_KEYS: [&str; 2] = ["toolchain:", "rust-version:"];
+///
+/// `RUSTUP_TOOLCHAIN` outranks the other two. rustup reads it before it looks
+/// for a `rust-toolchain.toml` anywhere in the cwd ancestry, so a job setting
+/// it in `env:` chooses a compiler that no install step and no declaration can
+/// override. It is spelled in upper case and `str::find` is case-sensitive, so
+/// it matched neither key: the highest-precedence mechanism was the one input
+/// this gate could not see.
+pub const TOOLCHAIN_PIN_KEYS: [&str; 3] = ["toolchain:", "rust-version:", "RUSTUP_TOOLCHAIN:"];
 
 /// One toolchain-naming input found in one hosted workflow.
 #[derive(Clone, Debug, PartialEq, Eq)]

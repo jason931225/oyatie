@@ -65,13 +65,36 @@ fn every_hosted_toolchain_pin_agrees_with_the_declared_channel() {
 #[test]
 fn the_scanner_reads_a_pin_from_every_workflow_that_names_one() {
     for (name, contents) in hosted_workflows() {
-        if !TOOLCHAIN_PIN_KEYS.iter().any(|key| contents.contains(key)) {
+        // Counted the way the scanner counts: one pin per key occurrence per
+        // line, comment-only lines skipped like the scanner skips them.
+        //
+        // The population size is the assertion, not the refusal count.
+        // Asserting only that SOMETHING was refused detects total blindness,
+        // and total blindness is not the case that happens: a file with six
+        // readable pins and one silently dropped pin satisfied that while a
+        // wrong compiler reached a protected job. Refusals legitimately number
+        // fewer than pins, because a shadowed install is left to its own gate.
+        let named: usize = contents
+            .lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+            .map(|line| {
+                TOOLCHAIN_PIN_KEYS
+                    .iter()
+                    .filter(|key| line.contains(**key))
+                    .count()
+            })
+            .sum();
+        if named == 0 {
             continue;
         }
-        let violations = execution_channel_violations(
-            "no-such-channel",
-            &workflow_toolchain_pins(&name, &contents),
+        let pins = workflow_toolchain_pins(&name, &contents);
+        assert_eq!(
+            pins.len(),
+            named,
+            "{name} names {named} toolchain input(s); the scanner read {}",
+            pins.len()
         );
+        let violations = execution_channel_violations("no-such-channel", &pins);
         assert!(
             !violations.is_empty(),
             "{name} names a toolchain input the scanner cannot read"
@@ -122,6 +145,31 @@ fn a_deny_action_rust_version_is_never_shadowed() {
         execution_channel_violations("9.9.9", &workflow_toolchain_pins("d.yml", workflow));
     assert_eq!(violations.len(), 1, "{violations:?}");
     assert!(violations[0].contains("rust-version:"));
+}
+
+/// `RUSTUP_TOOLCHAIN` in a job `env:` picks the compiler before any
+/// declaration is consulted, so no later install can shadow it and it must be
+/// judged wherever it appears. It is also the only pin key spelled in upper
+/// case, which is how it escaped a case-sensitive scan entirely.
+#[test]
+fn a_rustup_toolchain_environment_override_is_judged_and_never_shadowed() {
+    let workflow = concat!(
+        "jobs:\n  qualify:\n",
+        "    env:\n      RUSTUP_TOOLCHAIN: \"1.42.0\"\n",
+        "    steps:\n      - uses: install\n        with:\n          toolchain: \"9.9.9\"\n",
+    );
+    let pins = workflow_toolchain_pins("q.yml", workflow);
+    assert_eq!(pins.len(), 2, "both inputs must be read: {pins:?}");
+    let violations = execution_channel_violations("9.9.9", &pins);
+    assert_eq!(
+        violations.len(),
+        1,
+        "the override disagrees and the install agrees: {violations:?}"
+    );
+    assert!(
+        violations[0].contains("RUSTUP_TOOLCHAIN:") && violations[0].contains("1.42.0"),
+        "the refusal must name the override it measured: {violations:?}"
+    );
 }
 
 #[test]
