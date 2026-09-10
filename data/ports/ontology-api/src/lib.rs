@@ -1,10 +1,4 @@
 //! Platform Object Graph entity upsert API boundary.
-//!
-//! This crate owns authenticated REST-boundary normalization, path/body tenant
-//! and entity binding, request fingerprint idempotency, property tier/data-class
-//! parsing, in-memory row-isolated entity projection, and stable public error
-//! projection for `object-graph.entity.upsert` before handing typed entity
-//! construction to the Object Graph kernel.
 
 use std::collections::BTreeMap;
 

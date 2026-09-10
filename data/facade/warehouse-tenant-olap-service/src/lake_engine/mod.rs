@@ -1,36 +1,12 @@
-//! lake_engine — open-table-format ACID write substrate for the data-warehouse
-//! microservice.
-//!
-//! Truth-up scaffold (Wave 15-IMPL-truth-up, 2026-05-21). The IP slices
-//! (IP-031 Delta, IP-032 Iceberg, IP-033 Hudi, IP-034 Unity-Catalog-class,
-//! IP-037 CDF, IP-040 Time-Travel, IP-041 Zero-Copy-Clone) declare a
-//! `lake-engine` sublayer that hosts the Delta / Iceberg / Hudi protocol
-//! writers. The `manifest.json` `layer_enum_conformance.declared_layers`
-//! list carries `lake-engine` as the 10th declared layer. The ADR-0105
-//! 12-layer enum (`crate::domain::ArchitectureLayer`) keeps the canonical
-//! enum closed at 12; `lake_engine` sits inside the adapter/worker/
-//! infrastructure stratum as an open-table substrate, not as a new
-//! top-level layer.
-//!
-//! This module is a scaffold: the protocol writers (`DeltaWriterCore`,
-//! `IcebergWriterCore`, `HudiWriterCore`) carry only the shape that IPs
-//! 031/032/033 reference, so downstream IPs can cite a real Rust path.
-//! Full ACID commit semantics land in subsequent Wave-15B implementation
-//! plans per the REMEDIATION-NOTES follow-up ledger.
-
 #![allow(dead_code)]
 
 use crate::domain::{DatasetId, TenantId};
 use crate::error::{ServiceError, ServiceResult};
 
-/// Open-table protocol identifier per IPs 031/032/033.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum LakeProtocol {
-    /// Delta Lake (IP-031)
     Delta,
-    /// Apache Iceberg v2 (IP-032)
     Iceberg,
-    /// Apache Hudi (IP-033)
     Hudi,
 }
 
@@ -44,7 +20,6 @@ impl LakeProtocol {
     }
 }
 
-/// Tenant-scoped lake table identity (per-tenant bucket layout from IP-031 §3.2).
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct LakeTableRef {
     pub tenant_id: TenantId,
@@ -69,7 +44,6 @@ impl LakeTableRef {
         Ok(())
     }
 
-    /// Storage prefix per IP-031 §3.2 layout (tenant-pinned bucket).
     pub fn storage_prefix(&self) -> String {
         format!(
             "oyatie-{}-warehouse/{}/{}/{}",
@@ -81,7 +55,6 @@ impl LakeTableRef {
     }
 }
 
-/// Atomic-commit outcome shared by Delta / Iceberg / Hudi writers.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct LakeCommitReceipt {
     pub table: LakeTableRef,
@@ -91,20 +64,11 @@ pub struct LakeCommitReceipt {
     pub conflict_retries: u8,
 }
 
-/// Delta-Lake-class protocol writer (IP-031).
-///
-/// Wave 15-IMPL-truth-up scaffold; full putIfAbsent commit loop is Wave-15B.
 pub struct DeltaWriterCore;
 
 impl DeltaWriterCore {
     pub const PROTOCOL: LakeProtocol = LakeProtocol::Delta;
 
-    /// Validate a Delta write request and emit a scaffolded receipt.
-    ///
-    /// The full putIfAbsent commit-collision retry loop (IP-031 §3.3) is
-    /// scheduled for Wave-15B. This scaffold only enforces the tenant
-    /// scope and table identity invariants that the IP-031 acceptance
-    /// criteria depend on.
     pub fn stage_commit(
         table: LakeTableRef,
         bytes_written: u64,
@@ -120,7 +84,6 @@ impl DeltaWriterCore {
     }
 }
 
-/// Apache-Iceberg-v2 protocol writer (IP-032).
 pub struct IcebergWriterCore;
 
 impl IcebergWriterCore {
@@ -141,7 +104,6 @@ impl IcebergWriterCore {
     }
 }
 
-/// Apache-Hudi protocol writer (IP-033).
 pub struct HudiWriterCore;
 
 impl HudiWriterCore {
@@ -162,7 +124,6 @@ impl HudiWriterCore {
     }
 }
 
-/// Change-Data-Feed cursor for IP-037.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct ChangeDataFeedCursor {
     pub from_version: u64,

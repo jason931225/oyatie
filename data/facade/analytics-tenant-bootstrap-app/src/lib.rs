@@ -1,24 +1,3 @@
-//! Tenant bootstrap controller for the analytics µservice (ADR-0193, IP-002).
-//!
-//! This sidecar consumes tenancy lifecycle events (tenant-created,
-//! tenant-suspended, tenant-deleted) and reconciles per-tenant ClickHouse
-//! state:
-//!
-//! - Creates `tenant_{id}` ClickHouse database on tenant-created.
-//! - Applies row-level policies.
-//! - Binds per-tenant quota (ADR-0155).
-//! - Drops / archives database on tenant-deleted.
-//!
-//! ## Honest-claims note
-//!
-//! Status is "planned". Event-consumer wiring is deferred (IP-002 + IP-004).
-//! The struct and method stubs compile and the dependency graph is visible
-//! to the architecture gate.
-//!
-//! non_claim: no live ClickHouse reconciliation, no Kafka consumer, no
-//! production deployment in this scaffolding.
-
-// ADR-0083 Tier 3: tests may use unwrap/expect/panic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -26,22 +5,11 @@ use std::fmt;
 
 use shared_olap_client_kernel::{KernelError, OlapClient, TenantId};
 
-// =====================================================================
-// Tenant lifecycle events
-// =====================================================================
-
-/// A tenancy lifecycle event delivered to the bootstrap controller.
-///
-/// data_class: INTERNAL_ONLY
 #[derive(Clone, Debug)]
 pub enum TenantEvent {
-    /// A new tenant was provisioned. Bootstrap ClickHouse state.
     Created { tenant_id: TenantId },
-    /// Tenant suspended. Quota enforcement without data deletion.
     Suspended { tenant_id: TenantId },
-    /// Tenant reactivated after suspension.
     Reactivated { tenant_id: TenantId },
-    /// Tenant deleted. Scheduled data retention then database drop.
     Deleted { tenant_id: TenantId },
 }
 
@@ -57,16 +25,9 @@ impl TenantEvent {
     }
 }
 
-// =====================================================================
-// Reconciliation error
-// =====================================================================
-
-/// Errors from tenant bootstrap reconciliation.
 #[derive(Clone, Debug)]
 pub enum ReconcileError {
-    /// The OLAP engine returned an error during database creation.
     Kernel(KernelError),
-    /// Feature not yet wired (honest-claims).
     Unimplemented(&'static str),
 }
 
@@ -87,20 +48,6 @@ impl From<KernelError> for ReconcileError {
     }
 }
 
-// =====================================================================
-// Bootstrap controller
-// =====================================================================
-
-/// Controller that reconciles ClickHouse state from tenancy events.
-///
-/// In production this subscribes to Kafka (IP-004) and processes events in
-/// order. For tests an [`InMemoryEventQueue`] drives it deterministically.
-///
-/// non_claim: Kafka wiring and live ClickHouse reconciliation are deferred
-/// (IP-002, IP-004). `process` calls `ensure_tenant_database` for Created
-/// events and `drop_tenant_database` for Deleted events via the OlapClient
-/// port; since the ClickHouse adapter returns Unimplemented, in CI we use
-/// the in-memory adapter instead.
 pub struct TenantBootstrapController<'a> {
     olap: &'a mut dyn OlapClient,
 }
@@ -111,10 +58,6 @@ impl<'a> TenantBootstrapController<'a> {
         Self { olap }
     }
 
-    /// Process a single tenancy event and reconcile ClickHouse state.
-    ///
-    /// # Errors
-    /// Returns [`ReconcileError`] on kernel failure or unimplemented paths.
     pub fn process(&mut self, event: &TenantEvent) -> Result<(), ReconcileError> {
         match event {
             TenantEvent::Created { tenant_id } => {
@@ -122,7 +65,6 @@ impl<'a> TenantBootstrapController<'a> {
                 Ok(())
             }
             TenantEvent::Suspended { .. } | TenantEvent::Reactivated { .. } => {
-                // Quota enforcement is deferred (IP-002 / ADR-0155).
                 Err(ReconcileError::Unimplemented(
                     "tenant_suspended/reactivated: quota enforcement IP-002 deferred",
                 ))
@@ -135,11 +77,6 @@ impl<'a> TenantBootstrapController<'a> {
     }
 }
 
-// =====================================================================
-// In-memory event queue for tests
-// =====================================================================
-
-/// Ordered queue of tenancy events for test injection.
 #[derive(Default)]
 pub struct InMemoryEventQueue {
     events: Vec<TenantEvent>,
@@ -151,13 +88,10 @@ impl InMemoryEventQueue {
         Self::default()
     }
 
-    /// Push an event onto the queue.
     pub fn push(&mut self, event: TenantEvent) {
         self.events.push(event);
     }
 
-    /// Drain and process all events through `controller`.
-    ///
     /// Returns a list of `(event, result)` pairs; processing continues even
     /// when an event fails (fail-open for test inspection).
     pub fn drain_and_process(
@@ -175,41 +109,69 @@ impl InMemoryEventQueue {
     }
 }
 
-// =====================================================================
-// Tests
-// =====================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use shared_olap_client_kernel::memory_adapter::InMemoryOlapClient;
+    use shared_olap_client_kernel::{QualifiedTable, Query, TableName};
 
     fn tid(s: &str) -> TenantId {
         TenantId::try_new(s).unwrap()
     }
 
+    fn probe_query(tenant: &TenantId) -> Query {
+        Query {
+            source: QualifiedTable::new(tenant.clone(), TableName::try_new("events").unwrap()),
+            columns: vec!["id".to_string()],
+            aggregates: vec![],
+            filter: None,
+            group_by: vec![],
+            order_by: vec![],
+            limit: None,
+        }
+    }
+
+    fn query_refusal(client: &InMemoryOlapClient, tenant: &TenantId) -> String {
+        match client.query(tenant, &probe_query(tenant)).unwrap_err() {
+            KernelError::AdapterError(message) => message,
+            other => panic!("expected AdapterError, got {other}"),
+        }
+    }
+
     #[test]
     fn controller_creates_tenant_database_via_in_memory_adapter() {
         let mut client = InMemoryOlapClient::new();
+        let tenant = tid("t1");
+        assert_eq!(
+            query_refusal(&client, &tenant),
+            "database tenant_t1 does not exist"
+        );
+
         let mut ctrl = TenantBootstrapController::new(&mut client);
-        let event = TenantEvent::Created {
-            tenant_id: tid("t1"),
-        };
-        ctrl.process(&event).unwrap();
-        // Verify by attempting a known-good query on the created database.
-        // The in-memory adapter will succeed because the database now exists.
+        ctrl.process(&TenantEvent::Created {
+            tenant_id: tenant.clone(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            query_refusal(&client, &tenant),
+            "table tenant_t1.events does not exist"
+        );
     }
 
     #[test]
     fn controller_drops_tenant_database() {
         let mut client = InMemoryOlapClient::new();
-        // Create first, then drop.
         client.ensure_tenant_database(&tid("t1")).unwrap();
         let mut ctrl = TenantBootstrapController::new(&mut client);
         let event = TenantEvent::Deleted {
             tenant_id: tid("t1"),
         };
         ctrl.process(&event).unwrap();
+        assert_eq!(
+            query_refusal(&client, &tid("t1")),
+            "database tenant_t1 does not exist"
+        );
     }
 
     #[test]
@@ -241,10 +203,8 @@ mod tests {
         });
         let results = queue.drain_and_process(&mut ctrl);
         assert_eq!(results.len(), 2);
-        // Created and Deleted both succeed via in-memory adapter.
         assert!(results[0].1.is_ok());
         assert!(results[1].1.is_ok());
-        // Queue is now empty.
         assert!(queue.drain_and_process(&mut ctrl).is_empty());
     }
 

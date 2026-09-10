@@ -58,7 +58,6 @@ pub enum ObjectGraphEntityUpsertApiError {
     /// read path is the ontology surface's own; this port never lies by
     /// stringifying.
     NonStringPropertyValue {
-        /// Name of the property whose value is typed.
         name: String,
     },
 }
