@@ -78,6 +78,26 @@ registry/fixuptasks.jsonl merge=fixup-ledger
 # git config get a normal conflict; cloud-ci gates remain the canonical backstop.
 ci/facade/action-item-accounting/friction-ledger.jsonl merge=friction-ledger
 
+# The admission crate root is a re-export hub. Every module a lane adds needs one
+# `pub mod` line and one `pub use` group here, `occupancy (path-set)` claims a whole
+# file with no ordering between claimants, and a refused lane cannot enter the merge
+# queue -- so two lanes adding unrelated modules refused each other at spawn and the
+# only exit was closing one pull request. That is the `Cargo.lock` wedge recorded
+# above, on a hand-written file.
+#
+# `merge=union` is WRONG here, for the reason recorded above. The re-export groups are
+# rustfmt-wrapped and edited IN PLACE: two lanes that rewrap one `pub use` group would
+# keep both copies, and a duplicated `//!` line would survive with nothing to catch it.
+#
+# No driver is registered for this name and none is intended. Git falls back to its
+# ordinary three-way text merge, which is the correct reconciler here: disjoint module
+# additions merge clean, and two lanes editing one region conflict AT MERGE, loudly,
+# instead of refusing both lanes at spawn. A bad text merge cannot pass silently --
+# a duplicated `pub mod` is E0428, a duplicated re-export is E0252, and a mis-wrapped
+# group fails `cargo fmt --check`. What this declaration buys is that the conflict is
+# raised where it can be resolved rather than predicted where it usually is not.
+pipeline/core/admission/src/lib.rs merge=concurrent-lanes
+
 # Force LF for Rust sources so include_bytes! / git-blob identity stays platform-stable.
 # Hosted windows-latest defaults to core.autocrlf=true; CRLF worktree + LF blobs broke
 # corpus-doc-parser census ParserSource equality (soft platform-smoke scm-facts integration).
