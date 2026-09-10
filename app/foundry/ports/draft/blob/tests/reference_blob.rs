@@ -1,6 +1,6 @@
 //! Reference in-memory blob store, driven through the port's conformance
 //! suite. Volatile on purpose; it proves the contract and declines to prove
-//! durability, exactly as the records reference does.
+//! durability.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;

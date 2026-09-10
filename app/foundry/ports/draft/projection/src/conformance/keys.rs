@@ -1,12 +1,3 @@
-//! Primary-key laws: a declared key identifies at most one object
-//! within its (tenant, entity type).
-//!
-//! The designation itself is NOT projection state — it lives in the
-//! registry, which is fold input — so it arrives as an apply parameter.
-//! A store therefore enforces uniqueness without ever owning a
-//! definition, and the canonical entry bytes (hence dedup identity)
-//! stay exactly what they were.
-
 use data_ontology_kernel::PropertyValue;
 
 use crate::conformance::{ProjectionFixture, applied, fail, object};

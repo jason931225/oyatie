@@ -22,7 +22,6 @@ pub struct KeyDesignations {
 }
 
 impl KeyDesignations {
-    /// Declare `property` as the key of `entity_type`.
     pub fn declaring(
         mut self,
         entity_type: impl Into<String>,
@@ -33,7 +32,6 @@ impl KeyDesignations {
         self
     }
 
-    /// The key property of `entity_type`, if it declares one.
     pub fn property_for(&self, entity_type: &str) -> Option<&str> {
         self.by_entity_type
             .get(entity_type)

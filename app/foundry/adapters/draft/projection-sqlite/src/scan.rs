@@ -1,9 +1,3 @@
-//! The read machinery: index-pruned candidate walks in `object_ref`
-//! order, with the port's own `matches` as the final word on every
-//! candidate — the index accelerates, it never decides. Kind drift
-//! refuses window-independently via a probe over the whole type scope,
-//! exactly the shared-suite law.
-
 use data_ontology_kernel::{CalendarDate, PropertyValue};
 use foundry_projection_draft::{
     Page, PageRequest, ProjectionCursor, ProjectionStoreError, PropertyPredicate,
@@ -110,9 +104,6 @@ pub(crate) fn scan(
     Ok(Page { objects, next })
 }
 
-/// The candidate SQL plus its bindings: a plain type scan without a
-/// predicate, or an index-pruned join keyed on (property, kind) with a
-/// value-column constraint where the kind has one.
 fn candidate_query(
     tenant_id: &str,
     entity_type: &str,

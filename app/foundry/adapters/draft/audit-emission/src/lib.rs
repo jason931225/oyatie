@@ -19,7 +19,6 @@ use audit_emission_api::AuditEventEmitRequest;
 use audit_emission_kernel::{AuditEmitter, ChainCoordinate};
 use foundry_audit_draft::{AuditPortError, AuditSink, FoundryAuditEvent};
 
-/// The chain pack every Foundry event files under.
 pub const FOUNDRY_AUDIT_PACK: &str = "foundry";
 
 /// The platform-chain sink: generic over any emitter of the producer

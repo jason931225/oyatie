@@ -52,8 +52,6 @@ impl Drop for Fixture {
     }
 }
 
-/// WAL writes two sidecars beside the database; removing only the file
-/// leaked 72 strays per suite run, unbounded once names became unique.
 fn sweep(path: &Path) {
     let _ = std::fs::remove_file(path);
     for suffix in ["-wal", "-shm"] {
@@ -98,9 +96,7 @@ fn entry(ordinal: u64, objects: Vec<ProjectedObject>) -> AppliedEntry {
 }
 
 /// A head that will not convert is a CORRUPT store, not an empty one,
-/// so the discard refuses. `try_into().unwrap_or(0)` returned `Ok(0)` —
-/// nothing discarded — while deleting every row: the exact "loss" a
-/// returned head exists to distinguish itself from.
+/// so the discard refuses.
 #[test]
 fn a_corrupt_head_refuses_the_discard_and_keeps_the_rows() {
     let fixture = Fixture::new("corrupt-head");
@@ -126,7 +122,6 @@ fn a_corrupt_head_refuses_the_discard_and_keeps_the_rows() {
         matches!(refused, Err(ProjectionStoreError::Storage { .. })),
         "a corrupt head refuses: {refused:?}"
     );
-    // The refusal rolls the transaction back: nothing was lost.
     let survivors = rusqlite::Connection::open(&fixture.path)
         .unwrap()
         .query_row(

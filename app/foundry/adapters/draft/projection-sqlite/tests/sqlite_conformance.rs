@@ -5,10 +5,10 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// A monotonic per-process counter. The wall-clock recipe alone
-/// duplicated across parallel tests under load — two tests then shared
-/// one database and produced divergent-replay and malformed-image
-/// failures that read as real defects.
+/// The wall-clock recipe alone duplicated across parallel tests under
+/// load — two tests then shared one database and produced
+/// divergent-replay and malformed-image failures that read as real
+/// defects.
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
 use foundry_projection_draft::ProjectionStore;
@@ -60,9 +60,7 @@ impl Drop for SqliteFixture {
         sweep(&self.path);
     }
 }
-/// WAL mode writes two sidecars beside the database, so removing only
-/// the file leaves them behind — bounded while fixture names repeated,
-/// unbounded once they are unique. Measured at 72 strays per suite run.
+
 fn sweep(path: &std::path::Path) {
     let _ = std::fs::remove_file(path);
     for suffix in ["-wal", "-shm"] {

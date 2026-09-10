@@ -1,8 +1,5 @@
-//! The store trait an adapter implements.
-
 use crate::blob::BlobRef;
 
-/// Why the store refused an operation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BlobStoreError {
     /// Adapter-level failure (I/O, corruption); the message is diagnostic.

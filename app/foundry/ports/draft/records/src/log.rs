@@ -1,8 +1,5 @@
-//! The log trait an adapter implements.
-
 use crate::envelope::{ActionEnvelope, Receipt, SealedEnvelope};
 
-/// Why the log refused an operation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RecordsLogError {
     /// The idempotency key was already spent on a different envelope. The log
@@ -18,8 +15,7 @@ pub enum RecordsLogError {
 /// A per-tenant, append-only Action log.
 ///
 /// The executable meaning of this contract is [`crate::conformance`]; an
-/// adapter that passes the suite implements the port, and one that does not,
-/// does not, whatever its documentation says.
+/// adapter that passes the suite implements the port.
 pub trait RecordsLog {
     /// Append one envelope. Re-appending a byte-identical envelope under the
     /// same idempotency key returns the original receipt marked deduplicated.

@@ -9,6 +9,9 @@ use audit_emission_kernel::AuditEmitter;
 use foundry_audit_draft::{AuditDisposition, AuditPortError, AuditSink, FoundryAuditEvent};
 use foundry_audit_emission_draft::{ChainAuditSink, FOUNDRY_AUDIT_PACK, emit_request};
 
+const APPLIED_AT_2023_11_14_MS: u64 = 1_700_000_000_000;
+const LEAP_DAY_2000_02_29_MS: u64 = 951_782_400_000;
+
 #[derive(Default)]
 struct CapturingEmitter {
     requests: RefCell<Vec<AuditEventEmitRequest>>,
@@ -37,7 +40,7 @@ fn applied() -> FoundryAuditEvent {
         "dec_1",
         "ent_r1",
         AuditDisposition::Applied { ordinal: 4 },
-        1_700_000_000_000, // 2023-11-14
+        APPLIED_AT_2023_11_14_MS,
     )
     .unwrap()
 }
@@ -75,7 +78,7 @@ fn period_derivation_is_civil_and_clock_free() {
     let mut event = applied();
     event.occurred_at_epoch_ms = 0;
     assert_eq!(emit_request(&event).coordinate.period, "1970-01");
-    event.occurred_at_epoch_ms = 951_782_400_000; // 2000-02-29
+    event.occurred_at_epoch_ms = LEAP_DAY_2000_02_29_MS;
     assert_eq!(emit_request(&event).coordinate.period, "2000-02");
 }
 

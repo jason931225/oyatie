@@ -2,10 +2,7 @@
 //! one durable, indexed projection. Object rows carry the adapter's
 //! canonical bytes as the round-trip source of truth; a per-property
 //! index table carries the value kind plus StorageClass-affinity
-//! columns, so predicates prune through real secondary indexes while
-//! the port's own `matches` stays the final word on every candidate.
-//! Applies run in one immediate transaction — dense, deduplicated,
-//! atomic — exactly the write laws the conformance suite pins.
+//! columns, so predicates prune through real secondary indexes.
 #![forbid(unsafe_code)]
 
 mod codec;
@@ -28,7 +25,6 @@ use crate::codec::decode_object;
 /// `EXPLAIN QUERY PLAN`.
 pub const PROPERTY_INDEX_NAME: &str = "projection_property_kind";
 
-/// A durable [`ProjectionStore`] over one SQLite database file.
 pub struct SqliteProjectionStore {
     connection: Connection,
 }

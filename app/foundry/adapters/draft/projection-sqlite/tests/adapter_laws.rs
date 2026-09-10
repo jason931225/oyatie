@@ -1,17 +1,13 @@
-//! Adapter-specific laws beyond the shared suite: byte-faithful
-//! round-trips across reopen, the Date index key's order agreement with
-//! the kernel's `Ord`, the property index actually serving queries, and
-//! the typed columns never aliasing across kinds.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// A monotonic per-process counter. The wall-clock recipe alone
-/// duplicated across parallel tests under load — two tests then shared
-/// one database and produced divergent-replay and malformed-image
-/// failures that read as real defects.
+/// The wall-clock recipe alone duplicated across parallel tests under
+/// load — two tests then shared one database and produced
+/// divergent-replay and malformed-image failures that read as real
+/// defects.
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
 use data_boundary_kernel::{Classified, DataClass, PrivacyDataClass};
@@ -254,8 +250,6 @@ fn predicate_queries_run_through_the_property_index() {
     );
 }
 
-/// WAL writes two sidecars beside the database; removing only the file
-/// leaked 72 strays per suite run, unbounded once names became unique.
 fn sweep(path: &std::path::Path) {
     let _ = std::fs::remove_file(path);
     for suffix in ["-wal", "-shm"] {
