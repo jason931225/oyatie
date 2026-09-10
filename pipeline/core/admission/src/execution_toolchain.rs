@@ -3,12 +3,17 @@
 
 /// Inputs by which a hosted action is told which Rust toolchain to use.
 ///
-/// `RUSTUP_TOOLCHAIN` outranks the other two. rustup reads it before it looks
-/// for a `rust-toolchain.toml` anywhere in the cwd ancestry, so a job setting
-/// it in `env:` chooses a compiler that no install step and no declaration can
-/// override. It is spelled in upper case and `str::find` is case-sensitive, so
-/// it matched neither key: the highest-precedence mechanism was the one input
-/// this gate could not see.
+/// `RUSTUP_TOOLCHAIN` outranks the DECLARATION: rustup reads it before it
+/// looks for a `rust-toolchain.toml` in the cwd ancestry, so a job setting it
+/// in `env:` overrides the channel this gate exists to enforce. It is spelled
+/// in upper case and `str::find` is case-sensitive, so it matched neither of
+/// the other keys and was invisible here.
+///
+/// It is NOT the highest-precedence mechanism, and this scanner is not a
+/// complete account of toolchain selection. An explicit `+<channel>` argument
+/// beats it -- measured on the build host, `RUSTUP_TOOLCHAIN=1.98.0 rustc
+/// +1.97.1` resolves to 1.97.1 -- and a `cargo +<channel>` inside a `run:`
+/// body is not read here at all.
 pub const TOOLCHAIN_PIN_KEYS: [&str; 3] = ["toolchain:", "rust-version:", "RUSTUP_TOOLCHAIN:"];
 
 /// One toolchain-naming input found in one hosted workflow.
@@ -97,7 +102,11 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
             step += 1;
         }
         for key in TOOLCHAIN_PIN_KEYS {
-            let Some(at) = line.find(key) else {
+            // Searched on the comment-stripped line. Against the raw line, a
+            // key named inside a trailing comment became a pin whose value
+            // parsed to whatever followed it, and the gate refused a workflow
+            // for a sentence about a toolchain.
+            let Some(at) = structure.find(key) else {
                 continue;
             };
             pins.push(ToolchainPin {
@@ -106,7 +115,7 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
                 key,
                 job: job.clone(),
                 step,
-                value: pin_value(&line[at + key.len()..]),
+                value: pin_value(&structure[at + key.len()..]),
             });
         }
     }
@@ -118,11 +127,19 @@ pub fn workflow_toolchain_pins(workflow: &str, contents: &str) -> Vec<ToolchainP
 /// named, so it goes silently wrong at the next bump; a literal that differs
 /// is an oracle for version comparison and is never matched here.
 pub fn channel_literal_violations(channel: &str, path: &str, contents: &str) -> Vec<String> {
-    let quoted = format!("\"{channel}\"");
+    // Both quote spellings. Matching only the double-quoted form left a
+    // one-character bypass: TOML treats `'1.98.0'` as the same string, and the
+    // tree already restates the channel that way -- so the rule read clean over
+    // files that name the channel, which is the precise failure it exists to
+    // prevent.
+    let spellings = [format!("\"{channel}\""), format!("'{channel}'")];
     contents
         .lines()
         .enumerate()
-        .filter(|(_, line)| line.replace('\\', "").contains(&quoted))
+        .filter(|(_, line)| {
+            let unescaped = line.replace('\\', "");
+            spellings.iter().any(|spelling| unescaped.contains(spelling))
+        })
         .map(|(index, _)| {
             format!(
                 "{path}:{}: spells the declared channel {channel:?} as a literal; \
@@ -136,7 +153,14 @@ pub fn channel_literal_violations(channel: &str, path: &str, contents: &str) -> 
 /// Only an install in the very next step replaces this one unused. Any step
 /// in between may have run cargo on the earlier compiler.
 fn supersedes(later: &ToolchainPin, earlier: &ToolchainPin) -> bool {
-    later.key == earlier.key
+    // An unattributed pin is never shadowed. `step` is file-global and job
+    // attribution needs the exact two-space `  name:` shape, so legal YAML this
+    // scanner cannot parse -- four-space indentation, or a quoted `"jobs":` --
+    // gives every pin the same empty job and consecutive step numbers across a
+    // job boundary. Two installs in different jobs would then shadow each
+    // other, and a drifted pin would be admitted as replaced.
+    !earlier.job.is_empty()
+        && later.key == earlier.key
         && later.workflow == earlier.workflow
         && later.job == earlier.job
         && later.step == earlier.step + 1
