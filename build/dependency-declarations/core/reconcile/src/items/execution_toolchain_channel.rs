@@ -56,9 +56,13 @@ impl ExecutionChannel {
 
     /// Whether this channel satisfies a declared stable MSRV floor.
     ///
-    /// A dated nightly is built from a branch ahead of every released stable,
-    /// so the floor is satisfied for every MSRV value; the answer is vacuously
-    /// true rather than skipped.
+    /// A stable channel answers by semver. A dated nightly answers `true`
+    /// because the floor is not evaluable against it: the engine holds no map
+    /// from release date to version, so a nightly carries no value to compare.
+    /// The answer is vacuous, not a judgement. A nightly dated before the
+    /// release that carried the MSRV is admitted here and fails later, in
+    /// compilation; closing that needs a date-to-release table this kernel
+    /// does not have.
     pub fn meets_msrv(&self, msrv: &Version) -> bool {
         match self {
             Self::Stable(version) => version >= msrv,

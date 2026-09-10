@@ -210,6 +210,18 @@ fn a_stable_channel_still_answers_the_msrv_floor_by_semver() {
 }
 
 #[test]
+fn a_nightly_older_than_the_msrv_release_is_still_admitted_by_the_floor() {
+    let stale = channel_of("nightly-2020-01-01");
+    let floor = channel_of("1.98.0");
+    let floor = floor.stable().expect("stable channel exposes its version");
+    assert!(
+        stale.meets_msrv(floor),
+        "the MSRV floor is not evaluable against a nightly, so this admission \
+         is vacuous; a stale nightly is caught by compilation, not by this gate"
+    );
+}
+
+#[test]
 fn the_patch_only_policy_holds_an_unchanged_dated_nightly_and_refuses_every_move() {
     let unchanged = apply_policy(
         &declaration(NIGHTLY),
