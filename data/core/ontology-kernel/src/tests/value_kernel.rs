@@ -1,11 +1,10 @@
-//! Lane-1 pins for the typed value plane: finite-double ordering, calendar
+//! Pins for the typed value plane: finite-double ordering, calendar
 //! validation, storage classes, and the legacy-bridge read path.
 
 use std::collections::BTreeMap;
 
 use crate::*;
 
-/// NaN and both infinities never construct; every finite double does.
 #[test]
 fn non_finite_doubles_rejected() {
     for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
@@ -15,7 +14,6 @@ fn non_finite_doubles_rejected() {
     assert!(FiniteDouble::new(f64::MIN).is_ok());
 }
 
-/// Negative zero folds to positive zero: one value, one key, one equality.
 #[test]
 fn negative_zero_folds() {
     let neg = FiniteDouble::new(-0.0).unwrap();
@@ -24,8 +22,6 @@ fn negative_zero_folds() {
     assert_eq!(neg.get().to_bits(), 0.0f64.to_bits());
 }
 
-/// The derived Ord on the monotone key equals IEEE numeric order across
-/// signs, magnitudes, and subnormals.
 #[test]
 fn derived_ord_equals_numeric_order() {
     let ordered = [
@@ -51,7 +47,6 @@ fn derived_ord_equals_numeric_order() {
     assert!(keys.windows(2).all(|w| w[0] < w[1]));
 }
 
-/// Construction round-trips the exact finite value.
 #[test]
 fn finite_double_round_trips() {
     for v in [f64::MIN, -3.25, 0.0, 1.5, 6.02e23, f64::MAX] {
@@ -59,7 +54,6 @@ fn finite_double_round_trips() {
     }
 }
 
-/// Month lengths and leap years are enforced; valid dates construct.
 #[test]
 fn calendar_dates_validated() {
     assert!(
@@ -90,7 +84,6 @@ fn calendar_dates_validated() {
     );
 }
 
-/// Calendar ordering is chronological through the derived Ord.
 #[test]
 fn calendar_dates_order_chronologically() {
     let a = CalendarDate::new(2025, 12, 31).unwrap();
@@ -99,7 +92,6 @@ fn calendar_dates_order_chronologically() {
     assert!(a < b && b < c);
 }
 
-/// Storage classes map 1:1 to SQLite affinity per the design ruling.
 #[test]
 fn storage_classes_are_the_ruled_mapping() {
     let cases: Vec<(PropertyValue, StorageClass)> = vec![
@@ -126,7 +118,6 @@ fn storage_classes_are_the_ruled_mapping() {
     }
 }
 
-/// The legacy bridge read path: `as_str` answers only for String.
 #[test]
 fn as_str_answers_only_for_string() {
     assert_eq!(PropertyValue::String("v".into()).as_str(), Some("v"));
@@ -134,7 +125,6 @@ fn as_str_answers_only_for_string() {
     assert_eq!(PropertyValue::Array(vec![]).as_str(), None);
 }
 
-/// Type labels are the stable diagnostic vocabulary.
 #[test]
 fn type_labels_stable() {
     assert_eq!(PropertyValue::Integer(1).type_label(), "integer");

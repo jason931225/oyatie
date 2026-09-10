@@ -24,7 +24,7 @@ rust_test(
     name = "data-ontology-kernel-link-action-invariants",
     srcs = [
         "tests/link_action_invariants.rs",
-        "tests/link_action_invariants_support.rs",
+        "tests/link_action_support/mod.rs",
     ],
     crate = "data_ontology_kernel_link_action_invariants",
     crate_root = "tests/link_action_invariants.rs",
@@ -51,7 +51,7 @@ rust_test(
     name = "data-ontology-kernel-schema-evolution",
     srcs = [
         "tests/schema_evolution.rs",
-        "tests/schema_evolution_support.rs",
+        "tests/schema_evolution_support/mod.rs",
     ],
     crate = "data_ontology_kernel_schema_evolution",
     crate_root = "tests/schema_evolution.rs",
@@ -78,7 +78,7 @@ rust_test(
     name = "data-ontology-kernel-schema-evolution-removals",
     srcs = [
         "tests/schema_evolution_removals.rs",
-        "tests/schema_evolution_support.rs",
+        "tests/schema_evolution_support/mod.rs",
     ],
     crate = "schema_evolution_removals",
     crate_root = "tests/schema_evolution_removals.rs",
@@ -93,7 +93,7 @@ rust_test(
     name = "data-ontology-kernel-link-action-pillars",
     srcs = [
         "tests/link_action_pillars.rs",
-        "tests/link_action_invariants_support.rs",
+        "tests/link_action_support/mod.rs",
     ],
     crate = "link_action_pillars",
     crate_root = "tests/link_action_pillars.rs",

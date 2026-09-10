@@ -10,31 +10,23 @@ use crate::error::OntologyEngineError;
 use super::{OntologyEngine, ontology_scoped_key};
 
 impl OntologyEngine {
-    /// Register or evolve an entity type definition.
-    ///
-    /// - **First registration** (id unknown for the tenant): behaves identically
-    ///   to [`register_entity_type`](Self::register_entity_type) — inserts the
-    ///   definition and returns `Ok(id)`. `DuplicateEntityType` is never
-    ///   returned by this method.
-    /// - **Evolution** (id already registered): requires
-    ///   `definition.revision > stored.revision` (strict monotonicity) and that
-    ///   every prior property is retained with an unchanged frozen quadruple
-    ///   (`tier`, `data_class`, `required`, `value_type` — `Some` immutable,
-    ///   `None` -> `Some` rejected alike). New properties must be optional
-    ///   (`required: false`), and the pillar annotation is immutable. On
-    ///   success the stored definition is replaced with `definition`.
+    /// Register or evolve an entity type definition. An id unknown for the
+    /// tenant is a first registration and `DuplicateEntityType` is never
+    /// returned here.
     ///
     /// # Errors
     ///
     /// | Error | Condition |
     /// |-------|-----------|
-    /// | [`OntologyEngineError::InvalidTenantId`] | Tenant id fails prefix check. |
-    /// | [`OntologyEngineError::EmptyDisplayName`] | `display_name` is blank. |
-    /// | [`OntologyEngineError::EmptyProperties`] | `properties` is empty. |
-    /// | [`OntologyEngineError::EmptyPropertyName`] | A property name is blank. |
+    /// | [`OntologyEngineError::DesignatedPropertyNotDeclared`] | A primary-key or title designation names no declared property. |
+    /// | [`OntologyEngineError::PrimaryKeyPropertyNotRequired`] | The designated primary-key property is optional. |
+    /// | [`OntologyEngineError::BlankDisplayField`] | A present display field is blank. |
+    /// | [`OntologyEngineError::InvalidValueType`] | A `value_type` declaration fails validation. |
+    /// | [`OntologyEngineError::ValueTypeTierMismatch`] | A `value_type` projection differs from the stated tier. |
     /// | [`OntologyEngineError::NonMonotonicRevision`] | `definition.revision <= stored.revision`. |
-    /// | [`OntologyEngineError::IncompatibleSchemaEvolution`] | A prior property was removed or its quadruple (tier, data class, required, value type) mutated, or a new property is `required`. |
     /// | [`OntologyEngineError::PillarChangedOnEvolution`] | The pillar annotation differs from the stored definition's. |
+    /// | [`OntologyEngineError::PrimaryKeyChangedOnEvolution`] | An already-set primary-key designation changed or was removed. |
+    /// | [`OntologyEngineError::IncompatibleSchemaEvolution`] | A prior property was removed or its frozen quadruple mutated, or a new property is `required`. |
     pub fn evolve_entity_type(
         &mut self,
         definition: EntityTypeDefinition,
@@ -53,33 +45,24 @@ impl OntologyEngine {
         let key = ontology_scoped_key(&definition.tenant_id, &definition.id.value);
         match self.entity_types.get(&key) {
             None => {
-                // First registration: identical to register_entity_type.
                 let id = definition.id.clone();
                 self.retain_entity_type_revision(&definition);
                 self.entity_types.insert(key, definition);
                 Ok(id)
             }
             Some(stored) => {
-                // Revision monotonicity check.
                 if definition.revision <= stored.revision {
                     return Err(OntologyEngineError::NonMonotonicRevision);
                 }
-                // Pillar immutability: link types were endpoint-validated
-                // against the stored pillar; changing it would void the
-                // CrossPillarLink guarantee for existing link types.
                 if definition.pillar != stored.pillar {
                     return Err(OntologyEngineError::PillarChangedOnEvolution);
                 }
-                // Primary-key immutability: adopting a key (None -> Some) is
-                // allowed; changing or removing a set key re-keys the
-                // population, a breaking change.
                 if stored.primary_key_property.is_some()
                     && definition.primary_key_property != stored.primary_key_property
                 {
                     return Err(OntologyEngineError::PrimaryKeyChangedOnEvolution);
                 }
-                // Backward-compatibility check.
-                check_schema_compatibility(stored, &definition)?;
+                check_property_compatibility(stored, &definition)?;
                 let id = definition.id.clone();
                 self.retain_entity_type_revision(&definition);
                 self.entity_types.insert(key, definition);
@@ -89,23 +72,18 @@ impl OntologyEngine {
     }
 }
 
+/// Additive-only property compatibility between two revisions of one entity
+/// type.
 ///
-/// Rules:
-/// - Every property in `prior` must exist in `candidate` with identical
-///   `tier`, `data_class`, and `required` flag.
-/// - New properties in `candidate` that are absent from `prior` must be
-///   optional (`required: false`): every object projected under `prior`
-///   lacks them, so a required new property would invalidate the existing
-///   population.
-/// - The `value_type` declaration is part of the frozen quadruple: `Some`
-///   is immutable, and `None -> Some` in-place typing is rejected — the
-///   blessed idiom is a NEW optional typed property.
-/// - Revision monotonicity is **not** checked here; the caller is responsible.
-pub(crate) fn check_schema_compatibility(
+/// A new property must be optional because every object projected under
+/// `prior` lacks it, so a required one would invalidate the existing
+/// population. `value_type` is frozen in both directions: `None -> Some`
+/// in-place typing is rejected too, and the blessed idiom for adopting a
+/// type is a NEW optional typed property.
+pub(crate) fn check_property_compatibility(
     prior: &EntityTypeDefinition,
     candidate: &EntityTypeDefinition,
 ) -> Result<(), OntologyEngineError> {
-    // Build a lookup map from the candidate's property list.
     let candidate_map: std::collections::BTreeMap<&str, &EntityTypePropertyDefinition> = candidate
         .properties
         .iter()

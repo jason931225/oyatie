@@ -7,47 +7,46 @@ use super::identifiers::{ActionTypeId, AutonomyTier, EntityTypeId, validate_onto
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionTypeDefinition {
-    pub tenant_id: String,               // data_class: INTERNAL_ONLY
-    pub id: ActionTypeId,                // data_class: INTERNAL_ONLY
-    pub entity_type: EntityTypeId,       // data_class: INTERNAL_ONLY
-    pub surface: String,                 // data_class: INTERNAL_ONLY
-    pub max_autonomy_tier: AutonomyTier, // data_class: INTERNAL_ONLY
-    pub audit_event_type: String,        // data_class: INTERNAL_ONLY
-    pub revision: u32,                   // data_class: INTERNAL_ONLY
-    /// Rendering hints; freely evolvable.
-    pub display: Option<crate::display::DisplayMetadata>, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub id: ActionTypeId,
+    pub entity_type: EntityTypeId,
+    pub surface: String,
+    pub max_autonomy_tier: AutonomyTier,
+    pub audit_event_type: String,
+    pub revision: u32,
+    pub display: Option<crate::display::DisplayMetadata>,
     /// Declared parameter schema. Empty means the action takes no
     /// parameters; submissions carrying any value are then non-conformant.
-    pub parameters: Vec<ActionParameterDefinition>, // data_class: INTERNAL_ONLY
+    pub parameters: Vec<ActionParameterDefinition>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionPolicyDecision {
-    pub decision_id: String,           // data_class: INTERNAL_ONLY
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub principal_id: String,          // data_class: INTERNAL_ONLY
-    pub allowed_surfaces: Vec<String>, // data_class: INTERNAL_ONLY
-    pub autonomy_tier: AutonomyTier,   // data_class: INTERNAL_ONLY
+    pub decision_id: String,
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub allowed_surfaces: Vec<String>,
+    pub autonomy_tier: AutonomyTier,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionInvocationRequest {
-    pub tenant_id: String,               // data_class: INTERNAL_ONLY
-    pub principal_id: String,            // data_class: INTERNAL_ONLY
-    pub action_id: ActionTypeId,         // data_class: INTERNAL_ONLY
-    pub entity_id: String,               // data_class: INTERNAL_ONLY
-    pub idempotency_key: String,         // data_class: INTERNAL_ONLY
-    pub requested_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub action_id: ActionTypeId,
+    pub entity_id: String,
+    pub idempotency_key: String,
+    pub requested_at_epoch_seconds: u64,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionInvocationReceipt {
-    pub decision_id: String,            // data_class: INTERNAL_ONLY
-    pub tenant_id: String,              // data_class: INTERNAL_ONLY
-    pub principal_id: String,           // data_class: INTERNAL_ONLY
-    pub action_id: String,              // data_class: INTERNAL_ONLY
-    pub entity_id: String,              // data_class: INTERNAL_ONLY
-    pub idempotency_key: String,        // data_class: INTERNAL_ONLY
-    pub audit_event_type: String,       // data_class: INTERNAL_ONLY
-    pub occurred_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
-    pub schema_version: u32,            // data_class: INTERNAL_ONLY
+    pub decision_id: String,
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub action_id: String,
+    pub entity_id: String,
+    pub idempotency_key: String,
+    pub audit_event_type: String,
+    pub occurred_at_epoch_seconds: u64,
+    pub schema_version: u32,
 }
 
 impl ActionTypeDefinition {
@@ -82,14 +81,11 @@ impl ActionTypeDefinition {
         })
     }
 
-    /// Attach rendering hints. Returns `self` for chaining.
     pub fn with_display(mut self, display: crate::display::DisplayMetadata) -> Self {
         self.display = Some(display);
         self
     }
 
-    /// Attach the declared parameter schema. Returns `self` for chaining,
-    /// mirroring [`EntityTypeDefinition::with_pillar`].
     pub fn with_parameters(mut self, parameters: Vec<ActionParameterDefinition>) -> Self {
         self.parameters = parameters;
         self

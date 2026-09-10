@@ -1,28 +1,8 @@
-// ADR-0083 Tier 3: integration tests use `.expect()` / `.unwrap()` to assert
-// invariant setup; these are intentional under the cfg(test) exemption.
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
-//! RED tests for the ontology-kernel-link-action-validation slice.
-//!
-//! Acceptance criteria exercised here (subtasks st1 / st2):
-//!
-//! st1 – endpoint-reference validation
-//!  • link_type_with_dangling_from_endpoint_cross_tenant_rejected
-//!  • link_type_with_dangling_to_endpoint_cross_tenant_rejected
-//!  • action_type_with_dangling_entity_type_cross_tenant_rejected
-//!  • self_referential_link_type_with_both_endpoints_registered_accepted
-//!
-//! st2 – pillar-consistency + cardinality accessor surface
-//!  • registered_link_type_is_queryable_via_accessor
-//!  • registered_action_type_is_queryable_via_accessor
-//!  • link_type_returns_none_for_unregistered_id
-//!  • action_type_returns_none_for_unregistered_id
-//!
-//! These tests reference `OntologyEngine::link_type` and
-//! `OntologyEngine::action_type` query accessors that do not yet exist on the
-//! public API, ensuring they fail (RED) until the accessor methods are added.
+//! Endpoint-reference validation for link and action type registration.
 
-#[path = "link_action_invariants_support.rs"]
+#[path = "link_action_support/mod.rs"]
 mod support;
 use support::*;
 
@@ -148,7 +128,6 @@ fn self_referential_link_type_with_both_endpoints_registered_accepted() {
 }
 
 // ---------------------------------------------------------------------------
-// st1/st2 – query accessor surface (RED: methods don't exist yet)
 //
 // `OntologyEngine::link_type(tenant_id, id)` and
 // `OntologyEngine::action_type(tenant_id, id)` mirror the existing
@@ -182,7 +161,6 @@ fn registered_link_type_is_queryable_via_accessor() {
         )
         .unwrap();
 
-    // RED: `link_type` accessor does not exist yet.
     let stored = engine
         .link_type("ten_retail", &link_id)
         .expect("registered link type must be queryable");

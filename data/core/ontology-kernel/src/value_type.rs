@@ -2,8 +2,6 @@
 //! describes what a property or parameter value must be, and
 //! [`ValueTypeDeclaration::admits_value`] walks a value in lockstep with its
 //! declaration — zero coercion, value depth bounded by declaration depth.
-//!
-//! Lane 2 of the design of record; consumed by no engine path yet.
 
 use crate::property::PropertyTier;
 use crate::value::{PropertyValue, ValueTypeError};
@@ -40,9 +38,9 @@ impl ScalarType {
 /// One declared field of a struct schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StructFieldDeclaration {
-    pub name: String, // data_class: INTERNAL_ONLY
+    pub name: String,
     pub value_type: ValueTypeDeclaration,
-    pub required: bool, // data_class: INTERNAL_ONLY
+    pub required: bool,
 }
 
 /// A named-field schema for struct values. Non-empty, with unique,
@@ -212,8 +210,7 @@ impl ValueTypeDeclaration {
 impl crate::definitions::EntityTypePropertyDefinition {
     /// A typed property definition: the tier is DERIVED from the
     /// declaration's projection, so tier/type incoherence is
-    /// unrepresentable here. (Lives here rather than `definitions.rs`
-    /// purely for the file-budget split.)
+    /// unrepresentable here.
     pub fn typed(
         name: impl Into<String>,
         value_type: ValueTypeDeclaration,

@@ -1,14 +1,6 @@
 //! Instance-vs-type conformance: validate an [`ObjectEntity`](crate::ObjectEntity)
 //! against the [`EntityTypeDefinition`](crate::EntityTypeDefinition) registered
 //! for its tenant.
-//!
-//! # The identity join
-//!
-//! A conformant instance carries the registered [`EntityTypeId`](crate::EntityTypeId)
-//! **value** (`ety_`-prefixed) as its `entity_type`, and a `ten_`-prefixed
-//! tenant id — the same `(tenant_id, type id)` key the registry uses. An
-//! entity written with any other vocabulary resolves to no definition and is
-//! rejected with [`OntologyEngineError::UnknownEntityType`](crate::OntologyEngineError::UnknownEntityType).
 
 use data_boundary_kernel::DataClassification;
 
@@ -23,7 +15,7 @@ impl OntologyEngine {
     /// Check that `entity` conforms to the entity type definition registered
     /// for `(entity.tenant_id, entity.entity_type)`.
     ///
-    /// Fail-closed contract, in check order:
+    /// Fail-closed contract:
     ///
     /// | Error | Condition |
     /// |-------|-----------|
@@ -76,7 +68,7 @@ impl OntologyEngine {
     /// schema declared by the action type registered for
     /// `(tenant_id, action_id)`.
     ///
-    /// Fail-closed contract, in check order:
+    /// Fail-closed contract:
     ///
     /// | Error | Condition |
     /// |-------|-----------|

@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: tests use `.unwrap()` / `.expect()` under the cfg(test) exemption.
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
 //! Acceptance tests for the ontology-kernel-link-instance-cardinality-enforcement slice.
@@ -13,10 +12,6 @@ use data_ontology_kernel::{
     PropertyTier,
 };
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
 fn internal() -> PrivacyDataClass {
     PrivacyDataClass::try_from(DataClass::InternalOnly).unwrap()
 }
@@ -29,15 +24,13 @@ fn entity(tenant: &str, id: &str) -> EntityTypeDefinition {
     EntityTypeDefinition::new(
         tenant,
         EntityTypeId::new(id).unwrap(),
-        id, // display_name equals id for brevity
+        id,
         vec![prop("name")],
         1,
     )
     .unwrap()
 }
 
-/// Build an engine with one registered link type `lty_edge` (OneToOne by default).
-/// Returns `(engine, link_type_id)`.
 fn engine_with_link_type(cardinality: LinkCardinality) -> (OntologyEngine, LinkTypeId) {
     let mut engine = OntologyEngine::default();
     engine
@@ -62,9 +55,11 @@ fn engine_with_link_type(cardinality: LinkCardinality) -> (OntologyEngine, LinkT
     (engine, link_id)
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+#[derive(Clone, Copy, Debug)]
+enum SecondEdge {
+    Outbound,
+    Inbound,
+}
 
 /// Calling `register_link_instance` with a `LinkTypeId` that was never registered
 /// for the tenant must return `UnknownLinkType`.
@@ -80,107 +75,61 @@ fn unknown_link_type_rejected() {
     );
 }
 
-/// OneToOne: inserting a second outbound edge from the same `from_entity_id`
-/// (to a *different* to) must be rejected.
+/// Every cardinality against both shapes of a second edge laid beside the
+/// first `(ent_a, ent_b)`: a second OUTBOUND edge from `ent_a`, and a second
+/// INBOUND edge into `ent_b`.
 #[test]
-fn one_to_one_second_from_rejected() {
-    let (mut engine, link_id) = engine_with_link_type(LinkCardinality::OneToOne);
-
-    // First edge: ok.
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_b"),
-        Ok(LinkInstanceOutcome::Registered)
-    );
-
-    // Second edge: same from, different to → violation.
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_c"),
-        Err(OntologyEngineError::CardinalityViolation {
-            cardinality: LinkCardinality::OneToOne
-        }),
-        "OneToOne must reject a second outbound edge from the same from_entity_id"
-    );
-}
-
-/// OneToOne: inserting a second inbound edge into the same `to_entity_id`
-/// (from a *different* from) must be rejected.
-#[test]
-fn one_to_one_second_to_rejected() {
-    let (mut engine, link_id) = engine_with_link_type(LinkCardinality::OneToOne);
-
-    // First edge: ok.
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_b"),
-        Ok(LinkInstanceOutcome::Registered)
-    );
-
-    // Second edge: different from, same to → violation.
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_c", "ent_b"),
-        Err(OntologyEngineError::CardinalityViolation {
-            cardinality: LinkCardinality::OneToOne
-        }),
-        "OneToOne must reject a second inbound edge into the same to_entity_id"
-    );
-}
-
-/// OneToMany: fan-out from the same `from_entity_id` to multiple distinct `to_entity_id`s
-/// must all succeed.
-#[test]
-fn one_to_many_fan_out_allowed() {
-    let (mut engine, link_id) = engine_with_link_type(LinkCardinality::OneToMany);
-
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_b"),
-        Ok(LinkInstanceOutcome::Registered)
-    );
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_c"),
-        Ok(LinkInstanceOutcome::Registered),
-        "OneToMany must allow fan-out from the same from_entity_id"
-    );
-}
-
-/// OneToMany: inserting a second inbound edge into the same `to_entity_id`
-/// (from a different from) must be rejected.
-#[test]
-fn one_to_many_second_into_rejected() {
-    let (mut engine, link_id) = engine_with_link_type(LinkCardinality::OneToMany);
-
-    // First edge.
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_b"),
-        Ok(LinkInstanceOutcome::Registered)
-    );
-
-    // Different from, same to → inbound violation.
-    assert_eq!(
-        engine.register_link_instance("ten_t", &link_id, "ent_c", "ent_b"),
-        Err(OntologyEngineError::CardinalityViolation {
-            cardinality: LinkCardinality::OneToMany
-        }),
-        "OneToMany must reject a second inbound edge into the same to_entity_id"
-    );
-}
-
-/// ManyToMany: all combinations of from/to must be accepted with no violations.
-#[test]
-fn many_to_many_all_allowed() {
-    let (mut engine, link_id) = engine_with_link_type(LinkCardinality::ManyToMany);
-
-    let pairs = [
-        ("ent_a", "ent_b"),
-        ("ent_a", "ent_c"),
-        ("ent_b", "ent_a"),
-        ("ent_b", "ent_c"),
-        ("ent_c", "ent_a"),
+fn cardinality_governs_the_second_edge() {
+    let violation = |cardinality| Err(OntologyEngineError::CardinalityViolation { cardinality });
+    let registered = || Ok(LinkInstanceOutcome::Registered);
+    let rows = [
+        (
+            LinkCardinality::OneToOne,
+            SecondEdge::Outbound,
+            violation(LinkCardinality::OneToOne),
+        ),
+        (
+            LinkCardinality::OneToOne,
+            SecondEdge::Inbound,
+            violation(LinkCardinality::OneToOne),
+        ),
+        (
+            LinkCardinality::OneToMany,
+            SecondEdge::Outbound,
+            registered(),
+        ),
+        (
+            LinkCardinality::OneToMany,
+            SecondEdge::Inbound,
+            violation(LinkCardinality::OneToMany),
+        ),
+        (
+            LinkCardinality::ManyToMany,
+            SecondEdge::Outbound,
+            registered(),
+        ),
+        (
+            LinkCardinality::ManyToMany,
+            SecondEdge::Inbound,
+            registered(),
+        ),
     ];
 
-    for (from, to) in pairs {
+    for (cardinality, second, expected) in rows {
+        let (mut engine, link_id) = engine_with_link_type(cardinality);
+        assert_eq!(
+            engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_b"),
+            registered(),
+            "{cardinality:?}: the first edge must always register"
+        );
+        let (from, to) = match second {
+            SecondEdge::Outbound => ("ent_a", "ent_c"),
+            SecondEdge::Inbound => ("ent_c", "ent_b"),
+        };
         assert_eq!(
             engine.register_link_instance("ten_t", &link_id, from, to),
-            Ok(LinkInstanceOutcome::Registered),
-            "ManyToMany must allow all combinations; failed on ({from}, {to})"
+            expected,
+            "{cardinality:?} with a second {second:?} edge ({from}, {to})"
         );
     }
 }
@@ -191,20 +140,15 @@ fn many_to_many_all_allowed() {
 fn idempotent_reinsert_returns_already_exists() {
     let (mut engine, link_id) = engine_with_link_type(LinkCardinality::OneToOne);
 
-    // First insert.
     assert_eq!(
         engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_b"),
         Ok(LinkInstanceOutcome::Registered)
     );
-
-    // Identical insert: must be idempotent.
     assert_eq!(
         engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_b"),
         Ok(LinkInstanceOutcome::AlreadyExists),
         "re-inserting the identical edge tuple must return AlreadyExists"
     );
-
-    // OneToOne: a genuinely new edge from the same from must still be rejected (indices unchanged).
     assert_eq!(
         engine.register_link_instance("ten_t", &link_id, "ent_a", "ent_c"),
         Err(OntologyEngineError::CardinalityViolation {

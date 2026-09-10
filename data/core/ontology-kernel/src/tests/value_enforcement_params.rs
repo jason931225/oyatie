@@ -1,4 +1,4 @@
-//! Lane-5 pins, parameter plane: declared value types on action
+//! Parameter plane: declared value types on action
 //! parameters are enforced as the final conformance step, mirroring the
 //! property plane — same `None`-requires-`String` rule, same precedence.
 
@@ -148,8 +148,6 @@ fn untyped_parameter_requires_string_carrier() {
     );
 }
 
-/// The pre-existing parameter data-class check still wins over the value
-/// check.
 #[test]
 fn parameter_data_class_mismatch_precedes_value_check() {
     let engine = engine_with_action(vec![

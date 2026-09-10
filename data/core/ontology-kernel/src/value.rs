@@ -1,9 +1,4 @@
 //! The typed value plane: [`PropertyValue`] and its scalar carriers.
-//!
-//! Design of record: the 2026-08-30 value-model panel synthesis. Doubles are
-//! finite-only and stored as a monotone key so the derived `Eq`/`Ord`/`Hash`
-//! agree with IEEE numeric order; dates are validated proleptic Gregorian;
-//! nothing here is consumed by the engine yet (lane 1 of 6).
 
 use std::collections::BTreeMap;
 
@@ -58,8 +53,6 @@ impl FiniteDouble {
         }
     }
 
-    /// The monotone key itself — ordering this `u64` ascending orders the
-    /// doubles numerically. The future property index sorts by it directly.
     pub const fn sort_key(self) -> u64 {
         self.0
     }
@@ -107,8 +100,7 @@ const fn days_in_month(year: i32, month: u8) -> u8 {
     }
 }
 
-/// SQLite-affinity storage class of a value — the future adapters and
-/// property index key off it 1:1.
+/// SQLite-affinity storage class of a value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StorageClass {
     Integer,

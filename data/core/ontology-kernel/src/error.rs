@@ -1,4 +1,4 @@
-//! The engine-level error vocabulary shared by every kernel operation.
+//! The engine-level error vocabulary.
 
 use crate::definitions::LinkCardinality;
 
@@ -32,21 +32,18 @@ pub enum OntologyEngineError {
     /// action types that reference them.
     UnknownEntityTypeEndpoint,
     /// A `LinkTypeDefinition` binds an org-pillar endpoint to a person-pillar
-    /// endpoint (or vice versa), violating Bominal-ADR-0132 org/person
-    /// isolation. Both endpoints must share the same [`OntologyPillar`](crate::OntologyPillar), or at
-    /// least one must be pillar-agnostic (`pillar: None`).
+    /// endpoint (or vice versa). Both endpoints must share the same
+    /// [`OntologyPillar`](crate::OntologyPillar), or at least one must be
+    /// pillar-agnostic (`pillar: None`).
     CrossPillarLink,
     /// The candidate revision is not strictly greater than the stored revision.
     /// [`OntologyEngine::evolve_entity_type`](crate::OntologyEngine::evolve_entity_type) requires
     /// `candidate.revision > stored.revision`.
     NonMonotonicRevision,
     /// The candidate definition removes or mutates an existing property, or
-    /// introduces a new property with `required: true`.
-    /// [`OntologyEngine::evolve_entity_type`](crate::OntologyEngine::evolve_entity_type) only allows additive changes:
-    /// every prior property must remain with unchanged `tier`, `data_class`,
-    /// and `required` flag, and a new property must be optional — every
-    /// object projected under the prior revision lacks it, so a required
-    /// new property would invalidate the existing population.
+    /// introduces a new property with `required: true`. Every object
+    /// projected under the prior revision lacks a newly declared property,
+    /// so a required one would invalidate the existing population.
     IncompatibleSchemaEvolution,
     /// The candidate definition changes the stored [`OntologyPillar`](crate::OntologyPillar)
     /// annotation (including adding or removing it). Link types were
@@ -66,10 +63,7 @@ pub enum OntologyEngineError {
         field: String,
     },
     /// An evolution candidate changes a field that is frozen for its
-    /// definition kind: link endpoints, cardinality, or cross-tenant flag;
-    /// an action's entity type, surface, autonomy ceiling, or audit event
-    /// type; or any existing parameter's quadruple. The field label names
-    /// the frozen field.
+    /// definition kind.
     FrozenFieldChangedOnEvolution {
         /// Static label of the frozen field that differed.
         field: String,
@@ -103,8 +97,8 @@ pub enum OntologyEngineError {
         name: String,
     },
     /// The candidate definition changes an already-set primary-key
-    /// designation (including removing it). Re-keying a population is a
-    /// breaking change; adopting a key where none was set remains allowed.
+    /// designation (including removing it); adopting a key where none was
+    /// set remains allowed.
     PrimaryKeyChangedOnEvolution,
     /// An [`ActionParameterDefinition`](crate::ActionParameterDefinition)
     /// was constructed with a blank name.

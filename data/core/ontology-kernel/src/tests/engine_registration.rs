@@ -127,122 +127,124 @@ fn ontology_engine_gates_action_invocation_by_policy_and_autonomy() {
     assert_eq!(too, OntologyEngineError::AutonomyTierExceeded);
 }
 
-// --- st1: endpoint-reference validation tests ---
+mod endpoint_reference_validation {
+    use super::*;
 
-#[test]
-fn link_type_with_dangling_from_endpoint_rejected() {
-    let mut engine = OntologyEngine::default();
-    // Register only the "to" entity type; "from" is missing.
-    engine
-        .register_entity_type(
-            EntityTypeDefinition::new(
-                "ten_clinic",
-                EntityTypeId::new("ety_appointment").unwrap(),
-                "Appointment",
-                vec![property("starts_at")],
-                1,
+    #[test]
+    fn link_type_with_dangling_from_endpoint_rejected() {
+        let mut engine = OntologyEngine::default();
+        // Register only the "to" entity type; "from" is missing.
+        engine
+            .register_entity_type(
+                EntityTypeDefinition::new(
+                    "ten_clinic",
+                    EntityTypeId::new("ety_appointment").unwrap(),
+                    "Appointment",
+                    vec![property("starts_at")],
+                    1,
+                )
+                .unwrap(),
             )
-            .unwrap(),
+            .unwrap();
+        let link = LinkTypeDefinition::new(
+            "ten_clinic",
+            LinkTypeId::new("lty_missing_from").unwrap(),
+            EntityTypeId::new("ety_patient").unwrap(), // not registered
+            EntityTypeId::new("ety_appointment").unwrap(),
+            LinkCardinality::OneToMany,
+            false,
         )
         .unwrap();
-    let link = LinkTypeDefinition::new(
-        "ten_clinic",
-        LinkTypeId::new("lty_missing_from").unwrap(),
-        EntityTypeId::new("ety_patient").unwrap(), // not registered
-        EntityTypeId::new("ety_appointment").unwrap(),
-        LinkCardinality::OneToMany,
-        false,
-    )
-    .unwrap();
-    assert_eq!(
-        engine.register_link_type(link),
-        Err(OntologyEngineError::UnknownEntityTypeEndpoint)
-    );
-}
+        assert_eq!(
+            engine.register_link_type(link),
+            Err(OntologyEngineError::UnknownEntityTypeEndpoint)
+        );
+    }
 
-#[test]
-fn link_type_with_dangling_to_endpoint_rejected() {
-    let mut engine = OntologyEngine::default();
-    // Register only the "from" entity type; "to" is missing.
-    engine.register_entity_type(patient_type()).unwrap();
-    let link = LinkTypeDefinition::new(
-        "ten_clinic",
-        LinkTypeId::new("lty_missing_to").unwrap(),
-        EntityTypeId::new("ety_patient").unwrap(),
-        EntityTypeId::new("ety_appointment").unwrap(), // not registered
-        LinkCardinality::OneToMany,
-        false,
-    )
-    .unwrap();
-    assert_eq!(
-        engine.register_link_type(link),
-        Err(OntologyEngineError::UnknownEntityTypeEndpoint)
-    );
-}
-
-#[test]
-fn action_type_with_dangling_entity_type_rejected() {
-    let mut engine = OntologyEngine::default();
-    // No entity types registered at all.
-    let action = ActionTypeDefinition::new(
-        "ten_clinic",
-        ActionTypeId::new("aty_discharge").unwrap(),
-        EntityTypeId::new("ety_patient").unwrap(), // not registered
-        "ontology.action.discharge",
-        AutonomyTier::T1Assist,
-        "EVT-DISCHARGE",
-    )
-    .unwrap();
-    assert_eq!(
-        engine.register_action_type(action),
-        Err(OntologyEngineError::UnknownEntityTypeEndpoint)
-    );
-}
-
-#[test]
-fn valid_link_and_action_type_registers_after_endpoints_present() {
-    let mut engine = OntologyEngine::default();
-    let patient = engine.register_entity_type(patient_type()).unwrap();
-    let appointment = engine
-        .register_entity_type(
-            EntityTypeDefinition::new(
-                "ten_clinic",
-                EntityTypeId::new("ety_appointment").unwrap(),
-                "Appointment",
-                vec![property("starts_at")],
-                1,
-            )
-            .unwrap(),
+    #[test]
+    fn link_type_with_dangling_to_endpoint_rejected() {
+        let mut engine = OntologyEngine::default();
+        // Register only the "from" entity type; "to" is missing.
+        engine.register_entity_type(patient_type()).unwrap();
+        let link = LinkTypeDefinition::new(
+            "ten_clinic",
+            LinkTypeId::new("lty_missing_to").unwrap(),
+            EntityTypeId::new("ety_patient").unwrap(),
+            EntityTypeId::new("ety_appointment").unwrap(), // not registered
+            LinkCardinality::OneToMany,
+            false,
         )
         .unwrap();
-    // Both endpoints present: link type should register successfully.
-    let link_id = engine
-        .register_link_type(
-            LinkTypeDefinition::new(
-                "ten_clinic",
-                LinkTypeId::new("lty_patient_appointment").unwrap(),
-                patient.clone(),
-                appointment,
-                LinkCardinality::OneToMany,
-                false,
-            )
-            .unwrap(),
+        assert_eq!(
+            engine.register_link_type(link),
+            Err(OntologyEngineError::UnknownEntityTypeEndpoint)
+        );
+    }
+
+    #[test]
+    fn action_type_with_dangling_entity_type_rejected() {
+        let mut engine = OntologyEngine::default();
+        // No entity types registered at all.
+        let action = ActionTypeDefinition::new(
+            "ten_clinic",
+            ActionTypeId::new("aty_discharge").unwrap(),
+            EntityTypeId::new("ety_patient").unwrap(), // not registered
+            "ontology.action.discharge",
+            AutonomyTier::T1Assist,
+            "EVT-DISCHARGE",
         )
         .unwrap();
-    assert_eq!(link_id.value, "lty_patient_appointment");
-    // Endpoint present: action type should register successfully.
-    let action_id = engine
-        .register_action_type(
-            ActionTypeDefinition::new(
-                "ten_clinic",
-                ActionTypeId::new("aty_discharge").unwrap(),
-                patient,
-                "ontology.action.discharge",
-                AutonomyTier::T1Assist,
-                "EVT-DISCHARGE",
+        assert_eq!(
+            engine.register_action_type(action),
+            Err(OntologyEngineError::UnknownEntityTypeEndpoint)
+        );
+    }
+
+    #[test]
+    fn valid_link_and_action_type_registers_after_endpoints_present() {
+        let mut engine = OntologyEngine::default();
+        let patient = engine.register_entity_type(patient_type()).unwrap();
+        let appointment = engine
+            .register_entity_type(
+                EntityTypeDefinition::new(
+                    "ten_clinic",
+                    EntityTypeId::new("ety_appointment").unwrap(),
+                    "Appointment",
+                    vec![property("starts_at")],
+                    1,
+                )
+                .unwrap(),
             )
-            .unwrap(),
-        )
-        .unwrap();
-    assert_eq!(action_id.value, "aty_discharge");
+            .unwrap();
+        // Both endpoints present: link type should register successfully.
+        let link_id = engine
+            .register_link_type(
+                LinkTypeDefinition::new(
+                    "ten_clinic",
+                    LinkTypeId::new("lty_patient_appointment").unwrap(),
+                    patient.clone(),
+                    appointment,
+                    LinkCardinality::OneToMany,
+                    false,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(link_id.value, "lty_patient_appointment");
+        // Endpoint present: action type should register successfully.
+        let action_id = engine
+            .register_action_type(
+                ActionTypeDefinition::new(
+                    "ten_clinic",
+                    ActionTypeId::new("aty_discharge").unwrap(),
+                    patient,
+                    "ontology.action.discharge",
+                    AutonomyTier::T1Assist,
+                    "EVT-DISCHARGE",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(action_id.value, "aty_discharge");
+    }
 }

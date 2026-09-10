@@ -1,14 +1,10 @@
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 //! Ontology pillar: org/person isolation boundary.
 //!
 //! The Ontology substrate segments all typed objects into two mutually-exclusive
 //! pillars — `org` and `person` — per Bominal-ADR-0132 org/person pillar
-//! isolation. This enum is the canonical Rust representation of the `pillar`
-//! column constraint in `ontology.objects` (`CHECK (pillar IN ('org',
-//! 'person'))`).
+//! isolation.
 
 /// The two pillars that partition every Ontology object.
 ///

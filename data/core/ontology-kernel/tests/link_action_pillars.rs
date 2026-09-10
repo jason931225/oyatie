@@ -1,28 +1,8 @@
-// ADR-0083 Tier 3: integration tests use `.expect()` / `.unwrap()` to assert
-// invariant setup; these are intentional under the cfg(test) exemption.
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
-//! RED tests for the ontology-kernel-link-action-validation slice.
-//!
-//! Acceptance criteria exercised here (subtasks st1 / st2):
-//!
-//! st1 – endpoint-reference validation
-//!  • link_type_with_dangling_from_endpoint_cross_tenant_rejected
-//!  • link_type_with_dangling_to_endpoint_cross_tenant_rejected
-//!  • action_type_with_dangling_entity_type_cross_tenant_rejected
-//!  • self_referential_link_type_with_both_endpoints_registered_accepted
-//!
-//! st2 – pillar-consistency + cardinality accessor surface
-//!  • registered_link_type_is_queryable_via_accessor
-//!  • registered_action_type_is_queryable_via_accessor
-//!  • link_type_returns_none_for_unregistered_id
-//!  • action_type_returns_none_for_unregistered_id
-//!
-//! These tests reference `OntologyEngine::link_type` and
-//! `OntologyEngine::action_type` query accessors that do not yet exist on the
-//! public API, ensuring they fail (RED) until the accessor methods are added.
+//! Pillar consistency and the link/action query accessors.
 
-#[path = "link_action_invariants_support.rs"]
+#[path = "link_action_support/mod.rs"]
 mod support;
 use support::*;
 
@@ -49,7 +29,6 @@ fn registered_action_type_is_queryable_via_accessor() {
         )
         .unwrap();
 
-    // RED: `action_type` accessor does not exist yet.
     let stored = engine
         .action_type("ten_finance", &action_id)
         .expect("registered action type must be queryable");
@@ -68,7 +47,6 @@ fn link_type_returns_none_for_unregistered_id() {
     let engine = OntologyEngine::default();
     let unknown_id = LinkTypeId::new("lty_phantom").unwrap();
 
-    // RED: `link_type` accessor does not exist yet.
     assert!(
         engine.link_type("ten_x", &unknown_id).is_none(),
         "link_type must return None for an unregistered id"
@@ -81,7 +59,6 @@ fn action_type_returns_none_for_unregistered_id() {
     let engine = OntologyEngine::default();
     let unknown_id = ActionTypeId::new("aty_phantom").unwrap();
 
-    // RED: `action_type` accessor does not exist yet.
     assert!(
         engine.action_type("ten_x", &unknown_id).is_none(),
         "action_type must return None for an unregistered id"
@@ -123,7 +100,6 @@ fn action_type_on_person_pillar_entity_accepted_and_queryable() {
         )
         .expect("action type on person-pillar entity must be accepted");
 
-    // RED: `action_type` accessor does not exist yet.
     let stored = engine
         .action_type("ten_hr", &action_id)
         .expect("action type must be queryable after registration");

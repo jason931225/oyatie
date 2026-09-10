@@ -59,8 +59,6 @@ fn entity(properties: Vec<ObjectProperty>) -> ObjectEntity {
     .unwrap()
 }
 
-/// The conformant fast path: required property present, optional omitted,
-/// tier and data class matching the declaration.
 #[test]
 fn conformant_instance_accepted() {
     let engine = engine_with_profile_type();
@@ -70,9 +68,6 @@ fn conformant_instance_accepted() {
     );
 }
 
-/// The identity-join contract: a conformant instance carries the registered
-/// `EntityTypeId` value as its `entity_type` and a `ten_`-prefixed tenant.
-/// The legacy free-string vocabulary resolves to no definition.
 #[test]
 fn legacy_free_string_entity_type_is_unknown() {
     let engine = engine_with_profile_type();
@@ -89,7 +84,6 @@ fn legacy_free_string_entity_type_is_unknown() {
     );
 }
 
-/// A definition property with `required: true` must be present.
 #[test]
 fn missing_required_property_rejected() {
     let engine = engine_with_profile_type();
@@ -101,9 +95,6 @@ fn missing_required_property_rejected() {
     );
 }
 
-/// Fail-closed on vocabulary: a property the definition does not declare is
-/// rejected rather than ignored — additive-only evolution means a reader can
-/// always evolve the type first.
 #[test]
 fn undeclared_property_rejected() {
     let engine = engine_with_profile_type();
@@ -118,7 +109,6 @@ fn undeclared_property_rejected() {
     );
 }
 
-/// The instance property's tier must match the declared tier.
 #[test]
 fn property_tier_mismatch_rejected() {
     let engine = engine_with_profile_type();
@@ -136,13 +126,36 @@ fn property_tier_mismatch_rejected() {
     );
 }
 
-/// The instance property's data class must match the declared class.
 #[test]
 fn property_data_class_mismatch_rejected() {
     let engine = engine_with_profile_type();
     assert_eq!(
         engine.check_instance_conformance(&entity(vec![scalar_prop("name", pii())])),
         Err(OntologyEngineError::PropertyDataClassMismatch {
+            name: "name".into()
+        })
+    );
+}
+
+#[test]
+fn missing_required_property_outranks_a_fault_on_another_property() {
+    let engine = engine_with_profile_type();
+    assert_eq!(
+        engine.check_instance_conformance(&entity(vec![scalar_prop("email", internal())])),
+        Err(OntologyEngineError::MissingRequiredProperty {
+            name: "name".into()
+        })
+    );
+}
+
+#[test]
+fn property_tier_mismatch_outranks_data_class_mismatch() {
+    let engine = engine_with_profile_type();
+    let wrong_on_both =
+        ObjectProperty::new("name".into(), "value".into(), PropertyTier::Vector, pii());
+    assert_eq!(
+        engine.check_instance_conformance(&entity(vec![wrong_on_both])),
+        Err(OntologyEngineError::PropertyTierMismatch {
             name: "name".into()
         })
     );

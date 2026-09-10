@@ -26,9 +26,6 @@ fn def(revision: u32, extra: Vec<EntityTypePropertyDefinition>) -> EntityTypeDef
     .unwrap()
 }
 
-/// A NEW property introduced by evolution must be optional: every object
-/// already projected under the prior revision lacks it, so a required new
-/// property would invalidate the entire existing population.
 #[test]
 fn new_required_property_rejected_as_incompatible() {
     let mut engine = OntologyEngine::default();
@@ -41,7 +38,6 @@ fn new_required_property_rejected_as_incompatible() {
     );
 }
 
-/// A new OPTIONAL property remains the additive fast path.
 #[test]
 fn new_optional_property_still_accepted() {
     let mut engine = OntologyEngine::default();
@@ -60,7 +56,6 @@ fn new_optional_property_still_accepted() {
     );
 }
 
-/// The rejected candidate must not replace the stored definition.
 #[test]
 fn stored_definition_unchanged_after_required_property_rejection() {
     let mut engine = OntologyEngine::default();
@@ -89,9 +84,6 @@ fn pillar_def(revision: u32, pillar: Option<OntologyPillar>) -> EntityTypeDefini
     }
 }
 
-/// Changing the pillar annotation on evolve is rejected: link types were
-/// endpoint-validated against the stored pillar at registration time, and a
-/// pillar change would silently void that CrossPillarLink guarantee.
 #[test]
 fn pillar_change_on_evolve_rejected() {
     for (from, to) in [
@@ -111,7 +103,6 @@ fn pillar_change_on_evolve_rejected() {
     }
 }
 
-/// An unchanged pillar (including staying pillar-agnostic) evolves freely.
 #[test]
 fn unchanged_pillar_evolves_freely() {
     for pillar in [

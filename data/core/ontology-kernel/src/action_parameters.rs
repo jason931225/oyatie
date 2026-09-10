@@ -8,17 +8,15 @@ use crate::error::OntologyEngineError;
 use crate::property::PropertyTier;
 use crate::value_type::ValueTypeDeclaration;
 
-/// One declared parameter of an action type: name, tier, data class, and
-/// whether a submission must carry it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionParameterDefinition {
-    pub name: String,       // data_class: INTERNAL_ONLY
-    pub tier: PropertyTier, // data_class: INTERNAL_ONLY
+    pub name: String,
+    pub tier: PropertyTier,
     pub data_class: PrivacyDataClass,
-    pub required: bool, // data_class: INTERNAL_ONLY
+    pub required: bool,
     /// Declared value type; `None` is the legacy string contract.
     /// Action types are register-once, so a declaration is immutable.
-    pub value_type: Option<ValueTypeDeclaration>, // data_class: INTERNAL_ONLY
+    pub value_type: Option<ValueTypeDeclaration>,
 }
 
 impl ActionParameterDefinition {
@@ -41,8 +39,8 @@ impl ActionParameterDefinition {
         })
     }
 
-    /// A typed parameter: the tier is DERIVED from the declaration's
-    /// projection, so tier/type incoherence is unrepresentable here.
+    /// The tier is DERIVED from the declaration's projection, so tier/type
+    /// incoherence is unrepresentable here.
     pub fn typed(
         name: impl Into<String>,
         value_type: ValueTypeDeclaration,

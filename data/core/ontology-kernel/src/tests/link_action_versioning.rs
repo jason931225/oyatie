@@ -64,8 +64,6 @@ fn param(name: &str, required: bool) -> ActionParameterDefinition {
     ActionParameterDefinition::new(name, PropertyTier::Scalar, internal(), required).unwrap()
 }
 
-/// Definitions are born at revision 1; a monotonic revision-only bump
-/// evolves; equal or lower revisions are refused; unknown ids are refused.
 #[test]
 fn link_evolution_is_monotonic_and_known_only() {
     let mut engine = engine_with_types();
@@ -96,7 +94,6 @@ fn link_evolution_is_monotonic_and_known_only() {
     );
 }
 
-/// Every semantic link field is frozen, each named in the refusal.
 #[test]
 fn link_semantic_fields_frozen() {
     let mut engine = engine_with_types();
@@ -133,9 +130,6 @@ fn link_semantic_fields_frozen() {
     }
 }
 
-/// Action evolution: frozen semantic fields; a new OPTIONAL parameter is
-/// the one admitted change; new required, removed, or mutated parameters
-/// are refused.
 #[test]
 fn action_parameter_law_mirrored() {
     let mut engine = engine_with_types();
