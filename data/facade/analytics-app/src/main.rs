@@ -1,13 +1,3 @@
-//! Analytics composition-root binary entry point.
-//!
-//! Reads config from environment variables, builds the adapter + app, and
-//! (once IP-015 lands) starts the HTTP listener.
-//!
-//! ## Honest-claims note
-//!
-//! non_claim: HTTP server start-up is deferred (IP-015). The binary exits 0
-//! after boot validation to enable smoke-test CI runs.
-
 #![forbid(unsafe_code)]
 
 use data_analytics_app::{AnalyticsApp, AnalyticsConfig};
@@ -34,7 +24,6 @@ fn main() {
                 tenant = %app.primary_tenant_id(),
                 "analytics service boot complete (HTTP listener deferred: IP-015)"
             );
-            // non_claim: HTTP serve loop is deferred. Exit 0 for smoke-test CI.
         }
         Err(e) => {
             tracing::error!(target: "data_analytics_app::boot", error = %e, "boot failed");

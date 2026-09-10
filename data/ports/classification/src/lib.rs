@@ -1,9 +1,7 @@
 //! Agreed cross-owner surface for data-classification values.
 //!
 //! This compatibility port gives other capabilities a provider-owned import
-//! path without forking Data's established value types. The legacy boundary
-//! core remains their defining crate until its package identity is migrated in
-//! a dedicated Data structural lane.
+//! path without forking Data's established value types.
 
 #![forbid(unsafe_code)]
 

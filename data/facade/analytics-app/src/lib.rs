@@ -1,16 +1,3 @@
-//! Analytics composition root (ADR-0083 layer 12, ADR-0193).
-//!
-//! Wires the kernel + adapter + domain + usecase + api into a runnable µservice.
-//!
-//! ## Honest-claims note
-//!
-//! Status is "planned". The [`AnalyticsApp`] struct holds the wired state;
-//! the HTTP listener is deferred (IP-015 follow-up; axum route mounting not yet
-//! scaffolded).
-//!
-//! non_claim: no live HTTP listener, no gRPC server, no production deployment.
-
-// ADR-0083 Tier 3: tests may use unwrap/expect/panic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -18,14 +5,10 @@ use std::fmt;
 
 use shared_olap_client_kernel::TenantId;
 
-/// Boot errors raised before the service starts listening.
 #[derive(Debug)]
 pub enum BootError {
-    /// The configured listen address is invalid.
     InvalidListenAddr(String),
-    /// A required configuration value is missing.
     MissingConfig(&'static str),
-    /// The tenant ID is syntactically invalid.
     InvalidTenantId(String),
 }
 
@@ -41,36 +24,33 @@ impl fmt::Display for BootError {
 
 impl std::error::Error for BootError {}
 
-/// Runtime configuration for the analytics service.
-///
-/// data_class: INTERNAL_ONLY
 #[derive(Clone, Debug)]
 pub struct AnalyticsConfig {
     pub listen_addr: String,
     pub clickhouse_url: String,
     pub clickhouse_user: String,
-    /// Sourced from OpenBao at runtime.
     /// data_class: INTERNAL_ONLY (secret)
     pub clickhouse_password: String,
-    /// Primary tenant ID for the composition root's serving context.
     pub primary_tenant_id: String,
 }
 
 impl AnalyticsConfig {
-    /// Validate the config. Returns [`BootError::MissingConfig`] for any empty field.
-    ///
+    fn non_empty_required_fields(&self) -> [(&'static str, &str); 3] {
+        [
+            ("listen_addr", &self.listen_addr),
+            ("clickhouse_url", &self.clickhouse_url),
+            ("clickhouse_user", &self.clickhouse_user),
+        ]
+    }
+
     /// # Errors
     /// Returns [`BootError::MissingConfig`] if any required field is empty, or
     /// [`BootError::InvalidTenantId`] if the tenant ID is syntactically invalid.
     pub fn validate(&self) -> Result<TenantId, BootError> {
-        if self.listen_addr.is_empty() {
-            return Err(BootError::MissingConfig("listen_addr"));
-        }
-        if self.clickhouse_url.is_empty() {
-            return Err(BootError::MissingConfig("clickhouse_url"));
-        }
-        if self.clickhouse_user.is_empty() {
-            return Err(BootError::MissingConfig("clickhouse_user"));
+        for (name, value) in self.non_empty_required_fields() {
+            if value.is_empty() {
+                return Err(BootError::MissingConfig(name));
+            }
         }
         let tenant_id = TenantId::try_new(&self.primary_tenant_id)
             .map_err(|e| BootError::InvalidTenantId(e.to_string()))?;
@@ -78,20 +58,12 @@ impl AnalyticsConfig {
     }
 }
 
-/// The wired analytics application. Holds the validated config and the
-/// validated tenant ID. The OLAP adapter is wired by `main.rs` at startup.
-///
-/// non_claim: HTTP server / gRPC server mounting is deferred (IP-015).
 pub struct AnalyticsApp {
     config: AnalyticsConfig,
     primary_tenant_id: TenantId,
 }
 
 impl AnalyticsApp {
-    /// Build the app from a validated config.
-    ///
-    /// # Errors
-    /// Returns [`BootError`] if config validation fails.
     pub fn new(config: AnalyticsConfig) -> Result<Self, BootError> {
         let primary_tenant_id = config.validate()?;
         Ok(Self {
@@ -100,22 +72,16 @@ impl AnalyticsApp {
         })
     }
 
-    /// Return the configured listen address.
     #[must_use]
     pub fn listen_addr(&self) -> &str {
         &self.config.listen_addr
     }
 
-    /// Return the validated primary tenant ID.
     #[must_use]
     pub fn primary_tenant_id(&self) -> &TenantId {
         &self.primary_tenant_id
     }
 }
-
-// =====================================================================
-// Tests
-// =====================================================================
 
 #[cfg(test)]
 mod tests {
@@ -139,6 +105,13 @@ mod tests {
             BootError::MissingConfig(key) => assert_eq!(key, "listen_addr"),
             other => panic!("wrong error: {other}"),
         }
+    }
+
+    #[test]
+    fn empty_password_is_not_a_missing_required_field() {
+        let mut cfg = valid_config();
+        cfg.clickhouse_password = String::new();
+        assert!(cfg.validate().is_ok());
     }
 
     #[test]

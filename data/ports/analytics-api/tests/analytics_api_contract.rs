@@ -1,5 +1,3 @@
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` /
-// `.expect_err()` / `.unwrap_err()` to assert invariants — Tier 3 exemption.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::{Path, PathBuf};
@@ -12,9 +10,9 @@ use shared_olap_client_kernel::KernelError;
 
 /// The runtime constants must equal the paths the CATALOG declares, not a second copy of
 /// them written here. Hard-coding the expected strings made this test vacuous against the
-/// defect it exists to catch: retargeting `data/analytics/catalog/contracts.json` without a
-/// matching constant change left the test green while the constants pointed at the old
-/// location. Reading the catalog is what makes a retarget fail here.
+/// defect it exists to catch: retargeting the catalog without a matching constant change
+/// left the test green while the constants pointed at the old location. Reading the catalog
+/// is what makes a retarget fail here.
 #[test]
 fn analytics_api_contract_runtime_constants_match_the_catalog() {
     let catalog_path = repo_root().join("data/ports/analytics-api/contracts/contracts.json");
@@ -94,7 +92,6 @@ fn declared_contract(env_key: &str, relative: &str) -> PathBuf {
     }
 }
 
-/// Contract paths must resolve under the data/ capability root (Wave-2 hygiene).
 #[test]
 fn analytics_api_contract_files_exist_under_data_root() {
     for (env_key, rel) in [

@@ -1,13 +1,3 @@
-//! Tenant bootstrap controller binary entry point.
-//!
-//! Subscribes to tenancy lifecycle events and reconciles per-tenant ClickHouse
-//! state. Event source (Kafka) wiring is deferred per IP-002.
-//!
-//! ## Honest-claims note
-//!
-//! non_claim: Kafka consumer and live reconciliation are deferred (IP-002).
-//! The binary performs a boot-validation check then exits 0 for smoke-test CI.
-
 #![forbid(unsafe_code)]
 
 use data_analytics_tenant_bootstrap_app::TenantBootstrapController;
@@ -35,5 +25,4 @@ fn main() {
         target: "data_analytics_tenant_bootstrap_app::boot",
         "tenant bootstrap controller boot complete (Kafka consumer deferred: IP-002)"
     );
-    // non_claim: event-loop start is deferred. Exit 0 for smoke-test CI.
 }
