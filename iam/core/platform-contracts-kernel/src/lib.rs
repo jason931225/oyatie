@@ -1,39 +1,7 @@
-//! # shared-platform-contracts-kernel
-//!
-//! FD-001 shared platform contract models — the contract-lock seed for the
-//! tenancy/RBAC microservice core (`FD-001-tenancy-rbac-microservice-core`).
-//!
-//! ## Posture (Smithy-architecture seed)
-//! AWS models every service API as typed, protocol-agnostic shapes first
-//! (Smithy), then derives wire bindings from the locked model. This crate is
-//! that seed reimplemented as plain Rust per the owned-Rust-stack directive:
-//! pure `serde` types + explicit invariants, NO handlers, NO IO, NO transport
-//! coupling. The masterplan rule `api_first_contracts_must_exist_before_handlers`
-//! makes this crate the lock that parallel service lanes build against.
-//!
-//! ## Contract families
-//! - [`identity`] — principal, credential, token claims, identity domain
-//!   (precedent: AWS IAM / Google Cloud IAM identity models, SPIFFE workload
-//!   identity, RFC 7519/RFC 9068 token claims).
-//! - [`pdp`] — authorization request/response with decision id and an opaque
-//!   policy-version freshness token (precedent: Google Zanzibar "zookie"
-//!   consistency tokens; Cedar/AVP policy-store version pinning).
-//! - [`tenancy`] — tenant resource, lifecycle states, isolation posture
-//!   (precedent: AWS SaaS Well-Architected silo/pool/bridge isolation models,
-//!   cell-based architecture).
-//! - [`shell_bff`] — capability registry entry + module route registration for
-//!   the app-shell backend-for-frontend (precedent: SoundCloud/Netflix BFF,
-//!   micro-frontend route registries).
-//!
-//! ## Cedar seed
-//! The `cedar/` directory carries the FD-001 entity-type schema (Tenant,
-//! Principal, WorkloadIdentity, TenantResource), the structural cell/tenant
-//! isolation `forbid` invariant, and example RBAC/ABAC/PBAC policies. The
-//! integration tests validate all of it against the real `cedar-policy` engine
-//! (dev-dependency only; the production surface of this crate stays Cedar-free
-//! per ADR-0183 policy-engine separation).
-//!
-//! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
+//! Protocol-agnostic shapes for the shared platform contracts, modelled ahead of
+//! any handler that serves them: `serde` types plus their invariants, with no
+//! IO and no transport coupling.
+
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -44,33 +12,42 @@ pub mod pdp;
 pub mod shell_bff;
 pub mod tenancy;
 
-/// A single contract-invariant violation. Validation is surface-all: every
-/// `validate()` in this crate returns the FULL violation set, never just the
-/// first failure (matching the repo gate style).
+/// A single contract-invariant violation. Every `validate()` in this crate
+/// surfaces ALL of them, never just the first, so a caller can report a whole
+/// bad request at once.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ContractViolation {
-    /// A required field is empty or absent.
-    MissingValue { field: &'static str },
-    /// A field exceeds its maximum length.
+    MissingValue {
+        field: &'static str,
+    },
     TooLong {
         field: &'static str,
         max: usize,
         actual: usize,
     },
-    /// A field contains characters outside its allowed charset.
-    InvalidCharset { field: &'static str, value: String },
-    /// A temporal invariant is violated (e.g. expiry not after issuance).
-    InvalidTemporalOrder { field: &'static str, detail: String },
-    /// A lifecycle transition that the state machine forbids.
+    InvalidCharset {
+        field: &'static str,
+        value: String,
+    },
+    /// e.g. an expiry that does not follow its issuance.
+    InvalidTemporalOrder {
+        field: &'static str,
+        detail: String,
+    },
     InvalidTransition {
         from: &'static str,
         operation: &'static str,
     },
-    /// A structural/shape invariant violation not covered by the above.
-    InvalidShape { field: &'static str, detail: String },
-    /// A cross-record referential invariant violation (duplicate id, dangling
-    /// reference, ambiguous route, cross-tenant/cell mismatch).
-    BrokenReference { field: &'static str, detail: String },
+    /// A shape invariant not covered by the variants above.
+    InvalidShape {
+        field: &'static str,
+        detail: String,
+    },
+    /// Duplicate id, dangling reference, ambiguous route, cross-tenant mismatch.
+    BrokenReference {
+        field: &'static str,
+        detail: String,
+    },
 }
 
 impl fmt::Display for ContractViolation {
@@ -100,19 +77,14 @@ impl fmt::Display for ContractViolation {
 
 impl std::error::Error for ContractViolation {}
 
-/// Maximum length for slug-form identifiers across all contract families.
 pub const MAX_ID_LEN: usize = 128;
-/// Maximum length for human-readable display names.
 pub const MAX_DISPLAY_NAME_LEN: usize = 256;
-/// Maximum length for opaque tokens (policy versions, page tokens, refs).
 pub const MAX_OPAQUE_TOKEN_LEN: usize = 512;
 
 fn is_slug_char(c: char) -> bool {
     c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '.' | '_')
 }
 
-/// Surface-all slug check: non-empty, starts with `[a-z0-9]`, charset
-/// `[a-z0-9._-]`, bounded length. Shared by every id-bearing contract field.
 pub(crate) fn check_slug(
     field: &'static str,
     value: &str,
@@ -142,7 +114,6 @@ pub(crate) fn check_slug(
     }
 }
 
-/// Surface-all check for non-empty bounded free text (display names etc.).
 pub(crate) fn check_text(
     field: &'static str,
     value: &str,
@@ -162,7 +133,6 @@ pub(crate) fn check_text(
     }
 }
 
-/// Surface-all check for an opaque non-empty bounded token.
 pub(crate) fn check_opaque_token(
     field: &'static str,
     value: &str,

@@ -1,24 +1,16 @@
 //! Decision-audit emission onto the tracing pipeline.
-//!
-//! [`TracingDecisionAuditSink`] bridges the kernel [`DecisionAuditSink`]
-//! port onto structured tracing JSON so every decision — allow or deny,
-//! cached or evaluated — is on the log stream from first boot (the
-//! identity `TracingAuditSink` precedent). The audit-chain bridge
-//! (CloudEvents envelope + signed digest chain) lands behind this SAME port
-//! in a follow-up slice.
 
 use iam_pdp_kernel::DecisionAuditSink;
 use shared_pdp_kernel::DecisionAuditRecord;
 use shared_platform_contracts_kernel::pdp::Decision;
 
-/// [`DecisionAuditSink`] that emits each sealed record as one structured
-/// tracing event. Emission cannot fail (tracing is fire-and-forget), so the
-/// port contract — never fail the decision path — holds trivially.
+/// One structured tracing event per sealed record. Tracing is fire-and-forget,
+/// which is what satisfies the port's requirement that emission never fail the
+/// decision path.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TracingDecisionAuditSink;
 
 impl TracingDecisionAuditSink {
-    /// Build the sink.
     #[must_use]
     pub fn new() -> Self {
         Self

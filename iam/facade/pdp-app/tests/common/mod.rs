@@ -1,11 +1,5 @@
-//! Shared fixtures for the iam PDP service test ladder.
-//!
-//! One fixture set drives the REST contract suite, the gRPC contract suite,
-//! and the live-socket E2E, so every surface provably exercises the same
-//! seed bundle: the crate-local copies of the canonical FD-001 platform
-//! Cedar seeds (parity-guarded by tests/seed_parity.rs), covering RBAC
-//! (group grant), ABAC (step-up attribute condition), PBAC (template link),
-//! and the structural tenant-isolation forbid.
+//! One fixture set for the REST suite, the gRPC suite, and the live-socket
+//! E2E, so no surface can be tested against a bundle the others never see.
 
 #![allow(
     dead_code,
@@ -60,7 +54,6 @@ pub fn action_map() -> BTreeMap<String, String> {
     ])
 }
 
-/// The slice-1 seed bundle over the canonical platform Cedar seeds.
 pub fn seed_bundle(version: &str, template_links: Vec<TemplateLink>) -> PolicyBundle {
     PolicyBundle {
         version: PolicyVersion::new(version).unwrap(),
@@ -76,10 +69,6 @@ pub fn seed_bundle(version: &str, template_links: Vec<TemplateLink>) -> PolicyBu
     }
 }
 
-/// A PBAC link granting bob a scoped read on acme-doc-2 (NON-restricted): the
-/// link demonstrates an ordinary read grant, isolated from the step-up forbid
-/// (which gates restricted reads only). The restricted doc acme-doc-1 stays
-/// reserved for the ABAC step-up tests.
 pub fn bob_read_link() -> TemplateLink {
     TemplateLink {
         template_id: TEMPLATE_ID.to_owned(),
@@ -89,10 +78,9 @@ pub fn bob_read_link() -> TemplateLink {
     }
 }
 
-/// Two tenants; alice = acme tenant-admin with step-up "a"; bob = acme
-/// principal with NO group and NO step-up (only a PBAC link can let him
-/// read); mallory = globex principal (mis)joined into acme's admin group —
-/// the structural forbid must neutralize her entirely.
+/// mallory is deliberately mis-joined into acme's admin group: without the
+/// structural tenant forbid she would authorize, so she is the fixture that
+/// proves the forbid, not a mistake in the data.
 pub fn entity_slice() -> EntitySlice {
     let string_attrs = |pairs: &[(&str, &str)]| -> BTreeMap<String, serde_json::Value> {
         pairs
@@ -158,11 +146,8 @@ pub fn entity_slice() -> EntitySlice {
                 ]),
                 parents: vec![entity_ref("OyaPlatform::Tenant", "acme")],
             },
-            // A NON-restricted acme resource: ordinary read grants (PBAC links)
-            // target this so they exercise their intent without colliding with
-            // the security-critical step-up forbid (which gates restricted
-            // reads only). The restricted doc stays acme-doc-1 for the ABAC
-            // step-up tests.
+            // Non-restricted, so an ordinary read grant is testable here
+            // without tripping the step-up forbid that gates acme-doc-1.
             EntityRecord {
                 uid: entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
                 attributes: string_attrs(&[
@@ -195,9 +180,8 @@ pub fn request(
     }
 }
 
-/// Build the shared service state over the seed bundle with an inspectable
-/// in-memory audit sink (deterministic ids; tests never depend on wall-clock
-/// entropy).
+/// Ids come from a seeded generator, so no assertion depends on wall-clock
+/// entropy.
 pub fn seeded_state(links: Vec<TemplateLink>) -> (Arc<PdpState>, Arc<InMemoryDecisionAuditSink>) {
     let pdp = CedarPdp::load(
         &seed_bundle(SEED_VERSION, links),
@@ -210,11 +194,8 @@ pub fn seeded_state(links: Vec<TemplateLink>) -> (Arc<PdpState>, Arc<InMemoryDec
     (state, sink)
 }
 
-/// Write `contents` into a unique temp file and return its path (E2E bundle
-/// transport fixture — the ConfigMap stand-in). The contents are written
-/// VERBATIM — use [`signed_bundle_doc`] to wrap a serialized [`PolicyBundle`]
-/// in the signed envelope the file-store adapter requires, or pass raw bytes
-/// directly for malformed-envelope RED fixtures.
+/// Writes `contents` VERBATIM: wrap a bundle with [`signed_bundle_doc`] first,
+/// or pass raw bytes to build a malformed-envelope fixture.
 pub fn temp_bundle_file(tag: &str, contents: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("iam-pdp-e2e-{}-{tag}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("temp dir");
@@ -223,20 +204,10 @@ pub fn temp_bundle_file(tag: &str, contents: &str) -> PathBuf {
     path
 }
 
-// =====================================================================
-// TEST-SIDE policy-bundle SIGNING fixtures (G004 bundle-signing slice).
-//
-// The file-store adapter verifies a SIGNED ENVELOPE against a trusted
-// public-key set BEFORE parsing the inner bundle. Production private-key
-// custody is a deferred founder-gated slice; these helpers are TEST-ONLY and
-// reuse the OWNED aws-lc-rs Ed25519 signer (ADR-0506, ring-free).
-// =====================================================================
-
-/// The stable key_id every test fixture signs under (and the trust dir trusts).
 pub const TEST_SIGNING_KEY_ID: &str = "test-policy-signing-key";
 
-/// One process-global test signer, so a bundle file written by one helper
-/// verifies against the trust dir written by another (they share this key).
+/// Process-global, so a bundle written by one helper verifies against a trust
+/// dir written by another.
 fn test_signer() -> &'static Ed25519ChainSigner {
     use std::sync::OnceLock;
     static SIGNER: OnceLock<Ed25519ChainSigner> = OnceLock::new();
@@ -245,9 +216,8 @@ fn test_signer() -> &'static Ed25519ChainSigner {
     })
 }
 
-/// Wrap a serialized inner [`PolicyBundle`] in the signed envelope, detached-
-/// signed by the process-global test key. Sign==verify by construction: the
-/// signature covers the EXACT `inner_json` bytes embedded in the envelope.
+/// The signature covers the exact `inner_json` bytes embedded in the envelope,
+/// so sign and verify agree by construction.
 pub fn signed_bundle_doc(inner_json: &str) -> String {
     let signer = test_signer();
     let signature_hex = signer.sign_hex(inner_json.as_bytes()).expect("sign bundle");
@@ -262,14 +232,9 @@ pub fn signed_bundle_doc(inner_json: &str) -> String {
     serde_json::to_string(&doc).expect("serialize signed envelope")
 }
 
-/// Provision a trust-anchor directory trusting the process-global test signing
-/// key (the `OYATIE_CLOUD_IAM_PDP_BUNDLE_TRUST_DIR` stand-in). Returns the dir.
-///
-/// Each call writes a UNIQUE directory: parallel socket tests must not share one
-/// trust file (a concurrent read of a mid-write `.pub` yields truncated key
-/// bytes and a spurious signature rejection — the same isolation the bundle
-/// files already use). The signer is process-global, so every per-call trust dir
-/// trusts the SAME key the envelope is signed under.
+/// A UNIQUE directory per call: parallel socket tests sharing one trust file
+/// can read a mid-write `.pub`, whose truncated key bytes then reject a
+/// perfectly good signature.
 pub fn trust_dir(tag: &str) -> PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(0);

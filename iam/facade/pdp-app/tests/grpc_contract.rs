@@ -1,16 +1,5 @@
-//! gRPC contract suite for the iam PDP decision surface.
-//!
-//! Drives the tonic service impl directly (tonic::Request/Response, no TCP
-//! socket — the identity grpc_authorize_deny precedent), proving the
-//! gRPC surface shares the REST decision core:
-//!
-//! - allow + deny are DECISION responses (a deny is never an RPC error);
-//! - proto translation fails closed (missing principal / unset attribute
-//!   oneof -> INVALID_ARGUMENT);
-//! - stale zookie pin -> FAILED_PRECONDITION, unknown action ->
-//!   INVALID_ARGUMENT;
-//! - one audit record per decision, none per refusal;
-//! - the policy-version probe echoes the loaded bundle.
+//! Drives the tonic service impl directly, with no TCP socket, over the same
+//! fixtures the REST suite uses.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -53,7 +42,6 @@ fn proto_record(
     }
 }
 
-/// The same two-tenant fixture as the REST suite, in proto form.
 fn proto_entities() -> Vec<proto::EntityRecord> {
     vec![
         proto_record(
@@ -94,8 +82,6 @@ fn proto_entities() -> Vec<proto::EntityRecord> {
             ],
             vec![proto_entity_ref("OyaPlatform::Tenant", "acme")],
         ),
-        // NON-restricted acme resource for ordinary read grants (PBAC); keeps
-        // them clear of the restricted-read step-up forbid.
         proto_record(
             proto_entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
             &[
@@ -163,8 +149,8 @@ async fn deny_is_a_decision_response_not_a_status_error() {
             "req-grpc-deny",
             "bob",
             "resource.read",
-            // acme-doc-2 is non-restricted: a clean deny-by-default (no permit,
-            // no forbid), so determining_policy_ids stays empty.
+            // Deny-by-default leaves no determining policy: acme-doc-2 matches
+            // neither a permit nor a forbid.
             "acme-doc-2",
         )))
         .await

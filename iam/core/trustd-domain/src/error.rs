@@ -92,7 +92,6 @@ impl fmt::Display for TrustError {
     }
 }
 
-/// Convert into the workspace-wide core error at the crate boundary.
 impl From<TrustError> for CoreError {
     fn from(e: TrustError) -> Self {
         match e {

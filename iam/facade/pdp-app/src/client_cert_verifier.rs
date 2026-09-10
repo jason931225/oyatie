@@ -1,35 +1,7 @@
-//! rustls `ClientCertVerifier` that defers leaf trust to the SVID verifier
-//! (G002 slice-1b-ii; ADR-0561, ADR-0506).
-//!
-//! This is the live-transport edge of the mTLS PEP. The rustls server handshake
-//! REQUIRES a client certificate (`client_auth_mandatory == true`) and hands the
-//! presented peer leaf to [`TrustdSvidVerifier::verify_peer`] over the trust
-//! bundle — the EXACT same real-DER verification the in-process PEP uses, so the
-//! transport check and the PEP check can never diverge. A leaf that does not
-//! verify (untrusted issuer, bad signature, expired, malformed) aborts the
-//! handshake with [`rustls::CertificateError`]; the tenant-binding decision then
-//! runs at the application layer in [`crate::mtls::SpiffeCallerAuth`].
-//!
-//! ## Crypto provider (aws-lc-rs ONLY, NO ring)
-//!
-//! TLS-message signature verification (`verify_tls12_signature` /
-//! `verify_tls13_signature` / `supported_verify_schemes`) delegates to the
-//! aws-lc-rs provider's [`WebPkiSupportedAlgorithms`]
-//! (`rustls::crypto::aws_lc_rs::default_provider().signature_verification_algorithms`).
-//! This is distinct from the certificate-chain check, which the SVID verifier
-//! performs with `x509-parser` on the aws-lc backend — neither path touches ring
-//! (ADR-0506).
-//!
-//! ## `root_hint_subjects` is intentionally empty
-//!
-//! The hint list is advisory: it tells a client which CA subjects the server
-//! would accept, to help it pick a cert. A workload always presents its single
-//! SVID, so an empty list (RFC 8446: "send any client certificate you have") is
-//! both correct and the right choice. The trust decision is made entirely in
-//! [`Self::verify_client_cert`] -> the SVID verifier, never from the hints.
-//! (`TrustBundle::trusted_ca_spki_ders` returns SubjectPublicKeyInfo, which is
-//! the public key — not the DER subject distinguished name a hint requires — so
-//! it must not be used here.)
+//! The transport edge of the mTLS PEP: a rustls `ClientCertVerifier` that runs
+//! the leaf through the same [`TrustdSvidVerifier`] the in-process PEP uses, so
+//! the two checks cannot diverge. Tenant binding runs afterwards, at the
+//! application layer, in [`crate::mtls::SpiffeCallerAuth`].
 
 use std::sync::Arc;
 
@@ -43,22 +15,18 @@ use iam_identity_workload_svid_trustd::TrustdSvidVerifier;
 use os_trustd_domain::TrustBundle;
 use os_trustd_domain::signer::SigningBackend;
 
-/// A rustls client-certificate verifier over a trustd [`TrustBundle`].
+/// A rustls client-certificate verifier over a trustd [`TrustBundle`], owned
+/// rather than borrowed so no lifetime escapes into the rustls `ServerConfig`.
 ///
-/// Owns the trust bundle so the verifier has no borrow lifetime escaping into
-/// the rustls `ServerConfig`. Construction REQUIRES a non-empty bundle (a server
-/// that cannot prove a trust root must never accept a client), mirroring
-/// [`crate::mtls::SpiffeCallerAuth::new`].
+/// An empty bundle trusts nothing and so denies every leaf; unlike
+/// [`crate::mtls::SpiffeCallerAuth::new`] this constructor does not refuse one.
 pub struct SvidClientCertVerifier<S: SigningBackend> {
     bundle: Arc<TrustBundle<S>>,
     supported_algs: WebPkiSupportedAlgorithms,
-    /// Empty by construction — see the module note on `root_hint_subjects`.
-    no_hints: Vec<DistinguishedName>,
 }
 
-// `ClientCertVerifier: Debug`, but neither `TrustBundle<S>` nor
-// `WebPkiSupportedAlgorithms` is `Debug`; print only a static label (the bundle
-// holds trust material that must not leak into logs anyway).
+// Hand-written because the trait requires `Debug` and neither field implements
+// it — and the bundle holds trust material that must not reach a log anyway.
 impl<S: SigningBackend> std::fmt::Debug for SvidClientCertVerifier<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("SvidClientCertVerifier")
@@ -66,8 +34,6 @@ impl<S: SigningBackend> std::fmt::Debug for SvidClientCertVerifier<S> {
 }
 
 impl<S: SigningBackend> SvidClientCertVerifier<S> {
-    /// Build the verifier over a shared trust bundle, using the aws-lc-rs
-    /// provider's signature-verification algorithms (NO ring).
     #[must_use]
     pub fn new(bundle: Arc<TrustBundle<S>>) -> Self {
         let supported_algs =
@@ -75,7 +41,6 @@ impl<S: SigningBackend> SvidClientCertVerifier<S> {
         Self {
             bundle,
             supported_algs,
-            no_hints: Vec::new(),
         }
     }
 }
@@ -86,25 +51,24 @@ impl<S: SigningBackend + Send + Sync + 'static> ClientCertVerifier for SvidClien
     }
 
     fn client_auth_mandatory(&self) -> bool {
-        // Fail-closed: a connection without a client cert is refused at the
-        // handshake, never silently downgraded to anonymous.
         true
     }
 
+    /// Deliberately empty. Hints are advisory (RFC 8446 lets a client send any
+    /// certificate it has) and a workload has exactly one SVID to offer; the
+    /// trust decision lives entirely in [`Self::verify_client_cert`].
     fn root_hint_subjects(&self) -> &[DistinguishedName] {
-        &self.no_hints
+        &[]
     }
 
     fn verify_client_cert(
         &self,
         end_entity: &CertificateDer<'_>,
+        // Ignored: an SVID leaf is verified directly against the bundle's CA
+        // SPKIs, so there is no intermediate chain to build.
         _intermediates: &[CertificateDer<'_>],
         now: UnixTime,
     ) -> Result<ClientCertVerified, Error> {
-        // Defer the leaf trust decision to the SVID verifier: real chain +
-        // signature + validity against the bundle's CA SPKIs, then SPIFFE-id
-        // parse. Any failure is an InvalidCertificate handshake abort — never a
-        // silent accept (fail-closed). The tenant binding runs later in the PEP.
         let verifier = TrustdSvidVerifier::new(&self.bundle);
         match verifier.verify_peer(end_entity.as_ref(), now.as_secs()) {
             Ok(_spiffe_id) => Ok(ClientCertVerified::assertion()),

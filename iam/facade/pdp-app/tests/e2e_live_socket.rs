@@ -1,16 +1,6 @@
-//! Live-socket E2E for the runnable iam PDP service.
-//!
-//! Boots the REAL service (`server::start` — the same boot path as `main`)
-//! on ephemeral loopback ports with a bundle file as the ConfigMap stand-in,
-//! then drives both delivery surfaces over real sockets: REST via reqwest,
-//! gRPC via the generated tonic client (the identity e2e_service
-//! precedent).
-//!
-//! RED fixtures (fail-closed boot doctrine):
-//! - missing bundle file        -> boot REFUSED (`StartError::Bundle`);
-//! - malformed bundle JSON      -> boot REFUSED (`StartError::Bundle`);
-//! - syntactically valid bundle with invalid Cedar policy text
-//!   -> boot REFUSED (`StartError::PolicyLoad`).
+//! Boots the real service on ephemeral loopback ports through the same
+//! `server::start` that `main` calls, then drives both delivery surfaces over
+//! real sockets.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -44,7 +34,6 @@ async fn serves_decisions_over_live_rest_and_grpc_sockets() {
     let base = format!("http://{}", handle.rest_addr);
     let client = reqwest::Client::new();
 
-    // Liveness + readiness over the live socket.
     let health: serde_json::Value = client
         .get(format!("{base}/healthz"))
         .send()
@@ -65,7 +54,6 @@ async fn serves_decisions_over_live_rest_and_grpc_sockets() {
     assert_eq!(ready["status"], "ready");
     assert_eq!(ready["policy_version"], common::SEED_VERSION);
 
-    // REST decision path: RBAC allow + default deny over the wire.
     let allow_body = serde_json::json!({
         "request": request(
             "req-e2e-allow",
@@ -107,7 +95,6 @@ async fn serves_decisions_over_live_rest_and_grpc_sockets() {
     let json: serde_json::Value = response.json().await.expect("decision json");
     assert_eq!(json["decision"], "deny");
 
-    // Unknown surface over the wire: default-deny 404.
     let response = client
         .get(format!("{base}/v1/bundles"))
         .send()
@@ -115,7 +102,6 @@ async fn serves_decisions_over_live_rest_and_grpc_sockets() {
         .expect("reachable");
     assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
 
-    // gRPC decision path through the generated client over the live socket.
     let endpoint = format!("http://{}", handle.grpc_addr);
     let channel = tonic::transport::Endpoint::from_shared(endpoint)
         .expect("endpoint")
@@ -153,14 +139,8 @@ async fn malformed_bundle_json_refuses_boot() {
     assert!(matches!(err, StartError::Bundle(_)), "{err}");
 }
 
-// =====================================================================
-// G004 bundle-signing slice RED fixtures (verify-on-load fail-closed boot).
-// =====================================================================
-
 #[tokio::test(flavor = "multi_thread")]
 async fn unsigned_bundle_file_refuses_boot() {
-    // A well-formed bundle wrapped in an envelope with NO signatures: the boot
-    // must refuse (StartError::Bundle from SignatureRejected); no socket serves.
     let bundle = seed_bundle(common::SEED_VERSION, vec![]);
     let inner = serde_json::to_string(&bundle).unwrap();
     let doc = serde_json::json!({ "bundle": inner, "signatures": [] });
@@ -175,8 +155,6 @@ async fn unsigned_bundle_file_refuses_boot() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn tampered_signed_bundle_file_refuses_boot() {
-    // Sign a bundle, then flip a byte of the embedded inner bytes after signing:
-    // verify fails -> boot refusal, never a serving socket.
     let bundle = seed_bundle(common::SEED_VERSION, vec![]);
     let inner = serde_json::to_string(&bundle).unwrap();
     let signed = signed_bundle_doc(&inner);
@@ -195,8 +173,6 @@ async fn tampered_signed_bundle_file_refuses_boot() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn empty_trust_anchor_refuses_boot() {
-    // A validly-signed bundle but an EMPTY trust anchor dir (no trusted keys):
-    // the PDP cannot prove which keys to trust -> boot refusal.
     let bundle = seed_bundle(common::SEED_VERSION, vec![]);
     let inner = serde_json::to_string(&bundle).unwrap();
     let path = temp_bundle_file("red-empty-trust", &signed_bundle_doc(&inner));
@@ -222,8 +198,8 @@ async fn empty_trust_anchor_refuses_boot() {
 async fn invalid_cedar_policy_text_refuses_boot() {
     let mut bundle = seed_bundle(common::SEED_VERSION, vec![]);
     bundle.policies_src = "permit (principal, action".to_owned();
-    // SIGNED so it passes verify-on-load and fails INSIDE the verified region at
-    // Cedar compile (proves the signature gate does not mask policy-load checks).
+    // Signed, so the asserted PolicyLoad (not Bundle) proves the signature gate
+    // does not mask policy-load checks.
     let inner = serde_json::to_string(&bundle).unwrap();
     let path = temp_bundle_file("red-cedar", &signed_bundle_doc(&inner));
     let err = server::start(&config_for(&path))
