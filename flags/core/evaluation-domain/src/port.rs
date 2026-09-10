@@ -1,15 +1,5 @@
-//! Ports for the flag-evaluation domain (clean-arch ports-in-core, ADR-0570).
-//!
-//! These traits are the CUTOVER-STABLE seam between the pure evaluation domain and the outside
-//! world. They are DEFINED here in `core/` and IMPLEMENTED later by DEFERRED adapters:
-//!
-//! - a persistence adapter (`flags/adapters/storage/*`) backed by the owned data substrate,
-//! - a cloud/control-plane adapter that streams flag definitions to edge evaluators,
-//! - an identity-aware adapter that enriches the [`crate::model::EvaluationContext`].
-//!
-//! Nothing here knows about Postgres, gRPC, OFREP, tokio, or any wire format. The port shapes are
-//! designed for the OWNED stack so they do not need to change at cutover: they speak only in domain
-//! types and a domain error.
+//! Ports for the flag-evaluation domain: traits defined in `core/`, implemented
+//! later by deferred storage, cloud and identity adapters.
 
 use crate::model::{Flag, FlagKey};
 

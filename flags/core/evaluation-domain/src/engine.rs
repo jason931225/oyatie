@@ -1,13 +1,8 @@
 //! The deterministic flag-evaluation engine.
-//!
-//! `evaluate(flag, context)` is a pure function: identical inputs always yield an identical
-//! [`Evaluation`]. No I/O, no clock, no RNG, no allocation-order dependence. Adapters fetch the
-//! [`Flag`] (via the [`crate::port::FlagSource`] port) and supply the [`EvaluationContext`]; the
-//! engine decides nothing about WHERE flags come from.
 
 use crate::bucket::bucket_basis_points;
 use crate::model::{
-    AttrValue, Condition, EvaluationContext, Flag, Operand, Operator, Rollout, RuleOutcome,
+    AttrValue, Condition, EvaluationContext, Flag, Operand, Operator, Rollout, Rule, RuleOutcome,
     Variant, VariantKey,
 };
 
@@ -55,56 +50,76 @@ pub enum EvalErrorCode {
 /// an unknown variant fails closed to the flag's `off_variant` (or the first variant if even that is
 /// unknown) with `Reason::Error`, never a panic.
 pub fn evaluate(flag: &Flag, context: &EvaluationContext) -> Evaluation {
-    // A flag with no variants cannot serve anything: hard fail-closed.
     let Some(first_variant) = flag.variants.first() else {
-        return Evaluation {
-            variant: String::new(),
-            value: crate::model::FlagValue::Bool(false),
-            reason: Reason::Error,
-            error_code: Some(EvalErrorCode::NoVariants),
-        };
+        return no_variants_outcome();
     };
-
-    // 1. Disabled → off variant.
     if !flag.enabled {
         return resolve(flag, &flag.off_variant, Reason::Disabled, first_variant);
     }
+    if let Some(rule) = first_matching_rule(flag, context) {
+        return matched_rule_outcome(flag, rule, context, first_variant);
+    }
+    default_rollout_outcome(flag, context, first_variant)
+        .unwrap_or_else(|| default_variant_outcome(flag, first_variant))
+}
 
-    // 2. First matching rule wins.
-    for rule in &flag.rules {
-        if rule
-            .conditions
+/// A flag with no variants can serve nothing at all: hard fail-closed.
+fn no_variants_outcome() -> Evaluation {
+    Evaluation {
+        variant: String::new(),
+        value: crate::model::FlagValue::Bool(false),
+        reason: Reason::Error,
+        error_code: Some(EvalErrorCode::NoVariants),
+    }
+}
+
+fn first_matching_rule<'flag>(
+    flag: &'flag Flag,
+    context: &EvaluationContext,
+) -> Option<&'flag Rule> {
+    flag.rules.iter().find(|rule| {
+        rule.conditions
             .iter()
-            .all(|c| condition_matches(c, context))
-        {
-            return match &rule.outcome {
-                RuleOutcome::Fixed(variant) => {
-                    resolve(flag, variant, Reason::TargetingMatch, first_variant)
-                }
-                RuleOutcome::Rollout(rollout) => {
-                    match assign_rollout(flag, rollout, context) {
-                        RolloutAssignment::Variant(variant) => {
-                            resolve(flag, &variant, Reason::Split, first_variant)
-                        }
-                        // Unallocated remainder of a rule rollout falls through to flag default.
-                        RolloutAssignment::Unallocated => {
-                            resolve(flag, &flag.default_variant, Reason::Default, first_variant)
-                        }
-                    }
-                }
-            };
+            .all(|condition| condition_matches(condition, context))
+    })
+}
+
+fn matched_rule_outcome(
+    flag: &Flag,
+    rule: &Rule,
+    context: &EvaluationContext,
+    first_variant: &Variant,
+) -> Evaluation {
+    match &rule.outcome {
+        RuleOutcome::Fixed(variant) => {
+            resolve(flag, variant, Reason::TargetingMatch, first_variant)
         }
+        RuleOutcome::Rollout(rollout) => match assign_rollout(flag, rollout, context) {
+            RolloutAssignment::Variant(variant) => {
+                resolve(flag, &variant, Reason::Split, first_variant)
+            }
+            RolloutAssignment::Unallocated => default_variant_outcome(flag, first_variant),
+        },
     }
+}
 
-    // 3. Default rollout (progressive delivery to the unruled population).
-    // An unallocated assignment falls through to the default variant.
-    if let Some(rollout) = &flag.default_rollout
-        && let RolloutAssignment::Variant(variant) = assign_rollout(flag, rollout, context)
-    {
-        return resolve(flag, &variant, Reason::Split, first_variant);
+/// Progressive delivery to the unruled population; `None` when the subject falls
+/// in the rollout's unallocated remainder.
+fn default_rollout_outcome(
+    flag: &Flag,
+    context: &EvaluationContext,
+    first_variant: &Variant,
+) -> Option<Evaluation> {
+    let rollout = flag.default_rollout.as_ref()?;
+    match assign_rollout(flag, rollout, context) {
+        RolloutAssignment::Variant(variant) => {
+            Some(resolve(flag, &variant, Reason::Split, first_variant))
+        }
+        RolloutAssignment::Unallocated => None,
     }
+}
 
-    // 4. Default variant.
+fn default_variant_outcome(flag: &Flag, first_variant: &Variant) -> Evaluation {
     resolve(flag, &flag.default_variant, Reason::Default, first_variant)
 }
 
@@ -189,5 +204,59 @@ fn attr_to_string(value: &AttrValue) -> String {
         AttrValue::Bool(b) => b.to_string(),
         AttrValue::Str(s) => s.clone(),
         AttrValue::Int(i) => i.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{FlagValue, TOTAL_BASIS_POINTS};
+
+    fn rule_rollout_flag(on_weight: u32) -> Flag {
+        Flag {
+            key: "checkout.rule-rollout".into(),
+            enabled: true,
+            variants: vec![
+                Variant {
+                    key: "on".into(),
+                    value: FlagValue::Bool(true),
+                },
+                Variant {
+                    key: "fallback".into(),
+                    value: FlagValue::Bool(false),
+                },
+                Variant {
+                    key: "off".into(),
+                    value: FlagValue::Bool(false),
+                },
+            ],
+            rules: vec![Rule {
+                id: "everyone".into(),
+                conditions: vec![],
+                outcome: RuleOutcome::Rollout(Rollout {
+                    buckets: vec![("on".into(), on_weight)],
+                    salt: String::new(),
+                }),
+            }],
+            default_rollout: None,
+            default_variant: "fallback".into(),
+            off_variant: "off".into(),
+        }
+    }
+
+    #[test]
+    fn rule_scoped_rollout_serves_its_allocated_variant() {
+        let flag = rule_rollout_flag(TOTAL_BASIS_POINTS);
+        let ev = evaluate(&flag, &EvaluationContext::for_key("u1"));
+        assert_eq!(ev.variant, "on");
+        assert_eq!(ev.reason, Reason::Split);
+    }
+
+    #[test]
+    fn rule_scoped_rollout_remainder_serves_default_variant_not_off() {
+        let flag = rule_rollout_flag(0);
+        let ev = evaluate(&flag, &EvaluationContext::for_key("u1"));
+        assert_eq!(ev.variant, "fallback");
+        assert_eq!(ev.reason, Reason::Default);
     }
 }

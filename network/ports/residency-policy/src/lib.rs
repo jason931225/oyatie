@@ -1,13 +1,11 @@
 //! Agreed cross-owner surface for residency-policy values and predicates.
 //!
-//! Consumers receive Network's established exact residency identities, typed
-//! validation errors, label parsing, and home-region predicate without
-//! importing its internal aggregate. The port is signature-closed through the
-//! exact Data classification wrapper and Network region-reference values. It
-//! intentionally excludes residency registries, tenant bindings, change plans,
-//! transfer permits, jurisdiction inference, and data-class conversion. The
-//! legacy residency core remains the defining crate until a dedicated Network
-//! structural lane decomposes it.
+//! The port intentionally excludes residency registries, tenant bindings,
+//! change plans, transfer permits, jurisdiction inference, and data-class
+//! conversion.
+//!
+//! The legacy residency core remains the defining crate until a dedicated
+//! Network structural lane decomposes it.
 
 #![forbid(unsafe_code)]
 

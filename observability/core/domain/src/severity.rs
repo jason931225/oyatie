@@ -1,18 +1,7 @@
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-//! Telemetry severity classification.
-//!
-//! Six-level severity per the M02b/P07-observability impl-plan's LogRecord
-//! contract. Ordered: Trace < Debug < Info < Warn < Error < Fatal. The
-//! `as_otel_int` mapping matches the OpenTelemetry SeverityNumber spec
-//! (Trace=1, Debug=5, Info=9, Warn=13, Error=17, Fatal=21) so downstream
-//! exporters can serialize without re-mapping.
-//!
-//! Companion to the existing telemetry vocabulary in `lib.rs::fields`. This
-//! enum is the first M02b/P07 merge-variant delta; runtime crates that emit
-//! log records use it instead of stringly-typed severity labels.
+//! Telemetry severity classification: `as_otel_int` follows the OpenTelemetry
+//! SeverityNumber specification, so exporters serialize without re-mapping.
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Severity {
@@ -215,13 +204,10 @@ mod tests {
 
     #[test]
     fn from_otel_int_bucket_boundaries() {
-        // Last value of Trace range, first value of Debug range.
         assert_eq!(Severity::from_otel_int(4), Some(Severity::Trace));
         assert_eq!(Severity::from_otel_int(5), Some(Severity::Debug));
-        // Last value of Error range, first value of Fatal range.
         assert_eq!(Severity::from_otel_int(20), Some(Severity::Error));
         assert_eq!(Severity::from_otel_int(21), Some(Severity::Fatal));
-        // Out-of-range sentinels.
         assert_eq!(Severity::from_otel_int(0), None);
         assert_eq!(Severity::from_otel_int(25), None);
     }
