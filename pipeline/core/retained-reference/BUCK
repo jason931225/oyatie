@@ -1,0 +1,24 @@
+rust_library(
+    name = "pipeline-retained-reference",
+    srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
+    crate = "pipeline_retained_reference",
+    crate_root = "src/lib.rs",
+    visibility = ["PUBLIC"],
+)
+
+rust_test(
+    name = "pipeline-retained-reference-unittest",
+    srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
+    crate = "pipeline_retained_reference",
+    crate_root = "src/lib.rs",
+    visibility = ["PUBLIC"],
+)
+
+rust_test(
+    name = "pipeline-retained-reference-refusal",
+    srcs = ["tests/refusal.rs"],
+    crate = "pipeline_retained_reference_refusal",
+    crate_root = "tests/refusal.rs",
+    visibility = ["PUBLIC"],
+    deps = [":pipeline-retained-reference"],
+)
