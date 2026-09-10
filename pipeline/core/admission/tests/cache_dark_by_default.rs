@@ -3,27 +3,19 @@
 //! `build/toolchains/cache/defs.bzl` states the invariant and names a
 //! conformance gate at `ci/facade/build-cache-policy` that asserts it. That
 //! path does not exist -- retired with the canary by ADR-0716 D3 -- so the
-//! invariant has been a comment since. A stated invariant with no detector is
-//! the shape this repository keeps finding: it reports protection while
-//! measuring nothing.
+//! invariant has been a comment since.
 //!
-//! The same paragraph, and `build/toolchains/cache/BUCK`, name opt-in overlays
-//! at `infra/ci/buckconfig/warm-cache-{rw,ro}.buckconfig` as the only thing
-//! that selects the platform. Those files were never created and `infra/` is
-//! not a root of this tree, so it has no checked-in selector at all. Both
-//! sites are byte-mirrored into the port-engine toolchain corpus, so neither
-//! can be corrected without re-pinning that corpus digest; this is the only
-//! admissible home for the correction until that happens.
-//!
-//! Two facts, both cheap and both currently true:
+//! That same paragraph, and `build/toolchains/cache/BUCK`, name overlays at
+//! `infra/ci/buckconfig/warm-cache-{rw,ro}.buckconfig` as the platform's only
+//! selector. Those files were never created and `infra/` is not a root here.
+//! Both sites are byte-mirrored into the port-engine toolchain corpus, so this
+//! is the only admissible home for the correction.
 //!
 //! 1. The root `.buckconfig` selects the prelude platform and carries no
-//!    `[cache]` section. That is the whole of what these tests read; the
-//!    `.buckconfig.d/` overlay directory is closed off by
-//!    `ALLOWED_DOT_ROOT_DIRS`, which is a different gate.
+//!    `[cache]` section. That is all these tests read; `.buckconfig.d/` is
+//!    closed off by `ALLOWED_DOT_ROOT_DIRS`, a different gate.
 //! 2. `specs/cache-warm-license.json` does not exist and cannot: ADR-0716 D2
-//!    and the g004 mapping name that path as the admission control, and
-//!    `specs` is in FORBIDDEN_NAMES.
+//!    and the g004 mapping name that path, and `specs` is in FORBIDDEN_NAMES.
 
 use std::path::{Path, PathBuf};
 
