@@ -137,7 +137,7 @@ fn validate_checkout(
 fn validate_toolchain(step: &str, job: &str) -> Result<(), String> {
     ensure(
         direct_entries(step, 8) == [("with", "")]
-            && direct_entries(step, 10) == [("toolchain", "\"1.98.0\"")],
+            && direct_entries(step, 10) == [("toolchain", "\"nightly-2026-09-10\"")],
         format!("{job} toolchain step must be pinned and closed"),
     )
 }

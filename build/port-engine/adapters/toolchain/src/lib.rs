@@ -66,7 +66,7 @@ mod tests {
         let d = toolchain_digest();
         assert_eq!(
             d.0,
-            "sha256:b27b5e3f75b54b19ee0b59afad80abd578dca79d890b387f7e82d5a950825f54"
+            "sha256:21fa7a4116e8a0cf9b3714b3fa5d173ad535eba6610d9b30a1b7f74dbfb74c0d"
         );
         assert_eq!(d, toolchain_digest());
     }

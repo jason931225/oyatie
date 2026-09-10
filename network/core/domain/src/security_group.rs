@@ -135,10 +135,7 @@ fn rule_matches(rule: &SecurityRule, flow: &FlowMatch) -> Result<bool, CloudNetw
         (Some(_), None) => return Ok(false),
         (None, _) => {}
     }
-    if !cidr_contains_cidr(&rule.cidr, &flow.peer_cidr)? {
-        return Ok(false);
-    }
-    Ok(true)
+    cidr_contains_cidr(&rule.cidr, &flow.peer_cidr)
 }
 
 /// Returns `true` when rule `a` fully subsumes rule `b`:

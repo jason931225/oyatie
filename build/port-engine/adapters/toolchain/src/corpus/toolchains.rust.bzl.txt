@@ -53,6 +53,18 @@ _DIGESTS = {
             "rustc": "18ed6559de1b8ea6b77474ea86992b9a507d3a3d134d9ee017d30cf3f406e3ee",
         },
     },
+    "nightly-2026-09-10": {
+        "aarch64-apple-darwin": {
+            "clippy": "d7e1ffe68e27808b9e308ca6ed930ab6f7dc1891ebd6cc428fca0f1c8cd123b0",
+            "rust-std": "ce5735b43a33cbfa5124821ab2a3fb775a323f2774d928f5d7ca095505214c85",
+            "rustc": "43d6831fc30581c8ed21781e19df12746c8152d43aa0a4e220451d4f921f30b3",
+        },
+        "x86_64-unknown-linux-gnu": {
+            "clippy": "d18dd53095da48d4193eda2b798204adc5175b2ca16b003072aabf73ae9090f6",
+            "rust-std": "92ca154d7d65676a31122f74f4500db0ada97f211c2b5bd02ec04d51581778df",
+            "rustc": "278fc118a5044c9130aa2cf2ddab425c42ffee82efc2d228f962d46b45af308d",
+        },
+    },
 }
 
 # Hosts this repo builds on. An unlisted host gets "no condition matched" at
