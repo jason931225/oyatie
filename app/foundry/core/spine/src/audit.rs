@@ -48,7 +48,6 @@ pub(crate) fn record_denial(
     ) else {
         return;
     };
-    // The append may fail; the refusal it describes must not.
     let _ = denial_log.append(envelope);
 }
 

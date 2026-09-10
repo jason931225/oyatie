@@ -1,19 +1,6 @@
 //! The ActionWriter: the ONE way anything becomes a log entry.
-//!
-//! Deny-by-default gates run in order — authorization, parameter
-//! conformance, edit admission with an advisory dry-run of the fold's
-//! own apply — then the record is canonically encoded, appended
-//! receipt-by-value, and applied through THE SAME fold replay uses.
-//! Determinism law: every payload and envelope byte is a pure function
-//! of (request, decision, edits) — the writer never reads a clock and
-//! never mints an id; `occurred_at` derives from the caller's request,
-//! which is what makes the byte-identical retry contract hold.
-//!
-//! The registry the gates consult IS the projection's seeded snapshot
-//! (`registry_input`), so the writer and the fold can never disagree
-//! about the law in force.
 
-use data_ontology_kernel::ActionInvocationReceipt;
+use data_ontology_kernel::{ActionInvocationReceipt, OntologyEngine};
 use foundry_edits::{ActionRecord, OntologyEdit, encode_action_record};
 use foundry_records_draft::{ActionEnvelope, Receipt, RecordsLog, RecordsLogError, SealedEnvelope};
 
@@ -35,8 +22,9 @@ pub struct ActionSubmission {
 /// What became of an accepted submission.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ApplyOutcome {
-    /// Appended (or deduplicated) and applied.
-    Applied { receipt: Receipt },
+    Applied {
+        receipt: Receipt,
+    },
     /// The entry stands in the log but the projection refused it — the
     /// refusal is the projection's, honestly reported, never un-appended.
     Poisoned {
@@ -77,18 +65,38 @@ fn submit_gated(
     projection: &mut ProjectionState,
 ) -> Result<ApplyOutcome, WriteError> {
     let registry = projection.registry_input.clone();
+    let receipt = authorize_invocation(&registry, submission)?;
+    check_parameter_conformance(&registry, submission)?;
+    let schema_revision = admit_edits_and_stamp_registered_revision(&registry, submission)?;
+    let envelope = encode_envelope(submission, &receipt, schema_revision)?;
+    advisory_dry_run_against_scratch_fold(projection, &envelope)?;
+    let log_receipt =
+        append_with_receipt(receipt, log, envelope.clone()).map_err(WriteError::Log)?;
+    if log_receipt.deduplicated {
+        return Ok(outcome_of_deduplicated_append(projection, log_receipt));
+    }
+    Ok(apply_through_fold(projection, envelope, log_receipt))
+}
 
-    // Gate 1: AUTHORIZE. Failure appends nothing, anywhere.
-    let receipt = registry
+/// Failure appends nothing, anywhere.
+fn authorize_invocation(
+    registry: &OntologyEngine,
+    submission: &ActionSubmission,
+) -> Result<ActionInvocationReceipt, WriteError> {
+    registry
         .authorize_action_invocation(submission.request.clone(), submission.decision.clone())
         .map_err(|_| {
             refuse(
                 RefusalGate::Authorization,
                 "policy decision does not cover this invocation",
             )
-        })?;
+        })
+}
 
-    // Gate 2: PARAMETER CONFORMANCE against the declared schema.
+fn check_parameter_conformance(
+    registry: &OntologyEngine,
+    submission: &ActionSubmission,
+) -> Result<(), WriteError> {
     let converted = submission
         .parameters
         .iter()
@@ -111,11 +119,13 @@ fn submit_gated(
                 RefusalGate::Parameters,
                 "parameters fail the declared schema",
             )
-        })?;
+        })
+}
 
-    // Gate 3: EDIT ADMISSION. The action's declared entity type bounds
-    // every CreateObject, and the writer stamps the CURRENT registered
-    // revision — the caller never chooses it.
+fn admit_edits_and_stamp_registered_revision(
+    registry: &OntologyEngine,
+    submission: &ActionSubmission,
+) -> Result<u32, WriteError> {
     let action = registry
         .action_type(&submission.request.tenant_id, &submission.request.action_id)
         .ok_or_else(|| {
@@ -134,12 +144,17 @@ fn submit_gated(
             ));
         }
     }
-    let schema_revision = registry
+    Ok(registry
         .entity_type(&submission.request.tenant_id, &action.entity_type)
         .map(|definition| definition.revision)
-        .unwrap_or(1);
+        .unwrap_or(1))
+}
 
-    // ENCODE: canonical bytes, receipt fields embedded as payload law.
+fn encode_envelope(
+    submission: &ActionSubmission,
+    receipt: &ActionInvocationReceipt,
+    schema_revision: u32,
+) -> Result<ActionEnvelope, WriteError> {
     let occurred_at_epoch_ms = receipt.occurred_at_epoch_seconds.saturating_mul(1000);
     let record = ActionRecord::new(
         receipt.principal_id.clone(),
@@ -151,7 +166,7 @@ fn submit_gated(
         submission.edits.clone(),
     )
     .map_err(|_| refuse(RefusalGate::Admission, "record identity fields refused"))?;
-    let envelope = ActionEnvelope::new(
+    ActionEnvelope::new(
         receipt.tenant_id.clone(),
         receipt.entity_id.clone(),
         receipt.action_id.clone(),
@@ -160,11 +175,16 @@ fn submit_gated(
         encode_action_record(&record),
         occurred_at_epoch_ms,
     )
-    .map_err(|_| refuse(RefusalGate::Admission, "envelope shape refused"))?;
+    .map_err(|_| refuse(RefusalGate::Admission, "envelope shape refused"))
+}
 
-    // ADVISORY DRY-RUN: the projector's own apply on a scratch copy.
-    // Authoritative admission is the fold's re-check; a raced entry
-    // poisons deterministically instead of corrupting state.
+/// Advisory only: authoritative admission is the fold's own re-check at
+/// apply time, so a raced entry poisons deterministically rather than
+/// corrupting state.
+fn advisory_dry_run_against_scratch_fold(
+    projection: &ProjectionState,
+    envelope: &ActionEnvelope,
+) -> Result<(), WriteError> {
     let mut scratch = projection.clone();
     let probe = SealedEnvelope {
         envelope: envelope.clone(),
@@ -174,34 +194,40 @@ fn submit_gated(
             deduplicated: false,
         },
     };
-    if let FoldOutcome::Poisoned(_) = apply_sealed(&mut scratch, &probe) {
-        return Err(refuse(
+    match apply_sealed(&mut scratch, &probe) {
+        FoldOutcome::Poisoned(_) => Err(refuse(
             RefusalGate::Admission,
             "edits fail the fold's own admission",
-        ));
+        )),
+        FoldOutcome::Applied => Ok(()),
     }
+}
 
-    // APPEND, receipt by value — then never lie about what happened.
-    let log_receipt =
-        append_with_receipt(receipt, log, envelope.clone()).map_err(WriteError::Log)?;
-    if log_receipt.deduplicated {
-        return Ok(match projection.poison.get(&log_receipt.ordinal) {
-            Some(reason) => ApplyOutcome::Poisoned {
-                receipt: log_receipt,
-                reason: reason.clone(),
-            },
-            None => ApplyOutcome::Applied {
-                receipt: log_receipt,
-            },
-        });
+fn outcome_of_deduplicated_append(
+    projection: &ProjectionState,
+    log_receipt: Receipt,
+) -> ApplyOutcome {
+    match projection.poison.get(&log_receipt.ordinal) {
+        Some(reason) => ApplyOutcome::Poisoned {
+            receipt: log_receipt,
+            reason: reason.clone(),
+        },
+        None => ApplyOutcome::Applied {
+            receipt: log_receipt,
+        },
     }
+}
 
-    // APPLY = FOLD: the same function replay uses; no second write path.
+fn apply_through_fold(
+    projection: &mut ProjectionState,
+    envelope: ActionEnvelope,
+    log_receipt: Receipt,
+) -> ApplyOutcome {
     let sealed = SealedEnvelope {
         envelope,
         receipt: log_receipt.clone(),
     };
-    Ok(match apply_sealed(projection, &sealed) {
+    match apply_sealed(projection, &sealed) {
         FoldOutcome::Applied => ApplyOutcome::Applied {
             receipt: log_receipt,
         },
@@ -209,7 +235,7 @@ fn submit_gated(
             receipt: log_receipt,
             reason,
         },
-    })
+    }
 }
 
 fn refuse(gate: RefusalGate, cause: &'static str) -> WriteError {

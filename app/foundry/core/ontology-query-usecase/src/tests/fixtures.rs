@@ -1,8 +1,6 @@
 //! Shared fixtures for the execution-usecase tests: the graph, the
 //! registry every link upsert consults, and the canonical input.
 
-//! The original inline test corpus, body verbatim.
-
 pub(super) use crate::*;
 pub(super) use data_ontology_kernel::ObjectGraph;
 pub(super) use foundry_ontology_query_domain::{
@@ -91,7 +89,6 @@ pub(super) fn store() -> MemoryProjectionStore {
         link_type: "lty_owns".to_string(),
         from_object_ref: "ent_root".to_string(),
         to_object_ref: "ent_child".to_string(),
-        // Seconds in the request's floor, milliseconds in the store.
         observed_at_epoch_ms: 10_000,
     }];
     let mut store = MemoryProjectionStore::default();

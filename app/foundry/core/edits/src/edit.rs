@@ -7,14 +7,18 @@
 
 use crate::property::WireProperty;
 
+const ENTITY_TYPE_ID_PREFIX: &str = "ety_";
+const LINK_TYPE_ID_PREFIX: &str = "lty_";
+const TARGET_ENTITY_ID_PREFIX: &str = "ent_";
+
 /// Why an edit or edit set was refused at construction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EditError {
-    /// Entity type ids are `ety_`-prefixed, trimmed, and non-blank.
+    /// Not `ENTITY_TYPE_ID_PREFIX`-prefixed, trimmed, and non-blank.
     InvalidEntityTypeId,
-    /// Link type ids are `lty_`-prefixed, trimmed, and non-blank.
+    /// Not `LINK_TYPE_ID_PREFIX`-prefixed, trimmed, and non-blank.
     InvalidLinkTypeId,
-    /// Link targets are `ent_`-prefixed, trimmed, and non-blank.
+    /// Not `TARGET_ENTITY_ID_PREFIX`-prefixed, trimmed, and non-blank.
     InvalidTargetEntityId,
     /// An edit set must carry at least one edit.
     EmptyEditSet,
@@ -29,12 +33,12 @@ pub enum EditError {
 pub enum EditTag {
     CreateObject,
     UpsertProperties,
-    /// RESERVED: the kernel has no property-removal operation.
+    /// RESERVED.
     UnsetProperties,
-    /// RESERVED: the kernel has no object-removal operation.
+    /// RESERVED.
     DeleteObject,
     CreateLink,
-    /// RESERVED: the kernel has no link-removal operation.
+    /// RESERVED.
     DeleteLink,
 }
 
@@ -72,8 +76,8 @@ impl EditTag {
     }
 }
 
-/// One edit to the envelope's object. Only the live vocabulary is
-/// constructible; see [`EditTag`] for the reserved kinds.
+/// One edit to the envelope's object; see [`EditTag`] for the reserved
+/// kinds.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OntologyEdit {
     CreateObject {
@@ -90,34 +94,42 @@ pub enum OntologyEdit {
 }
 
 impl OntologyEdit {
-    /// A validated object creation.
     pub fn create_object(
         entity_type: impl Into<String>,
         properties: Vec<WireProperty>,
     ) -> Result<Self, EditError> {
         let entity_type = entity_type.into();
-        validate_prefixed(&entity_type, "ety_", EditError::InvalidEntityTypeId)?;
+        validate_prefixed(
+            &entity_type,
+            ENTITY_TYPE_ID_PREFIX,
+            EditError::InvalidEntityTypeId,
+        )?;
         Ok(Self::CreateObject {
             entity_type,
             properties,
         })
     }
 
-    /// A validated property upsert.
     pub fn upsert_properties(set: Vec<WireProperty>) -> Result<Self, EditError> {
         Ok(Self::UpsertProperties { set })
     }
 
-    /// A validated outbound link creation; FROM is always the envelope's
-    /// object.
     pub fn create_link(
         link_type: impl Into<String>,
         to_entity_id: impl Into<String>,
     ) -> Result<Self, EditError> {
         let link_type = link_type.into();
-        validate_prefixed(&link_type, "lty_", EditError::InvalidLinkTypeId)?;
+        validate_prefixed(
+            &link_type,
+            LINK_TYPE_ID_PREFIX,
+            EditError::InvalidLinkTypeId,
+        )?;
         let to_entity_id = to_entity_id.into();
-        validate_prefixed(&to_entity_id, "ent_", EditError::InvalidTargetEntityId)?;
+        validate_prefixed(
+            &to_entity_id,
+            TARGET_ENTITY_ID_PREFIX,
+            EditError::InvalidTargetEntityId,
+        )?;
         Ok(Self::CreateLink {
             link_type,
             to_entity_id,

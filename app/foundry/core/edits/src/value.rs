@@ -13,11 +13,10 @@ pub enum WireValueError {
     NonCanonicalDoubleKey,
 }
 
-/// A finite IEEE double stored as its monotone order-preserving u64 key
-/// (negatives: `!bits`; non-negatives: `bits ^ (1 << 63)`), so the DERIVED
-/// `Eq`/`Ord`/`Hash` agree with IEEE numeric order and the key doubles as
-/// a sort key. `NaN` and the infinities are rejected at construction;
-/// `-0.0` folds to `0.0`.
+/// A finite IEEE double stored as its monotone order-preserving u64 key,
+/// so the DERIVED `Eq`/`Ord`/`Hash` agree with IEEE numeric order and the
+/// key doubles as a sort key. `NaN` and the infinities are rejected at
+/// construction; `-0.0` folds to `0.0`.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WireDouble(u64);
 
@@ -44,8 +43,6 @@ impl WireDouble {
         }
     }
 
-    /// The monotone key itself — the wire representation and the future
-    /// index sort key.
     pub const fn sort_key(self) -> u64 {
         self.0
     }
@@ -111,8 +108,6 @@ fn is_leap_year(year: i32) -> bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
-/// A typed property value as it appears on the wire. Mirrors the kernel's
-/// typed carrier shape by construction, never by dependency.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum WireValue {
     String(String),

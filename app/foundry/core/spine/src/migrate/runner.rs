@@ -60,10 +60,7 @@ pub struct MigrationStatus {
     /// re-attempt of the same object in a later pass counts again.
     pub conflicted: u64, // data_class: INTERNAL_ONLY
     /// Appends the log could not accept at all — an adapter fault, not a
-    /// verdict about the submission. Held apart from `conflicted` because
-    /// this crate's own law says so: a storage fault reported as a key
-    /// conflict is "a cause that did not occur, blame in the wrong place,
-    /// and advice against the retry that would work".
+    /// verdict about the submission, and so held apart from `conflicted`.
     pub unavailable: u64, // data_class: INTERNAL_ONLY
     /// DISTINCT poisoned ordinals this run observed — entries, not attempts.
     pub poisoned: u64, // data_class: INTERNAL_ONLY
@@ -71,8 +68,8 @@ pub struct MigrationStatus {
     pub fixpoint: bool, // data_class: INTERNAL_ONLY
 }
 
-/// `mig_<plan digest>_<object digest>:<last ordinal>` — fixed-width
-/// digests keep the key inside the envelope cap for any object_ref.
+/// Fixed-width digests keep the key inside the envelope cap for any
+/// `object_ref`.
 pub fn upcast_idempotency_key(plan: &MigrationPlan, object_ref: &str, last_ordinal: u64) -> String {
     let mut digest = Fnv1a64::new();
     digest.write(object_ref.as_bytes());
@@ -148,7 +145,6 @@ pub fn run_to_fixpoint(
         let mut progressed = false;
         for owed in pending {
             let key = upcast_idempotency_key(plan, &owed.object_ref, owed.last_ordinal);
-            // Non-empty by the pending predicate; fail-closed anyway.
             let Ok(edit) = OntologyEdit::upsert_properties(owed.targets) else {
                 status.refused += 1;
                 continue;
@@ -188,21 +184,7 @@ pub fn run_to_fixpoint(
                     // it, the same drift-sensitive key is re-derived, the
                     // byte-identical append deduplicates onto the same
                     // poisoned ordinal, and the next pass is identical to
-                    // this one. Counting it as progress made this loop
-                    // unbounded — a fixed point of its own body that it
-                    // refused to recognise, holding the tenant lock forever.
-                    // The module's own law says a pass that makes no progress
-                    // stops; a poison is exactly that class.
-                    // DISTINCT ORDINALS THIS RUN OBSERVED, not receipts it
-                    // appended. A later pass re-submits the same object under
-                    // the same drift-sensitive key and deduplicates onto the
-                    // ordinal already poisoned; counting that again reports
-                    // two poisoned entries where one exists. But gating on
-                    // `!deduplicated` under-counts the other way: a byte-
-                    // identical retry from an EARLIER run also deduplicates,
-                    // so a second run would report every field zero while a
-                    // poisoned entry still blocks the object — the bare count
-                    // with no reason in it that this module refuses to emit.
+                    // this one.
                     if seen_poison.insert(receipt.ordinal) {
                         status.poisoned += 1;
                     }
@@ -266,7 +248,6 @@ pub(super) fn computed_target(
         }
         UpcastTransform::DefaultTo { value, .. } => {
             if current.is_some() {
-                // A default fills absence; it never overwrites.
                 return None;
             }
             value.to_wire()

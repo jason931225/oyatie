@@ -30,12 +30,6 @@ struct OntologyQueryIntentFingerprint {
 
 impl OntologyQueryExecutionUsecase {
     /// Execute one policy-checked query against the DURABLE projection.
-    ///
-    /// The usecase no longer takes a caller-supplied `ObjectGraph` and a
-    /// hand-built link index: it reads the store the projector fills, so
-    /// a query answers from replayed truth rather than from whatever the
-    /// caller happened to assemble. Every policy, idempotency and audit
-    /// behaviour around it is unchanged.
     pub fn execute(
         &mut self,
         store: &dyn ProjectionStore,

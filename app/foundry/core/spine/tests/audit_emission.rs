@@ -1,6 +1,4 @@
-//! Derivation of port-shaped audit events from the spine's facts:
-//! applied, poisoned, and denied each become [`FoundryAuditEvent`]s;
-//! every consumed entry lands in exactly one of (events, underivable).
+//! Derivation of port-shaped audit events from the spine's facts.
 
 use data_boundary_kernel::{DataClass, PrivacyDataClass};
 use data_ontology_kernel::{
@@ -214,6 +212,19 @@ fn an_undecodable_entry_is_reported_underivable_never_dropped() {
         reason: UnderivableReason::PayloadUndecodable,
     };
     assert_eq!(derived.underivable, vec![expected]);
+}
+
+#[test]
+fn every_consumed_entry_lands_in_exactly_one_channel() {
+    let (entries, state) = seeded();
+    let derived = derive_action_events(&state, &entries);
+    let events: Vec<u64> = derived.events.iter().map(ordinal_of).collect();
+    let underivable: Vec<u64> = derived.underivable.iter().map(|row| row.ordinal).collect();
+    assert!(events.iter().all(|ordinal| !underivable.contains(ordinal)));
+    assert_eq!(
+        events.len() + underivable.len(),
+        state.applied_ordinal as usize
+    );
 }
 
 #[test]

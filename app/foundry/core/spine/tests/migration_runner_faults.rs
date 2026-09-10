@@ -58,14 +58,12 @@ fn invalid_plan_never_touches_the_log() {
     assert_eq!(denials.head("ten_test").unwrap(), 0);
 }
 
-/// A poisoned entry is counted by EVERY run that still owes it.
-///
-/// The count is over distinct ordinals THIS run observed, not over receipts
-/// it appended. Gating on `!receipt.deduplicated` fixes the double count
-/// within one run and breaks the next one: a byte-identical retry from an
-/// earlier run also deduplicates, so a second run reported every diagnostic
-/// field zero while a poisoned entry still blocked the object — a bare count
-/// with no reason in it, which is the failure this module refuses to emit.
+/// The count is over distinct ordinals THIS run observed, not over
+/// receipts it appended. Gating on `!receipt.deduplicated` fixes the
+/// double count within one run and breaks the next one: a byte-identical
+/// retry from an earlier run also deduplicates, so a second run reports
+/// every diagnostic field zero while a poisoned entry still blocks the
+/// object.
 #[test]
 fn a_poison_is_counted_by_each_run_that_still_owes_it() {
     let (_engine, mut log, mut state) = fixture();

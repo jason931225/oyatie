@@ -17,7 +17,6 @@ pub enum EdgeConsent {
 }
 
 impl EdgeConsent {
-    /// A granted posture from any string-ish ids.
     pub fn granted(ids: Vec<impl Into<String>>) -> Self {
         Self::Granted(ids.into_iter().map(Into::into).collect())
     }
@@ -43,7 +42,6 @@ pub struct KnowledgeGraphQueryRequest {
     pub observed_at_epoch_seconds: u64,     // data_class: INTERNAL_ONLY
     pub edge_consent: EdgeConsent,          // data_class: INTERNAL_ONLY
     pub direction: TraversalDirection,      // data_class: INTERNAL_ONLY
-    /// Resume a previously truncated walk; `None` starts from the top.
     pub resume_cursor: Option<QueryCursor>, // data_class: INTERNAL_ONLY
     /// Further roots for multi-root search-around (the object-set seam):
     /// the walk seeds from `root_entity_id` plus every id here, all at
@@ -92,8 +90,6 @@ impl KnowledgeGraphQueryRequest {
         Ok(self)
     }
 
-    /// Resume from the cursor a truncated response handed back. Returns
-    /// `self` for chaining.
     pub fn with_resume_cursor(mut self, cursor: QueryCursor) -> Self {
         self.resume_cursor = Some(cursor);
         self

@@ -18,8 +18,6 @@ fn prop(name: &str) -> WireProperty {
     .unwrap()
 }
 
-/// The u8 numbering of every edit kind, live and reserved, is byte-law:
-/// this enumeration is verbatim and any change is a wire-format break.
 #[test]
 fn edit_tag_numbering_is_frozen() {
     let expected = [
@@ -141,7 +139,6 @@ fn wire_dates_are_validated() {
     assert_eq!(WireDate::new(2024, 12, 0), Err(WireValueError::InvalidDate));
 }
 
-/// The tier and data-class tag numbering is byte-law, frozen verbatim.
 #[test]
 fn wire_tag_numbering_is_frozen() {
     let tiers = [

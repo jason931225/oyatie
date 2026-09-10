@@ -5,14 +5,14 @@
 /// without reading a stack trace.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum RefusalGate {
-    /// Gate 1: the invocation was not authorized for this principal,
-    /// decision, and action — nothing is appended to the object log.
+    /// The invocation was not authorized for this principal, decision,
+    /// and action — nothing is appended to the object log.
     Authorization,
-    /// Gate 2: submitted parameters failed conformance against the
-    /// action type's declared schema.
+    /// Submitted parameters failed conformance against the action type's
+    /// declared schema.
     Parameters,
-    /// Gate 3: the edit set was refused — a reserved edit kind, an
-    /// entity-type mismatch, or a dry-run conformance failure.
+    /// The edit set was refused — a reserved edit kind, an entity-type
+    /// mismatch, or a dry-run conformance failure.
     Admission,
 }
 
@@ -27,8 +27,6 @@ impl RefusalGate {
     }
 }
 
-/// A refused submission: the gate that refused it and a static,
-/// never-classified cause label.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Refused {
     pub gate: RefusalGate,   // data_class: INTERNAL_ONLY

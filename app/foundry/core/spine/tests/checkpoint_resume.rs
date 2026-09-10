@@ -143,9 +143,6 @@ fn a_foreign_registry_discards_the_checkpoint() {
     // The rev-2 entry poisoned under the rev-1 registry snapshot.
     assert_eq!(live.poison.keys().copied().collect::<Vec<_>>(), vec![2]);
 
-    // Resuming against the EVOLVED registry must not keep the stale
-    // poison: the checkpoint is discarded and the refold un-poisons the
-    // revision-ahead entry.
     let evolved = evolved_registry();
     let resumed = Checkpoint::capture(&live).resume(&evolved, &entries);
     assert_eq!(resumed, fold_from_scratch("ten_test", &evolved, &entries));

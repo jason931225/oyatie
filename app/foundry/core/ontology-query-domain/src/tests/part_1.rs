@@ -1,5 +1,3 @@
-//! Query-engine tests: part 1.
-
 use super::support::*;
 
 #[test]
@@ -227,8 +225,7 @@ fn cycle_edges_are_reported_without_unbounded_revisit() {
 
 // Deny-by-default law (parity row: link types with cardinality
 // enforcement): an edge whose lty_ type was never registered for the
-// tenant must be refused at upsert. RED against the fail-open (any
-// lty_-prefixed edge is accepted with no registry consultation).
+// tenant must be refused at upsert.
 #[test]
 fn an_unregistered_link_type_is_refused_at_upsert() {
     let g = graph();

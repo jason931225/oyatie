@@ -1,12 +1,6 @@
 //! The write-through law: mirroring the fold into the durable store
 //! leaves the store equal to `fold(log)`, and a store failure HALTS —
 //! it never becomes a poison.
-//!
-//! A poison is derived from (log bytes, registry snapshot) and is the
-//! same on every replay. A store outage is neither: it is
-//! infrastructure. Recording one as a poison would bake a transient
-//! failure into the projection forever, so the runner stops instead and
-//! the log stays the source of truth.
 
 use data_boundary_kernel::{DataClass, PrivacyDataClass};
 use data_ontology_kernel::{

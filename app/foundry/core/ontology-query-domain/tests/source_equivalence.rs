@@ -1,15 +1,8 @@
 //! Two sources, one law.
 //!
-//! The same graph is loaded into the in-memory index and into the
-//! durable projection store, then every request shape is run through
-//! both and the responses must be IDENTICAL. This is the test the
-//! traversal split exists to make possible: because the walk is written
-//! once, a difference here can only come from a source, never from two
-//! implementations of the law quietly diverging.
-//!
-//! It is also the regression net for the merged law tests — consent,
-//! freshness, direction, edge filters, caps and cursors all run against
-//! the store-backed path here without being restated.
+//! The regression net for the merged law tests — consent, freshness,
+//! direction, edge filters, caps and cursors all run against the
+//! store-backed path here without being restated.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod source_equivalence_support;

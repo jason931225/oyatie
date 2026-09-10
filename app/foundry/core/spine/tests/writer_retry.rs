@@ -57,8 +57,6 @@ fn registry() -> OntologyEngine {
     engine
 }
 
-/// A minimal honest in-memory log: dense per-tenant ordinals, per-object
-/// sequences, whole-envelope byte-equality dedup, loud conflicts.
 #[derive(Default)]
 struct MemoryLog {
     entries: Vec<SealedEnvelope>,

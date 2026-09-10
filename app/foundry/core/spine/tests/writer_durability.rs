@@ -1,4 +1,4 @@
-//! Suite check (f): the write path against the REAL durable adapter —
+//! The write path against the REAL durable adapter —
 //! kill the process's handle, reopen the file, refold the replay, and
 //! the projection is identical, poisons included.
 

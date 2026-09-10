@@ -1,21 +1,13 @@
 //! `store == fold(log)` proven against the DURABLE store, not a second
 //! in-memory one.
 //!
-//! Everything upstream of this file compared an in-memory projection to
-//! an in-memory projection: `write_through::the_store_equals_the_fold_of_the_log`
-//! mirrors into a `MemoryProjectionStore`, and the query plane's
-//! `source_equivalence` loads both of its graph sources from one. Both
-//! are real laws, and neither of them touches SQLite — so the adapter
-//! that actually holds the data was held only to the port's conformance
-//! suite, which never sees a log or a fold at all.
-//!
-//! The gap that leaves is not academic. The read path now serves from
-//! the durable store, so anything the adapter drops, reorders, or
-//! rounds on its way to disk is served as the answer. This file folds a
-//! log that contains objects, an edge, and a poison, rebuilds a real
-//! SQLite database from it, and compares that database to the fold —
-//! then drops the connection and compares again, because a projection
-//! that is only correct while its process is alive is not durable.
+//! The read path serves from the durable store, so anything the adapter
+//! drops, reorders, or rounds on its way to disk is served as the
+//! answer. This file folds a log that contains objects, an edge, and a
+//! poison, rebuilds a real SQLite database from it, and compares that
+//! database to the fold — then drops the connection and compares again,
+//! because a projection that is only correct while its process is alive
+//! is not durable.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

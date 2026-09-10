@@ -1,5 +1,3 @@
-//! Validated link instances.
-
 use crate::contract::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
