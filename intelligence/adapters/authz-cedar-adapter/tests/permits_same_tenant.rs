@@ -187,8 +187,9 @@ fn cross_tenant_is_forbidden_for_every_kernel_action() {
 }
 
 /// Every action the bundled policy names, with the realm that permits it.
-/// `decide()` reaches only `InvokeChatCompletion` and `RefreshKeyPool`; the
-/// widened forbid re-scoped the other four, so they are driven at Cedar here.
+/// `decide()` reaches only `InvokeChatCompletion` and `RefreshKeyPool`, so the other four are
+/// driven at Cedar here. Re-scoping is an independent property: the widening newly denies
+/// ListModels, ReadPoolStatus, RefreshKeyPool and ReadAudit — so RefreshKeyPool is in both.
 const REALM_BY_ACTION: [(&str, &str); 6] = [
     ("InvokeChatCompletion", "IngressRealm"),
     ("InvokeEmbeddings", "IngressRealm"),
