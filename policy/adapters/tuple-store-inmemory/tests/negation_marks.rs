@@ -143,7 +143,6 @@ fn a_cycle_crossing_only_the_inner_subtraction_is_still_refused() {
     let mut store = InMemoryTupleStore::new();
     write(&mut store, "doc:spec#editor@user:alice");
     write(&mut store, "doc:spec#flagged@user:alice");
-    // `exempt` is defined by `blocked`, and `blocked` subtracts `exempt`.
     write(&mut store, "doc:spec#exempt@doc:spec#blocked");
 
     let expander = new_expander(&store, &model, RebacReadSnapshot::latest());

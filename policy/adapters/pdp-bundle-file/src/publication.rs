@@ -1,5 +1,3 @@
-//! Signed file transport. Cedar compilation and policy-case qualification belong to the caller.
-
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -20,19 +18,16 @@ pub enum BundlePublishError {
     Serialization(serde_json::Error),
     Signing(DigestChainError),
     Verification(BundleStoreError),
-    /// The destination was not replaced.
     BeforeCommit {
         operation: &'static str,
         path: PathBuf,
         source: io::Error,
     },
-    /// The destination was not replaced, but removing the staging file also failed.
     StagingCleanupFailed {
         path: PathBuf,
         source: io::Error,
         publication_error: Box<BundlePublishError>,
     },
-    /// Rename succeeded. The new destination is visible, but directory durability is unknown.
     CommittedButDurabilityUnknown {
         path: PathBuf,
         source: io::Error,
@@ -86,12 +81,8 @@ impl std::error::Error for BundlePublishError {
 }
 
 impl FilePolicyBundleStore {
-    /// Serialize once, sign through caller-provided custody, verify against this
-    /// store's configured trust, then atomically replace its bundle document.
-    ///
-    /// This is a transport operation: the caller qualifies Cedar source and
-    /// authored decision cases before calling it. The public key is envelope
-    /// metadata; it never registers trust. The destination directory must exist.
+    /// The public key is envelope metadata; it never registers trust. The
+    /// destination directory must exist.
     ///
     /// # Errors
     /// A pre-commit error leaves the destination unchanged. A successful rename
@@ -104,7 +95,7 @@ impl FilePolicyBundleStore {
         signer: &dyn ChainSigner,
         public_key: &[u8],
     ) -> Result<(), BundlePublishError> {
-        let (verifier, _) =
+        let verifier =
             load_trust_anchor(self.trust_dir()).map_err(BundlePublishError::Verification)?;
         let inner = serde_json::to_string(bundle).map_err(BundlePublishError::Serialization)?;
         let signature_hex = signer

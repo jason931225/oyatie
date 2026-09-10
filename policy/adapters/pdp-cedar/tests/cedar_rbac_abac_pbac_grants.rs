@@ -1,6 +1,3 @@
-//! The three grant paths and the structural forbid that overrides them.
-//!
-//! Part of the G004 Cedar conformance suite; shared fixtures in `conformance/`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;
@@ -48,12 +45,9 @@ fn rbac_non_member_is_denied_by_default() {
     assert_eq!(outcome.response.decision, Decision::Deny);
 }
 
-// ---------------------------------------------------------------- ABAC ----
-
 #[test]
 fn abac_step_up_class_gates_restricted_reads() {
     let pdp = pdp(vec![]);
-    // alice asserted step-up class "a": allow, attributed to the ABAC policy.
     let allowed = pdp
         .authorize(
             &request(
@@ -71,7 +65,6 @@ fn abac_step_up_class_gates_restricted_reads() {
         allowed.response.determining_policy_ids,
         vec!["abac-step-up-restricted-read".to_owned()]
     );
-    // bob has no step_up_class attribute: deny-by-default.
     let denied = pdp
         .authorize(
             &request(
@@ -87,31 +80,33 @@ fn abac_step_up_class_gates_restricted_reads() {
     assert_eq!(denied.response.decision, Decision::Deny);
 }
 
-// ---------------------------------------------------------------- PBAC ----
-
 #[test]
 fn pbac_template_link_grants_scoped_read() {
-    // acme-doc-2 is NON-restricted: this isolates the PBAC grant from the
-    // step-up forbid (which only gates restricted reads).
+    let read_the_doc = request(
+        "req-pbac-1",
+        "acme",
+        entity_ref("OyaPlatform::Principal", "bob"),
+        "resource.read",
+        non_restricted_acme_doc(),
+    );
+    let unlinked = pdp(vec![])
+        .authorize(&read_the_doc, &entity_slice())
+        .unwrap();
+    assert_eq!(
+        unlinked.response.decision,
+        Decision::Deny,
+        "without the link the grant must not already exist, or the test below \
+         would pass vacuously"
+    );
+
     let link = TemplateLink {
         template_id: TEMPLATE_ID.to_owned(),
         link_id: "pbac-link-bob-doc2".to_owned(),
         principal: entity_ref("OyaPlatform::Principal", "bob"),
-        resource: entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+        resource: non_restricted_acme_doc(),
     };
-    // Without the link: deny-by-default (proved by the ABAC test above).
-    let pdp = pdp(vec![link]);
-    let outcome = pdp
-        .authorize(
-            &request(
-                "req-pbac-1",
-                "acme",
-                entity_ref("OyaPlatform::Principal", "bob"),
-                "resource.read",
-                entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
-            ),
-            &entity_slice(),
-        )
+    let outcome = pdp(vec![link])
+        .authorize(&read_the_doc, &entity_slice())
         .unwrap();
     assert_eq!(outcome.response.decision, Decision::Allow);
     assert_eq!(
@@ -120,8 +115,6 @@ fn pbac_template_link_grants_scoped_read() {
         "the allow is attributable to the template instantiation"
     );
 }
-
-// ---------------------------------------- structural tenant isolation ----
 
 #[test]
 fn structural_forbid_overrides_cross_tenant_group_membership() {
@@ -185,5 +178,3 @@ fn structural_forbid_overrides_misissued_cross_tenant_template_link() {
         "a mis-issued cross-tenant grant can never defeat the structural forbid"
     );
 }
-
-// ------------------------------------------- per-tenant overlays (G004) ----

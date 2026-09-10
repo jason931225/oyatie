@@ -1,6 +1,3 @@
-//! Per-tenant overlay policies: confinement, fail-closed load, and the forbid they cannot escape.
-//!
-//! Part of the G004 Cedar conformance suite; shared fixtures in `conformance/`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;
@@ -13,11 +10,6 @@ fn tenant_overlay_permit_applies_only_within_owning_tenant() {
         "acme".to_owned(),
         ACME_OVERLAY_BOB_READ.to_owned(),
     )]));
-    // bob, an acme principal, reading a NON-restricted acme resource: the acme
-    // overlay grants it, attributed to the overlay's namespaced id. (acme-doc-2
-    // is non-restricted so the step-up forbid does not apply; the forbid's
-    // effect on a restricted read is proven by
-    // `tenant_overlay_permit_cannot_bypass_step_up_forbid`.)
     let outcome = pdp
         .authorize(
             &request(
@@ -25,7 +17,7 @@ fn tenant_overlay_permit_applies_only_within_owning_tenant() {
                 "acme",
                 entity_ref("OyaPlatform::Principal", "bob"),
                 "resource.read",
-                entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+                non_restricted_acme_doc(),
             ),
             &entity_slice(),
         )
@@ -40,8 +32,6 @@ fn tenant_overlay_permit_applies_only_within_owning_tenant() {
 
 #[test]
 fn tenant_overlay_does_not_leak_to_other_tenant() {
-    // The SAME acme overlay; a request whose SVID-bound tenant is globex must
-    // NOT see it (the selection is keyed by the request's own tenant_id).
     let pdp = pdp_with_overlays(BTreeMap::from([(
         "acme".to_owned(),
         ACME_OVERLAY_BOB_READ.to_owned(),
@@ -67,7 +57,6 @@ fn tenant_overlay_does_not_leak_to_other_tenant() {
 
 #[test]
 fn fail_closed_default_deny_with_empty_overlays() {
-    // Empty tenant_policies + no global permit for bob: deny-by-default.
     let pdp = pdp_with_overlays(BTreeMap::new());
     let outcome = pdp
         .authorize(
@@ -86,7 +75,6 @@ fn fail_closed_default_deny_with_empty_overlays() {
 
 #[test]
 fn malformed_tenant_overlay_rejects_whole_bundle_fail_closed() {
-    // An overlay that is not valid Cedar must reject the WHOLE bundle at load.
     let result = CedarPdp::load(
         &locked_seed_bundle_with_overlays(
             "psv-000001",
@@ -130,7 +118,6 @@ permit (
         result.map(|_| "loaded")
     );
 
-    // And an overlay that NAMES another tenant by literal is likewise rejected.
     let foreign_literal_permit = r#"
 @id("ovl-foreign")
 permit (
@@ -193,10 +180,41 @@ when { principal.tenant_id == resource.tenant_id };
     );
 }
 
-// -------------------- the REAL tenant-isolation boundary (G004 audit) ----
-//
-// The sole, formally-verified tenant-isolation boundary is the global
-// `structural-tenant-isolation` forbid (forbid-overrides-permit) over the
-// schema-required `tenant_id` attribute — NOT any load-time overlay check.
-// These tests lock that boundary directly so a maintainer cannot remove the
-// forbid (or weaken the schema) without a red suite.
+#[test]
+fn overlay_permit_obligation_rides_out_from_the_merged_set() {
+    let overlay = r#"
+@id("ovl-bob-read-with-obligation")
+@obligation("redact-pii")
+permit (
+  principal == OyaPlatform::Principal::"bob",
+  action == OyaPlatform::Action::"ReadResource",
+  resource
+)
+when { principal.tenant_id == resource.tenant_id };
+"#;
+    let pdp = pdp_with_overlays(BTreeMap::from([("acme".to_owned(), overlay.to_owned())]));
+    let outcome = pdp
+        .authorize(
+            &request(
+                "req-ovl-obligation",
+                "acme",
+                entity_ref("OyaPlatform::Principal", "bob"),
+                "resource.read",
+                non_restricted_acme_doc(),
+            ),
+            &entity_slice(),
+        )
+        .unwrap();
+    assert_eq!(outcome.response.decision, Decision::Allow);
+    assert_eq!(
+        outcome
+            .response
+            .obligations
+            .iter()
+            .map(|obligation| obligation.obligation_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["redact-pii"],
+        "an overlay permit's obligation must be looked up against the merged \
+         set that decided the request, not the global set"
+    );
+}

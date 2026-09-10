@@ -1,13 +1,8 @@
-//! The G001 contract-lock seeds, embedded as Rust constants.
-//!
-//! These were crate-local `.cedar`/`.cedarschema` files, but the layout
-//! grammar admits only `.rs` (and `fixtures/<case>/` `.json`/`.txt`) under
-//! `tests/`, so the bytes live here instead. Byte-for-byte identity with the
-//! canonical copies under `iam/core/platform-contracts-kernel/cedar/` is
-//! enforced by `crate_local_cedar_seeds_match_canonical`; canonical wins -
-//! sync this file in the same change.
+//! Byte-for-byte identity with the canonical copies under
+//! `iam/core/platform-contracts-kernel/cedar/` is enforced by
+//! `crate_local_cedar_seeds_match_canonical`; canonical wins - sync this file
+//! in the same change.
 
-/// `platform.cedarschema`
 pub const SCHEMA_SRC: &str = r#"// FD-001 shared platform contracts — Cedar schema seed.
 // Binding ADRs: ADR-0183 (policy-engine separation: Cedar app-authz),
 // ADR-0243 (Cedar universal gate). Validated against the real cedar-policy
@@ -67,7 +62,6 @@ namespace OyaPlatform {
 }
 "#;
 
-/// `platform-policies.cedar`
 pub const POLICIES_SRC: &str = r#"// FD-001 shared platform contracts — policy seed.
 // Cedar semantics: deny-by-default, forbid-overrides-permit, order-independent
 // (formally verified; arXiv 2403.04651). The structural invariant below is
@@ -132,7 +126,6 @@ when {
 };
 "#;
 
-/// `platform-templates.cedar`
 pub const TEMPLATE_SRC: &str = r#"// FD-001 shared platform contracts — PBAC template seed.
 // Policy-as-data: the control plane links this template per grant
 // (?principal, ?resource), instead of authoring ad-hoc policies. Precedent:

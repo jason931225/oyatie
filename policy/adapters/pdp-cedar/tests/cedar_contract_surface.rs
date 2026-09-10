@@ -1,6 +1,3 @@
-//! Unknown actions, obligation pass-through, and crate-local seed drift.
-//!
-//! Part of the G004 Cedar conformance suite; shared fixtures in `conformance/`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;
@@ -32,8 +29,6 @@ fn obligations_ride_out_with_annotated_permits() {
         "\n@id(\"workload-read-grant\")\n@obligation(\"emit-step-up-audit\")\npermit (\n  principal is OyaPlatform::WorkloadIdentity,\n  action == OyaPlatform::Action::\"ReadResource\",\n  resource\n)\nwhen { principal.tenant_id == resource.tenant_id };\n",
     );
     let pdp = CedarPdp::load(&bundle, Arc::new(SeededIdGenerator::default()), 64).unwrap();
-    // acme-doc-2 is non-restricted: the obligation rides out on an ordinary
-    // grant, undisturbed by the step-up forbid.
     let outcome = pdp
         .authorize(
             &request(
@@ -41,7 +36,7 @@ fn obligations_ride_out_with_annotated_permits() {
                 "acme",
                 entity_ref("OyaPlatform::WorkloadIdentity", "payments"),
                 "resource.read",
-                entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+                non_restricted_acme_doc(),
             ),
             &entity_slice(),
         )
@@ -105,8 +100,6 @@ fn qualification_evaluation_does_not_populate_the_serving_cache() {
     assert!(!qualified.cache_hit);
     assert!(!pdp.authorize(&request, &entity_slice()).unwrap().cache_hit);
 }
-
-// ------------------------------------------------ seed parity guard ----
 
 #[test]
 fn crate_local_cedar_seeds_match_canonical() {

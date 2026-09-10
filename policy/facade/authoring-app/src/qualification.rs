@@ -12,6 +12,10 @@ use shared_ulid_id_kernel::IdGenerator;
 
 use crate::{DecisionExpectation, PolicyProject};
 
+/// Qualification must decide from the policies alone; a warm entry would let
+/// one case's outcome answer another's request.
+const QUALIFICATION_CACHE_DISABLED: usize = 0;
+
 #[derive(Debug)]
 pub enum QualificationError {
     Encoding {
@@ -48,7 +52,6 @@ pub struct PreparedPolicy {
 }
 
 impl PolicyProject {
-    /// Compile once and run every case against that exact candidate with cache disabled.
     /// A refusal is not a deny and cannot satisfy a deny expectation.
     ///
     /// # Errors
@@ -74,7 +77,8 @@ impl PolicyProject {
             .source
             .candidate()
             .map_err(map_content_identity_error)?;
-        let engine = CedarPdp::load(&bundle, id_gen, 0).map_err(QualificationError::Admission)?;
+        let engine = CedarPdp::load(&bundle, id_gen, QUALIFICATION_CACHE_DISABLED)
+            .map_err(QualificationError::Admission)?;
         for case in &self.cases {
             let outcome = engine
                 .authorize_for_qualification(&case.request, &case.entities)

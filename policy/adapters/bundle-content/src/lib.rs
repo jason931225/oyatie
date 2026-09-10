@@ -14,8 +14,6 @@ pub enum ContentIdentityError {
     Encoding { detail: String },
 }
 
-/// Complete authored serving inputs. Version is derived, never caller assigned.
-/// Source whitespace and vector order are significant; map insertion order is not.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PolicySource {
@@ -28,9 +26,6 @@ pub struct PolicySource {
 }
 
 impl PolicySource {
-    /// Identity covers every serving input, independent of qualification cases.
-    /// This does not parse or admit the source.
-    ///
     /// # Errors
     /// Returns a serialization or version-contract refusal.
     pub fn content_version(&self) -> Result<PolicyVersion, ContentIdentityError> {
@@ -40,8 +35,6 @@ impl PolicySource {
         })
     }
 
-    /// Materialize the complete serving candidate with its derived version.
-    ///
     /// # Errors
     /// Returns a content-identity refusal.
     pub fn candidate(&self) -> Result<PolicyBundle, ContentIdentityError> {

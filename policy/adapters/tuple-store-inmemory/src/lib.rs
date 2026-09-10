@@ -1,9 +1,6 @@
-//! In-memory tuple store.
-//!
-//! Writes are totally ordered by an increasing version, and each write returns
-//! a zookie naming that version. A read at an earlier snapshot cannot observe
-//! a later write, so "deny before the grant was written, allow after" is a
-//! real property here and not a simulation of one.
+//! In-memory tuple store. Writes are totally ordered and a read at an earlier
+//! snapshot cannot observe a later write, so "deny before the grant was
+//! written, allow after" is a real property here and not a simulation of one.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use policy_cedar_domain::rebac::{
@@ -16,10 +13,15 @@ use policy_cedar_domain::rebac::{
 /// that path.
 const DEFAULT_PAGE_SIZE: usize = 50;
 
+#[derive(Clone, Debug)]
+struct WrittenTuple {
+    version_written: u64,
+    tuple: RebacTuple,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct InMemoryTupleStore {
-    /// `(version_written, tuple)`, in write order.
-    written: Vec<(u64, RebacTuple)>,
+    written: Vec<WrittenTuple>,
     version: u64,
     page_size: usize,
 }
@@ -34,8 +36,6 @@ impl InMemoryTupleStore {
         }
     }
 
-    /// Page size for reads. Used by conformance suites to force pagination.
-    ///
     /// # Panics
     /// When `page_size` is zero: a zero page can never make progress, and a
     /// reader looping on it would hang rather than fail.
@@ -46,8 +46,6 @@ impl InMemoryTupleStore {
         self
     }
 
-    /// The zookie naming the most recent write.
-    ///
     /// # Errors
     /// When the version cannot be rendered as a valid token.
     pub fn head(&self) -> Result<Zookie, RebacTupleStoreError> {
@@ -75,7 +73,10 @@ impl InMemoryTupleStore {
 impl RebacTupleStore for InMemoryTupleStore {
     fn write_tuple(&mut self, tuple: RebacTuple) -> Result<Zookie, RebacTupleStoreError> {
         self.version = self.version.saturating_add(1);
-        self.written.push((self.version, tuple));
+        self.written.push(WrittenTuple {
+            version_written: self.version,
+            tuple,
+        });
         self.head()
     }
 
@@ -108,8 +109,8 @@ impl RebacTupleStore for InMemoryTupleStore {
         let matched: Vec<RebacTuple> = self
             .written
             .iter()
-            .filter(|(version, tuple)| *version <= ceiling && query.matches(tuple))
-            .map(|(_, tuple)| tuple.clone())
+            .filter(|written| written.version_written <= ceiling && query.matches(&written.tuple))
+            .map(|written| written.tuple.clone())
             .collect();
 
         let start = match query.page_token.as_deref() {

@@ -108,8 +108,6 @@ fn a_walk_does_not_inherit_a_previous_walks_negation_state() {
     write(&mut store, "group:b#member@group:a#member");
 
     let expander = new_expander(&store, &model, RebacReadSnapshot::latest());
-    // First check walks the subtraction and returns; the second must behave
-    // identically rather than carrying the first's state.
     let first = expander.check(
         &user("user:alice"),
         &relation("editor"),

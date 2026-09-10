@@ -1,33 +1,9 @@
-//! # iam-pdp-cedar
-//!
-//! Embedded cedar-policy PDP adapter for FD-001 (story G004, ADR-0536 D-2).
-//!
-//! ## Posture
-//! Implements the [`PolicyDecisionPoint`] port from `shared-pdp-kernel`
-//! over the upstream, formally-verified `cedar-policy` engine (arXiv
-//! 2403.04651): default-deny, forbid-overrides-permit, order-independent.
-//! Evaluation is strictly in-process — an authorization decision never takes
-//! a network hop (ADR-0536 D-2; precedent: Cedar / Amazon Verified
-//! Permissions embedded evaluator).
-//!
-//! Cedar is the TERMINAL engine decision, not a transitional impl: ADR-0536
-//! D-2 retires the hand-rolled `policy-cedar-*` evaluator in favor of
-//! this crate (two decision algorithms must never coexist, ADR-0243).
-//!
-//! ## Behavior
-//! - Bundles are parsed, template-linked, and STRICT-validated before load;
-//!   a rejected bundle never replaces a serving one (fail closed).
-//! - Zookie freshness: a caller-pinned `min_policy_version` that does not
-//!   match the loaded bundle version is a refusal, never a stale answer.
-//! - Decision cache keyed `(request-fingerprint, policy-version)`: a bundle
-//!   swap changes the version and structurally invalidates every prior
-//!   entry, so revocation latency reduces to bundle propagation
-//!   (sub-60s revocation SLO, G004).
-//! - One audit record per decision — allow or deny, cached or evaluated —
-//!   with a freshly minted decision id every time.
-//!
-//! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
+//! Embedded Cedar policy decision point.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeMap;
@@ -54,27 +30,15 @@ struct LoadedBundle {
     version: PolicyVersion,
     source_identity: Vec<u8>,
     schema: Schema,
-    /// The global policy set (structural forbid + RBAC/ABAC/PBAC). Served to
-    /// any request whose tenant has no overlay.
     policy_set: PolicySet,
-    /// Per-tenant MERGED policy sets: `tenant_id` -> (global ∪ that tenant's
-    /// overlay). Built at compile so the request path stays a single
-    /// `is_authorized` over one `PolicySet` (ADR-0243: one decision
-    /// algorithm). A tenant absent from this map falls back to `policy_set`.
-    /// The merge is per-tenant, so one tenant's overlay can NEVER appear in
-    /// another tenant's set (overlay SELECTION is keyed by the owning tenant).
-    /// Note: cross-tenant GRANT isolation is a separate, stronger guarantee
-    /// enforced at runtime by the global `structural-tenant-isolation` forbid
-    /// present in every merged set — not by this selection keying.
+    /// Cross-tenant GRANT isolation is a separate, stronger guarantee enforced
+    /// at runtime by the global `structural-tenant-isolation` forbid present in
+    /// every merged set — not by this selection keying.
     tenant_policy_sets: BTreeMap<String, PolicySet>,
     action_map: BTreeMap<String, EntityUid>,
 }
 
 impl LoadedBundle {
-    /// The policy set to decide `tenant_id` against: the per-tenant merged set
-    /// (global ∪ that tenant's overlay) when one exists, else the global set.
-    /// A tenant NEVER sees another tenant's overlay — the BTreeMap is keyed by
-    /// the owning tenant, so selection is structural.
     fn policy_set_for(&self, tenant_id: &str) -> &PolicySet {
         self.tenant_policy_sets
             .get(tenant_id)
@@ -82,8 +46,6 @@ impl LoadedBundle {
     }
 }
 
-/// The embedded Cedar PDP. One instance per process; the policy-store
-/// delivery fabric swaps bundles in place via [`CedarPdp::swap_bundle`].
 pub struct CedarPdp {
     state: RwLock<LoadedBundle>,
     cache: Mutex<DecisionCache>,
@@ -115,9 +77,9 @@ impl CedarPdp {
 
     /// Atomically replace the serving bundle (the revocation path). The new
     /// bundle is fully compiled and strict-validated BEFORE the swap; on any
-    /// error the current bundle keeps serving (fail closed, static
-    /// stability). A replacement invalidates cached content, including content
-    /// from a previous use of its opaque version. An identical reload is a no-op.
+    /// error the current bundle keeps serving (fail closed). A replacement
+    /// invalidates cached content, including content from a previous use of its
+    /// opaque version. An identical reload is a no-op.
     ///
     /// # Errors
     /// [`PdpError::BundleRejected`] when admission fails or the current version

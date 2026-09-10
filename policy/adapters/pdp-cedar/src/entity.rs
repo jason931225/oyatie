@@ -12,15 +12,11 @@ pub(super) fn entity_uid(entity_ref: &EntityRef) -> Result<EntityUid, PdpError> 
         })?;
     let id = match EntityId::from_str(&entity_ref.entity_id) {
         Ok(id) => id,
-        // EntityId parsing is infallible (FromStr<Err = Infallible>).
         Err(infallible) => match infallible {},
     };
     Ok(EntityUid::from_type_name_and_id(type_name, id))
 }
 
-/// ABAC values cross the port as JSON; the schema seed models string, bool,
-/// and long attributes, so exactly those are mapped. Anything else fails
-/// closed rather than silently coercing.
 pub(super) fn restricted_expression(
     field: &str,
     value: &serde_json::Value,

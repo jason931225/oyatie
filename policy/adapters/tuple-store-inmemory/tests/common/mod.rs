@@ -1,5 +1,3 @@
-//! Shared fixtures: a document/folder model with the usual rewrites.
-
 use policy_cedar_domain::rebac::{
     RebacObjectRef, RebacReadSnapshot, RebacRelation, RebacSubjectRef, RebacTenantScope,
     RebacTuple, RebacTupleStore, UsersetRewrite, Zookie,
@@ -49,8 +47,6 @@ pub fn bounded_expander<'a, S: RebacTupleStore>(
     Expander::new(store, namespace, tenant(), requested).with_bounds(bounds)
 }
 
-/// `folder#viewer` is direct. `document#viewer` is direct, or inherited from
-/// the viewer of the folder the document names as its parent.
 pub fn document_model() -> ValidatedNamespace {
     NamespaceConfig::new()
         .define("folder", &relation("viewer"), UsersetRewrite::this())

@@ -1,6 +1,3 @@
-//! The G004 audit's evasion permit shapes against the sound detector.
-//!
-//! Part of the G004 Cedar conformance suite; shared fixtures in `conformance/`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;
@@ -36,8 +33,6 @@ when { principal.tenant_id == resource.tenant_id };
         ("acme".to_owned(), acme_overlay.to_owned()),
         ("globex".to_owned(), globex_overlay.to_owned()),
     ]));
-    // acme's merged set: bob (acme) reading a globex resource crosses the
-    // boundary and must be denied by the structural forbid.
     let acme_outcome = pdp
         .authorize(
             &request(
@@ -45,7 +40,7 @@ when { principal.tenant_id == resource.tenant_id };
                 "acme",
                 entity_ref("OyaPlatform::Principal", "bob"),
                 "resource.read",
-                entity_ref("OyaPlatform::TenantResource", "globex-doc-1"),
+                foreign_tenant_doc(),
             ),
             &entity_slice(),
         )
@@ -61,8 +56,6 @@ when { principal.tenant_id == resource.tenant_id };
          structural forbid (present + armed), got {:?}",
         acme_outcome.response.determining_policy_ids
     );
-    // globex's merged set: mallory (globex) reading an acme resource is the
-    // symmetric cross-tenant read; same forbid must govern.
     let globex_outcome = pdp
         .authorize(
             &request(
@@ -70,7 +63,7 @@ when { principal.tenant_id == resource.tenant_id };
                 "globex",
                 entity_ref("OyaPlatform::Principal", "mallory"),
                 "resource.read",
-                entity_ref("OyaPlatform::TenantResource", "acme-doc-2"),
+                non_restricted_acme_doc(),
             ),
             &entity_slice(),
         )
@@ -95,7 +88,6 @@ fn entity_slice_missing_tenant_id_is_rejected_by_schema_validation() {
     // entity and the slice must be rejected by schema validation (fail closed),
     // never silently evaluated.
     let mut slice = entity_slice();
-    // Strip tenant_id from the acme-doc-1 resource record.
     let doc = slice
         .entities
         .iter_mut()
@@ -123,12 +115,9 @@ fn entity_slice_missing_tenant_id_is_rejected_by_schema_validation() {
 
 #[test]
 fn structural_forbid_denies_cross_tenant_read_for_any_permit_shape() {
-    // Prove the RUNTIME forbid is the boundary, independent of the load-time
-    // overlay detector: inject each audit evasion permit DIRECTLY into the
-    // GLOBAL policy set (bypassing the overlay path entirely), then show a
-    // cross-tenant read (bob@acme -> globex resource) is still denied. The
-    // forbid wins over every permit shape, so the boundary holds even if a
-    // detector were defeated.
+    // Injecting DIRECTLY into the GLOBAL policy set bypasses the overlay path
+    // entirely, so this proves the runtime forbid is the boundary even if the
+    // load-time detector were defeated.
     for (id, body) in EVASION_PERMITS {
         let mut bundle = locked_seed_bundle("psv-000001", vec![]);
         bundle
@@ -143,7 +132,7 @@ fn structural_forbid_denies_cross_tenant_read_for_any_permit_shape() {
                     "acme",
                     entity_ref("OyaPlatform::Principal", "bob"),
                     "resource.read",
-                    entity_ref("OyaPlatform::TenantResource", "globex-doc-1"),
+                    foreign_tenant_doc(),
                 ),
                 &entity_slice(),
             )
@@ -159,10 +148,6 @@ fn structural_forbid_denies_cross_tenant_read_for_any_permit_shape() {
 
 #[test]
 fn sound_detector_rejects_every_audit_evasion_overlay() {
-    // Each evasion overlay carries the same-tenant equality as a NON-binding
-    // token (behind ||, in an unless, behind !, etc.). The sound load-time
-    // detector must REJECT all 5 — a non-binding accept-on-presence detector
-    // would (wrongly) admit them.
     for (id, body) in EVASION_PERMITS {
         let overlay = format!("@id(\"{id}\")\n{body}");
         let result = CedarPdp::load(
@@ -184,8 +169,6 @@ fn sound_detector_rejects_every_audit_evasion_overlay() {
 
 #[test]
 fn sound_detector_accepts_every_legitimate_overlay_shape() {
-    // The sound detector must keep accepting genuinely tenant-confined permits:
-    // canonical, operand-swapped, parenthesized, and &&-nested.
     for (id, body) in LEGITIMATE_PERMITS {
         let overlay = format!("@id(\"{id}\")\n{body}");
         let result = CedarPdp::load(

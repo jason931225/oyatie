@@ -15,13 +15,8 @@ use shared_ulid_id_kernel::IdGenerator;
 
 use super::CedarPdp;
 
-/// Audit-chain surface emitted for every durable PDP decision record.
 pub const PDP_DECISION_AUDIT_SURFACE: &str = "authorization.pdp.decision";
 
-/// Durable signed audit-chain appender for PDP decisions. It owns the narrow
-/// adapter seam between the shared in-process Cedar PDP and the audit-chain
-/// file ledger: every append is Ed25519-signed, hash-chained, and persisted
-/// before the authorization outcome is returned to the caller.
 pub struct PdpDecisionAuditChainLogger {
     ledger: FileAuditLedger,
     signer: Ed25519SigningKey,
@@ -40,8 +35,6 @@ impl fmt::Debug for PdpDecisionAuditChainLogger {
 }
 
 impl PdpDecisionAuditChainLogger {
-    /// Load the existing ledger and prepare to append signed PDP decision events.
-    ///
     /// # Errors
     /// [`PdpAuditChainError::Load`] when the persisted ledger cannot be read or
     /// replayed as per-tenant audit-chain shards.
@@ -60,8 +53,6 @@ impl PdpDecisionAuditChainLogger {
         })
     }
 
-    /// Append, sign, and durably persist one PDP decision audit-chain event.
-    ///
     /// # Errors
     /// Returns an error if the in-memory chain lock is poisoned, the audit-chain
     /// kernel rejects the append, or the file ledger cannot persist the new tip.
@@ -121,7 +112,6 @@ fn load_trusted_multi_tenant_shards(
     Ok(chain)
 }
 
-/// Error surface for the audit-chain adapter seam.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PdpAuditChainError {
     Load(FileAuditLedgerError),
@@ -151,17 +141,14 @@ impl fmt::Display for PdpAuditChainError {
 
 impl std::error::Error for PdpAuditChainError {}
 
-/// Cedar PDP wrapper that fail-closes unless each decision is durably signed
-/// into the audit-chain ledger.
+/// Fail-closes unless each decision is durably signed into the audit-chain
+/// ledger BEFORE the authorization outcome is returned to the caller.
 pub struct AuditChainCedarPdp {
     inner: CedarPdp,
     audit_logger: PdpDecisionAuditChainLogger,
 }
 
 impl AuditChainCedarPdp {
-    /// Compile and strict-validate `bundle`, then serve from it with mandatory
-    /// durable signed audit-chain emission.
-    ///
     /// # Errors
     /// [`PdpError::BundleRejected`] when the bundle is invalid.
     pub fn load(
@@ -176,11 +163,6 @@ impl AuditChainCedarPdp {
         })
     }
 
-    /// Atomically replace the serving bundle while preserving the audit logger.
-    ///
-    /// # Errors
-    /// [`PdpError::BundleRejected`] when the new bundle fails to compile;
-    /// [`PdpError::Evaluation`] when the state lock is poisoned.
     pub fn swap_bundle(&self, bundle: &PolicyBundle) -> Result<(), PdpError> {
         self.inner.swap_bundle(bundle)
     }

@@ -1,6 +1,3 @@
-//! Signed audit-chain lineage, and the replays and key mismatches it refuses.
-//!
-//! Part of the G004 Cedar conformance suite; shared fixtures in `conformance/`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod conformance;

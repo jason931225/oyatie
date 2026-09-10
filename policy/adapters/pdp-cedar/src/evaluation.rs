@@ -91,10 +91,6 @@ impl CedarPdp {
         let mut obligations = Vec::new();
         if decision.is_allow() {
             for policy_id in response.diagnostics().reason() {
-                // Look up obligations against the SAME set we evaluated (the
-                // per-tenant merged set when an overlay applied), never the
-                // global set — else an overlay permit's @obligation is silently
-                // dropped (a fail-open on obligation enforcement).
                 let annotation = policy_set
                     .policy(policy_id)
                     .and_then(|p| p.annotation(OBLIGATION_ANNOTATION));
@@ -137,17 +133,14 @@ impl CedarPdp {
         Ok(state)
     }
 
-    /// Evaluate one authored qualification case against the current bundle.
-    ///
     /// Unlike ordinary serving, this refuses any per-policy Cedar evaluation
-    /// diagnostic. It bypasses the serving cache in both directions so a
+    /// diagnostic, and it bypasses the serving cache in BOTH directions so a
     /// permissive aggregate decision cannot mask a diagnostic and qualification
     /// cannot perturb serving state.
     ///
     /// # Errors
-    /// Returns the same request, freshness, entity, decision-id, and response
-    /// failures as ordinary authorization, plus [`PdpError::Evaluation`] when
-    /// Cedar reports any per-policy evaluation diagnostic.
+    /// [`PdpError::Evaluation`] when Cedar reports any per-policy evaluation
+    /// diagnostic, on top of ordinary authorization's refusals.
     pub fn authorize_for_qualification(
         &self,
         request: &AuthorizationRequest,
@@ -233,10 +226,6 @@ impl PolicyDecisionPoint for CedarPdp {
         if let Some(content) = cached {
             return self.outcome(request, &state.version, &content, true);
         }
-        // Select the decision set by the SVID-bound tenant: the per-tenant
-        // merged set (global ∪ that tenant's overlay) when it exists, else the
-        // global set. A tenant can never be evaluated against another tenant's
-        // overlay (the selection is keyed by the request's own tenant_id).
         let policy_set = state.policy_set_for(&request.tenant_id);
         let content = self.evaluate(
             &state,
