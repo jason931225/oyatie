@@ -6,13 +6,11 @@ use crate::identity::ResourceName;
 /// Maximum page size any provider must accept.
 pub const MAX_PAGE_SIZE: u32 = 1000;
 
-/// An opaque pagination cursor (AIP-158: tokens are opaque to clients).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PageToken(String);
 
 impl PageToken {
-    /// Build a non-empty page token.
     pub fn new(value: impl Into<String>) -> Result<Self, ContractShapeError> {
         let value = value.into();
         if value.is_empty() {
@@ -22,14 +20,12 @@ impl PageToken {
         }
     }
 
-    /// The raw token text.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
-/// A list-page request: bounded page size + optional cursor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PageRequest {
@@ -38,7 +34,6 @@ pub struct PageRequest {
 }
 
 impl PageRequest {
-    /// First page with the given size (`1..=MAX_PAGE_SIZE`).
     pub fn first(page_size: u32) -> Result<Self, ContractShapeError> {
         if page_size == 0 || page_size > MAX_PAGE_SIZE {
             return Err(ContractShapeError::PageSizeOutOfRange {
@@ -51,7 +46,6 @@ impl PageRequest {
         })
     }
 
-    /// The page after `token` with the same size.
     #[must_use]
     pub fn after(&self, token: PageToken) -> Self {
         Self {
@@ -61,7 +55,6 @@ impl PageRequest {
     }
 }
 
-/// One listed entry: the resource plus its name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ListEntry<R> {
@@ -69,7 +62,6 @@ pub struct ListEntry<R> {
     pub resource: R,        // data_class: TENANT_SCOPED
 }
 
-/// One page of list results.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Page<T> {

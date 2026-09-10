@@ -1,16 +1,7 @@
-//! M06-P02 vertical fan-out — 13-vertical capability-pack roster.
-//!
-//! Extends the marketplace with the remaining 13 verticals from
-//! M06-P02 (W-Vertical-Fan-Out), each at `preview` tier per
-//! `docs/SPEC.md §5`. Complements the 6-variant [`super::Vertical`]
-//! enum used by the plugin-manifest layer with a dedicated
-//! [`FanoutVertical`] closed enum covering only the M06 cohort, plus
-//! a [`FanoutTarget`] pairing each vertical with its Cosign-signed
+//! Vertical fan-out: a closed [`FanoutVertical`] enum and the
+//! [`FanoutTarget`] pairing each vertical with its Cosign-signed
 //! regional-pack identifier.
-//!
-//! No external Rust deps — std only per ADR-0015.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 const FANOUT_PACK_ID_PREFIX: &str = "vpack_";
@@ -26,10 +17,8 @@ pub enum FanoutError {
     DuplicateVertical,
 }
 
-/// The 13 remaining verticals in the M06-P02 fan-out cohort.
-///
-/// Korea (M04) is the already-proven vertical and is intentionally
-/// absent — this enum is the complement set.
+/// Korea is the already-proven vertical and is intentionally absent:
+/// this enum is the complement set.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FanoutVertical {
     Healthcare,
@@ -144,7 +133,7 @@ impl FanoutTarget {
 /// Roster of all 13 fan-out targets (one per vertical).
 ///
 /// Duplicate verticals are rejected to enforce the one-pack-per-vertical
-/// invariant required by M06-P02 acceptance criteria.
+/// invariant.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FanoutRoster {
     targets: Vec<FanoutTarget>,

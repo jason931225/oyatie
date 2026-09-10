@@ -1,7 +1,4 @@
 //! Draft S3 backend for the storage provider-object compatibility port.
-//!
-//! The adapter emits deterministic command and receipt projections only; it
-//! has no credentialed network execution or durability authority.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 

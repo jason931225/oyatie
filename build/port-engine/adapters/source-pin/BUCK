@@ -12,7 +12,6 @@ rust_library(
     ],
 )
 
-# Compiles #[cfg(test)] modules in src/lib.rs (embedded pin + license refusal).
 rust_test(
     name = "port-engine-source-pin-unittest",
     srcs = glob(["src/**/*.rs", "src/**/*.json"]),

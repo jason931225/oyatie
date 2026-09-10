@@ -1,10 +1,8 @@
-// ADR-0083 Tier 3: integration tests assert invariants with unwrap/expect.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! End-to-end token-validation test against real `aws-lc-rs` crypto: mint an ES256
-//! JWS with a freshly generated key, publish the matching JWK, then prove that
-//! a genuine token validates into an active principal and that a token signed
-//! by a different (untrusted) key is rejected.
+//! End-to-end token validation against real `aws-lc-rs` crypto rather than a
+//! stubbed verifier, so a signature check that silently passes everything would
+//! fail these tests.
 
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair};
@@ -20,7 +18,6 @@ fn b64url(bytes: &[u8]) -> String {
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
-/// Mint an ES256-signed JWS for `claims_json` and return `(token, jwk)`.
 fn mint(claims_json: &str, kid: &str) -> (String, Jwk) {
     let rng = SystemRandom::new();
     let pkcs8 =
@@ -70,8 +67,8 @@ fn token_signed_by_untrusted_key_is_rejected() {
         r#"{{"iss":"https://idp.oyatie.com","aud":"cloud-storage","exp":{},"tenant_id":"ten_globex","sub":"wl_x","owning_capability":"cap.cloud.storage"}}"#,
         now + 600
     );
-    // Token minted with kid "attacker", but the published JWKS advertises a
-    // DIFFERENT key under the same kid — signature must fail to verify.
+    // Same kid, different key: the kid must not be trusted to select a key
+    // whose signature was never checked.
     let (token, _attacker_jwk) = mint(&claims, "globex-2026");
     let (_other_token, honest_jwk) = mint(&claims, "globex-2026");
     let jwks = Jwks::new().add_key(honest_jwk);

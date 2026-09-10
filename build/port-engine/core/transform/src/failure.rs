@@ -1,20 +1,14 @@
 //! The source's failure convention, made structural.
 //!
-//! Every real package in the source language returns failure as a TRAILING RESULT — an extra value
-//! of a designated type, checked by convention rather than enforced by the type system. Nothing in
-//! a signature says the value must be checked, and nothing in the type system stops a caller from
-//! ignoring it. That is the single largest reason the engine could not port a real package: not one
-//! construct it lacked, but a convention it could not see.
-//!
-//! The target expresses the same thing as the WHOLE return type, which is what makes the
-//! translation more than a rename. Three shapes carry it, and each is matched structurally and
-//! refused otherwise:
+//! The source returns failure as a TRAILING RESULT of a designated type, checked by convention
+//! rather than enforced by the type system. The target expresses the same thing as the WHOLE
+//! return type. Three shapes carry it, each matched structurally and refused otherwise:
 //!
 //! - a fallible signature: `(T, error)` becomes `Result<T, E>`, and the failure value stops being a
 //!   value the caller may drop;
 //! - a return: the trailing operand decides which constructor the whole return becomes;
-//! - the CHECK: `v, err := f()` followed by `if err != nil { return …, err }` is the source's
-//!   propagation idiom, and it is the one shape that becomes an operator rather than a statement.
+//! - the CHECK: a bind followed by a guarded early return is the source's propagation idiom, and
+//!   it is the one shape that becomes an operator rather than a statement.
 //!
 //! Everything about the target — `Result`, `Ok`, `Err`, `?` — is decided here rather than declared
 //! in the pack, because this face renders Rust. What the pack declares is which SOURCE type carries
@@ -22,7 +16,7 @@
 
 use port_engine_api::{Declaration, FailureConvention, TypeRef};
 
-use crate::vocabulary::{ATTR_REF, CHILD_BIND, CHILD_RESULT, CHILD_VALUE};
+use crate::vocabulary::{ATTR_REF, CHILD_BIND, CHILD_RESULT, CHILD_VALUE, REF_ABSENT};
 
 /// Whether a type is the source's failure type.
 ///
@@ -62,7 +56,7 @@ pub(crate) fn is_absent(node: &Declaration, convention: Option<&FailureConventio
     let Some(convention) = convention else {
         return false;
     };
-    node.attr(ATTR_REF) == Some("nil") && node.name == convention.absent
+    node.attr(ATTR_REF) == Some(REF_ABSENT) && node.name == convention.absent
 }
 
 /// The propagation idiom, matched structurally over a pair of statements.

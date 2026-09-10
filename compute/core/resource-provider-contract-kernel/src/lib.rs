@@ -1,31 +1,4 @@
-//! # shared-resource-provider-contract-kernel
-//!
-//! The uniform resource-provider contract-test harness (FD-001 contract-lock
-//! seed). Every platform service runs these generic conformance checks
-//! against its resource handlers, so resource semantics are identical across
-//! the catalog — the same play AWS runs with the Smithy protocol test suites
-//! and Google with AIP conformance:
-//!
-//! - **Idempotent PUT** — replaying a PUT with the same client idempotency
-//!   key is a no-op that returns the original outcome (AIP-134 full replace;
-//!   AWS idempotent-PutX semantics).
-//! - **No duplicate create** — retrying a create under the same client-UUID
-//!   idempotency key returns the original resource and never creates a
-//!   second one (AIP-155 request ids; EC2 RunInstances client tokens).
-//! - **Read-after-write equality** — a get immediately after a write returns
-//!   exactly the written resource.
-//! - **Stable pagination** — cursor pagination yields every resource exactly
-//!   once in a stable total order across repeated walks (AIP-158).
-//! - **AIP-151 operations** — async mutations return an operation resource
-//!   (`operations/...`, `done`, response XOR error) that is pollable and
-//!   immutable once terminal.
-//!
-//! The harness is a trait + generic test fns, pure and IO-free. The
-//! in-memory reference provider lives in `tests/` as the fixture that proves
-//! the harness itself (test infrastructure, per the masterplan
-//! no-false-green rule: the harness must demonstrably catch violations).
-//!
-//! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
+// ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -92,15 +65,18 @@ mod tests {
 
     #[test]
     fn idempotency_key_rejects_non_uuid_shapes() {
-        for bad in [
-            "",
-            "not-a-uuid",
-            "00000000-0000-4000-8000-00000000002", // too short
-            "00000000-0000-4000-8000-00000000002az", // too long
-            "00000000000040008000000000000020abcd", // no dashes
-            "zzzzzzzz-0000-4000-8000-00000000002a", // non-hex
+        for (bad, rejected_because) in [
+            ("", "empty"),
+            ("not-a-uuid", "not uuid shaped"),
+            ("00000000-0000-4000-8000-00000000002", "too short"),
+            ("00000000-0000-4000-8000-0000000000021", "too long"),
+            ("00000000000040008000000000000020abcd", "no dashes"),
+            ("zzzzzzzz-0000-4000-8000-00000000002a", "non-hex"),
         ] {
-            assert!(IdempotencyKey::new(bad).is_err(), "{bad:?}");
+            assert!(
+                IdempotencyKey::new(bad).is_err(),
+                "{rejected_because}: {bad:?}"
+            );
         }
     }
 

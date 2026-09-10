@@ -71,14 +71,7 @@ pub(super) async fn assert_integrity(setup: &PgPool, repository: &PgK8sLifecycle
         assert_refused(repository, column).await;
         sqlx::query(&format!("UPDATE compute_k8s_lifecycle.operations SET {column} = $1 WHERE idempotency_key = 'integrity'")).bind(saved).execute(setup).await.unwrap();
     }
-    // Deliberately damage the owned fixture after startup to probe runtime refusal.
-    for sql in [
-        "ALTER TABLE compute_k8s_lifecycle.operations DROP CONSTRAINT operations_contract_state",
-        "ALTER TABLE compute_k8s_lifecycle.operations DROP CONSTRAINT operations_request_contract",
-        "ALTER TABLE compute_k8s_lifecycle.operations DROP CONSTRAINT operations_database_schema_version",
-    ] {
-        sqlx::query(sql).execute(setup).await.unwrap();
-    }
+    drop_contract_constraints_to_probe_runtime_refusal(setup).await;
     for mutation in [
         "operation_state = NULL",
         "operation_state = 'running'",
@@ -104,6 +97,16 @@ pub(super) async fn assert_integrity(setup: &PgPool, repository: &PgK8sLifecycle
         .execute(setup)
         .await
         .unwrap();
+    }
+}
+
+async fn drop_contract_constraints_to_probe_runtime_refusal(setup: &PgPool) {
+    for sql in [
+        "ALTER TABLE compute_k8s_lifecycle.operations DROP CONSTRAINT operations_contract_state",
+        "ALTER TABLE compute_k8s_lifecycle.operations DROP CONSTRAINT operations_request_contract",
+        "ALTER TABLE compute_k8s_lifecycle.operations DROP CONSTRAINT operations_database_schema_version",
+    ] {
+        sqlx::query(sql).execute(setup).await.unwrap();
     }
 }
 

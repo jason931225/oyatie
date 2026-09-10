@@ -3,10 +3,8 @@ use super::{
     AskUserQuestionToolConfig, ClaudeAgentOptions, McpServerConfig, PermissionMode,
     QuestionPreviewFormat, SettingSource, Skills, SystemPrompt, TaskBudget, ToolConfig,
 };
-use serde_json::Map;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::env;
 use std::path::PathBuf;
 
 mod callbacks;

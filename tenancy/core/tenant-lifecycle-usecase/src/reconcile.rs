@@ -1,14 +1,3 @@
-//! Level-triggered reconciliation of a declared tenant spec against the
-//! lifecycle provider — the pure core a K8s reconciler (later adapter
-//! slice) calls once per pass.
-//!
-//! Precedent: Kubernetes controller convention (spec vs status, one
-//! mutation per pass, convergence across passes) as practiced by AWS ACK
-//! and Azure Service Operator. Planning comes from the domain crate; every
-//! mutation flows through the same AIP-151 ledger as the API surface, with
-//! idempotency keys derived deterministically from (CR uid, generation,
-//! step) so controller restarts replay instead of duplicating.
-
 use shared_platform_contracts_kernel::tenancy::{IsolationPosture, Tenant, TenantLifecycleState};
 use shared_resource_provider_contract_kernel::{
     OperationResult, ProviderError, ResourceName, ResourceProvider,
@@ -18,38 +7,37 @@ use tenancy_tenant_lifecycle_kernel::TenantLifecycleStore;
 
 use crate::TenantLifecycleProvider;
 
-/// The declared (CR spec) shape of a tenant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TenantSpec {
-    pub display_name: String,                // data_class: INTERNAL_ONLY
-    pub isolation_posture: IsolationPosture, // data_class: INTERNAL_ONLY
-    pub cell_id: String,                     // data_class: INTERNAL_ONLY
-    pub residency_zone: Option<String>,      // data_class: INTERNAL_ONLY
-    pub desired: DesiredTenantState,         // data_class: INTERNAL_ONLY
+    pub display_name: String,
+    pub isolation_posture: IsolationPosture,
+    pub cell_id: String,
+    pub residency_zone: Option<String>,
+    pub desired: DesiredTenantState,
 }
 
-/// Reconcile identity: which CR revision is asking.
 #[derive(Debug, Clone, Copy)]
 pub struct ReconcileContext<'a> {
     /// The CR's stable uid (never reused, survives spec edits).
     pub cr_uid: &'a str,
-    /// The CR generation (bumps on every spec change).
     pub generation: i64,
 }
 
-/// What one reconcile pass concluded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReconcileOutcome {
     /// Observed equals desired (observed `None` means retired-and-gone).
     Converged {
         observed: Option<TenantLifecycleState>,
     },
-    /// One mutation was requested or is in flight; reconcile again.
-    Progressing { detail: String },
+    Progressing {
+        detail: String,
+    },
     /// Terminal for this spec: the plan is unreachable or the requested
     /// operation failed its precondition. A spec change (new generation)
     /// is required to make progress.
-    Blocked { reason: String },
+    Blocked {
+        reason: String,
+    },
 }
 
 fn tenant_from_spec(name: &ResourceName, spec: &TenantSpec) -> Tenant {
@@ -83,8 +71,6 @@ impl<S: TenantLifecycleStore + Send + Sync> TenantLifecycleProvider<S> {
         spec: &TenantSpec,
         ctx: ReconcileContext<'_>,
     ) -> Result<ReconcileOutcome, ProviderError> {
-        // Observe at STORE level so tombstones are visible: "never existed"
-        // and "terminally retired" reconcile differently.
         let observed = match self.observe_stored(name).await? {
             Some(tenant) => tenant,
             None => {

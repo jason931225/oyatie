@@ -6,14 +6,12 @@ use shared_resource_provider_contract_kernel::{
     OperationPhase, OperationState as LedgerState, ProviderError, ResourceName, RetryPolicy,
 };
 
-/// The resource payload exercised by the reference fixture.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Document {
     pub(super) title: String,
     pub(super) revision: u32,
 }
 
-/// What an idempotency key was first applied to (the dedup record).
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum AppliedWrite {
     Create {
@@ -30,8 +28,10 @@ pub(super) enum AppliedWrite {
     },
 }
 
-/// Operation lifecycle inside the reference provider: pending operations
-/// complete after one poll so the harness exercises the pending->done path.
+/// A pending operation completes after this many polls, so the harness
+/// exercises the pending->done path.
+pub(super) const POLLS_BEFORE_TERMINAL: u32 = 1;
+
 #[derive(Debug, Clone)]
 pub(super) enum ReferenceOperationState {
     Pending {
@@ -45,7 +45,7 @@ pub(super) enum ReferenceOperationState {
 #[derive(Debug, Default)]
 pub(super) struct ReferenceProvider {
     pub(super) items: BTreeMap<String, Document>,
-    pub(super) applied: BTreeMap<String, AppliedWrite>,
+    pub(super) dedup_log: BTreeMap<String, AppliedWrite>,
     pub(super) operations: BTreeMap<String, ReferenceOperationState>,
     pub(super) operation_seq: u64,
 }

@@ -1,8 +1,4 @@
 //! The tenant-scoped ontology registry engine.
-//!
-//! Registration methods live here; schema evolution, link-instance
-//! registration, and action-invocation authorization live in the sibling
-//! modules of this directory, each as its own `impl OntologyEngine` block.
 
 mod conformance;
 mod evolution;
@@ -13,7 +9,7 @@ mod value_conformance;
 pub use links::LinkInstanceOutcome;
 
 #[cfg(test)]
-pub(crate) use evolution::check_schema_compatibility;
+pub(crate) use evolution::check_property_compatibility;
 
 use std::collections::BTreeMap;
 
@@ -28,29 +24,75 @@ pub struct OntologyEngine {
     entity_types: BTreeMap<OntologyScopedKey, EntityTypeDefinition>,
     link_types: BTreeMap<OntologyScopedKey, LinkTypeDefinition>,
     action_types: BTreeMap<OntologyScopedKey, ActionTypeDefinition>,
-    /// Every ACCEPTED entity-type definition, keyed by
-    /// (tenant_id, type id, revision) — the revision history behind reader
-    /// pinning and instance-to-revision binding. Rejected candidates are
-    /// never retained.
-    /// data_class: INTERNAL_ONLY
-    entity_type_revisions: BTreeMap<(String, String, u32), EntityTypeDefinition>,
-    /// Full 4-tuple registry for idempotency checks.
-    /// Key: (tenant_id, link_type_id, from_entity_id, to_entity_id)
-    /// data_class: INTERNAL_ONLY
-    link_instances: BTreeMap<(String, String, String, String), ()>,
-    /// Outbound index: at most one outbound edge per (tenant, link_type, from) for OneToOne.
-    /// Key: (tenant_id, link_type_id, from_entity_id)
-    /// data_class: INTERNAL_ONLY
-    link_outbound: BTreeMap<(String, String, String), ()>,
-    /// Inbound index: at most one inbound edge per (tenant, link_type, to) for OneToOne/OneToMany.
-    /// Key: (tenant_id, link_type_id, to_entity_id)
-    /// data_class: INTERNAL_ONLY
-    link_inbound: BTreeMap<(String, String, String), ()>,
+    /// Only ACCEPTED definitions are retained; a rejected candidate never
+    /// enters the history.
+    entity_type_revisions: BTreeMap<EntityTypeRevisionKey, EntityTypeDefinition>,
+    link_instances: BTreeMap<LinkInstanceKey, ()>,
+    link_outbound: BTreeMap<LinkEndpointKey, ()>,
+    link_inbound: BTreeMap<LinkEndpointKey, ()>,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct OntologyScopedKey {
     tenant_id: String,
     id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) struct EntityTypeRevisionKey {
+    tenant_id: String,
+    entity_type_id: String,
+    revision: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) struct LinkInstanceKey {
+    tenant_id: String,
+    link_type_id: String,
+    from_entity_id: String,
+    to_entity_id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) struct LinkEndpointKey {
+    tenant_id: String,
+    link_type_id: String,
+    entity_id: String,
+}
+
+impl EntityTypeRevisionKey {
+    fn new(tenant_id: &str, entity_type_id: &str, revision: u32) -> Self {
+        Self {
+            tenant_id: tenant_id.to_string(),
+            entity_type_id: entity_type_id.to_string(),
+            revision,
+        }
+    }
+}
+
+impl LinkInstanceKey {
+    pub(super) fn new(
+        tenant_id: &str,
+        link_type_id: &LinkTypeId,
+        from_entity_id: &str,
+        to_entity_id: &str,
+    ) -> Self {
+        Self {
+            tenant_id: tenant_id.to_string(),
+            link_type_id: link_type_id.value.clone(),
+            from_entity_id: from_entity_id.to_string(),
+            to_entity_id: to_entity_id.to_string(),
+        }
+    }
+}
+
+impl LinkEndpointKey {
+    pub(super) fn new(tenant_id: &str, link_type_id: &LinkTypeId, entity_id: &str) -> Self {
+        Self {
+            tenant_id: tenant_id.to_string(),
+            link_type_id: link_type_id.value.clone(),
+            entity_id: entity_id.to_string(),
+        }
+    }
 }
 
 impl OntologyEngine {
@@ -83,28 +125,11 @@ impl OntologyEngine {
         &mut self,
         definition: LinkTypeDefinition,
     ) -> Result<LinkTypeId, OntologyEngineError> {
-        // st1: endpoint-reference validation
-        let from_def = self
-            .entity_types
-            .get(&ontology_scoped_key(
-                &definition.tenant_id,
-                &definition.from_entity_type.value,
-            ))
-            .ok_or(OntologyEngineError::UnknownEntityTypeEndpoint)?;
-        let to_def = self
-            .entity_types
-            .get(&ontology_scoped_key(
-                &definition.tenant_id,
-                &definition.to_entity_type.value,
-            ))
-            .ok_or(OntologyEngineError::UnknownEntityTypeEndpoint)?;
+        let from_def =
+            self.registered_endpoint(&definition.tenant_id, &definition.from_entity_type)?;
+        let to_def = self.registered_endpoint(&definition.tenant_id, &definition.to_entity_type)?;
         crate::display::check_display_integrity(definition.display.as_ref())?;
-        // st2: pillar-consistency enforcement (Bominal-ADR-0132)
-        if let (Some(from_pillar), Some(to_pillar)) = (from_def.pillar, to_def.pillar)
-            && from_pillar != to_pillar
-        {
-            return Err(OntologyEngineError::CrossPillarLink);
-        }
+        check_pillar_consistency(from_def, to_def)?;
         let key = ontology_scoped_key(&definition.tenant_id, &definition.id.value);
         if self.link_types.contains_key(&key) {
             return Err(OntologyEngineError::DuplicateLinkType);
@@ -117,20 +142,9 @@ impl OntologyEngine {
         &mut self,
         definition: ActionTypeDefinition,
     ) -> Result<ActionTypeId, OntologyEngineError> {
-        // st1: endpoint-reference validation
-        if !self.has_entity_type(&definition.tenant_id, &definition.entity_type) {
-            return Err(OntologyEngineError::UnknownEntityTypeEndpoint);
-        }
+        self.registered_endpoint(&definition.tenant_id, &definition.entity_type)?;
         crate::display::check_display_integrity(definition.display.as_ref())?;
-        // Parameter-schema integrity: names are unique.
-        let mut seen = std::collections::BTreeSet::new();
-        for parameter in &definition.parameters {
-            if !seen.insert(parameter.name.as_str()) {
-                return Err(OntologyEngineError::DuplicateParameterName {
-                    name: parameter.name.clone(),
-                });
-            }
-        }
+        check_parameter_names_unique(&definition)?;
         check_value_type_integrity(
             definition
                 .parameters
@@ -149,9 +163,6 @@ impl OntologyEngine {
         self.entity_types
             .get(&ontology_scoped_key(tenant_id, &id.value))
     }
-    /// The definition as it was ACCEPTED at `revision`, or `None` if no
-    /// evolution ever landed that exact revision for the tenant. History is
-    /// retained per accepted evolution — rejected candidates never appear.
     pub fn entity_type_at_revision(
         &self,
         tenant_id: &str,
@@ -159,40 +170,66 @@ impl OntologyEngine {
         revision: u32,
     ) -> Option<&EntityTypeDefinition> {
         self.entity_type_revisions
-            .get(&(tenant_id.to_string(), id.value.clone(), revision))
+            .get(&EntityTypeRevisionKey::new(tenant_id, &id.value, revision))
     }
     pub(crate) fn retain_entity_type_revision(&mut self, definition: &EntityTypeDefinition) {
         self.entity_type_revisions.insert(
-            (
-                definition.tenant_id.clone(),
-                definition.id.value.clone(),
+            EntityTypeRevisionKey::new(
+                &definition.tenant_id,
+                &definition.id.value,
                 definition.revision,
             ),
             definition.clone(),
         );
     }
-    /// Return the [`LinkTypeDefinition`] registered for `tenant_id` and `id`,
-    /// or `None` if no such link type has been registered.
     pub fn link_type(&self, tenant_id: &str, id: &LinkTypeId) -> Option<&LinkTypeDefinition> {
         self.link_types
             .get(&ontology_scoped_key(tenant_id, &id.value))
     }
-    /// Return the [`ActionTypeDefinition`] registered for `tenant_id` and `id`,
-    /// or `None` if no such action type has been registered.
     pub fn action_type(&self, tenant_id: &str, id: &ActionTypeId) -> Option<&ActionTypeDefinition> {
         self.action_types
             .get(&ontology_scoped_key(tenant_id, &id.value))
     }
 
-    fn has_entity_type(&self, tenant_id: &str, id: &EntityTypeId) -> bool {
+    fn registered_endpoint(
+        &self,
+        tenant_id: &str,
+        id: &EntityTypeId,
+    ) -> Result<&EntityTypeDefinition, OntologyEngineError> {
         self.entity_types
-            .contains_key(&ontology_scoped_key(tenant_id, &id.value))
+            .get(&ontology_scoped_key(tenant_id, &id.value))
+            .ok_or(OntologyEngineError::UnknownEntityTypeEndpoint)
     }
 }
 
-/// Value-type integrity: every `Some` declaration must validate and its
-/// tier projection must equal the stated tier — a `Some` on a tier the
-/// projection never yields (Timeseries/Geo/Ciphertext) is thereby rejected.
+fn check_pillar_consistency(
+    from_def: &EntityTypeDefinition,
+    to_def: &EntityTypeDefinition,
+) -> Result<(), OntologyEngineError> {
+    if let (Some(from_pillar), Some(to_pillar)) = (from_def.pillar, to_def.pillar)
+        && from_pillar != to_pillar
+    {
+        return Err(OntologyEngineError::CrossPillarLink);
+    }
+    Ok(())
+}
+
+fn check_parameter_names_unique(
+    definition: &ActionTypeDefinition,
+) -> Result<(), OntologyEngineError> {
+    let mut seen = std::collections::BTreeSet::new();
+    for parameter in &definition.parameters {
+        if !seen.insert(parameter.name.as_str()) {
+            return Err(OntologyEngineError::DuplicateParameterName {
+                name: parameter.name.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Requiring the projection to equal the stated tier rejects a `Some` on
+/// any tier the projection never yields (Timeseries/Geo/Ciphertext).
 pub(crate) fn check_value_type_integrity<'a>(
     declarations: impl Iterator<
         Item = (
@@ -220,9 +257,8 @@ pub(crate) fn check_value_type_integrity<'a>(
     Ok(())
 }
 
-/// Designation integrity: a primary-key or title designation must name a
-/// declared property, and the key property must be `required` — a key
-/// absent from a conformant instance is a contradiction.
+/// The key property must be `required`: a key absent from a conformant
+/// instance is a contradiction.
 pub(crate) fn check_designation_integrity(
     definition: &EntityTypeDefinition,
 ) -> Result<(), OntologyEngineError> {

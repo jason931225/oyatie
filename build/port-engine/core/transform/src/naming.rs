@@ -1,8 +1,7 @@
 //! Target-language identifiers: sanitising, region ids, and casing.
 //!
 //! This is the one place the target language's conventions are owned. That is legitimate — this
-//! face RENDERS Rust, so Rust's casing is its business; the source language it must stay ignorant
-//! of.
+//! face RENDERS Rust, so Rust's casing is its business.
 
 use port_engine_api::{Declaration, RuleId, UnitId};
 use port_engine_rust_ir::Visibility;
@@ -152,10 +151,9 @@ const TARGET_KEYWORDS: &[&str] = &[
     "virtual", "where", "while", "yield",
 ];
 
-/// The four that cannot be raw identifiers, because the grammar needs them to mean one thing
-/// everywhere. A collision with these is resolved by RENAMING, which is a real change to the
-/// identifier and is why they are listed separately rather than lumped in above.
-const UNRAWABLE_KEYWORDS: &[&str] = &["crate", "self", "Self", "super"];
+/// Keywords that cannot be raw identifiers, so a collision is resolved by RENAMING — a real change
+/// to the identifier, which is why they are listed apart from the escapable ones above.
+const UNRAWABLE_KEYWORDS: [&str; 4] = ["crate", "self", "Self", "super"];
 
 /// Make an identifier emittable, escaping a target keyword rather than refusing it.
 #[must_use]

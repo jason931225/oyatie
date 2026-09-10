@@ -1,5 +1,3 @@
-use super::*;
-
 pub(super) const RUNTIME_API: &str = r#"
 pub const CAPABILITY_INVOKE_SURFACE: &str = "foundry.capability.invoke";
 

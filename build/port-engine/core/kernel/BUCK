@@ -27,12 +27,8 @@ rust_test(
     ],
 )
 
-# Corpus-neutrality (ADR-0637 D1). ENFORCEMENT is the const-assertion block in src/lib.rs — a
-# forbidden token or an unscanned-code keyword fails the LIBRARY build, which is why the rule
-# also holds for anything that merely depends on this crate. This target proves the same predicates
-# and the same needle sets go RED on planted defects, which a const assertion cannot show without
-# breaking the build. src/** and tests/seams.rs are in srcs because the test include_str!s both
-# scanned files, so it certifies the same bytes the compile-time assertion evaluated.
+# src/** and tests/seams.rs are in srcs because this test include_str!s both scanned files, so it
+# certifies the same bytes the compile-time assertion evaluated.
 rust_test(
     name = "port-engine-kernel-neutrality",
     srcs = glob(["tests/neutrality.rs", "tests/seams.rs", "src/**/*.rs"]),

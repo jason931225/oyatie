@@ -165,7 +165,6 @@ fn peek_reflects_each_state() {
     let mut catalog = catalog_with_active_bucket();
     let mut ledger = CloudStorageObjectPutIdempotencyLedger::default();
 
-    // Before any PUT, peek returns None.
     assert!(
         ledger
             .peek(
@@ -178,7 +177,6 @@ fn peek_reflects_each_state() {
         "peek returns None before recording"
     );
 
-    // After first PUT, peek returns Some(Replayed { .. }).
     put_cloud_storage_object_from_api(&mut catalog, &mut ledger, make_request("req-u4", "idem-u4"))
         .expect("first PUT succeeds");
 
@@ -199,7 +197,6 @@ fn peek_reflects_each_state() {
         "outcome is Replayed after successful PUT"
     );
 
-    // A different (unknown) key still returns None.
     assert!(
         ledger
             .peek(

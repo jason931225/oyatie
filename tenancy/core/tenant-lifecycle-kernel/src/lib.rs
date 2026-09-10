@@ -1,21 +1,3 @@
-//! Tenant lifecycle kernel — the storage port and persisted record shapes
-//! for the tenant lifecycle control plane.
-//!
-//! Grounded in the locked G001 contracts: the tenant aggregate, lifecycle
-//! state machine, and isolation posture come from
-//! `shared-platform-contracts-kernel`; the resource/operation/idempotency
-//! shapes come from `shared-resource-provider-contract-kernel`. This
-//! crate never re-invents either — it only defines what the lifecycle
-//! control plane persists and the port it persists through.
-//!
-//! The port models the OWNED destination store (data: ordered keyed
-//! records with point get/put and range scans — the multi-Raft
-//! leader-per-range KV shape). Transient adapters (sqlx/Postgres from the
-//! G03 lane, in-memory test fixtures) absorb all impedance behind it; the
-//! trait would not change at W5 cutover.
-//!
-//! Per ADR-0105 the kernel layer is pure types and ports: zero I/O, zero
-//! business logic.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -27,17 +9,18 @@ use serde::{Deserialize, Serialize};
 use shared_platform_contracts_kernel::tenancy::{Tenant, TenantLifecycleOperation};
 use shared_resource_provider_contract_kernel::Operation;
 
-/// What a client-UUID idempotency key was first applied to: the dedup record
-/// consulted on every replay (AIP-155 request ids / AWS client tokens).
+/// AIP-155 request ids / AWS client tokens.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppliedWriteRecord {
-    /// A synchronous create of `name` with exactly this payload.
-    Create { name: String, tenant: Tenant },
-    /// A synchronous full-replace put of `name` with exactly this payload.
-    Put { name: String, tenant: Tenant },
-    /// An async lifecycle mutation of `name`; replays return the SAME
-    /// operation resource from the ledger.
+    Create {
+        name: String,
+        tenant: Tenant,
+    },
+    Put {
+        name: String,
+        tenant: Tenant,
+    },
     Lifecycle {
         name: String,
         operation: TenantLifecycleOperation,
@@ -45,16 +28,12 @@ pub enum AppliedWriteRecord {
     },
 }
 
-/// One entry in the AIP-151 operation ledger: the operation resource plus
-/// the lifecycle mutation it tracks. Terminal entries are immutable.
+/// One entry in the AIP-151 operation ledger.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OperationRecord {
-    /// The AIP-151 operation resource (`operations/...`, done, result).
-    pub operation: Operation, // data_class: INTERNAL_ONLY
-    /// The lifecycle transition this operation applies.
-    pub kind: TenantLifecycleOperation, // data_class: INTERNAL_ONLY
-    /// Resource name (`tenants/<id>`) the transition targets.
+    pub operation: Operation,
+    pub kind: TenantLifecycleOperation,
     pub target: String, // data_class: TENANT_SCOPED
 }
 
@@ -63,9 +42,7 @@ pub struct OperationRecord {
 /// can map them to `internal` without guessing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoreError {
-    /// The backing store cannot serve the request right now.
     Unavailable { detail: String },
-    /// A persisted record failed to decode against the locked contracts.
     Corrupt { detail: String },
 }
 
@@ -80,7 +57,6 @@ impl fmt::Display for StoreError {
 
 impl std::error::Error for StoreError {}
 
-/// Async ordered tenant-scan result returned by [`TenantLifecycleStore`].
 pub type TenantScanFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Vec<(String, Tenant)>, StoreError>> + Send + 'a>>;
 
@@ -88,24 +64,22 @@ pub type TenantScanFuture<'a> =
 /// point get/put/remove and an ordered range scan (the owned data
 /// shape). Async (the durable backend performs real I/O) but IO-free at this
 /// layer; adapters own transport. Async is modelled with a return-position
-/// boxed future — `core::future::Future` + `core::pin::Pin` + `Box::pin`, no
-/// `async-trait` / `futures` dep — so the kernel stays dependency-free
+/// boxed future — `core::future::Future` + `core::pin::Pin` + `Box::pin` — so
+/// the kernel takes no `async-trait` / `futures` dependency
 /// (kernel-purity gate, ADR-0547; ADR-0376 rejects async-trait for ports).
 pub trait TenantLifecycleStore {
-    /// Point read of the tenant stored under `name` (`tenants/<id>`).
     fn get_tenant<'a>(
         &'a self,
         name: &'a str,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Tenant>, StoreError>> + Send + 'a>>;
 
-    /// Point write of `tenant` under `name`.
     fn put_tenant<'a>(
         &'a mut self,
         name: &'a str,
         tenant: &'a Tenant,
     ) -> Pin<Box<dyn Future<Output = Result<(), StoreError>> + Send + 'a>>;
 
-    /// Remove the tenant under `name` (no-op when absent).
+    /// No-op when `name` is absent.
     fn remove_tenant<'a>(
         &'a mut self,
         name: &'a str,
@@ -129,14 +103,12 @@ pub trait TenantLifecycleStore {
     // the in-memory adapter ignores the scope (its maps are process-local) but
     // accepts it so both adapters share one port.
 
-    /// Point read of the idempotency dedup record for `key`, within `tenant_id`.
     fn get_applied<'a>(
         &'a self,
         tenant_id: &'a str,
         key: &'a str,
     ) -> Pin<Box<dyn Future<Output = Result<Option<AppliedWriteRecord>, StoreError>> + Send + 'a>>;
 
-    /// Record what `key` was first applied to, within `tenant_id`.
     fn put_applied<'a>(
         &'a mut self,
         tenant_id: &'a str,
@@ -144,7 +116,6 @@ pub trait TenantLifecycleStore {
         record: &'a AppliedWriteRecord,
     ) -> Pin<Box<dyn Future<Output = Result<(), StoreError>> + Send + 'a>>;
 
-    /// Point read of the ledger entry for `operation_name`, within `tenant_id`.
     fn get_operation<'a>(
         &'a self,
         tenant_id: &'a str,

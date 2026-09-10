@@ -1,4 +1,4 @@
-//! Lane-3 pins: value-type declarations bind to properties and parameters,
+//! Pins: value-type declarations bind to properties and parameters,
 //! registration re-validates them, tier coherence is enforced for
 //! literal-built definitions, and the evolution freeze covers the
 //! quadruple — Some immutable, None -> Some rejected.
@@ -25,8 +25,6 @@ fn def_with(revision: u32, properties: Vec<EntityTypePropertyDefinition>) -> Ent
     .unwrap()
 }
 
-/// typed() derives the tier from the projection — stated and projected can
-/// never disagree through this path.
 #[test]
 fn typed_constructors_derive_tier() {
     let prop = EntityTypePropertyDefinition::typed("count", int_decl(), internal(), true).unwrap();
@@ -40,8 +38,6 @@ fn typed_constructors_derive_tier() {
     assert_eq!(param.tier, PropertyTier::Vector);
 }
 
-/// Registration validates the declaration structurally and names the
-/// property and cause.
 #[test]
 fn malformed_declaration_rejected_at_registration() {
     let bad = ValueTypeDeclaration::Struct(StructSchema { fields: vec![] });
@@ -59,9 +55,6 @@ fn malformed_declaration_rejected_at_registration() {
     );
 }
 
-/// A literal-built definition stating a tier that differs from the
-/// projection is rejected — and a declaration on an exotic tier is the
-/// same refusal, since the projection never yields those tiers.
 #[test]
 fn tier_incoherence_rejected() {
     let mut stated_wrong =
@@ -87,7 +80,6 @@ fn tier_incoherence_rejected() {
     );
 }
 
-/// Action-parameter declarations get the same registration validation.
 #[test]
 fn parameter_declarations_validated_at_registration() {
     let mut engine = OntologyEngine::default();
@@ -127,8 +119,6 @@ fn parameter_declarations_validated_at_registration() {
     );
 }
 
-/// The evolution freeze covers the quadruple: a Some declaration is
-/// immutable, and None -> Some in-place typing is rejected.
 #[test]
 fn value_type_frozen_across_revisions() {
     let typed = EntityTypePropertyDefinition::typed("count", int_decl(), internal(), true).unwrap();

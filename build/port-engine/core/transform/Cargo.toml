@@ -6,10 +6,6 @@ rust-version.workspace = true
 publish = false
 license = "Apache-2.0"
 
-# Apply TransformPlan constructions → RustIr (W0-B Slice 11).
-# Neutral: construction/precondition are data strings; no corpus vocabulary.
-# No Cargo.lock absorb this tip.
-
 [dependencies]
 port-engine-analysis = { path = "../analysis" }
 port-engine-api = { path = "../../ports/api" }

@@ -1,8 +1,4 @@
 //! Cloud cell binding API application surface.
-//!
-//! Runtime proof surface for `contracts/openapi/cloud/cloud-cell-bind-v1.yaml`.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod cell_lifecycle;
@@ -17,56 +13,56 @@ pub const CLOUD_CELL_BINDING_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellBindRequest {
-    pub tenant_id: String,                // data_class: INTERNAL_ONLY
-    pub home_region_code: String,         // data_class: INTERNAL_ONLY
-    pub residency_class: String,          // data_class: INTERNAL_ONLY
-    pub required_density: Option<String>, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub home_region_code: String,
+    pub residency_class: String,
+    pub required_density: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellBindSuccessResponse {
-    pub data: CloudCellBindingRecord,   // data_class: INTERNAL_ONLY
-    pub metadata: CloudCellApiMetadata, // data_class: INTERNAL_ONLY
+    pub data: CloudCellBindingRecord,
+    pub metadata: CloudCellApiMetadata,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellApiMetadata {
-    pub request_id: String, // data_class: INTERNAL_ONLY
-    pub tenant_id: String,  // data_class: INTERNAL_ONLY
-    pub region: String,     // data_class: INTERNAL_ONLY
+    pub request_id: String,
+    pub tenant_id: String,
+    pub region: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellBindingRecord {
-    pub tenant_id: String,         // data_class: INTERNAL_ONLY
-    pub region: String,            // data_class: INTERNAL_ONLY
-    pub residency_class: String,   // data_class: INTERNAL_ONLY
-    pub az: String,                // data_class: INTERNAL_ONLY
-    pub cell_id: String,           // data_class: INTERNAL_ONLY
-    pub tier: String,              // data_class: INTERNAL_ONLY
-    pub hsm_partition_ref: String, // data_class: INTERNAL_ONLY
-    pub schema_version: u32,       // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub region: String,
+    pub residency_class: String,
+    pub az: String,
+    pub cell_id: String,
+    pub tier: String,
+    pub hsm_partition_ref: String,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellApiErrorResponse {
-    pub error: CloudCellApiErrorBody, // data_class: INTERNAL_ONLY
+    pub error: CloudCellApiErrorBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellApiErrorBody {
-    pub code: String,                          // data_class: INTERNAL_ONLY
-    pub message: String,                       // data_class: INTERNAL_ONLY
-    pub message_localized: Option<String>,     // data_class: INTERNAL_ONLY
-    pub request_id: String,                    // data_class: INTERNAL_ONLY
-    pub details: Vec<CloudCellApiErrorDetail>, // data_class: INTERNAL_ONLY
-    pub retry_after_seconds: Option<u64>,      // data_class: INTERNAL_ONLY
+    pub code: String,
+    pub message: String,
+    pub message_localized: Option<String>,
+    pub request_id: String,
+    pub details: Vec<CloudCellApiErrorDetail>,
+    pub retry_after_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellApiErrorDetail {
-    pub field: String, // data_class: INTERNAL_ONLY
-    pub issue: String, // data_class: INTERNAL_ONLY
+    pub field: String,
+    pub issue: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -96,8 +92,8 @@ impl CloudCellBindApiStatus {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellBindApiResult {
-    pub status: CloudCellBindApiStatus, // data_class: INTERNAL_ONLY
-    pub response: CloudCellBindApiResponse, // data_class: INTERNAL_ONLY
+    pub status: CloudCellBindApiStatus,
+    pub response: CloudCellBindApiResponse,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

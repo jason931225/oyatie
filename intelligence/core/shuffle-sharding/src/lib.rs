@@ -1,9 +1,8 @@
 //! Deterministic shuffle-sharding for tenant-to-cell placement.
 //!
-//! This crate intentionally contains no service runtime, storage adapter, or
-//! network client. It is the pure algorithmic surface that `tenancy` can call
-//! during tenant provisioning while `iac-app` and `observability` own the
-//! mutable cell topology and live health inputs.
+//! Pure algorithm only: the mutable cell topology and the live health inputs
+//! stay with `iac-app` and `observability`, so placement stays reproducible
+//! from its arguments alone.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::collections::BTreeSet;
@@ -11,13 +10,10 @@ use std::collections::BTreeSet;
 /// A cell candidate supplied by the caller.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellCandidate {
-    /// Stable cell identifier from the iac-app cell registry.
     pub cell_id: String,
-    /// Regional pack label used to keep assignments residency-safe.
+    /// Residency label, honoured only when the request sets `required_pack`.
     pub pack: String,
-    /// Runtime region label for optional regional narrowing.
     pub region: String,
-    /// Whether this cell is eligible for new tenant placement.
     pub accepts_new_tenants: bool,
 }
 
@@ -26,26 +22,19 @@ pub struct CellCandidate {
 pub struct ShuffleShardRequest {
     /// Stable tenant identifier. Raw user identifiers do not belong here.
     pub tenant_id: String,
-    /// Number of distinct cells to select.
     pub shard_width: usize,
-    /// Salt/version string controlled by the caller for deliberate rebalancing.
+    /// Changing this moves every tenant; it is the deliberate-rebalance knob.
     pub placement_salt: String,
-    /// Optional pack constraint; when set, only matching candidates are eligible.
     pub required_pack: Option<String>,
-    /// Optional region constraint; when set, only matching candidates are eligible.
     pub required_region: Option<String>,
-    /// Candidate cells read from the iac-app-owned registry.
     pub candidates: Vec<CellCandidate>,
 }
 
 /// Deterministic selection result.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ShuffleShard {
-    /// Tenant used for selection.
     pub tenant_id: String,
-    /// Salt/version used for selection.
     pub placement_salt: String,
-    /// Selected cell identifiers in deterministic rank order.
     pub cell_ids: Vec<String>,
 }
 
@@ -64,44 +53,8 @@ pub enum ShuffleShardError {
 
 /// Selects a deterministic shuffle shard for one tenant.
 ///
-/// The caller owns topology freshness and health filtering. This function only
-/// validates candidate shape, filters by the optional pack/region constraints,
-/// ranks each eligible cell with a stable hash of tenant, salt, and cell id,
-/// then returns the first `shard_width` unique cells.
-///
-/// # Example
-///
-/// ```
-/// use intelligence_shuffle_sharding::{
-///     CellCandidate, ShuffleShardRequest, select_shuffle_shard,
-/// };
-///
-/// let request = ShuffleShardRequest {
-///     tenant_id: "ten_acme".to_string(),
-///     shard_width: 2,
-///     placement_salt: "cell-assignment-v1".to_string(),
-///     required_pack: Some("pack-kr".to_string()),
-///     required_region: None,
-///     candidates: vec![
-///         CellCandidate {
-///             cell_id: "kr-cell-001".to_string(),
-///             pack: "pack-kr".to_string(),
-///             region: "ap-northeast-2".to_string(),
-///             accepts_new_tenants: true,
-///         },
-///         CellCandidate {
-///             cell_id: "kr-cell-002".to_string(),
-///             pack: "pack-kr".to_string(),
-///             region: "ap-northeast-2".to_string(),
-///             accepts_new_tenants: true,
-///         },
-///     ],
-/// };
-///
-/// let shard = select_shuffle_shard(request)?;
-/// assert_eq!(shard.cell_ids.len(), 2);
-/// # Ok::<(), intelligence_shuffle_sharding::ShuffleShardError>(())
-/// ```
+/// Topology freshness and cell health are the caller's: a cell that is
+/// unreachable but still `accepts_new_tenants` will be selected.
 pub fn select_shuffle_shard(
     request: ShuffleShardRequest,
 ) -> Result<ShuffleShard, ShuffleShardError> {

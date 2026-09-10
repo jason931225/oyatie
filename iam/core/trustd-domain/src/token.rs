@@ -1,10 +1,4 @@
 //! Cluster join-token verification.
-//!
-//! Talos `trustd` authenticates a node's *first* contact (before it has a client
-//! certificate) using the shared cluster join token from the machine config. The
-//! token is presented as gRPC metadata; trustd compares it in constant time to
-//! the configured token. This module models that check plus token format
-//! validation.
 
 use crate::error::{Result, TrustError};
 
@@ -44,15 +38,11 @@ impl JoinToken {
         Ok(())
     }
 
-    /// Deterministically derive a join token from a cluster seed. The id half is
-    /// a short fingerprint of the seed and the secret half a longer one, both
-    /// base36 so the result is whitespace-free and Talos-shaped (`<id>.<secret>`).
-    /// This stands in for a CSPRNG-generated token while remaining reproducible.
+    /// Deterministically derive a join token from a cluster seed.
     ///
-    /// A derived token is fully predictable from `cluster_seed`, so this is
-    /// behind the non-default `modeled-crypto` feature: no production target
-    /// enables it, and a production build therefore cannot link this function.
-    /// Real cluster tokens come from the machine config via [`JoinToken::new`].
+    /// HAZARD: fully predictable from `cluster_seed`, so it sits behind the
+    /// non-default `modeled-crypto` feature no production target enables. Real
+    /// cluster tokens come from the machine config via [`JoinToken::new`].
     #[cfg(any(test, feature = "modeled-crypto"))]
     pub fn derive(cluster_seed: &[u8]) -> Self {
         let id = base36(fnv64(cluster_seed, 0x01));
@@ -183,7 +173,6 @@ mod tests {
         let a = JoinToken::derive(b"cluster-uuid-1234");
         let b = JoinToken::derive(b"cluster-uuid-1234");
         assert_eq!(a, b);
-        // a derived token must itself satisfy the format rules
         JoinToken::validate_format(a.expose()).unwrap();
         assert!(a.verify_presented(a.expose()).is_ok());
     }
@@ -214,45 +203,13 @@ mod tests {
                 .fingerprint()
         );
         assert_ne!(a.fingerprint(), b.fingerprint());
-        // fingerprint must not leak the secret verbatim
         assert!(!a.fingerprint().contains("secretone"));
     }
 
-    /// Every constructor in this crate that mints *modeled* key material must
-    /// stay behind the non-default `modeled-crypto` gate, so a production build
-    /// cannot link it. The barrier is the `cfg`; this test only proves the
-    /// `cfg` does not silently disappear — by deletion OR by being commented
-    /// out, which are the two quiet ways an item goes unconditional. See
-    /// [`gated`] for why the second one needs saying.
-    ///
-    /// `JoinToken::derive` mints a token fully predictable from the cluster
-    /// seed. `KeyPair::from_seed` stands in for a real keygen. `InMemorySigner`
-    /// is a *whole modeled signing backend*: its "signature" is an 8-byte
-    /// FNV-1a MAC and `from_seed` makes the private key literally equal the
-    /// seed bytes, so anyone knowing the seed string forges any signature the
-    /// CA would accept. It satisfies the same `SigningBackend` bound
-    /// `CertificateAuthority::bootstrap` takes, so leaving it un-gated left a
-    /// production build able to stand up a CA that issues forgeable certs —
-    /// the same defect class as `derive`, one layer down. `KeyPair::new` and
-    /// `EcdsaP256Signer` stay un-gated: they take real key material.
-    // ponytail: source-text assertion. A `cfg` cannot be observed from inside a
-    // build where it is enabled, and a compile-fail harness (trybuild) would be
-    // a new dependency. Upgrade path: a repo-wide modeled-crypto gate if a
-    // second crate needs the same proof.
-    //
-    // That the gate BITES is proven separately, and by execution rather than by
-    // assertion — a rule never seen to fire is the false green it exists to
-    // prevent. Adding `pub fn probe() -> JoinToken { JoinToken::derive(b"x") }`
-    // to this file, outside `cfg(test)`, and building the PRODUCTION target:
-    //
-    //   buck2 build //os/core/trustd-domain:os-trustd-domain
-    //   error[E0599]: no associated function or constant named `derive` found
-    //                 for struct `JoinToken` in the current scope
-    //   BUILD FAILED
-    //
-    // Not merely private off-feature: it does not EXIST. The `rust_library`
-    // rule in BUCK declares no `features`, so no production target can turn
-    // `modeled-crypto` on. This test guards the attribute that makes that true.
+    /// Every constructor that mints *modeled* key material must stay behind the
+    /// non-default `modeled-crypto` gate. Source-text assertion: a `cfg` cannot
+    /// be observed from inside a build where it is enabled, and the gate must be
+    /// caught when COMMENTED OUT as well as when deleted — see [`gated`].
     #[test]
     fn modeled_crypto_constructors_stay_behind_the_gate() {
         let required: [(&str, &str); 5] = [
@@ -296,28 +253,9 @@ mod tests {
     /// True if some occurrence of `signature` in `src` is immediately preceded
     /// by a LINE that starts with [`GATE`].
     ///
-    /// Prefix-matching the last non-blank preceding line, rather than
-    /// suffix-matching the text before the signature, is the whole point. The
-    /// earlier `src[..i].trim_end().ends_with(GATE)` was satisfied by
-    /// `// #[cfg(any(test, feature = "modeled-crypto"))]` — a commented-out
-    /// gate still *ends with* the gate string — so the quiet way to remove the
-    /// barrier left this test green while the item became unconditional and
-    /// linkable by production. Deletion was caught; commenting out was not.
-    /// This is the same shape already used by
-    /// `os_secrets_domain::tests::crate_root_gate_is_present`, which is where
-    /// the hole was first closed.
-    ///
-    /// A trailing comment on the gate line itself is still allowed, and the
-    /// `GATE` const above cannot satisfy the check from its own source line
-    /// because it is written with escaped quotes.
-    ///
-    /// Proven to fire, by mutation rather than argument: commenting out the
-    /// gate above `pub struct InMemorySigner {` in `signer.rs` gives
-    ///
-    /// ```text
-    /// `pub struct InMemorySigner {` must be immediately preceded by
-    /// #[cfg(any(test, feature = "modeled-crypto"))]
-    /// ```
+    /// Prefix-matching the preceding line, not suffix-matching the text before
+    /// the signature: `ends_with(GATE)` is also satisfied by a COMMENTED-OUT
+    /// gate, which is the quiet way the barrier gets removed.
     fn gated(src: &str, signature: &str) -> bool {
         src.match_indices(signature).any(|(i, _)| {
             src[..i]

@@ -28,7 +28,6 @@ use std::fmt;
 
 use port_engine_api::{OwnershipFacts, PointerDisposition};
 
-/// Fail-closed readiness gate. `true` once ownership decision is present.
 #[must_use]
 pub const fn w0_ready() -> bool {
     true
@@ -41,15 +40,12 @@ pub const fn w0_ready() -> bool {
 /// that omits the facts asks them to trust it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Decision {
-    /// The rule that matched.
     pub rule_id: String,
     /// Target type template for a parameter, with `{0}` for the pointee.
     pub target: String,
-    /// Target form for a receiver, when the rule has one.
+    /// Target form for a receiver, emitted verbatim — unlike `target` it takes no pointee.
     pub receiver: Option<String>,
-    /// Why these facts deserve this form.
     pub reason: String,
-    /// The facts the decision was made on.
     pub facts: OwnershipFacts,
 }
 

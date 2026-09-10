@@ -1,11 +1,5 @@
-//! Cloud IAM application composition for Cedar-bound role creation.
-//!
-//! This crate owns the transactional app-level seam between the platform Cedar
-//! policy substrate and Cloud IAM role creation. Domain crates still own value
-//! validation; this layer binds a Cedar policy version to an IAM role without
-//! committing either side unless both kernels accept the request.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Binds a Cedar policy version to an IAM role, committing neither side unless
+//! both kernels accept. Value validation still belongs to the domain crates.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub use iam_domain::{
@@ -76,12 +70,9 @@ pub enum CloudIamCedarPolicyBindError {
     CloudIam(CloudIamError),
 }
 
-/// Bind a Cedar policy version to a Cloud IAM role as one rollback-friendly app unit.
-///
-/// The function executes against cloned kernel state and commits the clones back
-/// only after both publication and role creation succeed. That preserves a
-/// no-partial-side-effects contract for policy/role drift and IAM directory
-/// failures while keeping app-layer dependencies pointed inward to domain crates.
+/// All-or-nothing: both kernels are mutated on clones, and the clones are
+/// committed back only once both have succeeded, so a failure leaves neither
+/// the policy set nor the directory changed.
 pub fn bind_cedar_policy(
     policies: &mut PolicySet,
     directory: &mut IamDirectory,

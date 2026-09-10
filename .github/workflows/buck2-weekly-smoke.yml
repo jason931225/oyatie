@@ -1,8 +1,22 @@
-# Weekly non-blocking honesty check for the local hermetic buck2 graph.
-# Not part of the merge path. Red means BUCK/reindeer wiring rotted.
+# Weekly non-blocking honesty check for the buck2 graph, and the only lane that
+# reads the shared NativeLink cache. It never writes.
+#
+# Not part of the merge path. Red means BUCK/reindeer wiring rotted, or the
+# cache lane below reported something worth reading -- never that a change is
+# refused. AGENTS.md:208 is explicit that a live CAS alone does not overturn
+# ADR-0716.
+#
+# This lane reads and never writes. An earlier draft argued it should be the
+# single writer, because ephemeral identical runners stand in for the sandbox a
+# remote executor gives. That is a claim about the uniformity of the
+# ENVIRONMENT; an action-cache write is a claim about the integrity of the
+# MAPPING -- the right to decide what every later build receives instead of
+# compiling -- and no amount of the first buys the second.
 #
 # Authority: docs/decisions/ADR-0716-cargo-merge-path-buck2-local-hermeticity.md
-
+#            AGENTS.md:181-191. The buck2/NativeLink record it describes is not
+#            in docs/decisions/: the repository layout gate refused it
+#            (PR #2424), so AGENTS.md carries it.
 name: buck2-weekly-smoke
 
 on:
@@ -34,5 +48,237 @@ jobs:
           chmod +x /tmp/buck2
           sudo mv /tmp/buck2 /usr/local/bin/buck2
           buck2 --version
+      # The cache is an accelerator and may never be the reason a build fails.
+      # Absent secrets, an unreachable endpoint, or a malformed cert all land in
+      # the same place: no .buckconfig.local is written, buck2 builds exactly as
+      # it does today, and the run stays green. Fail-closed here would couple
+      # this repository's build to a single host's uptime.
+      #
+      # `[buck2_re_client]` is honoured only from a real buckconfig file.
+      # Measured 2026-09-10: passed via `--config-file` the same section reaches
+      # `buck2 audit config` intact and is still ignored by the RE client, which
+      # then fails the build with "No engine address". So the endpoint is
+      # written here rather than passed as an overlay flag.
+      - name: Point buck2 at the warm cache, or carry on without it
+        id: cache-config
+        env:
+          CACHE_CLIENT_CERT: ${{ secrets.OYATIE_CACHE_CLIENT_CERT }}
+          CACHE_CLIENT_KEY: ${{ secrets.OYATIE_CACHE_CLIENT_KEY }}
+          CACHE_CA_CERT: ${{ secrets.OYATIE_CACHE_CA_CERT }}
+          # The substrate publishes this, so it is not restated here. Its value
+          # is a URL (`grpcs://host:port`), which is right for its other
+          # consumers -- cache-check treats it as a URL and it documents the
+          # protocol -- and wrong for buck2, whose addresses are `host:port`
+          # with TLS selected by the `tls` key below, not by the scheme.
+          #
+          # buck2 rejects a scheme in a way that costs an afternoon: it WARNs
+          # "Invalid URI scheme: `grpcs` (you should omit it)", retries at
+          # 1/2/3/4/5s, and then fails the build on an unrelated prelude
+          # target. Under folded CI log groups that reads as graph rot.
+          #
+          # So the one consumer that needs the bare form strips it, rather than
+          # a second variable existing to state the same fact differently.
+          CACHE_ENDPOINT_URL: ${{ vars.CACHE_ENDPOINT }}
+        run: |
+          set -uo pipefail
+          if [ -z "${CACHE_CLIENT_CERT}" ] || [ -z "${CACHE_CLIENT_KEY}" ] || [ -z "${CACHE_CA_CERT}" ]; then
+            echo "no cache credentials in this context; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The admission control, honoured rather than stepped over.
+          #
+          # ADR-0716 D2 and the g004 mapping name specs/cache-warm-license.json
+          # as the switch that licenses warm reads; AGENTS.md:209 names the
+          # `warm_reads_licensed` key but not that path. The file does not exist
+          # and CANNOT: `specs` is in `pipeline_admission::FORBIDDEN_NAMES`
+          # (the constant, not a line number -- it moves), so the repository
+          # refuses the path its own ADR specifies. Restoring it was tried here
+          # and refused -- "forbidden root `specs`" -- which is why it is absent,
+          # and it is a contradiction between two governance artifacts rather
+          # than an oversight. Filed for a ruling; not resolved by a workflow.
+          #
+          # Absence is read as UNLICENSED, which is the safe direction: this
+          # lane skips the cache until a licence exists and says otherwise. When
+          # the path question is settled the file appears and this reads it,
+          # with no change here.
+          licensed=$(python3 -c 'import json;print(json.load(open("specs/cache-warm-license.json"))["warm_reads_licensed"])' 2>/dev/null || echo "error")
+          if [ "$licensed" != "True" ]; then
+            echo "warm reads are not licensed (specs/cache-warm-license.json: warm_reads_licensed=${licensed}); building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${CACHE_ENDPOINT_URL}" ]; then
+            echo "vars.CACHE_ENDPOINT is not published to this context; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # `grpcs://host:port` -> `host:port`; a value already bare is unchanged.
+          CACHE_ENDPOINT="${CACHE_ENDPOINT_URL#*://}"
+          case "$CACHE_ENDPOINT" in
+            *:*) ;;
+            *) echo "vars.CACHE_ENDPOINT (${CACHE_ENDPOINT_URL}) has no port after stripping its scheme; building without the cache"
+               echo "wired=no" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/cache-creds"
+          printf '%s\n%s\n' "${CACHE_CLIENT_CERT}" "${CACHE_CLIENT_KEY}" > "${RUNNER_TEMP}/cache-creds/client.pem"
+          printf '%s\n' "${CACHE_CA_CERT}" > "${RUNNER_TEMP}/cache-creds/ca.crt"
+          # A key buck2 cannot parse is a skipped cache, not a red build.
+          #
+          # This guard exists because the one below does not cover it: a TCP
+          # connect succeeds against a healthy endpoint whatever the key
+          # contains, so reachability would report usable and buck2 would then
+          # die at handshake -- failing the build, which inverts this lane's
+          # whole contract. That is this lane measuring one thing and reporting
+          # another, which is the defect it was written to avoid.
+          #
+          # The specific case: this PKI mints ECDSA P-256 and the tls provider
+          # emits SEC1 (`BEGIN EC PRIVATE KEY`). rustls, which buck2's RE client
+          # uses, parses only RSA or PKCS8 and refuses SEC1. The substrate now
+          # emits PKCS8 at source, but nothing forces a hand-set secret to
+          # rotate, so a stale SEC1 value would still reach here.
+          # The header, not `openssl pkey`. Measured: `openssl pkey -noout`
+          # ACCEPTS a SEC1 key, because OpenSSL reads both encodings and rustls
+          # reads only one -- so the obvious check passes on precisely the input
+          # it was written to reject. rustls keys off the PEM label, so that is
+          # what this reads.
+          if ! grep -q -- "-----BEGIN PRIVATE KEY-----" "${RUNNER_TEMP}/cache-creds/client.pem"; then
+            echo "the client key is not PKCS8 (rustls reads no other EC encoding); building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Guard order is load-bearing, cheapest and most specific question
+          # first: each probe may only run once every cause it does NOT measure
+          # has been excluded, or it reports a cause it never tested.
+          #
+          # `timeout` is used by both probes below, so its absence is settled
+          # before either runs.
+          if ! command -v timeout >/dev/null 2>&1; then
+            echo "no timeout(1) on this runner, so reachability cannot be bounded; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Reachability is checked before buck2 is told the endpoint exists, so
+          # an unreachable cache is a skipped feature rather than a failed build.
+          if ! timeout 20 bash -c "cat < /dev/null > /dev/tcp/${CACHE_ENDPOINT%:*}/${CACHE_ENDPOINT##*:}" 2>/dev/null; then
+            echo "${CACHE_ENDPOINT} did not accept a connection; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Does the SERVER accept this client cert? The TCP probe above proves
+          # the port answers; it says nothing about mTLS. An expired, revoked or
+          # wrong-CA cert passes every other guard and then kills the build at
+          # handshake -- the likeliest real failure, and the one the guards
+          # missed. This is a different question from the PKCS8 check above:
+          # that one asks whether rustls can PARSE the key, this asks whether
+          # the far end ACCEPTS the identity. It runs last because a connect
+          # failure here is indistinguishable from a rejected identity.
+          #
+          # `-verify_return_error` is what makes this a check. Without it
+          # s_client completes the handshake and exits 0 whatever -CAfile says:
+          # measured against a live host, a randomly generated CA and the real
+          # one both return 0, so a stale OYATIE_CACHE_CA_CERT would pass here
+          # and kill the build at the rustls handshake instead.
+          if ! echo | timeout 20 openssl s_client -connect "${CACHE_ENDPOINT}" \
+                 -cert "${RUNNER_TEMP}/cache-creds/client.pem" \
+                 -CAfile "${RUNNER_TEMP}/cache-creds/ca.crt" \
+                 -verify_return_error >/dev/null 2>&1; then
+            echo "the cache did not accept this client certificate; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cat > .buckconfig.local <<EOF
+          [buck2_re_client]
+            cas_address = ${CACHE_ENDPOINT}
+            action_cache_address = ${CACHE_ENDPOINT}
+            engine_address = ${CACHE_ENDPOINT}
+            instance_name = main
+            tls = true
+            tls_client_cert = ${RUNNER_TEMP}/cache-creds/client.pem
+            tls_ca_certs = ${RUNNER_TEMP}/cache-creds/ca.crt
+          EOF
+          # Quoted delimiter: everything below is literal. Unquoted, bash runs
+          # the backticked identifiers in the prose as command substitutions.
+          cat >> .buckconfig.local <<'EOF'
+
+          [cache]
+            remote_cache_enabled = true
+            # Reads only. The exposed action cache is read_only on instance
+            # "main" (substrate 1defdd0), so a write would be refused -- but
+            # that is not the reason this is false.
+            #
+            # A CAS entry is content-addressed: with verify_hash on, a hostile
+            # writer can only spend storage. An ACTION CACHE entry maps an
+            # action digest to an arbitrary result, so whoever writes one
+            # chooses what every later build receives INSTEAD of compiling. One
+            # unauthenticated AC write is arbitrary code execution in every
+            # consumer, and no argument about runner uniformity outranks that.
+            #
+            # The keying is not ready either. `build/toolchains/BUCK` passes
+            # /usr/bin/clang and /usr/bin/ar as strings and `system_cxx_toolchain`
+            # takes them as attrs.option(attrs.string()), with no artifact-accepting
+            # alternative -- so every link is cacheable and unkeyed on the C
+            # compiler. A CAS cannot detect a blob that is faithfully what a
+            # DIFFERENT clang produced; that is a keying problem, not an
+            # integrity one, and verify_hash does not touch it.
+            #
+            # Writes become their own decision, with their own evidence, after
+            # someone has watched a write be refused here.
+            allow_cache_uploads = false
+
+          [build]
+            execution_platforms = toolchains//cache:cache-platform
+          EOF
+          # NativeLink is cache-only: it runs no scheduler and no workers. The
+          # engine address above is required by buck2's OSS client at
+          # construction -- `opts.engine_address.as_ref().context("No engine
+          # address")?` runs before CAS setup -- and is never called, because
+          # the cache platform keeps `remote_enabled = False`.
+          # Only after the file exists and parses. `set -uo pipefail` has no
+          # `-e` -- deliberately, because every guard above exits 0 on purpose
+          # -- so a heredoc that failed part way (ENOSPC) would otherwise leave
+          # a truncated config, redden the build, and still report wired=yes.
+          # A hollow success line is the defect this lane is about.
+          #
+          # The last line of each heredoc, matched with its value rather than
+          # by key alone. `instance_name` sat mid-block: a first write that
+          # stopped after it matched, and reported wired=yes.
+          if ! grep -qF "tls_ca_certs = ${RUNNER_TEMP}/cache-creds/ca.crt" .buckconfig.local 2>/dev/null \
+             || ! grep -qF 'execution_platforms = toolchains//cache:cache-platform' .buckconfig.local 2>/dev/null; then
+            echo "the cache config was not written completely; building without the cache"
+            rm -f .buckconfig.local
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "wired=yes" >> "$GITHUB_OUTPUT"
+          echo "runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+
       - name: Hermetic workspace build
         run: buck2 build //...
+
+      # The number this lane exists to produce. ADR-0720's overturn is
+      # same-wave and needs evidence buck2 is worth the merge path; a hit rate
+      # nobody records is not that evidence.
+      #
+      # Reported, never asserted. There is no threshold here on purpose: a
+      # ratchet on a first measurement would encode today's accident as the
+      # floor.
+      - name: What the cache did
+        if: ${{ !cancelled() }}
+        run: |
+          set -uo pipefail
+          echo "cache wired: ${{ steps.cache-config.outputs.wired }}"
+          echo "runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+          if ! summary=$(buck2 log summary 2>&1); then
+            echo "buck2 log summary failed, so this run reported no cache accounting:"
+            echo "$summary" | tail -3
+          elif ! printf '%s' "$summary" | grep -iE "cache|remote|network"; then
+            echo "(the summary carried no cache, remote or network line)"
+          fi
+
+      # Credentials outlive the build otherwise: this runner is ephemeral, but
+      # a self-hosted one would not be, and the habit should not depend on that.
+      - name: Remove the credentials
+        if: ${{ always() }}
+        run: rm -rf "${RUNNER_TEMP:?}/cache-creds" .buckconfig.local

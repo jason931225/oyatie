@@ -24,8 +24,6 @@ fn def(revision: u32) -> EntityTypeDefinition {
     .unwrap()
 }
 
-/// The conformant fast path: key on a declared required property, title on
-/// a declared property.
 #[test]
 fn valid_designations_register() {
     let mut engine = OntologyEngine::default();
@@ -38,7 +36,6 @@ fn valid_designations_register() {
         .expect("valid designations must register");
 }
 
-/// A designation naming no declared property is rejected.
 #[test]
 fn undeclared_designation_rejected() {
     let mut engine = OntologyEngine::default();
@@ -56,8 +53,6 @@ fn undeclared_designation_rejected() {
     );
 }
 
-/// A primary key on an optional property is a contradiction: conformant
-/// instances may omit it.
 #[test]
 fn optional_primary_key_rejected() {
     let mut engine = OntologyEngine::default();
@@ -69,7 +64,6 @@ fn optional_primary_key_rejected() {
     );
 }
 
-/// Designation integrity holds on the evolve path too, both branches.
 #[test]
 fn evolve_first_registration_checks_designations() {
     let mut engine = OntologyEngine::default();
@@ -81,8 +75,6 @@ fn evolve_first_registration_checks_designations() {
     );
 }
 
-/// A set primary key is immutable: changing or removing it re-keys the
-/// population. Adoption (None -> Some) stays open.
 #[test]
 fn primary_key_immutable_once_set() {
     let mut engine = OntologyEngine::default();
@@ -110,8 +102,6 @@ fn primary_key_immutable_once_set() {
         .expect("unchanged key must evolve");
 }
 
-/// Adopting a key where none was set is allowed, and the title designation
-/// may change freely.
 #[test]
 fn key_adoption_and_title_change_allowed() {
     let mut engine = OntologyEngine::default();

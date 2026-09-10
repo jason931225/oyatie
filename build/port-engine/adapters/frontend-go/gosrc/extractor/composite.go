@@ -13,11 +13,6 @@ import (
 // zero to the rule pack.
 
 // compositeNode records a struct literal with every DECLARED field present.
-//
-// Go fills the fields a literal omits with their type's zero value; the target rejects an
-// incomplete literal. Which fields a struct has is a fact go/types holds and the engine does not,
-// so the omitted ones are recorded HERE, as `zero` nodes carrying the field's type — leaving the
-// target's spelling of that zero to the rule pack.
 func compositeNode(lit *ast.CompositeLit, ctx *extractCtx) node {
 	fields := compositeStruct(lit, ctx)
 	if fields == nil {

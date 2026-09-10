@@ -48,7 +48,7 @@ fn terminated_allowed_next_contains_only_self_loop() {
 }
 
 #[test]
-fn transition_graph_allowed_next_agrees_with_can_transition_to_for_all_pairs() {
+fn transition_graph_admits_exactly_the_legal_pairs() {
     let all_states = [
         ResourceState::Pending,
         ResourceState::Running,
@@ -56,15 +56,25 @@ fn transition_graph_allowed_next_agrees_with_can_transition_to_for_all_pairs() {
         ResourceState::Terminated,
         ResourceState::Error,
     ];
+    let legal = [
+        (ResourceState::Pending, ResourceState::Running),
+        (ResourceState::Pending, ResourceState::Error),
+        (ResourceState::Pending, ResourceState::Terminated),
+        (ResourceState::Running, ResourceState::Stopped),
+        (ResourceState::Running, ResourceState::Error),
+        (ResourceState::Running, ResourceState::Terminated),
+        (ResourceState::Stopped, ResourceState::Running),
+        (ResourceState::Stopped, ResourceState::Error),
+        (ResourceState::Stopped, ResourceState::Terminated),
+        (ResourceState::Error, ResourceState::Terminated),
+    ];
     for &from in &all_states {
-        let nexts = from.allowed_next();
         for &to in &all_states {
-            let via_predicate = from.can_transition_to(to);
-            let via_graph = nexts.contains(&to);
+            let expected = from == to || legal.contains(&(from, to));
             assert_eq!(
-                via_predicate, via_graph,
-                "allowed_next({from:?}) and can_transition_to({from:?}, {to:?}) disagree: \
-                     predicate={via_predicate}, graph={via_graph}"
+                from.can_transition_to(to),
+                expected,
+                "can_transition_to({from:?}, {to:?}) must be {expected}"
             );
         }
     }

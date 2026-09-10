@@ -31,39 +31,39 @@ pub enum SensitiveReadDecisionStatus {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SensitiveHrReadInput {
-    pub tenant_id: String,                    // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,              // data_class: INTERNAL_ONLY
-    pub actor_employee_id: String,            // data_class: INTERNAL_ONLY
-    pub subject_employee_id: String,          // data_class: INTERNAL_ONLY
-    pub data_kind: SensitiveHrDataKind,       // data_class: SENSITIVE_PIPA_ART23
-    pub purpose: SensitiveReadPurpose,        // data_class: INTERNAL_ONLY
-    pub legal_basis: SensitiveReadLegalBasis, // data_class: INTERNAL_ONLY
-    pub policy_ref: String,                   // data_class: INTERNAL_ONLY
-    pub basis_evidence_ref: String,           // data_class: INTERNAL_ONLY
-    pub consent_evidence_ref: Option<String>, // data_class: INTERNAL_ONLY
-    pub request_evidence_ref: String,         // data_class: INTERNAL_ONLY
-    pub read_log_evidence_ref: String,        // data_class: INTERNAL_ONLY
-    pub evaluated_at_epoch_seconds: u64,      // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub actor_employee_id: String,
+    pub subject_employee_id: String,
+    pub data_kind: SensitiveHrDataKind, // data_class: SENSITIVE_PIPA_ART23
+    pub purpose: SensitiveReadPurpose,
+    pub legal_basis: SensitiveReadLegalBasis,
+    pub policy_ref: String,
+    pub basis_evidence_ref: String,
+    pub consent_evidence_ref: Option<String>,
+    pub request_evidence_ref: String,
+    pub read_log_evidence_ref: String,
+    pub evaluated_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SensitiveHrReadDecision {
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub actor_employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub subject_employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub actor_employee_id: Classified<EmployeeId>,
+    pub subject_employee_id: Classified<EmployeeId>,
     pub data_kind: Classified<SensitiveHrDataKind>, // data_class: SENSITIVE_PIPA_ART23
-    pub purpose: Classified<SensitiveReadPurpose>, // data_class: INTERNAL_ONLY
-    pub legal_basis: Classified<SensitiveReadLegalBasis>, // data_class: INTERNAL_ONLY
-    pub policy_ref: Classified<PolicyRef>, // data_class: INTERNAL_ONLY
-    pub basis_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub consent_evidence_ref: Classified<Option<AuditEvidenceRef>>, // data_class: INTERNAL_ONLY
-    pub request_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub read_log_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub evaluated_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub decision_status: Classified<SensitiveReadDecisionStatus>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub purpose: Classified<SensitiveReadPurpose>,
+    pub legal_basis: Classified<SensitiveReadLegalBasis>,
+    pub policy_ref: Classified<PolicyRef>,
+    pub basis_evidence_ref: Classified<AuditEvidenceRef>,
+    pub consent_evidence_ref: Classified<Option<AuditEvidenceRef>>,
+    pub request_evidence_ref: Classified<AuditEvidenceRef>,
+    pub read_log_evidence_ref: Classified<AuditEvidenceRef>,
+    pub idempotency_key: Classified<String>,
+    pub evaluated_at_epoch_seconds: Classified<u64>,
+    pub decision_status: Classified<SensitiveReadDecisionStatus>,
+    pub schema_version: Classified<u32>,
 }
 
 pub fn evaluate_sensitive_hr_read(

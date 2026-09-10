@@ -11,7 +11,7 @@ use crate::body::{Body, TailPosition, branch, named_child, one_child, translate,
 use crate::body_expr::expression;
 use crate::error::TransformError;
 use crate::naming::to_snake_case;
-use crate::vocabulary::{ATTR_OP, ATTR_SOURCE_NODE};
+use crate::vocabulary::{ATTR_OP, ATTR_SOURCE_NODE, SOURCE_NODE_INCREMENT};
 
 /// A three-clause or condition-only `for`.
 ///
@@ -79,8 +79,7 @@ fn counted_range(
     if lhs.kind != "ident" || &lhs.name != counter {
         return Err(refuse("the condition does not test the counter"));
     }
-    // The post clause is `i++`, which reaches here as an unsupported IncDecStmt or an assign.
-    if post.attr(ATTR_SOURCE_NODE) != Some("IncDecStmt") {
+    if post.attr(ATTR_SOURCE_NODE) != Some(SOURCE_NODE_INCREMENT) {
         return Err(refuse("the post clause is not an increment"));
     }
 

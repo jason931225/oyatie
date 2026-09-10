@@ -1,7 +1,6 @@
 //! `PackEpoch` coverage checks: which signing key was authorized to sign
 //! which period.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+// ADR-0083 Tier 3: the `cfg(test)` unwrap/expect/panic exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use audit_sealing_kernel::{PackEpoch, SigningKeyRef};
@@ -11,31 +10,17 @@ use crate::SealingDomainError;
 /// Verify that `signing_key` was authorized, under `epoch`, to sign
 /// `period_id` for `(pack, tenant_partition)`.
 ///
-/// Checks run in this order: pack identity, then tenant-partition identity
-/// (an epoch for a different pack or tenant partition must never be treated
-/// as covering the period, regardless of its window), then which key signed,
-/// then whether `period_id` falls inside that key's window.
+/// `period_id`, `period_lo` and `period_hi` are compared with plain
+/// byte-lexicographic ordering: callers MUST encode periods so lexicographic
+/// order matches chronological order (e.g. zero-padded ISO-8601). This function
+/// never parses the encoding.
 ///
-/// ## Ordering assumption
-///
-/// `period_id`, `period_lo`, and `period_hi` are compared with plain string
-/// (byte-lexicographic) ordering. Callers MUST encode periods so that
-/// lexicographic order matches chronological order (e.g. zero-padded
-/// ISO-8601 `YYYY-MM` / `YYYY-MM-DD` strings) — this function does not parse
-/// or otherwise interpret the period encoding.
+/// A retiring key is bounded by the SAME `[period_lo, period_hi)` window as the
+/// active key — its grace never extends past the epoch that names it retiring.
 ///
 /// # Errors
-/// - [`SealingDomainError::EpochPackMismatch`] — `epoch.pack != pack`.
-/// - [`SealingDomainError::EpochTenantPartitionMismatch`] —
-///   `epoch.tenant_partition != tenant_partition`.
-/// - [`SealingDomainError::SigningKeyNotInEpoch`] — `signing_key` is neither
-///   `epoch.active_key` nor `epoch.retiring_key`.
-/// - [`SealingDomainError::PeriodOutsideEpochWindow`] — `signing_key` is the
-///   `active_key` but `period_id` is outside `[period_lo, period_hi)`.
-/// - [`SealingDomainError::RetiringKeyOutsideEpochWindow`] — `signing_key`
-///   is the `retiring_key` but `period_id` is outside `[period_lo,
-///   period_hi)`. A retiring key's grace period never extends past the
-///   epoch that names it as retiring.
+/// [`SealingDomainError`] — pack mismatch, tenant-partition mismatch, a key in
+/// neither epoch slot, or a period outside the window (checked in that order).
 pub fn verify_epoch_covers_period(
     epoch: &PackEpoch,
     pack: &str,
@@ -281,9 +266,6 @@ mod tests {
 
     #[test]
     fn pack_mismatch_is_reported_before_key_mismatch() {
-        // Ordering contract: identity checks (pack, tenant_partition) run
-        // before key/window checks, so a record wrong in both ways reports
-        // the pack error.
         let epoch = epoch_with_retiring();
         assert_eq!(
             verify_epoch_covers_period(

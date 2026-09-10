@@ -1,35 +1,8 @@
-// ADR-0083 Tier 3: integration tests use `.expect()` / `.unwrap()` to assert
-// invariant setup; these are intentional under the cfg(test) exemption.
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
-//! RED tests for the ontology-kernel schema-evolution slice.
-//!
-//! Acceptance criteria exercised here (subtasks ST1 / ST2):
-//!
-//! ST1 – backward-compatibility checker over property sets:
-//!  • additive_new_property_with_higher_revision_is_accepted
-//!  • tier_mutation_on_existing_property_rejected_with_incompatible
-//!  • data_class_mutation_on_existing_property_rejected_with_incompatible
-//!  • required_flag_flip_on_existing_property_rejected_with_incompatible
-//!  • property_removal_rejected_with_incompatible
-//!  • multiple_mutations_all_rejected_with_incompatible
-//!
-//! ST2 – OntologyEngine::evolve_entity_type:
-//!  • first_registration_via_evolve_inserts_and_returns_id
-//!  • monotonic_additive_evolution_accepted_updates_stored_revision
-//!  • equal_revision_rejected_with_non_monotonic_revision
-//!  • lower_revision_rejected_with_non_monotonic_revision
-//!  • breaking_change_higher_revision_rejected_with_incompatible
-//!  • stored_definition_unchanged_after_rejected_evolution
-//!  • evolve_does_not_return_duplicate_entity_type_error_on_second_call
-//!  • tenant_isolation_evolve_does_not_see_other_tenant_registration
-//!
-//! Schema evolution precedents honoured:
-//!  • Protobuf field-add / reader-writer Avro compatibility: additive-only.
-//!  • Confluent Schema Registry FORWARD/BACKWARD compat: field removal forbidden.
-//!  • Monotonic schema-version gating (Confluent compatibility level enforcement).
+//! Property removal and revision-history retention under evolution.
 
-#[path = "schema_evolution_support.rs"]
+#[path = "schema_evolution_support/mod.rs"]
 mod support;
 use support::*;
 

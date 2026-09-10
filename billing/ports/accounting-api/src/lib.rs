@@ -1,10 +1,7 @@
 //! Accounting journal API DTO contract layer.
 //!
 //! Serializable request shapes convert into accounting domain inputs while
-//! staying transport-neutral. This crate does not persist ledgers, file tax
-//! returns, execute payments, dispatch Workflow, or emit audit records.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! staying transport-neutral.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -17,15 +14,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiErrorEnvelope {
-    pub error: ApiErrorBody, // data_class: INTERNAL_ONLY
+    pub error: ApiErrorBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiErrorBody {
-    pub code: String,            // data_class: INTERNAL_ONLY
-    pub message: String,         // data_class: INTERNAL_ONLY
-    pub details: Option<String>, // data_class: INTERNAL_ONLY
+    pub code: String,
+    pub message: String,
+    pub details: Option<String>,
 }
 
 impl ApiErrorEnvelope {
@@ -43,13 +40,13 @@ impl ApiErrorEnvelope {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JournalPostRequest {
-    pub journal_id: String,             // data_class: INTERNAL_ONLY
-    pub tenant_id: String,              // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,        // data_class: INTERNAL_ONLY
-    pub period: String,                 // data_class: INTERNAL_ONLY
-    pub period_state: PeriodStateDto,   // data_class: INTERNAL_ONLY
-    pub source_documents: Vec<String>,  // data_class: INTERNAL_ONLY
-    pub approval_evidence_ref: String,  // data_class: INTERNAL_ONLY
+    pub journal_id: String,
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub period: String,
+    pub period_state: PeriodStateDto,
+    pub source_documents: Vec<String>,
+    pub approval_evidence_ref: String,
     pub lines: Vec<JournalLineRequest>, // data_class: FINANCIAL
 }
 
@@ -75,9 +72,9 @@ impl JournalPostRequest {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JournalLineRequest {
-    pub account_code: String, // data_class: INTERNAL_ONLY
-    pub debit_minor: i64,     // data_class: FINANCIAL
-    pub credit_minor: i64,    // data_class: FINANCIAL
+    pub account_code: String,
+    pub debit_minor: i64,  // data_class: FINANCIAL
+    pub credit_minor: i64, // data_class: FINANCIAL
 }
 
 impl JournalLineRequest {
@@ -93,14 +90,14 @@ impl JournalLineRequest {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PayrollPostingRequest {
-    pub journal_id: String,             // data_class: INTERNAL_ONLY
-    pub tenant_id: String,              // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,        // data_class: INTERNAL_ONLY
-    pub period: String,                 // data_class: INTERNAL_ONLY
-    pub source_payroll_digest: String,  // data_class: FINANCIAL
-    pub wage_ledger_refs: Vec<String>,  // data_class: INTERNAL_ONLY
-    pub approval_evidence_ref: String,  // data_class: INTERNAL_ONLY
-    pub reversal_path_ref: String,      // data_class: INTERNAL_ONLY
+    pub journal_id: String,
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub period: String,
+    pub source_payroll_digest: String, // data_class: FINANCIAL
+    pub wage_ledger_refs: Vec<String>,
+    pub approval_evidence_ref: String,
+    pub reversal_path_ref: String,
     pub lines: Vec<JournalLineRequest>, // data_class: FINANCIAL
 }
 
@@ -127,16 +124,16 @@ impl PayrollPostingRequest {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VatDeadlineRequest {
-    pub return_id: String,             // data_class: INTERNAL_ONLY
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,       // data_class: INTERNAL_ONLY
-    pub jurisdiction: JurisdictionDto, // data_class: INTERNAL_ONLY
-    pub period: String,                // data_class: INTERNAL_ONLY
-    pub deadline_epoch_seconds: u64,   // data_class: INTERNAL_ONLY
-    pub now_epoch_seconds: u64,        // data_class: INTERNAL_ONLY
-    pub workflow_ref: String,          // data_class: INTERNAL_ONLY
-    pub hometax_export_hash: String,   // data_class: FINANCIAL
-    pub evidence_ref: String,          // data_class: INTERNAL_ONLY
+    pub return_id: String,
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub jurisdiction: JurisdictionDto,
+    pub period: String,
+    pub deadline_epoch_seconds: u64,
+    pub now_epoch_seconds: u64,
+    pub workflow_ref: String,
+    pub hometax_export_hash: String, // data_class: FINANCIAL
+    pub evidence_ref: String,
 }
 
 impl VatDeadlineRequest {

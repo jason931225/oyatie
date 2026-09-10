@@ -1,8 +1,4 @@
 //! Deterministic in-memory SLA observability adapter.
-//!
-//! Stores the latest normalized control-plane status snapshot per cluster and
-//! computes summaries through the pure kernel. No Prometheus, Kubernetes, or
-//! network dependency is used.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
@@ -16,11 +12,10 @@ use k8s_sla_observability_api::{
 };
 use k8s_sla_observability_kernel::{SlaObservation, SlaPolicy, SlaSummary, summarize_sla};
 
-/// In-memory latest-snapshot store.
 #[derive(Debug)]
 pub struct InMemorySlaObservabilityStore {
     policy: SlaPolicy,
-    observations: Mutex<BTreeMap<ClusterKey, SlaObservation>>, // data_class: TENANT_SCOPED
+    observations: Mutex<BTreeMap<ClusterKey, SlaObservation>>,
 }
 
 impl Default for InMemorySlaObservabilityStore {
@@ -30,7 +25,6 @@ impl Default for InMemorySlaObservabilityStore {
 }
 
 impl InMemorySlaObservabilityStore {
-    /// Build an empty store with the supplied policy.
     #[must_use]
     pub fn new(policy: SlaPolicy) -> Self {
         Self {
@@ -39,11 +33,9 @@ impl InMemorySlaObservabilityStore {
         }
     }
 
-    /// Seed a snapshot for tests / local bring-up.
-    ///
     /// # Panics
-    /// Panics only if the supplied fixture is invalid or the test mutex is
-    /// poisoned. Production ingestion uses the fallible port method.
+    /// Panics if the supplied fixture is invalid or the mutex is poisoned;
+    /// production ingestion uses the fallible port method.
     #[must_use]
     pub fn with_snapshot(self, snapshot: ControlPlaneSlaSnapshot) -> Self {
         let key = ClusterKey::from_ref(&snapshot.cluster_ref);

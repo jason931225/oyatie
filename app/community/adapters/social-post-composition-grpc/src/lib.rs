@@ -17,9 +17,9 @@ pub enum GrpcStatusCode {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GrpcResponse<T> {
-    pub status: GrpcStatusCode, // data_class: INTERNAL_ONLY
-    pub rpc: GrpcUnaryPlan,     // data_class: INTERNAL_ONLY
-    pub body: T,                // data_class: INTERNAL_ONLY
+    pub status: GrpcStatusCode,
+    pub rpc: GrpcUnaryPlan,
+    pub body: T,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

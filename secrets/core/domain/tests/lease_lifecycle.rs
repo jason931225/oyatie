@@ -1,9 +1,4 @@
-//! Dynamic secret-lease lifecycle (story G002: zero static secrets).
-//!
-//! Ladder rungs (AMENDMENT 7): unit + RED/GREEN fixture pairs for every
-//! fail-closed gate (workload-identity binding, expiry bound, post-expiry
-//! renewal, renewal budget, absolute lifetime ceiling, revocation
-//! dominance + single CAEP event emission, Debug redaction).
+//! Dynamic secret-lease lifecycle: the fail-closed gates on issue, renew and revoke.
 
 use std::collections::BTreeMap;
 
@@ -171,7 +166,6 @@ fn red_renewal_budget_exhausts() {
 
 #[test]
 fn red_absolute_lifetime_ceiling_clamps_and_terminates() {
-    // Generous renewal budget; the CEILING is what must stop extension.
     let generous = LeasePolicy::new(TTL, 100, LIFETIME).expect("policy");
     let mut capped = DynamicLease::issue(
         LeaseId::new("lease/cap").unwrap(),
@@ -182,8 +176,6 @@ fn red_absolute_lifetime_ceiling_clamps_and_terminates() {
     )
     .expect("issue");
 
-    // Chain renewals so the lease stays continuously live up to the
-    // ceiling: T0+250 -> T0+550, T0+500 -> T0+800, T0+750 -> clamped.
     assert_eq!(capped.renew(T0 + 250).expect("renew 1"), T0 + 550);
     assert_eq!(capped.renew(T0 + 500).expect("renew 2"), T0 + 800);
     let clamped = capped.renew(T0 + 750).expect("clamped renew");
@@ -193,7 +185,6 @@ fn red_absolute_lifetime_ceiling_clamps_and_terminates() {
         "expiry clamps to the absolute ceiling"
     );
 
-    // At the ceiling, further renewal is meaningless: fail closed.
     assert_eq!(
         capped.renew(T0 + LIFETIME - 10),
         Err(LeaseError::MaxLifetimeReached {
@@ -201,7 +192,6 @@ fn red_absolute_lifetime_ceiling_clamps_and_terminates() {
         })
     );
 
-    // And the lease dies on schedule regardless of remaining budget.
     assert_eq!(capped.state(T0 + LIFETIME), LeaseState::Expired);
 }
 
@@ -218,7 +208,6 @@ fn revocation_emits_caep_event_exactly_once_and_dominates() {
     assert_eq!(event.reason, RevocationReason::CompromiseSuspected);
     assert_eq!(event.revoked_at_epoch_seconds, T0 + 5);
 
-    // Idempotent: no duplicate signal, first timestamp wins.
     assert!(
         revoked
             .revoke(T0 + 50, RevocationReason::Administrative)
@@ -231,7 +220,6 @@ fn revocation_emits_caep_event_exactly_once_and_dominates() {
         })
     );
 
-    // Dominates expiry and blocks renewal.
     assert_eq!(revoked.state(T0 + TTL + 1), LeaseState::Revoked);
     assert_eq!(
         revoked.renew(T0 + 10),
@@ -285,7 +273,6 @@ fn red_validation_gates() {
             requested_seconds: MAX_LEASE_TTL_SECONDS + 1
         })
     );
-    // Lifetime below the TTL or above the platform ceiling: rejected.
     assert_eq!(
         LeasePolicy::new(TTL, 0, TTL - 1),
         Err(LeaseError::LifetimeOutOfBounds {

@@ -12,23 +12,15 @@ pub const PRODUCER_BOOTSTRAP_GO: &str = "bootstrap-go-packages-go-types";
 /// Owned Rust front-end producer identity (authorized only after W2 equivalence).
 pub const PRODUCER_OWNED_RUST: &str = "owned-rust-go-front-end";
 
-/// Envelope version carrying unit identity only.
 pub const SCHEMA_VERSION_IDENTITY_ONLY: u32 = 0;
 
-/// Envelope version carrying the declaration tree with types as flat spellings.
-///
-/// NOT ACCEPTED. A v1 artifact cannot answer the questions v2 asks — it has no type structure and
-/// no package qualification — and decoding one by treating each spelling as an opaque name would
-/// reintroduce exactly the flat-table resolution v2 replaced. Refusing it names the fix
-/// (regenerate) instead of half-answering.
+/// Flat type spellings. NOT ACCEPTED: refusing names the fix (regenerate) instead of
+/// half-answering with a spelling the engine would have to re-resolve.
 pub const SCHEMA_VERSION_FLAT_TYPES: u32 = 1;
 
-/// Envelope version carrying the declaration tree with types as TREES.
 pub const SCHEMA_VERSION_DECLARATIONS: u32 = 2;
 
-/// The closed type-kind vocabulary. Closed for the same reason the declaration kinds are: a kind
-/// the engine has never heard of is a kind no rule will ever answer for, and accepting it would
-/// let a type resolve to nothing without anyone being told.
+/// Closed for the same reason as [`KNOWN_DECLARATION_KINDS`].
 pub const KNOWN_TYPE_KINDS: &[&str] = &[
     "array",
     "basic",
@@ -47,18 +39,10 @@ pub const KNOWN_TYPE_KINDS: &[&str] = &[
     "struct",
     "tuple",
     "type_param",
-    // A type shape with no node of its own is RECORDED rather than dropped, and refused by name
-    // downstream. Dropping it would make an untranslatable type look like an absent one.
     "unsupported",
 ];
 
 /// Declaration kinds this Go adapter admits, at package scope.
-///
-/// CLOSED, and the closure lives here rather than in `port-engine-api` on purpose. The neutral
-/// seam treats `kind` as an opaque slug because a second language pair must not need a second
-/// seam. This adapter is the Go half, so this is exactly where Go's declaration taxonomy is
-/// allowed to be named — and where an extractor that emits a kind the engine has never heard of
-/// gets refused instead of translated into silence.
 pub const KNOWN_DECLARATION_KINDS: &[&str] = &[
     "alias",
     "const",
@@ -118,8 +102,8 @@ pub const KNOWN_MEMBER_KINDS: &[&str] = &[
     "embeds",
     // A method a type gains through EMBEDDING rather than declaration. The target has no
     // promotion, so what is implicit in the source becomes a forwarding method — and recording it
-    // is what closes `census/interfaces.md` §11 item 7, where 2,747 types have method sets larger
-    // than the census could measure.
+    // is what closes `census/interfaces.md` §11 item 7, where types have method sets larger than
+    // the census could measure.
     "promoted",
     // An observed interface satisfaction, hung on the concrete type that satisfies it. It is a
     // MEMBER kind rather than a declaration kind because the impl belongs to the type: emitting it
@@ -194,7 +178,6 @@ pub const KNOWN_ATTR_KEYS: &[&str] = &[
     ATTR_LIT_KIND,
     ATTR_OP,
     ATTR_RANGE_KEY,
-    ATTR_RANGE_VALUE,
     ATTR_RECEIVER,
     ATTR_REF,
     ATTR_SITE,
@@ -207,15 +190,11 @@ pub const KNOWN_ATTR_KEYS: &[&str] = &[
 /// The target has no method promotion, so a forwarding method has to name the field it forwards to.
 pub const ATTR_VIA: &str = "via";
 
-/// Attribute keys holding the names a `range` loop binds.
-///
-/// Admitted late, and found by surveying a real package rather than by reading the extractor: the
-/// fixture corpus reaches the range loop through a shape that binds only the value, so the key
-/// attribute was emitted and never decoded. A closed vocabulary is only a check if the thing it
-/// closes over is exercised.
+/// Attribute key holding the name a `range` loop binds as its key.
 pub const ATTR_RANGE_KEY: &str = "key";
-/// See [`ATTR_RANGE_KEY`].
-pub const ATTR_RANGE_VALUE: &str = "value";
+
+/// A `range` loop's value binding and a constant's value deliberately share one key.
+pub const ATTR_RANGE_VALUE: &str = ATTR_VALUE;
 
 /// Attribute key holding the package-qualified IDENTITY of what a call resolves to.
 ///
@@ -259,7 +238,6 @@ pub const ATTR_GO_NODE: &str = "go_node";
 /// The target cases each differently, and the identifier alone cannot say which it is.
 pub const ATTR_REF: &str = "ref";
 
-/// Attribute key recording a literal's lexical class.
 pub const ATTR_LIT_KIND: &str = "lit_kind";
 
 /// Attribute key carrying a declaration's documentation block, newline-separated.

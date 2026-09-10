@@ -1,23 +1,9 @@
-//! `CapabilityStatus` — publication lifecycle discriminant for a registered capability.
-//!
-//! M02b-P17-capability-registry merge-variant delta-1.
-//! No I/O, no framework deps.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Publication lifecycle discriminant for a registered capability.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::fmt;
 
-/// Publication lifecycle state for a capability endpoint.
-///
-/// Mirrors the `status` column in the `capability.endpoints` DDL (P17 IP-001):
-/// `active | deprecated | disabled`.
-///
-/// - `Active` — capability is published and discoverable by tenant agents.
-/// - `Deprecated` — capability is still callable but excluded from new bindings
-///   and MCP discovery; scheduled for removal.
-/// - `Disabled` — capability is administratively suspended; not callable or
-///   discoverable until re-activated.
+/// The closed set of states a published capability endpoint can hold.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum CapabilityStatus {
     Active,
@@ -26,19 +12,17 @@ pub enum CapabilityStatus {
 }
 
 impl CapabilityStatus {
-    /// Returns `true` if the capability is visible to MCP discovery endpoints.
     #[inline]
     pub fn is_discoverable(self) -> bool {
         matches!(self, Self::Active)
     }
 
-    /// Returns `true` if the capability may be invoked by an authorised principal.
     #[inline]
     pub fn is_invocable(self) -> bool {
         matches!(self, Self::Active | Self::Deprecated)
     }
 
-    /// Canonical lowercase label, matching the DDL `CHECK` constraint values.
+    /// The stored representation; a rename is a schema migration.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Active => "active",
@@ -47,20 +31,8 @@ impl CapabilityStatus {
         }
     }
 
-    /// Attempt a lifecycle transition, enforcing the legal edge set.
-    ///
-    /// # Legal transitions
-    ///
-    /// | From       | To         | Meaning                        |
-    /// |------------|------------|--------------------------------|
-    /// | Active     | Deprecated | Soft deprecation               |
-    /// | Active     | Disabled   | Administrative suspend         |
-    /// | Deprecated | Active     | Rescind deprecation            |
-    /// | Deprecated | Disabled   | Escalate to suspend            |
-    /// | Disabled   | Active     | Re-activation                  |
-    ///
-    /// All other transitions — including same-state — return
-    /// [`Err(CapabilityStatusTransitionError)`].
+    /// A same-state transition is an error, not a no-op: the caller asked for
+    /// a change that did not happen.
     pub fn try_transition_to(
         self,
         next: CapabilityStatus,
@@ -87,9 +59,6 @@ impl fmt::Display for CapabilityStatus {
 }
 
 /// Error returned when a requested lifecycle transition is illegal.
-///
-/// Contains the source and target [`CapabilityStatus`] values so callers can
-/// produce human-readable diagnostics without re-encoding the rule table.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CapabilityStatusTransitionError {
     pub from: CapabilityStatus,
@@ -109,7 +78,6 @@ impl fmt::Display for CapabilityStatusTransitionError {
 
 impl std::error::Error for CapabilityStatusTransitionError {}
 
-/// Parse error returned by `TryFrom<&str>`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CapabilityStatusParseError(pub String);
 
@@ -190,8 +158,6 @@ mod tests {
         assert!(CapabilityStatus::Active < CapabilityStatus::Deprecated);
         assert!(CapabilityStatus::Deprecated < CapabilityStatus::Disabled);
     }
-
-    // --- ST3: transition matrix tests ---
 
     #[test]
     fn transition_active_to_deprecated() {

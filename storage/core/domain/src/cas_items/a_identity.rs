@@ -4,21 +4,12 @@ const MAX_TENANT_ID_LEN: usize = 128;
 const MAX_REFERENCE_LEN: usize = 512;
 const MAX_PAYLOAD_CHUNK_BYTES: usize = 16 * 1024 * 1024;
 
-// =====================================================================
-// Addressing and policy types
-// =====================================================================
 
-/// Tenant identifier. Every CAS address is tenant-scoped so identical content
-/// in two tenants never implies cross-tenant deduplication or shared KEK scope.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TenantId(String);
 
 impl TenantId {
     /// Parse a canonical tenant id (`ten_...`).
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidTenantId` when the identifier is empty,
-    /// malformed, too long, or contains non-canonical characters.
     pub fn parse(value: &str) -> Result<Self, ObjectStoreError> {
         if value.len() <= TENANT_ID_PREFIX.len()
             || value.len() > MAX_TENANT_ID_LEN
@@ -49,17 +40,12 @@ impl fmt::Display for TenantId {
 pub struct Blake3Digest(String);
 
 impl Blake3Digest {
-    /// Compute the BLAKE3 digest for a payload.
     #[must_use]
     pub fn for_payload(bytes: &[u8]) -> Self {
         Self(blake3::hash(bytes).to_hex().to_string())
     }
 
     /// Parse a lower-case BLAKE3 hex digest.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidBlake3Digest` when the value is not
-    /// exactly 64 lowercase hex characters.
     pub fn parse(value: &str) -> Result<Self, ObjectStoreError> {
         if is_lower_hex(value, BLAKE3_HEX_LEN) {
             Ok(Self(value.to_string()))
@@ -87,8 +73,8 @@ impl fmt::Display for Blake3Digest {
 /// cross-tenant side channels.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TenantScopedBlake3Address {
-    pub tenant_id: TenantId,  // data_class: INTERNAL_ONLY
-    pub digest: Blake3Digest, // data_class: INTERNAL_ONLY
+    pub tenant_id: TenantId,
+    pub digest: Blake3Digest,
 }
 
 impl TenantScopedBlake3Address {
@@ -103,9 +89,6 @@ impl TenantScopedBlake3Address {
     }
 
     /// Build an address from already-computed parts.
-    ///
-    /// # Errors
-    /// Returns validation errors from `TenantId` or `Blake3Digest` parsing.
     pub fn parse(tenant_id: &str, digest: &str) -> Result<Self, ObjectStoreError> {
         Ok(Self {
             tenant_id: TenantId::parse(tenant_id)?,
@@ -119,22 +102,16 @@ impl TenantScopedBlake3Address {
     }
 }
 
-/// Per-tenant KEK boundary used by CAS writes.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TenantKekBoundary {
-    pub tenant_id: TenantId,              // data_class: INTERNAL_ONLY
-    pub kms_key_ref: String,              // data_class: INTERNAL_ONLY
-    pub kms_key_version: u32,             // data_class: INTERNAL_ONLY
-    pub ciphertext_ref: String,           // data_class: INTERNAL_ONLY
-    pub crypto_shred_ref: Option<String>, // data_class: INTERNAL_ONLY
+    pub tenant_id: TenantId,
+    pub kms_key_ref: String,
+    pub kms_key_version: u32,
+    pub ciphertext_ref: String,
+    pub crypto_shred_ref: Option<String>,
 }
 
 impl TenantKekBoundary {
-    /// Build a KEK boundary.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidKekBoundary` when references are empty,
-    /// contain control characters, or the key version is zero.
     pub fn new(
         tenant_id: TenantId,
         kms_key_ref: impl Into<String>,
@@ -185,12 +162,11 @@ impl CasWormMode {
     }
 }
 
-/// WORM policy required for CAS objects that anchor audit material.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CasWormPolicy {
-    pub mode: CasWormMode,               // data_class: PUBLIC
-    pub retain_until_epoch_seconds: u64, // data_class: INTERNAL_ONLY
-    pub legal_hold: bool,                // data_class: INTERNAL_ONLY
+    pub mode: CasWormMode,
+    pub retain_until_epoch_seconds: u64,
+    pub legal_hold: bool,
 }
 
 impl CasWormPolicy {
@@ -230,20 +206,14 @@ impl CasWormPolicy {
     }
 }
 
-/// Audit digest-chain anchor stored alongside CAS metadata.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CasAuditAnchor {
-    pub audit_event_id: String,          // data_class: INTERNAL_ONLY
-    pub digest_chain_head: Blake3Digest, // data_class: INTERNAL_ONLY
-    pub anchored_at_epoch_seconds: u64,  // data_class: INTERNAL_ONLY
+    pub audit_event_id: String,
+    pub digest_chain_head: Blake3Digest,
+    pub anchored_at_epoch_seconds: u64,
 }
 
 impl CasAuditAnchor {
-    /// Build an audit anchor.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidAuditAnchor` when the event id is empty
-    /// or the timestamp is zero.
     pub fn new(
         audit_event_id: impl Into<String>,
         digest_chain_head: Blake3Digest,

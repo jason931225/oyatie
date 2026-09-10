@@ -1,10 +1,6 @@
-//! Wire-contract tests for the workload-identity API DTOs.
-//!
-//! These pin the serialized JSON shape (camelCase keys + stable enum strings)
-//! the OpenAPI 3.2.0 contract in
-//! `microservices/identity/contracts/openapi/workload.yaml` describes, and the
-//! round-trip from the domain decision types into the response DTOs. They are
-//! the executable half of the OpenAPI/asyncapi/proto contract surface.
+//! Pins the serialized JSON shape of the workload-identity DTOs: camelCase
+//! keys and stable enum strings are a wire contract, so a rename here breaks
+//! every deployed client.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -37,11 +33,10 @@ fn authorize_with_token_request_uses_camel_case_and_typed_claims() {
     assert_eq!(body["action"], "cloud.kms.Decrypt");
     assert_eq!(body["resource"]["resourceType"], "Secret");
     assert_eq!(body["resource"]["resourceId"], "db-password");
-    // Typed claim is tag/content encoded so it round-trips losslessly.
+    // Tag/content encoding is what makes the typed claim round-trip losslessly.
     assert_eq!(body["context"]["mfa"]["kind"], "bool");
     assert_eq!(body["context"]["mfa"]["value"], true);
 
-    // The action + context project into the domain shapes.
     assert_eq!(request.action().as_str(), "cloud.kms.Decrypt");
     assert!(request.context_domain().contains_key("mfa"));
 }

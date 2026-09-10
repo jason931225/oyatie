@@ -3,9 +3,7 @@
 //! Consumers receive Secrets' established exact value identities, typed
 //! validation errors, and validation behavior without importing its internal
 //! aggregate. This port intentionally excludes key material, provider clients,
-//! cryptographic operations, and the KMS directory. The legacy domain remains
-//! the defining crate until its large crate root is decomposed in a dedicated
-//! Secrets structural lane.
+//! cryptographic operations, and the KMS directory.
 
 #![forbid(unsafe_code)]
 

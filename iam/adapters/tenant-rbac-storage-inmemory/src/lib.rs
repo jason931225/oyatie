@@ -1,14 +1,6 @@
-//! Tenant RBAC in-memory storage adapter reference.
-//!
-//! SECURITY/OPERATIONS: NOT FOR PRODUCTION. This adapter is an in-process
-//! reference implementation for Tenant RBAC metadata storage seams. It is
-//! volatile, process-local, and loses every record on restart. It exists to pin
-//! the repository/idempotency contract for later durable Postgres/RLS and cloud
-//! adapters without claiming a deployed storage backend, runtime write path,
-//! Workflow execution, OpenTofu execution, downstream-service network call, or
-//! audit-chain emission.
-//! ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-//! `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! NOT FOR PRODUCTION: this adapter is process-local and volatile, losing every
+//! record on restart. It exists to pin the repository and idempotency contract
+//! that a durable adapter must then satisfy.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 

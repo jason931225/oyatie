@@ -1,7 +1,4 @@
 //! Deprecated HTTP-shaped block metadata compatibility boundary.
-//!
-//! This remains a local P0 fixture; block promotion is a later independent
-//! evidence-backed lane.
 
 use std::collections::BTreeMap;
 

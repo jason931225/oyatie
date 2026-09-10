@@ -1,26 +1,3 @@
-/// Deterministic feed-ranking usecase.
-///
-/// # Score formula
-///
-/// All arithmetic is integer-only (no floats) to guarantee identical results
-/// across platforms and compiler versions.
-///
-/// ```text
-/// RECENCY_WEIGHT  = 86_400   (seconds in one day; mirrors story-purge TTL model)
-/// ENGAGEMENT_CAP  = 10_000   (bounds engagement signal; prevents score domination)
-///
-/// age_secs             = now.saturating_sub(created_at)
-/// recency_component    = RECENCY_WEIGHT.saturating_sub(age_secs.min(RECENCY_WEIGHT))
-/// engagement_component = engagement_count.min(ENGAGEMENT_CAP)
-///
-/// score = recency_component + engagement_component
-/// ```
-///
-/// ## Properties
-/// - Monotonically non-decreasing in `engagement_count` at fixed time (up to cap).
-/// - Monotonically non-increasing in `age_secs` at fixed engagement.
-/// - Bounded: `0 ≤ score ≤ 96_400`.
-/// - Saturating arithmetic throughout; no panics on overflow.
 use crate::{AuthorizedSocialContext, SocialUsecaseError};
 
 /// Recency weight constant: one day in seconds.
@@ -53,8 +30,6 @@ pub struct FeedRankInput {
 }
 
 /// Returns the deterministic integer score for a single post at a given wall-clock instant.
-///
-/// See module-level documentation for the full formula and monotonicity guarantees.
 pub fn score(input: &FeedRankInput, now: u64) -> u64 {
     let age_secs = now.saturating_sub(input.created_at);
     let recency_component = RECENCY_WEIGHT.saturating_sub(age_secs.min(RECENCY_WEIGHT));
@@ -67,10 +42,6 @@ pub fn score(input: &FeedRankInput, now: u64) -> u64 {
 /// # Context guard
 /// `ctx.validate()` is called first. Any validation error is surfaced as
 /// `Err(SocialUsecaseError::Api(...))`.
-///
-/// # Scope
-/// The input slice is assumed to be pre-scoped by the caller (the authorized context
-/// asserts session scope). Posts with an empty `post_id` are silently excluded.
 ///
 /// # Ordering
 /// Primary: descending `score(post, now)`.
@@ -250,5 +221,20 @@ mod tests {
             first, second,
             "repeated ranking of identical input must be byte-identical"
         );
+    }
+
+    #[test]
+    fn score_is_bounded_by_recency_weight_plus_engagement_cap() {
+        let now = 1_000_000u64;
+        let max = RECENCY_WEIGHT + ENGAGEMENT_CAP;
+        assert_eq!(max, 96_400);
+        for created_at in [0, now - 200_000, now - 86_400, now - 1, now, now + 5_000] {
+            for engagement in [0, 1, ENGAGEMENT_CAP, ENGAGEMENT_CAP + 1, u64::MAX] {
+                let observed = score(&make_post("p", created_at, engagement), now);
+                assert!(observed <= max, "score {observed} exceeded bound {max}");
+            }
+        }
+        assert_eq!(score(&make_post("p", now, u64::MAX), now), max);
+        assert_eq!(score(&make_post("p", 0, 0), now), 0);
     }
 }

@@ -1,7 +1,6 @@
 //! Shared fixture for the migration-runner suites: a two-revision
-//! registry, an honest in-memory log (byte-equality dedup, loud
-//! divergent-key conflicts), hand-sealed rev-1 objects, and the plan and
-//! authority under test.
+//! registry, hand-sealed rev-1 objects, and the plan and authority
+//! under test.
 
 use data_boundary_kernel::{DataClass, PrivacyDataClass};
 use data_ontology_kernel::{

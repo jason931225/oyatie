@@ -1,13 +1,4 @@
-//! Payroll period types for M07/P02-payroll merge-variant delta-1.
-//!
-//! Smallest net-new kernel surface: `PayrollPeriod` (pay-cycle granularity enum),
-//! `PayslipStatus` (payslip lifecycle FSM), `PayCycleKind` (frequency enum),
-//! and `UnknownPayrollPeriod` error for wire-string round-tripping.
-//!
-//! Wire strings match the `payroll.pay_cycle_kind` and `payroll.payslip_status`
-//! Postgres ENUM column names used by `migrations/payroll/001_payroll_schema.sql`.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Payroll period, pay-cycle and payslip-lifecycle types.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 /// Granularity of a payroll computation period.
@@ -24,7 +15,6 @@ pub enum PayrollPeriod {
 }
 
 impl PayrollPeriod {
-    /// Canonical wire string — matches Postgres ENUM label exactly.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Daily => "daily",
@@ -72,7 +62,6 @@ pub enum PayCycleKind {
 }
 
 impl PayCycleKind {
-    /// Canonical wire string — matches Postgres ENUM label exactly.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Weekly => "weekly",
@@ -106,7 +95,6 @@ pub enum PayslipStatus {
 }
 
 impl PayslipStatus {
-    /// Canonical wire string — matches Postgres ENUM label exactly.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Draft => "draft",
@@ -118,10 +106,9 @@ impl PayslipStatus {
 
     /// Returns `true` if the payslip may still be modified.
     ///
-    /// Per the FSM (`Draft → Approved → Dispatched`; `Draft → Voided`),
-    /// immutability begins only at terminal states `Dispatched` and `Voided`
-    /// (근로기준법 §48). `Approved` records may still receive pre-dispatch
-    /// corrections and are therefore mutable.
+    /// Immutability begins only at the terminal states `Dispatched` and
+    /// `Voided` (근로기준법 §48); `Approved` records may still receive
+    /// pre-dispatch corrections.
     pub fn is_mutable(self) -> bool {
         matches!(self, Self::Draft | Self::Approved)
     }
@@ -148,23 +135,16 @@ impl UnknownPayrollPeriod {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     // ── PayrollPeriod ────────────────────────────────────────────────────────
 
     #[test]
-    fn payroll_period_wire_strings_are_distinct() {
-        let strings: HashSet<_> = [
-            PayrollPeriod::Daily,
-            PayrollPeriod::Weekly,
-            PayrollPeriod::BiWeekly,
-            PayrollPeriod::Monthly,
-            PayrollPeriod::Quarterly,
-        ]
-        .iter()
-        .map(|p| p.as_str())
-        .collect();
-        assert_eq!(strings.len(), 5);
+    fn payroll_period_wire_strings_are_pinned() {
+        assert_eq!(PayrollPeriod::Daily.as_str(), "daily");
+        assert_eq!(PayrollPeriod::Weekly.as_str(), "weekly");
+        assert_eq!(PayrollPeriod::BiWeekly.as_str(), "bi_weekly");
+        assert_eq!(PayrollPeriod::Monthly.as_str(), "monthly");
+        assert_eq!(PayrollPeriod::Quarterly.as_str(), "quarterly");
     }
 
     #[test]
@@ -199,22 +179,15 @@ mod tests {
     // ── PayCycleKind ─────────────────────────────────────────────────────────
 
     #[test]
-    fn pay_cycle_kind_wire_strings_are_distinct() {
-        let strings: HashSet<_> = [
-            PayCycleKind::Weekly,
-            PayCycleKind::BiWeekly,
-            PayCycleKind::SemiMonthly,
-            PayCycleKind::Monthly,
-        ]
-        .iter()
-        .map(|k| k.as_str())
-        .collect();
-        assert_eq!(strings.len(), 4);
+    fn pay_cycle_kind_wire_strings_are_pinned() {
+        assert_eq!(PayCycleKind::Weekly.as_str(), "weekly");
+        assert_eq!(PayCycleKind::BiWeekly.as_str(), "bi_weekly");
+        assert_eq!(PayCycleKind::SemiMonthly.as_str(), "semi_monthly");
+        assert_eq!(PayCycleKind::Monthly.as_str(), "monthly");
     }
 
     #[test]
-    fn pay_cycle_kind_runs_per_year_sum_sanity() {
-        // Monthly + weekly = 12 + 52; both must be > 0
+    fn runs_per_year_matches_calendar_cadence() {
         assert_eq!(PayCycleKind::Monthly.runs_per_year(), 12);
         assert_eq!(PayCycleKind::Weekly.runs_per_year(), 52);
         assert_eq!(PayCycleKind::BiWeekly.runs_per_year(), 26);
@@ -224,33 +197,21 @@ mod tests {
     // ── PayslipStatus ────────────────────────────────────────────────────────
 
     #[test]
-    fn payslip_status_wire_strings_are_distinct() {
-        let strings: HashSet<_> = [
-            PayslipStatus::Draft,
-            PayslipStatus::Approved,
-            PayslipStatus::Dispatched,
-            PayslipStatus::Voided,
-        ]
-        .iter()
-        .map(|s| s.as_str())
-        .collect();
-        assert_eq!(strings.len(), 4);
+    fn payslip_status_wire_strings_are_pinned() {
+        assert_eq!(PayslipStatus::Draft.as_str(), "draft");
+        assert_eq!(PayslipStatus::Approved.as_str(), "approved");
+        assert_eq!(PayslipStatus::Dispatched.as_str(), "dispatched");
+        assert_eq!(PayslipStatus::Voided.as_str(), "voided");
     }
 
     #[test]
     fn draft_and_approved_are_mutable_dispatched_and_voided_are_not() {
-        // Draft: initial state — always mutable
         assert!(PayslipStatus::Draft.is_mutable());
-        // Approved: pre-dispatch corrections are still permitted
         assert!(PayslipStatus::Approved.is_mutable());
-        // Terminal states: immutable per 근로기준법 §48
         assert!(!PayslipStatus::Dispatched.is_mutable());
         assert!(!PayslipStatus::Voided.is_mutable());
     }
 
-    /// Synthetic-violation regression: the original implementation returned
-    /// `false` for `Approved`, prematurely locking payslips before dispatch.
-    /// This test would have failed against that code and must stay green.
     #[test]
     fn approved_payslip_is_mutable_pre_dispatch_regression() {
         assert!(
@@ -269,7 +230,6 @@ mod tests {
 
     #[test]
     fn payslip_fsm_terminal_states_are_not_mutable() {
-        // Dispatched and Voided are terminal — labour law retention starts here
         for terminal in [PayslipStatus::Dispatched, PayslipStatus::Voided] {
             assert!(!terminal.is_mutable(), "{terminal:?} must be immutable");
         }

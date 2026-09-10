@@ -1,4 +1,3 @@
-use crate::cidr::{Ipv4Cidr, Ipv6Cidr};
 use compute_resource::CloudResourceError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]

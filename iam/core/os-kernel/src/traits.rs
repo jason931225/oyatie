@@ -1,31 +1,23 @@
-//! Cross-cutting traits used workspace-wide: runnable services and sequence
-//! hooks, modeled on Talos `runtime` controller/service abstractions.
+//! Runnable services and sequence hooks, modeled on the Talos `runtime`
+//! controller and service abstractions.
 
 use crate::error::Result;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// Lifecycle state of a [`Runnable`].
+/// Lifecycle state of a [`Runnable`]. [`RunState::can_transition_to`] is the
+/// state machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunState {
-    /// Created but not started.
     Initialized,
-    /// Preparing to run (pulling images, writing config, ...).
     Preparing,
-    /// Actively running.
     Running,
-    /// Stopped cleanly.
     Stopped,
-    /// Stopped due to a failure.
     Failed,
 }
 
 impl RunState {
-    /// Whether a transition from `self` to `next` is permitted.
-    ///
-    /// The lifecycle is: Initialized -> Preparing -> Running -> (Stopped |
-    /// Failed). A Stopped or Failed runnable may be re-Initialized (restart).
     pub fn can_transition_to(self, next: RunState) -> bool {
         use RunState::{Failed, Initialized, Preparing, Running, Stopped};
         matches!(
@@ -37,56 +29,48 @@ impl RunState {
         )
     }
 
-    /// Whether this is a terminal-for-now state.
+    /// Terminal only until a restart: both states can transition back to
+    /// `Initialized`.
     pub fn is_terminal(self) -> bool {
         matches!(self, RunState::Stopped | RunState::Failed)
     }
 }
 
-/// A long-running component (a "service") that the runtime supervises.
-///
-/// Mirrors the Talos `system.Service`/`Runnable` notion: it has an identity,
-/// can be started and stopped, and reports health.
+/// A long-running component the runtime supervises.
 pub trait Runnable {
-    /// Stable identifier for this runnable (e.g. `"kubelet"`).
+    /// Stable across restarts, e.g. `"kubelet"`.
     fn id(&self) -> &str;
 
-    /// Start the runnable. Should be idempotent if already running.
+    /// Implementors MUST make this idempotent: calling it on an
+    /// already-running instance succeeds rather than erroring.
     fn start(&mut self) -> Result<()>;
 
-    /// Stop the runnable. Should be idempotent if already stopped.
+    /// Implementors MUST make this idempotent: calling it on an
+    /// already-stopped instance succeeds rather than erroring.
     fn stop(&mut self) -> Result<()>;
 
-    /// Current lifecycle state.
     fn state(&self) -> RunState;
 
-    /// Whether the runnable is healthy. Default: healthy iff running.
     fn is_healthy(&self) -> bool {
         self.state() == RunState::Running
     }
 }
 
-/// A discrete phase in a boot/upgrade/reset sequence.
-///
-/// Talos models machine lifecycle as ordered sequences (Boot, Upgrade, Reset,
-/// Shutdown) composed of named phases each containing tasks. This is the
-/// minimal hook surface other crates build on.
+/// One phase of a machine-lifecycle sequence such as boot, upgrade or reset.
 pub trait SequenceHook {
-    /// Human-readable phase name.
     fn name(&self) -> &str;
 
-    /// Run the phase. Returning `Err` aborts the sequence.
+    /// An `Err` aborts the whole sequence; later phases do not run.
     fn run(&mut self) -> Result<()>;
 
-    /// Whether this phase may be skipped when a previous run already satisfied
-    /// its postconditions. Default: not skippable.
+    /// Advisory only: [`Sequence::run_all`] does not consult this, and no
+    /// skip-on-rerun path exists yet.
     fn is_idempotent(&self) -> bool {
         false
     }
 }
 
-/// Orders and runs a list of [`SequenceHook`] phases, recording the names of
-/// phases that completed successfully.
+/// Runs [`SequenceHook`] phases in push order, recording those that succeeded.
 #[derive(Default)]
 pub struct Sequence {
     phases: Vec<Box<dyn SequenceHook>>,
@@ -94,7 +78,6 @@ pub struct Sequence {
 }
 
 impl Sequence {
-    /// An empty sequence.
     pub fn new() -> Self {
         Sequence {
             phases: Vec::new(),
@@ -102,18 +85,16 @@ impl Sequence {
         }
     }
 
-    /// Append a phase.
     pub fn push(&mut self, phase: Box<dyn SequenceHook>) {
         self.phases.push(phase);
     }
 
-    /// Names of phases that completed, in order.
     pub fn completed(&self) -> &[String] {
         &self.completed
     }
 
-    /// Run every phase in order, stopping at the first error. On error the
-    /// error is returned and `completed()` reflects phases that succeeded.
+    /// Stops at the first error, leaving [`Sequence::completed`] holding the
+    /// phases that had already succeeded.
     pub fn run_all(&mut self) -> Result<()> {
         for phase in &mut self.phases {
             phase.run()?;

@@ -16,13 +16,33 @@ use foundry_projection_draft::{
     ProjectedObject, ProjectionStore,
 };
 
-/// (from, to, edge type, observed-at seconds)
-pub(crate) const EDGES: &[(&str, &str, &str, u64)] = &[
-    ("ent_root", "ent_b", "lty_partner", 10),
-    ("ent_b", "ent_c", "lty_partner", 10),
-    ("ent_root", "ent_d", "lty_member", 10),
+pub(crate) struct EdgeFixture {
+    pub(crate) from: &'static str,
+    pub(crate) to: &'static str,
+    pub(crate) edge_type: &'static str,
+    pub(crate) observed_at_seconds: u64,
+}
+
+const fn edge(
+    from: &'static str,
+    to: &'static str,
+    edge_type: &'static str,
+    observed_at_seconds: u64,
+) -> EdgeFixture {
+    EdgeFixture {
+        from,
+        to,
+        edge_type,
+        observed_at_seconds,
+    }
+}
+
+pub(crate) const EDGES: &[EdgeFixture] = &[
+    edge("ent_root", "ent_b", "lty_partner", 10),
+    edge("ent_b", "ent_c", "lty_partner", 10),
+    edge("ent_root", "ent_d", "lty_member", 10),
     // Deliberately stale: the freshness floor must drop it in BOTH.
-    ("ent_root", "ent_e", "lty_partner", 1),
+    edge("ent_root", "ent_e", "lty_partner", 1),
 ];
 
 pub(crate) const NODES: &[(&str, &str)] = &[
@@ -88,7 +108,6 @@ pub(crate) fn registry() -> OntologyEngine {
     engine
 }
 
-/// The graph as the in-memory engine holds it.
 pub(crate) fn in_memory() -> (ObjectGraph, KnowledgeGraphQueryEngine) {
     let mut graph = ObjectGraph::default();
     for (id, ety) in NODES {
@@ -106,12 +125,19 @@ pub(crate) fn in_memory() -> (ObjectGraph, KnowledgeGraphQueryEngine) {
     }
     let registry = registry();
     let mut engine = KnowledgeGraphQueryEngine::default();
-    for (from, to, edge, at) in EDGES {
+    for fixture in EDGES {
         engine
             .upsert_link(
                 &registry,
                 &graph,
-                KnowledgeGraphLinkInstance::new("ten_alpha", *from, *to, *edge, *at).unwrap(),
+                KnowledgeGraphLinkInstance::new(
+                    "ten_alpha",
+                    fixture.from,
+                    fixture.to,
+                    fixture.edge_type,
+                    fixture.observed_at_seconds,
+                )
+                .unwrap(),
             )
             .unwrap();
     }
@@ -138,12 +164,11 @@ pub(crate) fn in_store() -> MemoryProjectionStore {
         .collect();
     let links: Vec<ProjectedLink> = EDGES
         .iter()
-        .map(|(from, to, edge, at)| ProjectedLink {
-            link_type: (*edge).to_string(),
-            from_object_ref: (*from).to_string(),
-            to_object_ref: (*to).to_string(),
-            // The store's unit is milliseconds; the source converts.
-            observed_at_epoch_ms: at * 1_000,
+        .map(|fixture| ProjectedLink {
+            link_type: fixture.edge_type.to_string(),
+            from_object_ref: fixture.from.to_string(),
+            to_object_ref: fixture.to.to_string(),
+            observed_at_epoch_ms: fixture.observed_at_seconds * 1_000,
         })
         .collect();
     store
@@ -181,7 +206,6 @@ pub(crate) fn request(
     .unwrap()
 }
 
-/// Every shape that the merged law tests care about.
 pub(crate) fn shapes() -> Vec<(&'static str, KnowledgeGraphQueryRequest)> {
     vec![
         (

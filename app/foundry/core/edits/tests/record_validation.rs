@@ -1,6 +1,3 @@
-//! Payload-root pins: version stamped at construction, identity fields
-//! fail closed on blank or untrimmed input.
-
 use foundry_edits::{
     ActionRecord, DenialRecord, EditSet, OntologyEdit, RecordError, WIRE_FORMAT_VERSION,
     WireDataClass, WireProperty, WireTier, WireValue,

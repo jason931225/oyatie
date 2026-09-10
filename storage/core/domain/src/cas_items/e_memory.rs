@@ -1,10 +1,3 @@
-// =====================================================================
-// Reference in-memory adapter
-// =====================================================================
-//
-// tests exercise the owned CAS port without standing up a transitional bridge.
-// It also has an explicit transitional-adapter mode so adapter receipts can be
-// tested without leaking vendor bucket/key APIs into the trait.
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct StoredCasObject {
@@ -17,7 +10,6 @@ struct InMemoryStorage {
     objects: BTreeMap<TenantScopedBlake3Address, StoredCasObject>,
 }
 
-/// Reference in-memory `ObjectStore`. Use in tests.
 #[derive(Debug)]
 pub struct InMemoryObjectStore {
     inner: Mutex<InMemoryStorage>,
@@ -235,6 +227,3 @@ impl ObjectStoreDiagnostics for InMemoryObjectStore {
     }
 }
 
-// =====================================================================
-// Helpers
-// =====================================================================

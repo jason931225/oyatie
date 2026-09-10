@@ -1,7 +1,5 @@
-//! Deprecated source-compatibility crate for the pre-P0 CAS package identity.
-//!
-//! New storage code imports [`storage_domain::cas`]. This crate remains during
-//! the advertised P0 compatibility window and contains no independent engine.
+//! Deprecated source-compatibility crate for the historical CAS package
+//! identity. New storage code imports [`storage_domain::cas`].
 
 #![forbid(unsafe_code)]
 

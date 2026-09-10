@@ -1,9 +1,3 @@
-//! Binary entry point for the tenant registration / lifecycle service.
-//!
-//! Reads `LISTEN_ADDR` from the environment (default `127.0.0.1:8080`) and
-//! starts the tenant lifecycle REST service backed by the in-memory store.
-//! Production swaps a persistent store behind the same kernel port.
-
 use tenancy_tenant_lifecycle_app::serve;
 
 #[tokio::main]

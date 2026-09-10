@@ -6,6 +6,10 @@ use crate::line_budget::{CommentScanner, LineKind};
 
 const STUB_PREFIX: &str = "NotImplemented";
 
+/// Path roots no crate in this repository defines, so a trait segment under one
+/// is never the trait a header of this repository implements.
+const FOREIGN_ROOTS: [&str; 3] = ["std", "core", "alloc"];
+
 /// One changed Rust source: the path, its bytes at the head commit (empty
 /// when the change deletes it), and its bytes at the base commit when the path
 /// already held content there.
@@ -154,10 +158,7 @@ fn implemented_trait(header: &str) -> Option<String> {
     let (signature, bounds) = rest.split_once(" where ").unwrap_or((rest, ""));
     let (trait_path, target) = signature.split_once(" for ")?;
     let trait_path = trait_path.trim().trim_start_matches("::");
-    if ["std::", "core::", "alloc::"]
-        .iter()
-        .any(|root| trait_path.starts_with(root))
-    {
+    if is_foreign(trait_path.split("::").next().unwrap_or_default()) {
         return None;
     }
     let name = last_segment(trait_path)?;
@@ -192,9 +193,9 @@ fn split_generics(parameters: &str) -> (&str, &str) {
 }
 
 /// Identifier words in `text` that no foreign path qualifies, so
-/// `std::io::Write` contributes `std` and not `Write`. A path rooted at
-/// `crate`, `self` or `super` names this crate's own item, so its last segment
-/// is a mention like a bare one; a bound naming another crate's trait is not.
+/// `std::io::Write` contributes `std` and not `Write`. Every other root —
+/// `crate`, `self`, `super`, a module of this crate, another crate here — may
+/// name a trait this repository defines, so its last segment stays a mention.
 fn unqualified_words(text: &str) -> Vec<&str> {
     let mut found = Vec::new();
     let mut start = None;
@@ -220,12 +221,13 @@ fn push_unqualified<'text>(
     end: usize,
     found: &mut Vec<&'text str>,
 ) {
-    if matches!(
-        path_root(&text[..begin]),
-        None | Some("crate" | "self" | "super")
-    ) {
+    if !path_root(&text[..begin]).is_some_and(is_foreign) {
         found.push(&text[begin..end]);
     }
+}
+
+fn is_foreign(root: &str) -> bool {
+    FOREIGN_ROOTS.contains(&root)
 }
 
 /// The first segment of the `::`-joined path that ends at `prefix`, or `None`

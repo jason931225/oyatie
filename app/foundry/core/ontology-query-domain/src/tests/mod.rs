@@ -1,6 +1,3 @@
-//! The original inline test corpus, split to the file budget; bodies
-//! are verbatim, only the fixture module and preludes are new.
-
 mod support;
 
 mod multiroot;

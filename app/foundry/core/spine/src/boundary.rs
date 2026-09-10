@@ -103,31 +103,18 @@ pub(crate) fn wire_tier(kernel: PropertyTier) -> WireTier {
     }
 }
 
+/// Derived from the tag numbering rather than re-listed, so a new
+/// variant cannot be missed here.
+fn every_wire_data_class() -> impl Iterator<Item = WireDataClass> {
+    (0u8..=u8::MAX).map_while(WireDataClass::from_tag)
+}
+
 /// The wire label for a kernel class, recovered by searching the ONE
 /// frozen forward table above — no second mapping exists to drift.
 pub(crate) fn wire_label(kernel: &PrivacyDataClass) -> Option<WireDataClass> {
-    const LABELS: [WireDataClass; 13] = [
-        WireDataClass::Public,
-        WireDataClass::InternalOnly,
-        WireDataClass::PiiIdentifying,
-        WireDataClass::PiiQuasiIdentifier,
-        WireDataClass::Phi,
-        WireDataClass::Pci,
-        WireDataClass::Financial,
-        WireDataClass::FinancialRegulatedCredit,
-        WireDataClass::BehavioralTenantProduct,
-        WireDataClass::BehavioralAds,
-        WireDataClass::DeclaredPreference,
-        WireDataClass::SearchQuery,
-        WireDataClass::SensitivePipaArt23,
-    ];
-    LABELS
-        .into_iter()
-        .find(|label| data_class(*label).as_ref() == Ok(kernel))
+    every_wire_data_class().find(|label| data_class(*label).as_ref() == Ok(kernel))
 }
 
-/// The inverse of [`value`]: total over every kernel carrier, because the
-/// wire vocabulary mirrors the kernel's by construction.
 pub(crate) fn wire_value(kernel: &PropertyValue) -> Result<WireValue, BoundaryError> {
     Ok(match kernel {
         PropertyValue::String(text) => WireValue::String(text.clone()),
@@ -154,4 +141,30 @@ pub(crate) fn wire_value(kernel: &PropertyValue) -> Result<WireValue, BoundaryEr
                 .collect::<Result<_, BoundaryError>>()?,
         ),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use data_boundary_kernel::PRIVACY_PROGRAM_DATA_CLASS_LABELS;
+
+    #[test]
+    fn the_wire_vocabulary_is_exactly_the_privacy_program_label_set() {
+        let mut wire: Vec<&str> = every_wire_data_class().map(WireDataClass::label).collect();
+        wire.sort_unstable();
+        let mut kernel: Vec<&str> = PRIVACY_PROGRAM_DATA_CLASS_LABELS.to_vec();
+        kernel.sort_unstable();
+        assert_eq!(wire, kernel);
+    }
+
+    #[test]
+    fn every_wire_class_converts_and_recovers_its_own_label() {
+        let mut round_tripped = 0;
+        for label in every_wire_data_class() {
+            let kernel = data_class(label).expect("wire class has a kernel carrier");
+            assert_eq!(wire_label(&kernel), Some(label));
+            round_tripped += 1;
+        }
+        assert_eq!(round_tripped, PRIVACY_PROGRAM_DATA_CLASS_LABELS.len());
+    }
 }

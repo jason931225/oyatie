@@ -4,7 +4,7 @@ use port_engine_api::Declaration;
 use port_engine_rust_ir::{Receiver, RustFn, RustParam, RustType, Visibility};
 
 use crate::error::TransformError;
-use crate::naming::{to_snake_case, visibility};
+use crate::naming::to_snake_case;
 use crate::ownership::{binds_by_pointer, facts_of, parameter_target, receiver_for};
 use crate::params::{params, refuse_variadic, results};
 use crate::resolve::Resolver;
@@ -204,9 +204,4 @@ pub(crate) fn method_signature(
             Body::None => None,
         },
     })
-}
-
-/// Visibility for a declaration, as a value the IR places rather than a prefix a string carries.
-pub(crate) fn declared_visibility(declaration: &Declaration) -> Visibility {
-    visibility(declaration)
 }

@@ -9,22 +9,22 @@ const MAX_OBJECT_KEY_LEN: usize = 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct BucketName {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ObjectKey {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ETag {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct VolumeName {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -58,9 +58,9 @@ pub enum ObjectLockMode {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ObjectLockPolicy {
-    pub mode: ObjectLockMode,            // data_class: PUBLIC
-    pub retain_until_epoch_seconds: u64, // data_class: INTERNAL_ONLY
-    pub legal_hold: bool,                // data_class: INTERNAL_ONLY
+    pub mode: ObjectLockMode,
+    pub retain_until_epoch_seconds: u64,
+    pub legal_hold: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -82,70 +82,70 @@ pub enum VolumeState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BucketCreate {
-    pub resource_id: String,                   // data_class: INTERNAL_ONLY
-    pub tenant_id: String,                     // data_class: INTERNAL_ONLY
-    pub name: String,                          // data_class: INTERNAL_ONLY
-    pub region: String,                        // data_class: PUBLIC
-    pub residency: ResidencyClass,             // data_class: INTERNAL_ONLY
-    pub tier: BucketTier,                      // data_class: PUBLIC
-    pub replication: ReplicationPolicyCreate,  // data_class: INTERNAL_ONLY
-    pub encryption: EncryptionMode,            // data_class: PUBLIC
-    pub kms_key: Option<String>,               // data_class: INTERNAL_ONLY
-    pub object_lock: Option<ObjectLockPolicy>, // data_class: INTERNAL_ONLY
-    pub allowed_data_classes: Vec<DataClass>,  // data_class: INTERNAL_ONLY
-    pub state: BucketState,                    // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64,         // data_class: INTERNAL_ONLY
+    pub resource_id: String,
+    pub tenant_id: String,
+    pub name: String,
+    pub region: String,
+    pub residency: ResidencyClass,
+    pub tier: BucketTier,
+    pub replication: ReplicationPolicyCreate,
+    pub encryption: EncryptionMode,
+    pub kms_key: Option<String>,
+    pub object_lock: Option<ObjectLockPolicy>,
+    pub allowed_data_classes: Vec<DataClass>,
+    pub state: BucketState,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Bucket {
-    pub resource_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub name: Classified<BucketName>,        // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>,      // data_class: PUBLIC
-    pub residency: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub tier: Classified<BucketTier>,        // data_class: PUBLIC
-    pub replication: Classified<ReplicationPolicy>, // data_class: INTERNAL_ONLY
-    pub encryption: Classified<EncryptionMode>, // data_class: PUBLIC
-    pub kms_key: Classified<Option<KmsKeyId>>, // data_class: INTERNAL_ONLY
-    pub object_lock: Classified<Option<ObjectLockPolicy>>, // data_class: INTERNAL_ONLY
-    pub allowed_data_classes: Classified<BTreeSet<PrivacyDataClass>>, // data_class: INTERNAL_ONLY
-    pub state: Classified<BucketState>,      // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,     // data_class: PUBLIC
+    pub resource_id: Classified<ResourceId>,
+    pub tenant_id: Classified<String>,
+    pub name: Classified<BucketName>,
+    pub region: Classified<RegionCode>,
+    pub residency: Classified<ResidencyClass>,
+    pub tier: Classified<BucketTier>,
+    pub replication: Classified<ReplicationPolicy>,
+    pub encryption: Classified<EncryptionMode>,
+    pub kms_key: Classified<Option<KmsKeyId>>,
+    pub object_lock: Classified<Option<ObjectLockPolicy>>,
+    pub allowed_data_classes: Classified<BTreeSet<PrivacyDataClass>>,
+    pub state: Classified<BucketState>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObjectCreate {
-    pub bucket_id: String,                           // data_class: INTERNAL_ONLY
-    pub tenant_id: String,                           // data_class: INTERNAL_ONLY
-    pub key: String,                                 // data_class: INTERNAL_ONLY
-    pub size_bytes: u64,                             // data_class: INTERNAL_ONLY
-    pub etag: String,                                // data_class: INTERNAL_ONLY
-    pub data_class: DataClass,                       // data_class: INTERNAL_ONLY
-    pub encryption: ObjectEncryptionBindingCreate,   // data_class: INTERNAL_ONLY
-    pub stored_at_epoch_seconds: u64,                // data_class: INTERNAL_ONLY
-    pub last_accessed_at_epoch_seconds: Option<u64>, // data_class: INTERNAL_ONLY
+    pub bucket_id: String,
+    pub tenant_id: String,
+    pub key: String,
+    pub size_bytes: u64,
+    pub etag: String,
+    pub data_class: DataClass,
+    pub encryption: ObjectEncryptionBindingCreate,
+    pub stored_at_epoch_seconds: u64,
+    pub last_accessed_at_epoch_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObjectEncryptionBindingCreate {
-    pub kms_key: String,                 // data_class: INTERNAL_ONLY
-    pub kms_key_version: u32,            // data_class: INTERNAL_ONLY
-    pub material_ref: String,            // data_class: INTERNAL_ONLY
-    pub ciphertext_ref: String,          // data_class: INTERNAL_ONLY
-    pub kms_encrypt_event_id: String,    // data_class: INTERNAL_ONLY
-    pub purpose: KmsPurpose,             // data_class: INTERNAL_ONLY
-    pub shred_proof_ref: Option<String>, // data_class: INTERNAL_ONLY
+    pub kms_key: String,
+    pub kms_key_version: u32,
+    pub material_ref: String,
+    pub ciphertext_ref: String,
+    pub kms_encrypt_event_id: String,
+    pub purpose: KmsPurpose,
+    pub shred_proof_ref: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObjectEncryptionBinding {
-    pub kms_key: KmsKeyId,                            // data_class: INTERNAL_ONLY
-    pub kms_key_version: u32,                         // data_class: INTERNAL_ONLY
-    pub material_ref: MaterialRef,                    // data_class: INTERNAL_ONLY
-    pub ciphertext_ref: CiphertextRef,                // data_class: INTERNAL_ONLY
-    pub kms_encrypt_event_id: KmsUseEventId,          // data_class: INTERNAL_ONLY
-    pub purpose: KmsPurpose,                          // data_class: INTERNAL_ONLY
-    pub shred_proof_ref: Option<DestructionProofRef>, // data_class: INTERNAL_ONLY
+    pub kms_key: KmsKeyId,
+    pub kms_key_version: u32,
+    pub material_ref: MaterialRef,
+    pub ciphertext_ref: CiphertextRef,
+    pub kms_encrypt_event_id: KmsUseEventId,
+    pub purpose: KmsPurpose,
+    pub shred_proof_ref: Option<DestructionProofRef>,
 }

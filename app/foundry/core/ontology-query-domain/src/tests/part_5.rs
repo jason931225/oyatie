@@ -1,9 +1,5 @@
-//! Query-engine tests: part 5.
-
 use super::support::*;
 
-/// Omitting an explicit direction (using Outbound default) reproduces the
-/// same result as an explicit Outbound request byte-for-byte.
 #[test]
 fn default_direction_reproduces_outbound_result() {
     let g = dir_graph();
@@ -43,11 +39,7 @@ fn default_direction_reproduces_outbound_result() {
     );
 }
 
-/// Consent scope prunes correctly under Inbound traversal.
 /// Graph: ent_pred --lty_owns--> ent_root <--lty_partner-- ent_other
-/// With consent scope ["lty_partner"], inbound traversal from ent_root
-/// must see ent_other (via consented lty_partner) but not ent_pred (via
-/// non-consented lty_owns).
 #[test]
 fn inbound_consent_prunes_non_consented_edges() {
     let mut g = ObjectGraph::default();
@@ -110,7 +102,6 @@ fn inbound_consent_prunes_non_consented_edges() {
     );
 }
 
-/// Freshness floor prunes stale inbound edges correctly.
 #[test]
 fn inbound_freshness_floor_prunes_stale_edges() {
     let mut g = ObjectGraph::default();
@@ -158,7 +149,6 @@ fn inbound_freshness_floor_prunes_stale_edges() {
     );
 }
 
-/// Node cardinality cap triggers result_truncated under Inbound traversal.
 #[test]
 fn inbound_node_cap_triggers_result_truncated() {
     let cap = MAX_QUERY_RESULT_NODES;

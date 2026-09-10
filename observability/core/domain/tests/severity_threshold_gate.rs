@@ -1,24 +1,6 @@
-// Integration-level acceptance tests for the severity-threshold-gate slice.
-//
-// These tests exercise the public API through the crate boundary (not inline
-// #[cfg(test)]) and map 1-to-1 to the three subtask acceptance criteria:
-//
-//   sd-1: Severity::from_otel_int — OTel SeverityNumber range inverse
-//   sd-2: should_emit — min-threshold gate re-exported from lib root
-//   sd-3: Boundary, round-trip, and threshold-matrix coverage
-//
-// The implementation lives in src/severity.rs; the public surface is
-// re-exported from the crate root (lib.rs).
-//
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use observability_domain::{Severity, should_emit};
-
-// ---------------------------------------------------------------------------
-// sd-1: from_otel_int — signature, canonical mapping, out-of-range
-// ---------------------------------------------------------------------------
 
 #[test]
 fn from_otel_int_returns_none_for_zero() {
@@ -97,7 +79,6 @@ fn from_otel_int_maps_range_21_to_24_to_fatal() {
     }
 }
 
-/// Canonical ints emitted by as_otel_int must survive from_otel_int round-trip.
 #[test]
 fn from_otel_int_round_trips_all_canonical_ints_via_as_otel_int() {
     for s in Severity::all() {
@@ -110,27 +91,16 @@ fn from_otel_int_round_trips_all_canonical_ints_via_as_otel_int() {
     }
 }
 
-/// Spec-named boundary values from the acceptance criteria.
 #[test]
 fn from_otel_int_acceptance_criteria_spot_checks() {
-    // Last of Trace range -> Trace
     assert_eq!(Severity::from_otel_int(4), Some(Severity::Trace));
-    // First of Debug range -> Debug
     assert_eq!(Severity::from_otel_int(5), Some(Severity::Debug));
-    // Last of Error range -> Error
     assert_eq!(Severity::from_otel_int(20), Some(Severity::Error));
-    // First of Fatal range -> Fatal
     assert_eq!(Severity::from_otel_int(21), Some(Severity::Fatal));
-    // Out-of-range sentinels
     assert_eq!(Severity::from_otel_int(0), None);
     assert_eq!(Severity::from_otel_int(25), None);
 }
 
-// ---------------------------------------------------------------------------
-// sd-2: should_emit — re-exported from lib root, threshold semantics
-// ---------------------------------------------------------------------------
-
-/// should_emit must be callable directly from the crate root (re-exported in lib.rs).
 #[test]
 fn should_emit_is_reexported_from_crate_root() {
     // Compilation of this test proves the re-export exists.
@@ -174,12 +144,6 @@ fn should_emit_fatal_threshold_passes_only_fatal() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// sd-3: Full threshold matrix across all six severity levels
-// ---------------------------------------------------------------------------
-
-/// Every (record, threshold) pair must satisfy: should_emit == (record >= threshold).
-/// This validates both the Ord correctness and the gate predicate in one sweep.
 #[test]
 fn should_emit_full_6x6_threshold_matrix_matches_ord() {
     let levels = Severity::all();
@@ -195,7 +159,6 @@ fn should_emit_full_6x6_threshold_matrix_matches_ord() {
     }
 }
 
-/// Explicit lower-triangle check: every level below threshold must not emit.
 #[test]
 fn should_emit_lower_triangle_never_emits() {
     let levels = Severity::all();
@@ -210,7 +173,6 @@ fn should_emit_lower_triangle_never_emits() {
     }
 }
 
-/// Explicit upper-triangle check: every level at-or-above threshold must emit.
 #[test]
 fn should_emit_upper_triangle_always_emits() {
     let levels = Severity::all();

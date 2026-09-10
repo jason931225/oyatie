@@ -1,11 +1,5 @@
-//! OCI Compute adapter boundary for Cloud Compute VM provisioning.
-//!
-//! This crate translates the provider-neutral Cloud Compute VM create contract
-//! into deterministic OCI Compute request shapes. It does not hold credentials,
-//! call OCI SDKs, or perform network I/O; credentialed live smoke remains a
-//! separate promotion gate.
-//! ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-//! `panic!()` to assert invariants under the `cfg(test)` exemption.
+// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
+// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use compute_domain::{

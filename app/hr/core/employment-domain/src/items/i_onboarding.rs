@@ -1,7 +1,3 @@
-// ---------------------------------------------------------------------------
-// Onboarding readiness domain model
-// ---------------------------------------------------------------------------
-
 /// The kinds of pre-hire onboarding checklist items.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum OnboardingChecklistItemKind {
@@ -15,20 +11,20 @@ pub enum OnboardingChecklistItemKind {
 /// A single item on the onboarding checklist.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardingChecklistItem {
-    pub kind: OnboardingChecklistItemKind, // data_class: INTERNAL_ONLY
-    pub is_mandatory: bool,                // data_class: INTERNAL_ONLY
-    pub is_cleared: bool,                  // data_class: INTERNAL_ONLY
-    pub evidence_ref: Option<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
+    pub kind: OnboardingChecklistItemKind,
+    pub is_mandatory: bool,
+    pub is_cleared: bool,
+    pub evidence_ref: Option<AuditEvidenceRef>,
 }
 
 /// Input to the onboarding readiness evaluator.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardingReadinessInput {
-    pub employee_id: String,                     // data_class: INTERNAL_ONLY
-    pub tenant_id: String,                       // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,                 // data_class: INTERNAL_ONLY
-    pub checklist: Vec<OnboardingChecklistItem>, // data_class: INTERNAL_ONLY
-    pub evaluated_at_epoch_seconds: u64,         // data_class: INTERNAL_ONLY
+    pub employee_id: String,
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub checklist: Vec<OnboardingChecklistItem>,
+    pub evaluated_at_epoch_seconds: u64,
 }
 
 /// The outcome of the onboarding readiness evaluation.
@@ -41,12 +37,12 @@ pub enum OnboardingDecision {
 /// Decision output from `evaluate_onboarding_readiness`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardingReadinessDecision {
-    pub employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>,     // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub decision: Classified<OnboardingDecision>, // data_class: INTERNAL_ONLY
-    pub outstanding_items: Classified<Vec<OnboardingChecklistItemKind>>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,                                 // data_class: PUBLIC
+    pub employee_id: Classified<EmployeeId>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub decision: Classified<OnboardingDecision>,
+    pub outstanding_items: Classified<Vec<OnboardingChecklistItemKind>>,
+    pub schema_version: Classified<u32>,
 }
 
 /// Pure evaluator: validates identifiers, rejects empty/duplicate checklists,

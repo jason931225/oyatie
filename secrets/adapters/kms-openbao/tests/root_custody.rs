@@ -1,9 +1,4 @@
-//! Sealing-root custody via OpenBao transit export (ADR-0510 transitional;
-//! story G002, ADR-0537 dogfood step 1).
-//!
-//! Ladder rungs (AMENDMENT 7): unit (command shapes, strict material
-//! validation) + the restart-survivability property: the same custodied
-//! material ingested at two different boots yields interchangeable roots.
+//! Sealing-root custody via OpenBao transit export.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -107,9 +102,6 @@ fn ingest_round_trip_restart_survivability() {
 
 #[test]
 fn ingest_carries_typed_transitional_provenance() {
-    // ADR-0537 step-0 deferral is TYPED: this custodian always reports the
-    // single-custodian transitional posture, which does NOT satisfy the
-    // quorum doctrine — boot paths gate/alarm on exactly this.
     let exported = BASE64_STANDARD.encode(fixture_material());
     let (_, provenance) = custody()
         .ingest_exported_root(root_id(), exported, CEREMONY_REF)
@@ -121,7 +113,6 @@ fn ingest_carries_typed_transitional_provenance() {
     assert!(!provenance.satisfies_quorum_doctrine());
     assert_eq!(provenance.ceremony_evidence_ref(), CEREMONY_REF);
 
-    // The W5-target quorum variant satisfies the doctrine once M>=2, N>=M.
     let quorum = RootProvenance::ShamirQuorumCeremony {
         threshold: 3,
         share_count: 5,

@@ -25,17 +25,17 @@ const ONBOARDING_READINESS_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct EmployeeId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TenantId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct LegalEntityId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -45,45 +45,45 @@ pub struct PersonRef {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AuditEvidenceRef {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct HrEventId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RulepackRef {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct WorkflowRef {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PolicyRef {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct LaborComplianceObligationId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct LeaveRequestId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RulepackEffectiveDate {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RulepackSourceDigest {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }

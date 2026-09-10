@@ -1,6 +1,4 @@
-//! Hyper-based OAuth token client for Anthropic's token endpoint.
-//! Performs `grant_type=authorization_code` (exchange) and `grant_type=refresh_token` (refresh).
-//! No raw token values appear in tracing output.
+//! OAuth token client. No raw token value reaches tracing output.
 // data_class: INTERNAL_ONLY throughout this module.
 
 use std::sync::Arc;
@@ -16,31 +14,28 @@ use tracing::{debug, warn};
 
 use crate::token_state::{RefreshFailureKind, SeatTokenState, classify_oauth_error};
 
-/// Default Anthropic token endpoint (per oauth-subscription-kernel constant).
-pub const ANTHROPIC_TOKEN_ENDPOINT: &str = "https://console.anthropic.com/v1/oauth/token";
+pub const ANTHROPIC_TOKEN_ENDPOINT: &str =
+    intelligence_oauth_subscription_kernel::ANTHROPIC_TOKEN_ENDPOINT;
 
-/// Anthropic API version header value.
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
 
-/// Anthropic beta header value for OAuth subscription (matches ccproxy-api defaults).
 pub const ANTHROPIC_BETA: &str = "oauth-2025-04-20";
 
-/// Default OAuth client_id for Claude.ai subscription (matches ccproxy-api defaults).
 pub const ANTHROPIC_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
-/// Errors from the OAuth client.
+/// Only [`OAuthClientError::OAuthError`] can be terminal; every other variant
+/// is worth retrying.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OAuthClientError {
-    /// Transport/TLS error (transient).
     Transport(String),
-    /// Non-200 response without a parseable OAuth error field (transient).
-    HttpError { status: u16 },
-    /// Parseable OAuth error field — classified as terminal or transient.
+    /// Non-200 whose body carried no parseable OAuth error field.
+    HttpError {
+        status: u16,
+    },
     OAuthError {
         error: String,
         kind: RefreshFailureKind,
     },
-    /// Response body could not be parsed (transient).
     ParseError(String),
 }
 
@@ -56,7 +51,6 @@ impl OAuthClientError {
     }
 }
 
-/// Wire shape for successful token response.
 // data_class: INTERNAL_ONLY
 #[derive(serde::Deserialize)]
 struct TokenResponse {
@@ -65,25 +59,23 @@ struct TokenResponse {
     expires_in: Option<u64>,       // seconds until expiry
 }
 
-/// Wire shape for error response.
 // data_class: INTERNAL_ONLY
 #[derive(serde::Deserialize)]
 struct ErrorResponse {
     error: String, // data_class: INTERNAL_ONLY
 }
 
-/// Shared hyper HTTPS client (TLS via the canonical PQC-hybrid aws-lc-rs policy).
+/// TLS via the canonical PQC-hybrid policy.
 pub fn build_https_client() -> HyperHttpsClient {
     build_pqc_hybrid_https_client()
 }
 
-/// Explicit test/mock client: allows plaintext HTTP only for loopback mock servers.
+/// Admits plaintext HTTP on loopback. Never reach for this off loopback.
 #[doc(hidden)]
 pub fn build_loopback_http_or_https_test_client() -> HyperHttpsClient {
     build_loopback_http_or_pqc_hybrid_https_client_for_tests()
 }
 
-/// OAuth token client. Holds an Arc to the shared hyper client.
 pub struct OAuthTokenClient {
     http: Arc<HyperHttpsClient>,
     token_endpoint: String,
@@ -99,20 +91,16 @@ impl OAuthTokenClient {
         }
     }
 
-    /// Override token endpoint URL (used in tests against local mock server).
     pub fn with_token_endpoint(mut self, url: impl Into<String>) -> Self {
         self.token_endpoint = url.into();
         self
     }
 
-    /// Override client_id (used in tests).
     pub fn with_client_id(mut self, client_id: impl Into<String>) -> Self {
         self.client_id = client_id.into();
         self
     }
 
-    /// Exchange an authorization code + PKCE verifier for tokens.
-    /// Returns new `SeatTokenState` stamped with `now_secs`.
     pub async fn exchange(
         &self,
         code: &str,
@@ -131,8 +119,7 @@ impl OAuthTokenClient {
         self.post_token_request(body.into_bytes(), now_secs).await
     }
 
-    /// Refresh an existing refresh_token. Returns updated `SeatTokenState` with new tokens.
-    /// The existing `refresh_token` is used; the response may return a rotated refresh token.
+    /// The provider may rotate the refresh token in its response.
     pub async fn refresh(
         &self,
         current_state: &SeatTokenState,
@@ -181,9 +168,8 @@ impl OAuthTokenClient {
 
             let expires_in = tr.expires_in.unwrap_or(3600);
             let expires_at = now_secs.saturating_add(expires_in);
-            // If provider rotates the refresh token, use the new one; else keep old.
-            // Caller provides current refresh_token via current_state; for exchange,
-            // the response always includes a refresh_token.
+            // A response that omits refresh_token leaves this empty; the
+            // previous one is not carried forward.
             let refresh_token = tr.refresh_token.unwrap_or_default();
 
             Ok(SeatTokenState::new(
@@ -193,7 +179,7 @@ impl OAuthTokenClient {
                 now_secs,
             ))
         } else {
-            // Attempt to parse as OAuth error response.
+            // A parseable error field is what separates terminal from transient.
             if let Ok(err) = serde_json::from_slice::<ErrorResponse>(&body_bytes) {
                 let kind = classify_oauth_error(&err.error);
                 if matches!(kind, RefreshFailureKind::Terminal(_)) {
@@ -210,7 +196,7 @@ impl OAuthTokenClient {
     }
 }
 
-/// Minimal percent-encoding for form values (RFC 3986 unreserved chars pass through).
+/// Percent-encodes everything outside the RFC 3986 unreserved set.
 fn url_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.as_bytes() {
@@ -224,8 +210,6 @@ fn url_encode(s: &str) -> String {
     out
 }
 
-/// Build outbound `Authorization: Bearer` + Anthropic version/beta headers.
-/// Returns a `Vec<(name, value)>` to inject on proxy calls.
 pub fn outbound_auth_headers(access_token: &str) -> Vec<(String, String)> {
     vec![
         ("authorization".to_owned(), format!("Bearer {access_token}")),

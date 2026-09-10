@@ -1,5 +1,4 @@
 use crate::NETWORK_SCHEMA_VERSION;
-use crate::bgp::{advertised_prefixes, bgp_sessions};
 use crate::error::CloudNetworkError;
 use crate::interconnect::{
     DirectInterconnect, DirectInterconnectCreate, InterconnectPartner, InterconnectPartnerCreate,

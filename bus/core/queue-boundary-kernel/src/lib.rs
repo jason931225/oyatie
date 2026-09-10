@@ -13,16 +13,7 @@
 //! - poison-message containment: a job failed past its
 //!   [`DeadLetterPolicy`] budget moves to the queue's dead-letter topic
 //!   instead of redelivering forever (SQS redrive policy).
-//!
-//! # Naming justification
-//! `messaging-queue-boundary-kernel` follows the ADR-0532/0533 de-branded
-//! grammar `<capability:messaging>-<topic:queue-boundary>-<layer:kernel>`,
-//! mirroring its sibling `messaging-substrate-kernel`. The `queue.`
-//! topic prefix below is a WIRE identifier, not a crate name: it is
-//! deliberately unchanged by the de-brand, because renaming a topic is a
-//! behavior change and must not ride along inside a relocation.
-//!
-//! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
+
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -71,8 +62,8 @@ impl QueueName {
     /// Returns [`QueueError::InvalidQueueName`] when the derived topic
     /// names would not be canonical slugs.
     pub fn parse(value: &str) -> Result<Self, QueueError> {
-        // Validation is delegated to the substrate name rules so the two
-        // surfaces can never drift.
+        // `queue.` is a WIRE identifier, not a crate name: a rename here is a
+        // behavior change and must not ride along inside a relocation.
         TopicName::parse(&format!("queue.{value}")).map_err(|_| QueueError::InvalidQueueName {
             value: value.to_owned(),
         })?;

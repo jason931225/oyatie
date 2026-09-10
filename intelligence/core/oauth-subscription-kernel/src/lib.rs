@@ -1,25 +1,6 @@
-//! M02-P02-IP-004 — OAuth subscription-token capture kernel (pure value types).
-//!
-//! Pure-Rust kernel that captures the OAuth subscription-token flow as
-//! deterministic value objects (PKCE challenge/verifier, flow kind, capture
-//! request/response). I/O (loopback server, browser open, upstream HTTP
-//! exchange) lives in a runtime adapter that consumes this kernel. The kernel
-//! exposes:
-//!
-//!   - `SubscriptionOAuthFlow` — PKCE-pinned flow record.
-//!   - `capture_subscription_token` — pure function that constructs the flow
-//!     prerequisites and the authorization URL.
-//!   - `OAuthLoopbackServer` — value object describing the loopback the
-//!     runtime adapter will spin up (port + redirect URI + scopes).
-//!   - `FlowKind` — enum with `AnthropicSubscriptionOAuth | OpenAiOAuth |
-//!     ApiKeyImport` variants. Linus good-taste: API-key import is a
-//!     degenerate flow variant; there is one entry point, no branching.
-//!
-//! Per ADR-0043: tokens are NEVER persisted in raw form — only the resulting
-//! `SecretReference` (sref://…) is. The kernel does not handle raw tokens
-//! itself; it only provides the PKCE handshake primitives.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! OAuth subscription-token capture as pure value objects. The loopback
+//! server, the browser and the upstream exchange all live in a runtime
+//! adapter, so no raw token is ever in this crate's scope (ADR-0043).
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use intelligence_account_kernel::{ProviderFamily, SecretReference};
@@ -43,7 +24,7 @@ mod tests {
     use super::*;
 
     fn good_verifier() -> PkceVerifier {
-        // 43-char fixed test verifier (RFC 7636 minimum).
+        // RFC 7636 §4.1 sets 43 characters as the minimum verifier length.
         PkceVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_owned()).unwrap()
     }
 
@@ -167,7 +148,6 @@ mod tests {
         let flow = capture_subscription_token(&req).unwrap();
         assert_eq!(flow.flow_kind, FlowKind::ApiKeyImport);
         assert!(flow.authorization_endpoint.is_empty());
-        // URL builder degenerates to empty string for ApiKeyImport.
         assert_eq!(build_authorization_url(&flow).unwrap(), "");
     }
 
@@ -201,8 +181,6 @@ mod tests {
         );
         assert_eq!(resp.sref, sref);
         assert_eq!(resp.flow_kind, FlowKind::AnthropicSubscriptionOAuth);
-        // Debug of sref is redacted (kernel rule); the response struct itself
-        // does not leak the raw token because there is no raw-token field.
         let dbg = format!("{:?}", resp.sref);
         assert!(dbg.contains("[REDACTED]"));
     }
@@ -264,7 +242,6 @@ mod tests {
 
     #[test]
     fn base64url_known_vector() {
-        // base64url("foo") = "Zm9v"
         let s = base64url_no_pad(b"foo");
         assert_eq!(s, "Zm9v");
     }

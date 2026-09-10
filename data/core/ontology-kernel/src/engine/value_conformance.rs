@@ -1,6 +1,5 @@
 //! The shared value-conformance station: the FINAL per-property and
-//! per-parameter step of both conformance checks (after the data-class
-//! check, preserving the documented error precedence).
+//! per-parameter step of both conformance checks.
 //!
 //! `Some(declaration)` walks the carrier in declaration lockstep with zero
 //! coercion; `None` requires the legacy [`PropertyValue::String`] carrier —

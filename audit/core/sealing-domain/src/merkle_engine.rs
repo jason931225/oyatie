@@ -1,7 +1,13 @@
 //! `MerkleEngine` port implementation backed by [`audit_chain_domain::MerkleTree`].
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+    )
+)]
 
 use audit_chain_domain::{MerkleTree, Sha256Hash};
 use audit_sealing_kernel::MerkleEngine;
@@ -21,18 +27,6 @@ impl MerkleEngine for MerkleTreeEngine {
     type Root = Sha256Hash;
     type Error = SealingDomainError;
 
-    /// Compute the RFC 6962 §2.1 Merkle root over `leaves` (see the crate
-    /// doc's "Merkle scheme actually in use" section for exactly what
-    /// `audit_chain_domain::MerkleTree` computes).
-    ///
-    /// No leaf-shape restriction is applied beyond non-emptiness: RFC
-    /// 6962's domain-separated k-split does not collide an `n`-leaf tree
-    /// with an `(n+1)`-leaf tree formed by repeating the final leaf (unlike
-    /// the naive duplicate-the-lone-node construction this crate's earlier
-    /// revision had to work around — see `audit_chain_domain::merkle_tree`'s
-    /// own regression tests), so a leaf slice with identical trailing
-    /// entries is accepted like any other.
-    ///
     /// # Errors
     /// [`SealingDomainError::InvalidLeafCount`] when `leaves` is empty.
     fn root(&self, leaves: &[Sha256Hash]) -> Result<Sha256Hash, SealingDomainError> {
@@ -136,11 +130,6 @@ mod tests {
         );
     }
 
-    /// Regression anchor: the CVE-2012-2459-shaped collision an earlier
-    /// revision of `audit_chain_domain` had (and that this crate used to
-    /// work around with a `TrailingLeafDuplicated` guard) is gone at the
-    /// source. A leaf slice ending in a literal repeat of its last leaf is
-    /// now accepted, and does NOT collide with its shorter prefix's root.
     #[test]
     fn root_accepts_trailing_duplicate_leaf_and_does_not_collide() {
         let engine = MerkleTreeEngine;
@@ -166,8 +155,6 @@ mod tests {
 
     #[test]
     fn root_accepts_non_trailing_duplicate_leaves() {
-        // A duplicate leaf value elsewhere in the set is not rejected either
-        // — RFC 6962's k-split needs no leaf-shape restriction at all.
         let engine = MerkleTreeEngine;
         assert!(engine.root(&[leaf(1), leaf(1), leaf(2)]).is_ok());
     }

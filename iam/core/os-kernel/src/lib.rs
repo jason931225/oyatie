@@ -1,29 +1,14 @@
 #![cfg_attr(not(test), no_std)]
-// This crate is a large surface of small primitive accessors and fallible
-// constructors. The following pedantic lints would require annotating well over
-// a hundred trivial methods without making the API meaningfully clearer, so we
-// opt out crate-wide rather than littering per-item attributes:
-//   - `must_use_candidate` / `return_self_not_must_use`: pure accessors and
-//     builders where ignoring the result is already obviously a no-op.
-//   - `missing_errors_doc`: the `Result`-returning functions document their
-//     failure modes inline; a separate `# Errors` section adds noise here.
 #![allow(
     clippy::must_use_candidate,
     clippy::return_self_not_must_use,
     clippy::missing_errors_doc
 )]
-//! # talos-core
+//! Machine primitives ported from the `siderolabs/talos` `machinery` package:
+//! machine types, RBAC roles, semantic versions, node addressing, resource
+//! identifiers, platforms, and the traits used to run services.
 //!
-//! Foundational crate for the operating-system Talos migration. Every other crate in the
-//! workspace depends on this one (and only this one).
-//!
-//! It mirrors the primitives found in the `siderolabs/talos` `machinery`
-//! package: machine types, RBAC roles, semantic versions, node addressing,
-//! resource identifiers, supported platforms, and the cross-cutting traits used
-//! to run services and generate identifiers.
-//!
-//! The crate is `no_std` for real builds and only uses the `alloc` crate. Under
-//! `cargo test` it links against `std` on the host so the test harness works.
+//! It has no dependencies of its own.
 
 extern crate alloc;
 

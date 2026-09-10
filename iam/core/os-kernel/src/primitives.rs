@@ -1,5 +1,4 @@
-//! Composite primitives built from the smaller newtypes: a node identity
-//! aggregate and a label map, mirroring common Talos machinery values.
+//! A node-identity aggregate and a label map, built from the smaller newtypes.
 
 use crate::address::{Hostname, NodeAddress};
 use crate::error::{Error, Result};
@@ -10,29 +9,26 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// A small, validated key/value label map (Kubernetes-style).
+/// A validated key/value label map, Kubernetes-style.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Labels {
     inner: BTreeMap<String, String>,
 }
 
 impl Labels {
-    /// An empty label map.
     pub fn new() -> Self {
         Labels {
             inner: BTreeMap::new(),
         }
     }
 
-    /// Insert a label after validating its key. Keys must be non-empty and
-    /// contain only `[A-Za-z0-9._/-]`.
     pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) -> Result<()> {
         let key = key.into();
         if key.is_empty() {
             return Err(Error::invalid("label key is empty"));
         }
         for c in key.chars() {
-            if !(c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '/' | '-')) {
+            if !is_label_key_char(c) {
                 return Err(Error::invalid(alloc::format!(
                     "invalid label key character '{c}'"
                 )));
@@ -42,22 +38,20 @@ impl Labels {
         Ok(())
     }
 
-    /// Look up a label value.
     pub fn get(&self, key: &str) -> Option<&str> {
         self.inner.get(key).map(String::as_str)
     }
 
-    /// Number of labels.
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    /// Whether the map is empty.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
-    /// Whether every key/value in `selector` is present and equal here.
+    /// A selector matches when every one of ITS entries is present and equal
+    /// here; extra labels here do not prevent a match.
     pub fn matches(&self, selector: &Labels) -> bool {
         selector
             .inner
@@ -65,7 +59,8 @@ impl Labels {
             .all(|(k, v)| self.inner.get(k) == Some(v))
     }
 
-    /// Render as a stable, sorted `k=v` comma-joined string.
+    /// Key order is sorted and therefore stable across calls, so the result is
+    /// safe to compare or hash.
     pub fn to_selector_string(&self) -> String {
         let parts: Vec<String> = self
             .inner
@@ -76,27 +71,24 @@ impl Labels {
     }
 }
 
-/// An aggregate describing a single node's identity, combining several
-/// primitive newtypes. This is the value most subsystems thread through their
+fn is_label_key_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '/' | '-')
+}
+
+/// A single node's identity: the value most subsystems thread through their
 /// APIs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeIdentity {
-    /// The node's hostname.
     pub hostname: Hostname,
-    /// Its primary address.
     pub address: NodeAddress,
-    /// Whether it is a control-plane or worker node.
     pub machine_type: MachineType,
-    /// The platform it runs on.
     pub platform: Platform,
-    /// The Talos OS version it reports.
     pub os_version: Version,
-    /// Arbitrary labels.
     pub labels: Labels,
 }
 
 impl NodeIdentity {
-    /// Construct a node identity with empty labels.
+    /// Starts with no labels; add them with [`Labels::insert`].
     pub fn new(
         hostname: Hostname,
         address: NodeAddress,
@@ -114,8 +106,8 @@ impl NodeIdentity {
         }
     }
 
-    /// Validate cross-field invariants. For example, an `Unknown` machine type
-    /// is never a valid joined node identity.
+    /// A node that has actually joined can never still be `Unknown` on either
+    /// axis, so either one is a refusal rather than a default.
     pub fn validate(&self) -> Result<()> {
         if self.machine_type == MachineType::Unknown {
             return Err(Error::invalid_state("node has unknown machine type"));
@@ -126,12 +118,10 @@ impl NodeIdentity {
         Ok(())
     }
 
-    /// Whether this node is eligible to run control-plane components.
     pub fn is_control_plane(&self) -> bool {
         self.machine_type.is_control_plane()
     }
 
-    /// A stable, human-friendly identity string.
     pub fn display_name(&self) -> String {
         alloc::format!(
             "{}/{}/{}",
@@ -165,6 +155,9 @@ mod tests {
             .unwrap();
         assert_eq!(l.len(), 2);
         assert!(l.insert("bad key", "x").is_err());
+        // The charset is closed, not merely inclusive: a punctuation mark
+        // outside it is refused even though it is neither space nor control.
+        assert!(l.insert("a!b", "v").is_err());
 
         let mut sel = Labels::new();
         sel.insert("topology.kubernetes.io/zone", "us-east-1a")

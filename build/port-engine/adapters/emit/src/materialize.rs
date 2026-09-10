@@ -14,6 +14,10 @@ use crate::canary::{CanaryArtifact, assert_matches_golden};
 use crate::error::EmitError;
 use crate::{CANARY_FILENAME, CANARY_OUT_DIRNAME, EMIT_OUT_DIRNAME};
 
+/// Validate `out_dir` is allowlisted for single-file canary materialize.
+///
+/// # Errors
+/// [`EmitError::PathRefused`] when basename is wrong, path has `..`, or points at the corpus root.
 pub fn validate_canary_out_dir(out_dir: &Path) -> Result<(), EmitError> {
     validate_out_dir(out_dir, CANARY_OUT_DIRNAME)
 }
@@ -33,7 +37,6 @@ fn validate_out_dir(out_dir: &Path, required_basename: &str) -> Result<(), EmitE
             detail: "path must not contain `..`".into(),
         });
     }
-    // Refuse any k8s corpus path component (W0-B bulk emit hard stop).
     for component in out_dir.components() {
         if let std::path::Component::Normal(name) = component
             && name == "k8s"
@@ -58,11 +61,6 @@ fn validate_out_dir(out_dir: &Path, required_basename: &str) -> Result<(), EmitE
 
 /// Materialize a whole emit tree under `out_dir`, one file per region.
 ///
-/// The `k8s/` refusal and the `..` refusal are UNCHANGED and still apply: widening what may be
-/// written did not widen where. Region ids are already sanitized identifiers by the time they
-/// reach here, and each one is re-checked below rather than trusted, because a region id is the
-/// only part of the destination path that comes from data.
-///
 /// Returns the written paths in region order.
 ///
 /// # Errors
@@ -79,29 +77,32 @@ pub fn materialize_tree(
 
     let mut written = Vec::with_capacity(emitted.len());
     for (region, bytes) in emitted {
-        // A region id becomes a FILENAME here, which is the one place data reaches the path. A
-        // region called `../escape` or `a/b` would place the file outside the validated root, so
-        // the id is required to be a bare identifier rather than merely assumed to be one.
-        if region.0.is_empty()
-            || !region
-                .0
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'_')
-        {
-            return Err(EmitError::PathRefused {
-                detail: format!(
-                    "region id `{}` is not a bare identifier and cannot name a file",
-                    region.0
-                ),
-            });
-        }
-        let dest = out_dir.join(format!("{}.rs", region.0));
+        let dest = out_dir.join(region_filename(region)?);
         fs::write(&dest, bytes).map_err(|err| EmitError::Io {
             detail: err.to_string(),
         })?;
         written.push(dest);
     }
     Ok(written)
+}
+
+/// A region id is the only part of a destination path that comes from DATA, so it is checked
+/// rather than trusted: `../escape` as a region name would place a file outside the validated root.
+fn region_filename(region: &RegionId) -> Result<String, EmitError> {
+    if region.0.is_empty()
+        || !region
+            .0
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    {
+        return Err(EmitError::PathRefused {
+            detail: format!(
+                "region id `{}` is not a bare identifier and cannot name a file",
+                region.0
+            ),
+        });
+    }
+    Ok(format!("{}.rs", region.0))
 }
 
 /// Materialize the single canary file under `out_dir` (create dir if needed).

@@ -1,9 +1,9 @@
 use super::*;
 
 pub struct CloudIacAppService {
-    pub(super) router: Router<SyncHandler>, // data_class: INTERNAL_ONLY
-    pub(super) middleware: MiddlewareChain<HttpRequest, HttpResponse>, // data_class: INTERNAL_ONLY
-    pub(super) server_config: ServerConfig, // data_class: INTERNAL_ONLY
+    pub(super) router: Router<SyncHandler>,
+    pub(super) middleware: MiddlewareChain<HttpRequest, HttpResponse>,
+    pub(super) server_config: ServerConfig,
 }
 
 impl CloudIacAppService {

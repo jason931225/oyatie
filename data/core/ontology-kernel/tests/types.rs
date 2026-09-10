@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests use `.expect()` to assert invariant setup.
 #![allow(clippy::expect_used, clippy::panic)]
 
 use data_boundary_kernel::{DataClass, PrivacyDataClass};

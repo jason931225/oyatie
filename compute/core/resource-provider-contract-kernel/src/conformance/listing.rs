@@ -39,8 +39,6 @@ pub(super) async fn list_all<P: ResourceProvider>(
     ))
 }
 
-/// Stable pagination: every resource exactly once, in a stable total order,
-/// identical across repeated walks (AIP-158).
 pub async fn check_stable_pagination<F: ConformanceFixture>(
     fixture: &F,
 ) -> Result<(), ConformanceViolation> {

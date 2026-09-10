@@ -3,7 +3,9 @@ use shared_resource_provider_contract_kernel::{
     ProviderFuture, ResourceName,
 };
 
-use super::support::{AppliedWrite, ReferenceOperationState, ReferenceProvider};
+use super::support::{
+    AppliedWrite, POLLS_BEFORE_TERMINAL, ReferenceOperationState, ReferenceProvider,
+};
 
 pub(super) fn delete<'a>(
     provider: &'a mut ReferenceProvider,
@@ -12,7 +14,7 @@ pub(super) fn delete<'a>(
 ) -> ProviderFuture<'a, Operation> {
     Box::pin(async move {
         let key = idempotency_key.as_str().to_owned();
-        if let Some(applied) = provider.applied.get(&key) {
+        if let Some(applied) = provider.dedup_log.get(&key) {
             return match applied {
                 AppliedWrite::Delete {
                     name: n,
@@ -40,12 +42,12 @@ pub(super) fn delete<'a>(
         provider.operations.insert(
             operation_name.clone(),
             ReferenceOperationState::Pending {
-                remaining_polls: 1,
+                remaining_polls: POLLS_BEFORE_TERMINAL,
                 target: name.clone(),
                 ledger: ledger.clone(),
             },
         );
-        provider.applied.insert(
+        provider.dedup_log.insert(
             key,
             AppliedWrite::Delete {
                 name: name.to_string(),

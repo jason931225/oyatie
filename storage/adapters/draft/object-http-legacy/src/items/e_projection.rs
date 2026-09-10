@@ -56,10 +56,6 @@ fn purpose_label(purpose: KmsPurpose) -> &'static str {
     }
 }
 
-/// Compute the replay outcome for an existing ledger entry against the presented
-/// fingerprint. This is the single source of truth for same-fingerprint vs
-/// different-fingerprint decisions; both `put_cloud_storage_object_from_api` and
-/// `CloudStorageObjectPutIdempotencyLedger::peek` delegate here.
 fn replay_outcome_for(
     entry: &CloudStorageObjectPutLedgerEntry,
     presented_fingerprint: &CloudStorageObjectRequestFingerprint,

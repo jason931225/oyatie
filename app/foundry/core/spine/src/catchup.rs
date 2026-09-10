@@ -1,57 +1,22 @@
 //! Catch-up: bring a durable projection to its log's head by refolding
 //! from the store's own `applied_head`.
 //!
-//! [`crate::project_through`] has always DOCUMENTED this recovery — "a
-//! caller recovers by refolding from the store's `applied_head`" — but
-//! no caller existed. A store that halted on an outage, and a store
-//! that was never populated at all, both had no way back, and
-//! [`crate::store_sync_status`] could only report the lag it had no
-//! means to close. That gap stopped being cosmetic when reads began
-//! being served from the durable projection: a store younger than its
-//! log answers incompletely, and answers with authority.
+//! **Catch-up resumes INCLUSIVE of the store's own head entry.** The
+//! re-apply dedups when the store really does hold this log, and is
+//! refused when it does not. Without it, catch-up would happily top up
+//! a store built from a DIFFERENT log and leave it reporting
+//! `applied_head == log head` over rows that are not `fold(log)`.
 //!
-//! **Catch-up resumes INCLUSIVE of the store's own head entry.**
-//! Re-applying that entry is a deduplicated no-op when the store really
-//! does hold this log, and a refusal when it does not. Without the
-//! re-apply, catch-up would happily top up a store built from a
-//! DIFFERENT log and leave it reporting `applied_head == log head`
-//! while holding rows that are not `fold(log)` — a readiness signal
-//! that lies.
-//!
-//! Revalidation alone proves only the resume POINT, and a head entry's
-//! bytes can be identical under two logs that disagree earlier — one
-//! envelope is one object, so a differing prefix need not reach it. So
-//! catch-up also checks that **the poisons the store holds below its
-//! head are the poisons this (log, registry) produces there**
-//! ([`CatchUpError::DivergentPrefixPoisons`]). The prefix fold is
-//! already computed to rebuild the resume state, so that costs one
-//! store read and no extra folding.
-//!
-//! Neither check proves the whole prefix: a divergence that changes an
-//! applied outcome without changing any poison still passes, and a
-//! store whose file was swapped below its head can be exactly that. The
-//! only full audit is a rebuild from empty, which
-//! [`foundry_projection_draft::ProjectionStore::reset_tenant`] exists to
-//! make reachable. Closing it properly needs a digest written at apply
-//! time — a port change, and its own lane.
+//! No check here proves the whole prefix: a divergence that changes an
+//! applied outcome without changing any poison still passes. The only
+//! full audit is a rebuild from empty, via
+//! [`foundry_projection_draft::ProjectionStore::reset_tenant`].
 //!
 //! **Precondition: `registry` should be the snapshot the store was
-//! built under.** The port deliberately holds no registry identity —
-//! snapshots "live elsewhere" by its own scope clause — and proving a
-//! resume runs against the SAME fold input is the [`crate::Checkpoint`]'s
-//! job, which discards and refolds when the registry differs so that
-//! "resume must never produce a state a fresh fold would not". This is
-//! the durable twin of that operation and cannot make the comparison,
-//! so it detects the evolution only where outcomes CHANGED: a
-//! [`crate::PoisonReason::UnknownRevision`] that the evolution should
-//! have un-poisoned now surfaces as `DivergentPrefixPoisons` rather
-//! than silently persisting, and a changed head outcome surfaces as
-//! [`CatchUpError::DivergentResumePoint`]. Both refusals have two
-//! readings — a different log, or a different registry — and cannot
-//! tell them apart. **After a registry evolution, rebuild from empty**
-//! via `reset_tenant` and this function over the whole log.
-//! That is not damage control: it IS the refold `UnknownRevision`
-//! promises and the migration doctrine requires.
+//! built under.** Nothing here compares snapshots: an evolution
+//! surfaces only where outcomes CHANGED, and every refusal reads
+//! equally as a different log or a different registry. After one,
+//! rebuild from empty and run this function over the whole log.
 
 use data_ontology_kernel::OntologyEngine;
 use foundry_projection_draft::{ProjectionStore, ProjectionStoreError};
@@ -65,7 +30,6 @@ use crate::writethrough::{WriteThroughError, project_through};
 /// Where a catch-up began, and where it left the store.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CaughtUp {
-    /// The store's head before the call — the ordinal it durably held.
     pub resumed_from: u64,
     /// The store's head afterwards, READ BACK from the store rather
     /// than computed, so this is the same number the store will report
@@ -101,8 +65,7 @@ pub enum CatchUpError {
     /// hands back a slice, which makes this the easy caller mistake, and
     /// left unchecked it mirrors entries against a fresh fold and writes
     /// poisons that derive from where the caller cut rather than from
-    /// the log. It is also why log compaction needs a snapshot at the
-    /// retention boundary rather than a guard on some other arm.
+    /// the log.
     LogDoesNotStartAtOne { first_ordinal: u64 },
     /// The log has no entry at the store's head, so the resume point
     /// cannot be re-applied and nothing validates the store against
@@ -155,10 +118,6 @@ pub fn catch_up(
     log: &[SealedEnvelope],
 ) -> Result<CaughtUp, CatchUpError> {
     let resumed_from = store.applied_head(tenant_id).map_err(CatchUpError::Read)?;
-    // The log must be the WHOLE log. Resume state is rebuilt by folding
-    // everything below the store's head, so a slice that begins later
-    // cannot produce it — and mirroring against a fresh fold would write
-    // poisons derived from where the caller cut rather than from the log.
     if let Some(first) = log.first()
         && first.receipt.ordinal != 1
     {
@@ -166,10 +125,6 @@ pub fn catch_up(
             first_ordinal: first.receipt.ordinal,
         });
     }
-    // ...and it must be THIS tenant's. The fold would poison a foreign
-    // entry rather than apply it, which is correct and still wrong here:
-    // the poison spends an ordinal in this tenant's ledger and wedges it
-    // against its own log forever.
     if let Some(foreign) = log
         .iter()
         .find(|sealed| sealed.envelope.tenant_id != tenant_id)
@@ -185,17 +140,11 @@ pub fn catch_up(
             log_head,
         });
     }
-    // Resume AT the head entry, not after it. Ordinals are dense from 1,
-    // so an empty store starts at the first entry and has nothing to
-    // revalidate.
-    let resume_at = resumed_from.max(1);
+    let resume_at = resume_at_inclusive(resumed_from);
     let split = log
         .iter()
         .position(|sealed| sealed.receipt.ordinal >= resume_at)
         .unwrap_or(log.len());
-    // The resume point must actually BE in the log, or nothing
-    // revalidates the store against it and `revalidated` would be a
-    // claim about arithmetic rather than about a re-apply that happened.
     if resumed_from > 0 && log.get(split).map(|sealed| sealed.receipt.ordinal) != Some(resumed_from)
     {
         return Err(CatchUpError::ResumePointMissingFromLog {
@@ -221,6 +170,10 @@ pub fn catch_up(
         head,
         revalidated: resumed_from > 0,
     })
+}
+
+fn resume_at_inclusive(store_head: u64) -> u64 {
+    store_head.max(1)
 }
 
 /// The poisons the store holds below its head must be the poisons this

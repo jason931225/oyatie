@@ -1,15 +1,5 @@
-//! Query-engine tests: part 4.
-
 use super::support::*;
 
-// An UNRESTRICTED posture traverses everything — the explicit opt-out
-// that replaced the empty-scope fail-open (the old pin
-// `empty_consent_scope_preserves_prior_behavior` pinned open-on-empty;
-// deny-by-default overturned it and absence is now a named posture).
-//
-// Graph (same as above):
-//   ent_root --lty_partner--> ent_b --lty_partner--> ent_c
-//   ent_root --lty_member-->  ent_d
 #[test]
 fn unrestricted_consent_traverses_every_edge() {
     let g = consent_graph();
@@ -55,9 +45,6 @@ fn unrestricted_consent_traverses_every_edge() {
     );
 }
 
-// ST2 acceptance: consent gate fires before the cardinality cap checks, so
-// pruned (non-consented) edges do not count toward the cap.  With a small
-// graph well under caps, result_truncated must remain false.
 #[test]
 fn consent_gate_fires_before_cap_check_and_does_not_set_result_truncated() {
     let g = consent_graph();
@@ -83,9 +70,6 @@ fn consent_gate_fires_before_cap_check_and_does_not_set_result_truncated() {
     );
 }
 
-// ST2 acceptance: consent gate fires after the freshness filter, so a
-// stale consented edge is still dropped by freshness before the consent
-// check could pass it through.
 #[test]
 fn freshness_filter_still_applies_to_consented_edges() {
     let mut g = ObjectGraph::default();
@@ -138,8 +122,6 @@ fn freshness_filter_still_applies_to_consented_edges() {
     );
 }
 
-/// Inbound traversal from ent_root reaches ent_pred (predecessor) but NOT
-/// ent_succ (successor). Outbound would not reach ent_pred.
 #[test]
 fn inbound_reaches_predecessors_outbound_cannot() {
     let g = dir_graph();
@@ -202,8 +184,6 @@ fn inbound_reaches_predecessors_outbound_cannot() {
     );
 }
 
-/// Both direction from ent_root yields the union: ent_pred and ent_succ
-/// both visible, with no duplicate nodes or edges.
 #[test]
 fn both_yields_union_of_outbound_and_inbound() {
     let g = dir_graph();
@@ -247,7 +227,7 @@ fn both_yields_union_of_outbound_and_inbound() {
 
 // Deny-by-default law (parity row: consent-scoped traversal): a consent
 // posture that grants nothing traverses nothing — only the root comes
-// back. RED-observed against the fail-open this lane removed.
+// back.
 #[test]
 fn a_consent_input_granting_nothing_traverses_no_edges() {
     let g = consent_graph();

@@ -1,10 +1,5 @@
-//! authn-device-firmware — authenticator-side WebAuthn firmware stub.
-//!
-//! Phase-1 reference per ADR-0508: wraps Google's OpenSK (vendored at
-//! `tools/opensk-vendored/`). Phase-2+ replaces OpenSK with bespoke
-//! Rust fork carrying oyatie attestation root CA.
-//!
-//! Single-crate pattern per ADR-0509.
+//! Authenticator-side WebAuthn firmware. Every subsystem below is a stub: this
+//! crate has no dependencies and implements no CTAP2 yet.
 
 #![forbid(unsafe_code)]
 

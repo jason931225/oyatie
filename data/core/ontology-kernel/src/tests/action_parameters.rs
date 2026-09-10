@@ -69,7 +69,6 @@ fn aty() -> ActionTypeId {
     ActionTypeId::new("aty_discharge").unwrap()
 }
 
-/// A blank parameter name never constructs.
 #[test]
 fn blank_parameter_name_rejected_at_construction() {
     assert_eq!(
@@ -78,7 +77,6 @@ fn blank_parameter_name_rejected_at_construction() {
     );
 }
 
-/// Two declared parameters with one name are rejected at registration.
 #[test]
 fn duplicate_parameter_names_rejected_at_registration() {
     let mut engine = OntologyEngine::default();
@@ -123,7 +121,6 @@ fn duplicate_parameter_names_rejected_at_registration() {
     );
 }
 
-/// The conformant fast path: required present, optional omitted.
 #[test]
 fn conformant_submission_accepted() {
     let engine = engine_with_discharge_action(vec![param("reason", true), param("note", false)]);
@@ -137,7 +134,6 @@ fn conformant_submission_accepted() {
     );
 }
 
-/// An unknown action id resolves to no schema.
 #[test]
 fn unknown_action_type_rejected() {
     let engine = engine_with_discharge_action(vec![]);
@@ -151,7 +147,6 @@ fn unknown_action_type_rejected() {
     );
 }
 
-/// A declared `required: true` parameter must be submitted.
 #[test]
 fn missing_required_parameter_rejected() {
     let engine = engine_with_discharge_action(vec![param("reason", true)]);
@@ -163,8 +158,6 @@ fn missing_required_parameter_rejected() {
     );
 }
 
-/// Fail-closed on vocabulary: a parameterless action rejects any value, and
-/// an undeclared name is rejected even when everything declared is present.
 #[test]
 fn undeclared_parameter_rejected() {
     let engine = engine_with_discharge_action(vec![]);
@@ -180,7 +173,6 @@ fn undeclared_parameter_rejected() {
     );
 }
 
-/// A submitted value's tier must match the declaration.
 #[test]
 fn parameter_tier_mismatch_rejected() {
     let engine = engine_with_discharge_action(vec![param("reason", true)]);
@@ -198,7 +190,6 @@ fn parameter_tier_mismatch_rejected() {
     );
 }
 
-/// A submitted value's data class must match the declaration.
 #[test]
 fn parameter_data_class_mismatch_rejected() {
     let engine = engine_with_discharge_action(vec![param("reason", true)]);

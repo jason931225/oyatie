@@ -1,15 +1,9 @@
 //! # port-engine-rulepack — fixture-gated neutral `RulePack` loader.
 //!
-//! ADR-0637 D1: rule SEMANTICS live in data under the forever home `specs/port-rules/**`. This
-//! adapter embeds package-local mirrors and implements the `RulePack` and `PackSemantics` seams
-//! from the ports face.
-//!
-//! **Every loaded rule MUST carry ≥1 positive selecting fixture**, and every fixture MUST agree
-//! with the selection derived from `applies`. Missing, empty, or false fixtures cannot manufacture
-//! coverage. Digest is SHA-256 of the embedded JSON bytes. Neutral only — no corpus vocabulary.
+//! ADR-0637 D1: rule SEMANTICS live in data under the forever home `specs/port-rules/**`; this
+//! adapter embeds package-local mirrors of that tree.
 #![forbid(unsafe_code)]
 
-/// This crate's own sources, for the engine-identity axis assembled by the facade.
 mod sources;
 pub use sources::CRATE_SOURCES;
 
@@ -36,7 +30,6 @@ pub(crate) const RULEPACK_GO_RUST_V1_JSON: &str = include_str!("rulepack-go-rust
 /// else with a different value.
 pub const CONFLICT_REFUSE: &str = "refuse";
 
-/// Fail-closed readiness gate. `true` once fixture-gated load is present.
 #[must_use]
 pub const fn w0_ready() -> bool {
     true

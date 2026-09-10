@@ -1,16 +1,5 @@
 //! # port-engine-identity — the receipt's `engine_digest` axis.
 //!
-//! ADR-0637 D2 makes `engine_digest` one of six receipt axes, and the kernel's delta rule rests on
-//! it: emitted bytes that change while every axis holds are `Unexplained` and RED, because nothing
-//! accounts for them. That rule is only as good as what the axis actually covers.
-//!
-//! It used to cover a hand-maintained list of crate NAMES. An engine change moved nothing, so every
-//! engine change was by the kernel's own definition an unexplained one — and nothing detected it,
-//! because the delta check runs a single binary twice and can only answer `Unchanged`. The contract
-//! was vacuous in the one direction where the engine is the thing changing.
-//!
-//! Now the axis is a content digest of the engine's own sources.
-//!
 //! **This crate owns the ENCODING, not the enumeration.** Which crates make up the engine is a
 //! question only the facade can answer without inverting the dependency direction — an adapter
 //! reaching into `core/` and `facade/` to read their sources would point the hexagon backwards, and
@@ -20,7 +9,6 @@
 
 #![forbid(unsafe_code)]
 
-/// This crate's own sources, for the engine-identity axis assembled by the facade.
 mod sources;
 pub use sources::CRATE_SOURCES;
 
@@ -38,16 +26,15 @@ const ENGINE_IDENTITY_JSON: &str = include_str!("engine-identity-v0.json");
 /// is computed is itself an engine change and must be visible as one.
 const ENGINE_PREIMAGE_VERSION: &str = "engine-preimage-v1";
 
-/// One crate's contribution to the engine's identity: its name and the sources it owns.
+/// One crate's contribution to the engine's identity: its name, then the sources it owns as
+/// `(crate-relative path, file contents)` pairs.
 pub type CrateSources<'a> = (&'a str, &'a [(&'a str, &'a str)]);
 
-/// Fail-closed readiness gate.
 #[must_use]
 pub const fn w0_ready() -> bool {
     true
 }
 
-/// Content digest of the engine: every production source of every crate, plus the identity label.
 #[must_use]
 pub fn engine_digest(crates: &[CrateSources<'_>]) -> Digest {
     digest_bytes(&engine_preimage(crates))

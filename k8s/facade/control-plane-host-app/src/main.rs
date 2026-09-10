@@ -1,17 +1,4 @@
-//! Managed-Kubernetes control-plane-host binary — composition root (ADR-0376).
-//!
-//! Fail-closed boot:
-//! 1. Read the MANAGEMENT-cluster kubeconfig path from `$OYATIE_MGMT_KUBECONFIG`.
-//!    If absent/empty -> typed [`BootError::MissingMgmtKubeconfig`] and a
-//!    non-zero exit (NEVER a silent fall-back to the in-memory fake).
-//! 2. Build the kube-rs CAPI adapter from that kubeconfig (kube-rs stays
-//!    isolated to the adapter crate).
-//! 3. Compose [`AppState`] over the adapter and serve the axum admin/status
-//!    API on `$OYATIE_LISTEN_ADDR` (default `0.0.0.0:8080`).
-//!
-//! The live Kamaji/Talos CRD reconcile is honest-deferred inside the adapter:
-//! provision/status/teardown return HTTP 501 with a typed boundary until the
-//! follow-on ADR wires the real reconcile.
+//! Managed-Kubernetes control-plane-host binary — composition root.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
@@ -25,8 +12,6 @@ use k8s_control_plane_host_app::{
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber_init();
 
-    // Fail-closed: the platform-admin bearer is mandatory (refuses an empty
-    // secret) and the management kubeconfig is mandatory in production.
     let authz = authz_from_env()?;
     let kubeconfig_path = mgmt_kubeconfig_path_from_env()?;
     let host = CapiControlPlaneHost::from_kubeconfig_path(&kubeconfig_path).await?;

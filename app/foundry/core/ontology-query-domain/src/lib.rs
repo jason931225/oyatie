@@ -1,11 +1,5 @@
-//! Ontology query-engine domain foundation.
-//!
-//! This crate implements the source-level, in-memory query semantics for the
-//! preview Knowledge Graph contract. It intentionally stays adapter-free: cloud
-//! storage, query languages, distributed execution, authz enforcement, and SLO
-//! runtime evidence are future slices. The implemented semantics are bounded,
-//! tenant-scoped, deterministic traversal (outbound, inbound, or both) over
-//! validated link instances.
+//! Ontology query-engine domain foundation: bounded, tenant-scoped,
+//! deterministic traversal over validated link instances.
 // ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
 // `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]

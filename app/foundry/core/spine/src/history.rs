@@ -11,7 +11,6 @@ use foundry_records_draft::SealedEnvelope;
 use crate::fold::PoisonReason;
 use crate::state::ProjectionState;
 
-/// One applied change to one object: who, what, when, at which position.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HistoryEntry {
     pub ordinal: u64,              // data_class: INTERNAL_ONLY
@@ -63,14 +62,12 @@ pub fn object_history(
     view
 }
 
-/// The disposition of one log entry in the governance view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuditDisposition {
     Applied,
     Poisoned(PoisonReason),
 }
 
-/// One row of the governance audit view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuditEntry {
     pub ordinal: u64,            // data_class: INTERNAL_ONLY

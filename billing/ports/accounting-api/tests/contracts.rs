@@ -24,10 +24,6 @@ fn journal_post_request_uses_camel_case_and_stable_enums() {
 fn payroll_posting_request_converts_to_app_input() {
     let outcome = record_payroll_posting(payroll_request().into_domain()).expect("posting");
 
-    // SECURITY (ADR-0592): the key is the tenant-scoped LOGICAL key
-    // `idem-v2:<tenant>:<scope>:<primary_ref>` with NO embedded fingerprint (the
-    // body fingerprint is a separate field). Tenant id leads so two tenants can
-    // never collide on a shared caller-chosen journal_id.
     assert_eq!(
         outcome.audit_envelope.idempotency_key.value,
         "idem-v2:ten_acme:payroll-posted:jrn_payroll_2026_01"

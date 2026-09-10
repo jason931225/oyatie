@@ -58,7 +58,6 @@ fn request() -> KnowledgeGraphQueryRequest {
     .unwrap()
 }
 
-/// An uncapped walk carries no cursor and is not truncated.
 #[test]
 fn untruncated_result_has_no_cursor() {
     let (graph, engine) = star(5);
@@ -69,8 +68,6 @@ fn untruncated_result_has_no_cursor() {
     assert_eq!(response.edges.len(), 5);
 }
 
-/// A node-capped walk pages: every page disjoint, union complete, cursor
-/// chain terminating with an untruncated final page.
 #[test]
 fn capped_walk_pages_to_completion() {
     let spokes = MAX_QUERY_RESULT_NODES + 500;
@@ -119,8 +116,6 @@ fn capped_walk_pages_to_completion() {
     assert_eq!(all_edges.len(), spokes);
 }
 
-/// A cursor past the end of the walk yields an empty, untruncated page —
-/// never an error, never a wedge.
 #[test]
 fn cursor_past_the_end_is_an_empty_final_page() {
     let (graph, engine) = star(5);

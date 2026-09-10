@@ -2,23 +2,23 @@ const HR_SENSITIVE_READ_TOPIC: &str = "audit.hr.sensitive-read.policy";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrSensitiveReadEnvelope {
-    pub topic: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub tenant_id: data_boundary_kernel::Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: data_boundary_kernel::Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub actor_employee_id: data_boundary_kernel::Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub subject_employee_id: data_boundary_kernel::Classified<EmployeeId>, // data_class: INTERNAL_ONLY
+    pub topic: data_boundary_kernel::Classified<String>,
+    pub tenant_id: data_boundary_kernel::Classified<TenantId>,
+    pub legal_entity_id: data_boundary_kernel::Classified<LegalEntityId>,
+    pub actor_employee_id: data_boundary_kernel::Classified<EmployeeId>,
+    pub subject_employee_id: data_boundary_kernel::Classified<EmployeeId>,
     pub data_kind: data_boundary_kernel::Classified<SensitiveHrDataKind>, // data_class: SENSITIVE_PIPA_ART23
-    pub purpose: data_boundary_kernel::Classified<SensitiveReadPurpose>, // data_class: INTERNAL_ONLY
-    pub legal_basis: data_boundary_kernel::Classified<SensitiveReadLegalBasis>, // data_class: INTERNAL_ONLY
-    pub policy_ref: data_boundary_kernel::Classified<PolicyRef>, // data_class: INTERNAL_ONLY
-    pub basis_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub consent_evidence_ref: data_boundary_kernel::Classified<Option<AuditEvidenceRef>>, // data_class: INTERNAL_ONLY
-    pub request_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub read_log_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub decision_status: data_boundary_kernel::Classified<SensitiveReadDecisionStatus>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: data_boundary_kernel::Classified<data_boundary_kernel::DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: data_boundary_kernel::Classified<u32>, // data_class: PUBLIC
+    pub purpose: data_boundary_kernel::Classified<SensitiveReadPurpose>,
+    pub legal_basis: data_boundary_kernel::Classified<SensitiveReadLegalBasis>,
+    pub policy_ref: data_boundary_kernel::Classified<PolicyRef>,
+    pub basis_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>,
+    pub consent_evidence_ref: data_boundary_kernel::Classified<Option<AuditEvidenceRef>>,
+    pub request_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>,
+    pub read_log_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>,
+    pub decision_status: data_boundary_kernel::Classified<SensitiveReadDecisionStatus>,
+    pub idempotency_key: data_boundary_kernel::Classified<String>,
+    pub payload_data_class: data_boundary_kernel::Classified<data_boundary_kernel::DataClass>,
+    pub schema_version: data_boundary_kernel::Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

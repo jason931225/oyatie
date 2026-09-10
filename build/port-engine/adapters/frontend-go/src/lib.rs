@@ -1,15 +1,6 @@
 //! # port-engine-frontend-go — Go SourceModel snapshot consumer.
-//!
-//! ADR-0638 D3 snapshot firewall: this adapter consumes **SourceModel snapshot bytes only** and
-//! must never invoke a Go toolchain in-process or from the `verify()` path, nor read the Go corpus
-//! from disk. Both halves of that fence are enforced by `tests/firewall.rs`.
-//!
-//! The crate is modular, so the fence is no longer "scan lib.rs". A `mod` declaration compiles a
-//! file the old single-file scan never read; the fence now enumerates every production source and
-//! PROVES the enumeration is the whole of `src/`.
 #![forbid(unsafe_code)]
 
-/// This crate's own sources, for the engine-identity axis assembled by the facade.
 mod sources;
 pub use sources::CRATE_SOURCES;
 
@@ -28,7 +19,6 @@ pub use vocabulary::{
     SCHEMA_VERSION_FLAT_TYPES, SCHEMA_VERSION_IDENTITY_ONLY,
 };
 
-/// Fail-closed readiness gate. `true` once snapshot decode is present.
 #[must_use]
 pub const fn w0_ready() -> bool {
     true

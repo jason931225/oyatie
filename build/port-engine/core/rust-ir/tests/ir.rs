@@ -264,14 +264,16 @@ fn the_empty_renderer_matches_declared_regions() {
     assert!(out[&RegionId("root".into())].is_empty());
 }
 
-/// The formatter axis must name a formatter, not a label somebody typed.
+/// The axis must name a formatter, not a label somebody typed. The version it carries is
+/// `CARGO_PKG_VERSION` — this workspace's, not the one `Cargo.lock` resolves for prettyplease — so
+/// it does NOT move when the formatter does. Correcting that moves a receipt axis: its own lane.
 #[test]
-fn the_formatter_identity_names_the_formatter() {
+fn the_formatter_identity_names_the_formatter_but_not_its_version() {
     let digest = RustRenderer::new().formatter_digest();
     assert!(digest.0.contains("prettyplease"), "{}", digest.0);
     assert!(
         digest.0.chars().any(|c| c.is_ascii_digit()),
-        "the identity must carry a version, or it cannot move when the formatter does: {}",
+        "the identity must carry a version: {}",
         digest.0
     );
 }

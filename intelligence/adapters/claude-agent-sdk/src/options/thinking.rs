@@ -1,5 +1,4 @@
 use super::ClaudeAgentOptions;
-use crate::error::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de;

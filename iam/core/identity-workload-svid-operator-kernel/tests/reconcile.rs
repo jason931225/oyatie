@@ -126,3 +126,73 @@ fn applying_issue_then_observing_the_fresh_leaf_is_idempotent() {
         Action::Noop
     );
 }
+
+const ISSUED_AT: u64 = 1_700_000_000;
+
+#[test]
+fn rotates_when_the_clock_reads_before_the_leaf_could_have_been_issued() {
+    let want = desired();
+    let leaf_not_after = ISSUED_AT + TTL_SECS;
+    let action = reconcile(
+        &ObservedState::present(leaf_not_after),
+        &want,
+        &FixedClock { now: 0 },
+    );
+    assert_eq!(
+        action,
+        Action::Rotate {
+            desired: want,
+            observed_leaf_not_after_epoch_seconds: leaf_not_after,
+            requested_at_epoch_seconds: 0,
+        }
+    );
+}
+
+#[test]
+fn no_clock_reading_below_the_leafs_issuance_yields_noop() {
+    let want = desired();
+    let leaf_not_after = ISSUED_AT + TTL_SECS;
+    let suppressed: Vec<u64> = [0, 1, ISSUED_AT - 1, ISSUED_AT - TTL_SECS]
+        .into_iter()
+        .filter(|now| {
+            reconcile(
+                &ObservedState::present(leaf_not_after),
+                &want,
+                &FixedClock { now: *now },
+            ) == Action::Noop
+        })
+        .collect();
+    assert!(
+        suppressed.is_empty(),
+        "clock readings that suppressed rotation: {suppressed:?}"
+    );
+}
+
+/// A shortened `ttl_secs` leaves a longer-lived leaf in place, so the
+/// `remaining > ttl_secs` disjunct also fires on a HEALTHY clock. Deriving the
+/// issuance instant from the leaf instead of the clock dates the replacement
+/// into the future there, and a not-yet-valid leaf is refused by every peer
+/// the moment it is applied.
+#[test]
+fn a_shortened_ttl_never_dates_the_replacement_after_the_clock() {
+    let want = desired();
+    let issuance = match reconcile(
+        &ObservedState::present(ISSUED_AT + 20 * TTL_SECS),
+        &want,
+        &FixedClock { now: ISSUED_AT },
+    ) {
+        Action::Issue {
+            requested_at_epoch_seconds,
+            ..
+        }
+        | Action::Rotate {
+            requested_at_epoch_seconds,
+            ..
+        } => Some(requested_at_epoch_seconds),
+        Action::Noop => None,
+    };
+    assert!(
+        issuance.is_some_and(|at| at <= ISSUED_AT),
+        "expected a mint instant at or before the clock reading {ISSUED_AT}, got {issuance:?}"
+    );
+}

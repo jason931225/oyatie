@@ -1,14 +1,3 @@
-// Cedar policy fragments for community.
-// Wave 15-ZF-14 propagation for ADR-0346, ADR-0347, ADR-0348, and ADR-0349.
-// ADR-0346 purpose: presubmit is the canonical local pre-push verifier and MUST locally mirror the full CI matrix.
-// ADR-0346 enforced_by: governance-verify-ci-mirror-coverage; governance-verify-ci-step-exit-semantics; governance-verify-skip-flag-allowlist; governance-submit-calls-verify; governance-verify-exit-code-contract.
-// ADR-0347 purpose: every governance-* CI lane prefix in the Oyatie corpus RENAMES to governance-* in a single bulk-rename pull request.
-// ADR-0347 enforced_by: governance-no-foundry-fitness-residue; governance-lane-prefix-vocabulary; governance-rename-inventory-presence.
-// ADR-0348 purpose: cellular topology MUST support AUTOSHARDING, AUTO-REBALANCE, and DYNAMIC SHARDING; tenant migration honors residency + compliance pack constraints; cross-jurisdiction migration requires an explicit Cedar permit per ADR-0243; every automation event MUST emit per ADR-0263.
-// ADR-0348 enforced_by: governance-sharding-automation-coverage; governance-autosharding-manual-mode-refusal; governance-auto-rebalance-residency-honored; governance-dynamic-sharding-threshold-coverage; governance-audit-chain-emit-on-automation-events; governance-tenant-migration-reversibility.
-// ADR-0349 purpose: Jenkins is the canonical CI orchestrator for air-gap + on-prem + colo + oyatie-as-cloud-provider contexts where GitHub Actions runners are not available; ArgoCD is the canonical GitOps CD orchestrator; ArgoCD REPLACES manual kubectl apply and Helm CLI deploys across all contexts.
-// ADR-0349 enforced_by: governance-jenkins-github-actions-parity; governance-argocd-application-cosign-verified; governance-argocd-tenant-namespace-isolation; governance-jenkins-jcasc-only; governance-deploy-audit-chain-emit.
-
 permit(
   principal == ServicePrincipal::"oyatie.foundry.cell-orchestrator",
   action in [Action::"ComputeAutoshardingPlacement", Action::"ExecuteAutoRebalance", Action::"ExecuteDynamicSharding"],

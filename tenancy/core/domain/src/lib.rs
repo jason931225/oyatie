@@ -1,6 +1,3 @@
-//! Tenant kernel: tenant identity, residency, and regional-pack binding.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod design_partner_status;

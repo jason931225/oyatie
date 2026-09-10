@@ -1,9 +1,7 @@
 //! The registry law at link upsert: an edge enters the store only under
 //! a link type REGISTERED for its tenant. Endpoint-type and cardinality
-//! law stay with the kernel's own link store (the projection path,
-//! #2323) and arrive here with the re-root onto the projection store —
-//! duplicating them against this in-memory index would let the two
-//! planes drift.
+//! law stay with the kernel's own link store — duplicating them against
+//! this in-memory index would let the two planes drift.
 
 use data_ontology_kernel::{LinkTypeId, OntologyEngine};
 

@@ -1,8 +1,6 @@
 //! The migration value vocabulary: total conversions, backfill constants
 //! with exact canonical digest bytes per variant, and the FNV-1a-64 digest
-//! the plan identity rides on. Wider default kinds (Date, Array, Struct)
-//! join by loosen-only widening when their wire types expose canonical
-//! bytes.
+//! the plan identity rides on.
 
 use data_ontology_kernel::ScalarType;
 use foundry_edits::{WireDouble, WireValue};

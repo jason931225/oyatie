@@ -1,12 +1,4 @@
 //! Framework-free REST router boundary for the Cloud IaC OpenTofu module registry.
-//!
-//! This crate registers the OpenTofu module-registry route table with the
-//! repo-local std-only HTTP router kernel and exposes low-cardinality route
-//! matches plus route-specific authorization surface metadata for a future
-//! composition layer. It intentionally does not depend on API/runtime crates,
-//! create a Hyper server, bind sockets, read request bodies, persist registry
-//! state, perform auth runtime calls, sign modules, run OpenTofu, call
-//! providers, or provision cloud resources.
 
 #![forbid(unsafe_code)]
 
@@ -45,10 +37,10 @@ impl CloudIacModuleRegistryRestRoute {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudIacModuleRegistryRestMatch {
-    pub route: CloudIacModuleRegistryRestRoute, // data_class: INTERNAL_ONLY
-    pub captures: BTreeMap<String, String>,     // data_class: INTERNAL_ONLY
-    pub matched_template: String,               // data_class: INTERNAL_ONLY
-    pub required_surface: String,               // data_class: INTERNAL_ONLY
+    pub route: CloudIacModuleRegistryRestRoute,
+    pub captures: BTreeMap<String, String>,
+    pub matched_template: String,
+    pub required_surface: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

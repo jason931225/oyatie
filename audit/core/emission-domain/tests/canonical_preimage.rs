@@ -2,9 +2,12 @@
 //! must be unambiguous, so no two distinct field tuples can collide onto the
 //! same byte string. A naive separator-joined encoding (e.g. joining fields
 //! with `,`) fails the boundary-shift case below and is not acceptable.
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` to assert
-// invariants — Tier 3 exemption.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+)]
 
 use audit_emission_domain::canonical_preimage;
 use audit_emission_kernel::ChainCoordinate;
@@ -17,12 +20,6 @@ fn coordinate(pack: &str, tenant_partition: &str, period: &str) -> ChainCoordina
     }
 }
 
-/// The load-bearing test: shifting a byte from `pack` into
-/// `tenant_partition` (or vice versa) must change the preimage. A
-/// separator-joined encoding without length prefixes would make
-/// `("ab", "c")` and `("a", "bc")` produce the same joined string whenever
-/// the shifted byte equals the separator's neighbor, but length-prefixing
-/// makes every field boundary explicit regardless of content.
 #[test]
 fn boundary_shift_between_pack_and_tenant_partition_changes_the_preimage() {
     let a = canonical_preimage(&coordinate("ab", "c", "2026-02-20"), "evt-1", "digest");
@@ -33,7 +30,6 @@ fn boundary_shift_between_pack_and_tenant_partition_changes_the_preimage() {
     );
 }
 
-/// Same boundary-shift property, but across `tenant_partition` and `period`.
 #[test]
 fn boundary_shift_between_tenant_partition_and_period_changes_the_preimage() {
     let a = canonical_preimage(
@@ -49,7 +45,6 @@ fn boundary_shift_between_tenant_partition_and_period_changes_the_preimage() {
     assert_ne!(a, b);
 }
 
-/// Same boundary-shift property, but across `event_id` and `payload_digest`.
 #[test]
 fn boundary_shift_between_event_id_and_payload_digest_changes_the_preimage() {
     let a = canonical_preimage(&coordinate("pack-kr", "t", "2026-02-20"), "ab", "c");

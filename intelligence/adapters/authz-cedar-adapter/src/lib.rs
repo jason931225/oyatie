@@ -1,24 +1,9 @@
 //! Cedar adapter implementing the kernel's [`AuthzGate`] trait (ADR-0384 D7).
 //!
-//! Evaluates each kernel [`AuthzRequest`] against a Cedar [`PolicySet`] loaded
-//! from `intelligence/policy/intelligence-app.cedar` (or a caller-
-//! provided policy text). Cedar's properties hold natively:
-//!
-//! 1. Deny by default.
-//! 2. Explicit permit only when a `permit` matches AND no `forbid` matches.
-//! 3. Forbid wins.
-//! 4. Order independence.
-//!
-//! Kernel-action → Cedar-action mapping (v1):
-//!
-//! | `AuthzAction`     | Cedar `Action`           | Implied principal role |
-//! |-------------------|--------------------------|------------------------|
-//! | `SelectSeat`      | `InvokeChatCompletion`   | `IngressRealm`         |
-//! | `RefreshToken`    | `RefreshKeyPool`         | `AdminRealm`           |
-//! | `InvalidateSeat`  | `RefreshKeyPool`         | `AdminRealm`           |
-//!
-//! In v2 the REST adapter will carry the principal's role on `AuthzRequest`
-//! directly (decoded from a JWT claim) and this hard-coded mapping retires.
+//! The principal's role is not carried on [`AuthzRequest`], so
+//! [`action_mapping`] derives it from the action. A request that should be
+//! admitted under one role and refused under another cannot be expressed
+//! until the role travels on the request.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::collections::{HashMap, HashSet};
@@ -29,14 +14,11 @@ use cedar_policy::{
 };
 use intelligence_kernel::{AuthzAction, AuthzDecision, AuthzGate, AuthzRequest, Provider};
 
-/// Default policy text bundled with the µservice. Compiled into the crate so
-/// the adapter is self-contained at runtime — no file I/O on the request path.
+/// Policy text compiled into the crate, so the request path does no file I/O.
 pub const DEFAULT_POLICY_TEXT: &str = include_str!("../../../cedar/cloud-intelligence.cedar");
 
-/// Adapter errors raised at construction time. The request path itself is
-/// total: any error during entity/request translation maps to a fail-closed
-/// [`AuthzDecision::Forbid`] so the kernel never sees an exception (default
-/// deny is the right behavior for a missing-attribute or malformed-id case).
+/// Construction-time errors. The request path is total: a malformed id or a
+/// missing attribute becomes [`AuthzDecision::Forbid`], never an error.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CedarAuthzGateError {
     PolicyParse(String),
@@ -60,7 +42,6 @@ pub struct CedarAuthzGate {
 }
 
 impl CedarAuthzGate {
-    /// Build from caller-provided Cedar policy text.
     pub fn from_policy_text(text: &str) -> Result<Self, CedarAuthzGateError> {
         let policy_set: PolicySet = text.parse().map_err(|e: cedar_policy::ParseErrors| {
             CedarAuthzGateError::PolicyParse(e.to_string())
@@ -68,12 +49,11 @@ impl CedarAuthzGate {
         Ok(Self { policy_set })
     }
 
-    /// Build from the bundled `intelligence-app.cedar` policy.
+    /// Build from [`DEFAULT_POLICY_TEXT`].
     pub fn with_default_policy() -> Result<Self, CedarAuthzGateError> {
         Self::from_policy_text(DEFAULT_POLICY_TEXT)
     }
 
-    /// Number of parsed policies.
     pub fn policy_count(&self) -> usize {
         self.policy_set.policies().count()
     }
@@ -88,9 +68,8 @@ impl AuthzGate for CedarAuthzGate {
     }
 }
 
-/// Fallible internals factored out so any translation error short-circuits to
-/// fail-closed Forbid via the `?`-on-`Option` pattern (no `unwrap` on the
-/// request path; ADR-0083 Tier-3 panic-free).
+/// Returns `Option` rather than `Result` so every translation failure
+/// short-circuits to the same fail-closed answer in [`CedarAuthzGate::decide`].
 fn try_decide(policy_set: &PolicySet, request: &AuthzRequest<'_>) -> Option<AuthzDecision> {
     let (cedar_action, role_name) = action_mapping(request.action);
 
@@ -160,10 +139,8 @@ fn provider_label(provider: Provider) -> &'static str {
     }
 }
 
-/// Build a Cedar `Type::"id"` UID, escaping the id so arbitrary text is safe.
-/// cedar-policy's `ParseErrors` is large by design (it accumulates a full
-/// diagnostic tree); we accept the size to keep the surface narrow because
-/// callers only need a binary "did it parse" signal.
+/// `ParseErrors` carries a whole diagnostic tree, but every caller reduces it
+/// to `None`, so the size never travels.
 #[allow(clippy::result_large_err)]
 fn cedar_uid(type_name: &str, id: &str) -> Result<EntityUid, cedar_policy::ParseErrors> {
     let literal = format!("{type_name}::{}", escape_cedar_string(id));

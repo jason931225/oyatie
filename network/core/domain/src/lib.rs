@@ -9,14 +9,7 @@
 // `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::str::FromStr;
-
-use cell_region::{AzCode, CellId, RegionCode};
-use compute_resource::{CloudResourceError, LbProtocol, PrincipalId, ResourceId, ResourceKind};
 use data_boundary_kernel::{Classified, DataClass, PrivacyDataClass};
-use network_residency::{ResidencyClass, residency_class_allows_home_region_label};
 
 mod bgp;
 mod catalog;

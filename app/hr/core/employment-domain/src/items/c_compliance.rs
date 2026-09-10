@@ -31,35 +31,35 @@ pub enum LaborComplianceObligationState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LegalEntityWorkforceSnapshot {
-    pub tenant_id: String,               // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,         // data_class: INTERNAL_ONLY
-    pub jurisdiction: Jurisdiction,      // data_class: INTERNAL_ONLY
-    pub active_employee_count: u32,      // data_class: INTERNAL_ONLY
-    pub rulepack_ref: String,            // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: String, // data_class: INTERNAL_ONLY
-    pub workflow_ref: String,            // data_class: INTERNAL_ONLY
-    pub evidence_ref: String,            // data_class: INTERNAL_ONLY
-    pub evaluated_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub jurisdiction: Jurisdiction,
+    pub active_employee_count: u32,
+    pub rulepack_ref: String,
+    pub rulepack_effective_date: String,
+    pub workflow_ref: String,
+    pub evidence_ref: String,
+    pub evaluated_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LaborComplianceObligation {
-    pub obligation_id: Classified<LaborComplianceObligationId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>,                        // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>,             // data_class: INTERNAL_ONLY
-    pub jurisdiction: Classified<Jurisdiction>,                 // data_class: INTERNAL_ONLY
-    pub kind: Classified<LaborComplianceObligationKind>,        // data_class: INTERNAL_ONLY
-    pub state: Classified<LaborComplianceObligationState>,      // data_class: INTERNAL_ONLY
-    pub threshold_employee_count: Classified<u32>,              // data_class: INTERNAL_ONLY
-    pub active_employee_count: Classified<u32>,                 // data_class: INTERNAL_ONLY
-    pub rulepack_ref: Classified<RulepackRef>,                  // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: Classified<RulepackEffectiveDate>, // data_class: INTERNAL_ONLY
-    pub workflow_ref: Classified<WorkflowRef>,                  // data_class: INTERNAL_ONLY
-    pub workflow_steps: Classified<Vec<LaborComplianceWorkflowStep>>, // data_class: INTERNAL_ONLY
-    pub evidence_paths: Classified<Vec<AuditEvidenceRef>>,      // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>,                    // data_class: INTERNAL_ONLY
-    pub evaluated_at_epoch_seconds: Classified<u64>,            // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,                        // data_class: PUBLIC
+    pub obligation_id: Classified<LaborComplianceObligationId>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub jurisdiction: Classified<Jurisdiction>,
+    pub kind: Classified<LaborComplianceObligationKind>,
+    pub state: Classified<LaborComplianceObligationState>,
+    pub threshold_employee_count: Classified<u32>,
+    pub active_employee_count: Classified<u32>,
+    pub rulepack_ref: Classified<RulepackRef>,
+    pub rulepack_effective_date: Classified<RulepackEffectiveDate>,
+    pub workflow_ref: Classified<WorkflowRef>,
+    pub workflow_steps: Classified<Vec<LaborComplianceWorkflowStep>>,
+    pub evidence_paths: Classified<Vec<AuditEvidenceRef>>,
+    pub idempotency_key: Classified<String>,
+    pub evaluated_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 pub fn evaluate_labor_compliance(

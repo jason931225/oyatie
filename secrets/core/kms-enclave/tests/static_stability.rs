@@ -1,10 +1,4 @@
-//! Static-stability failure injection for the bounded-TTL DEK cache
-//! (AMENDMENT 7: static stability DEMONSTRATED, not claimed).
-//!
-//! GREEN: KMS control plane down + DEK cached within TTL → reads keep
-//! serving from cache, no control-plane call.
-//! RED:   KMS control plane down + TTL elapsed → fail closed; an expired DEK
-//! is never served.
+//! Static-stability failure injection for the bounded-TTL DEK cache.
 
 use std::cell::Cell;
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -14,7 +8,6 @@ use secrets_kms_enclave::{
     FetchSource, KekId, KekMaterial, KekVersion, SystemClockSource,
 };
 
-/// Deterministic, manually advanced clock.
 struct FakeClock(Cell<u64>);
 
 impl ClockSource for &FakeClock {
@@ -57,7 +50,6 @@ fn green_control_plane_down_within_ttl_keeps_serving() {
     let mut dek_cache = cache(&clock);
     let key = cache_key("dek/obj_1");
 
-    // Warm the cache while the control plane is up.
     let fetches = Cell::new(0u32);
     let (_, source) = dek_cache
         .get_or_fetch(&key, || {
@@ -68,8 +60,6 @@ fn green_control_plane_down_within_ttl_keeps_serving() {
     assert_eq!(source, FetchSource::ControlPlane);
     assert_eq!(fetches.get(), 1);
 
-    // Control plane goes DOWN. Every read inside the TTL window must serve
-    // from cache and never invoke the loader.
     for offset in [1u64, TTL_MS / 2, TTL_MS - 1] {
         clock.0.set(1_000 + offset);
         let (dek, source) = dek_cache
@@ -94,7 +84,6 @@ fn red_control_plane_down_past_ttl_fails_closed() {
         .get_or_fetch(&key, || Ok(fresh_dek("dek/obj_1")))
         .expect("warm fetch");
 
-    // TTL elapsed exactly; control plane still down → fail closed.
     clock.0.set(1_000 + TTL_MS);
     let err = dek_cache
         .get_or_fetch(&key, || Err(ControlPlaneUnavailable))
@@ -133,7 +122,6 @@ fn recovery_after_outage_refreshes_the_window() {
         .get_or_fetch(&key, || Ok(fresh_dek("dek/obj_1")))
         .expect("warm");
 
-    // Outage past TTL.
     clock.0.set(TTL_MS + 1);
     assert!(
         dek_cache
@@ -141,7 +129,6 @@ fn recovery_after_outage_refreshes_the_window() {
             .is_err()
     );
 
-    // Control plane recovers: refresh re-arms a full window.
     let (_, source) = dek_cache
         .get_or_fetch(&key, || Ok(fresh_dek("dek/obj_1")))
         .expect("recovered");
@@ -171,14 +158,12 @@ fn cardinality_cap_evicts_oldest_inserted() {
     }
     assert_eq!(dek_cache.len(), 2);
 
-    // Oldest (obj_1) was evicted: serving it again needs the control plane.
     clock.0.set(30);
     let err = dek_cache
         .get_or_fetch(&cache_key("dek/obj_1"), || Err(ControlPlaneUnavailable))
         .expect_err("evicted entry needs refetch");
     assert!(matches!(err, DekCacheError::ControlPlaneUnavailable { .. }));
 
-    // Newer entries still serve from cache.
     for dek in ["dek/obj_2", "dek/obj_3"] {
         let (_, source) = dek_cache
             .get_or_fetch(&cache_key(dek), || Err(ControlPlaneUnavailable))
@@ -200,7 +185,6 @@ fn distinct_kek_versions_are_distinct_cache_entries() {
     dek_cache
         .get_or_fetch(&v1_key, || Ok(fresh_dek("dek/obj_1")))
         .expect("v1");
-    // Same DEK id under a different KEK version is a MISS, not a hit.
     let err = dek_cache
         .get_or_fetch(&v2_key, || Err(ControlPlaneUnavailable))
         .expect_err("version-scoped key must miss");
@@ -210,10 +194,9 @@ fn distinct_kek_versions_are_distinct_cache_entries() {
 
 #[test]
 fn system_clock_source_is_monotonic_enough_for_ttl() {
-    // Smoke check for the production clock: two reads are ordered and
-    // epoch-plausible (> 2020-01-01).
+    const EPOCH_MILLIS_2020_01_01: u64 = 1_577_836_800_000;
     let first = SystemClockSource.now_epoch_millis();
     let second = SystemClockSource.now_epoch_millis();
     assert!(second >= first);
-    assert!(first > 1_577_836_800_000);
+    assert!(first > EPOCH_MILLIS_2020_01_01);
 }

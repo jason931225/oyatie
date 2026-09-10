@@ -11,7 +11,6 @@ rust_library(
     ],
 )
 
-# Snapshot decode: the envelope, the closed vocabularies, and every refusal.
 rust_test(
     name = "port-engine-frontend-go-decode",
     srcs = glob(["tests/decode.rs"]),

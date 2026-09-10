@@ -11,9 +11,8 @@ use shared_resource_provider_contract_kernel::{
 use super::fixture::ReferenceFixture;
 use super::support::{Document, ReferenceProvider};
 
-/// Returns an AIP-151 operation but refuses the durable ledger lookup. This
-/// catches providers that put operation-looking metadata in the response while
-/// skipping the operation-ledger write-before-ack contract.
+/// Catches providers that put operation-looking metadata in the response
+/// while skipping the operation-ledger write-before-ack contract.
 #[derive(Debug, Default)]
 struct MissingOperationLedgerProvider(ReferenceProvider);
 
@@ -104,9 +103,6 @@ async fn harness_catches_missing_operation_ledger_row() {
     );
 }
 
-/// Returns the same operation name on delete replay but mutates the operation
-/// response metadata, proving the ledger check rejects a response that no
-/// longer snapshots the durable ledger row.
 #[derive(Debug, Default)]
 struct MismatchedReplayOperationProvider {
     inner: ReferenceProvider,

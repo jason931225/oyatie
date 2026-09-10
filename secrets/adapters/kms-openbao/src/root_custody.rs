@@ -1,5 +1,4 @@
-//! Transitional sealing-root custody via OpenBao (ADR-0510; story G002,
-//! dogfood bootstrap step 1 per ADR-0537).
+//! Transitional sealing-root custody via OpenBao.
 //!
 //! Custody design: OpenBao GENERATES and custodies the per-cell sealing root
 //! as an exportable transit key — ceremony tooling never passes key material
@@ -9,10 +8,7 @@
 //!
 //! Like the sibling transit adapter, this module builds provider request
 //! SHAPES and parses provider material strictly — it performs no network
-//! I/O. The transport lands with the enclave service binary sub-slice.
-//!
-//! At W5 cutover the owned HSM-backed root replaces this custodian behind
-//! the same `EnclaveRoot` ingress; nothing here leaks into the kernel.
+//! I/O.
 
 use std::fmt;
 
@@ -37,19 +33,11 @@ fn import_root_key<E>(
     result
 }
 
-/// Errors from root-custody command building and material ingestion.
 #[derive(Debug)]
 pub enum RootCustodyError {
-    /// Adapter configuration was rejected.
     Config(OpenBaoKmsAdapterConfigError),
-    /// The exported material is not valid standard base64.
     MaterialNotBase64,
-    /// The exported material does not decode to exactly 32 bytes.
-    MaterialWrongLength {
-        /// Decoded length actually seen.
-        got: usize,
-    },
-    /// The enclave kernel refused the material (mlock failure, etc.).
+    MaterialWrongLength { got: usize },
     Enclave(EnclaveError),
 }
 
@@ -79,28 +67,26 @@ impl From<EnclaveError> for RootCustodyError {
     }
 }
 
-/// A custody command shape against OpenBao (no I/O performed here).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OpenBaoCustodyCommand {
-    pub method: &'static str,       // data_class: PUBLIC
-    pub path: String,               // data_class: INTERNAL_ONLY
-    pub namespace: Option<String>,  // data_class: INTERNAL_ONLY
-    pub body_canonical: String,     // data_class: INTERNAL_ONLY
-    pub audit_evidence_ref: String, // data_class: INTERNAL_ONLY
+    pub method: &'static str,
+    pub path: String,
+    pub namespace: Option<String>,
+    pub body_canonical: String,
+    pub audit_evidence_ref: String,
 }
 
 /// Builder for sealing-root custody commands against one OpenBao transit
 /// mount + key. One custodian per cell sealing root.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OpenBaoRootCustody {
-    endpoint_origin: String,   // data_class: INTERNAL_ONLY
-    transit_mount: String,     // data_class: INTERNAL_ONLY
-    key_name: String,          // data_class: INTERNAL_ONLY
-    namespace: Option<String>, // data_class: INTERNAL_ONLY
+    endpoint_origin: String,
+    transit_mount: String,
+    key_name: String,
+    namespace: Option<String>,
 }
 
 impl OpenBaoRootCustody {
-    /// Construct a custody builder; rejects malformed endpoint/mount/key.
     pub fn new(
         endpoint_origin: impl Into<String>,
         transit_mount: impl Into<String>,
@@ -125,7 +111,6 @@ impl OpenBaoRootCustody {
         })
     }
 
-    /// Scope commands to an OpenBao namespace.
     pub fn with_namespace(
         mut self,
         namespace: impl Into<String>,
@@ -177,12 +162,6 @@ impl OpenBaoRootCustody {
     /// Ingest exported root material through the enclave one-way door. The
     /// base64 input and every intermediate buffer are zeroized; on success
     /// the only holder of the root is the returned [`EnclaveRoot`].
-    ///
-    /// Returns the root TOGETHER with its typed [`RootProvenance`] — always
-    /// [`RootProvenance::OpenBaoTransitionalSingleCustodian`] from this
-    /// custodian (single custodian + full-root export; defers the ADR-0537
-    /// step-0 Shamir quorum ceremony, see the provenance type for the risk
-    /// statement and W5 target). Boot paths log/gate on the provenance.
     pub fn ingest_exported_root(
         &self,
         root_id: SealingRootId,

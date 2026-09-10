@@ -4,15 +4,12 @@ use std::fmt;
 
 use super::{ProviderFamily, SecretReference, base64url_no_pad, sha256};
 
-/// data_class: INTERNAL_ONLY — PKCE verifier (high-entropy random secret).
-/// Held in this type while the flow is in flight; runtime adapter zeroizes
-/// on drop via `secrecy` (adapter-layer concern).
+/// data_class: INTERNAL_ONLY — high-entropy secret. Held in plain `String`
+/// and not zeroized on drop, so a copy can outlive the flow.
 #[derive(Clone, Eq, PartialEq)]
 pub struct PkceVerifier(String);
 
 impl PkceVerifier {
-    /// Construct from a pre-generated verifier string. Verifier must be
-    /// 43..=128 chars of `[A-Za-z0-9\-._~]` per RFC 7636.
     pub fn new(raw: String) -> Result<Self, OAuthError> {
         if raw.len() < 43 || raw.len() > 128 {
             return Err(OAuthError::InvalidVerifierLength);
@@ -44,8 +41,6 @@ fn is_unreserved(c: char) -> bool {
 pub struct PkceChallenge(String);
 
 impl PkceChallenge {
-    /// Derive challenge from verifier using SHA-256 — pure, allocation-free
-    /// implementation suitable for kernel layer. base64url-no-pad encoding.
     pub fn derive_s256(verifier: &PkceVerifier) -> Self {
         let digest = sha256(verifier.as_str().as_bytes());
         let encoded = base64url_no_pad(&digest);
@@ -57,7 +52,7 @@ impl PkceChallenge {
     }
 }
 
-/// data_class: INTERNAL_ONLY — flow modality.
+// data_class: INTERNAL_ONLY
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FlowKind {
     AnthropicSubscriptionOAuth,
@@ -75,13 +70,10 @@ impl FlowKind {
     }
 }
 
-/// Loopback redirect descriptor. Mirrors ccproxy-api `oauth_claude` default
-/// (port 35593, `/callback`). The runtime adapter binds the listener.
+/// Describes the loopback only; the runtime adapter binds the listener.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OAuthLoopbackServer {
-    // data_class: INTERNAL_ONLY
-    pub port: u16, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
+    pub port: u16,             // data_class: INTERNAL_ONLY
     pub callback_path: String, // data_class: INTERNAL_ONLY
 }
 
@@ -101,7 +93,6 @@ impl OAuthLoopbackServer {
     }
 }
 
-/// Per-flow PKCE state + endpoint metadata.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SubscriptionOAuthFlow {
     pub flow_kind: FlowKind,            // data_class: INTERNAL_ONLY
@@ -114,33 +105,23 @@ pub struct SubscriptionOAuthFlow {
     pub state_nonce: String,            // data_class: INTERNAL_ONLY
 }
 
-/// data_class: INTERNAL_ONLY
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SubscriptionTokenCaptureRequest {
-    // data_class: INTERNAL_ONLY
-    pub flow_kind: FlowKind, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub provider: ProviderFamily, // data_class: INTERNAL_ONLY
-    pub verifier: PkceVerifier,   // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub state_nonce: String, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
+    pub flow_kind: FlowKind,           // data_class: INTERNAL_ONLY
+    pub provider: ProviderFamily,      // data_class: INTERNAL_ONLY
+    pub verifier: PkceVerifier,        // data_class: INTERNAL_ONLY
+    pub state_nonce: String,           // data_class: INTERNAL_ONLY
     pub loopback: OAuthLoopbackServer, // data_class: INTERNAL_ONLY
 }
 
-/// data_class: INTERNAL_ONLY — payload returned after a successful capture.
-/// Carries only the `SecretReference`; raw token bytes never travel through
-/// this struct.
+/// There is no raw-token field, so a raw token cannot travel in a capture
+/// response.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SubscriptionTokenCaptureResponse {
-    // data_class: INTERNAL_ONLY
-    pub sref: SecretReference, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub flow_kind: FlowKind, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
+    pub sref: SecretReference,    // data_class: INTERNAL_ONLY
+    pub flow_kind: FlowKind,      // data_class: INTERNAL_ONLY
     pub provider: ProviderFamily, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub captured_unix_secs: u64, // data_class: INTERNAL_ONLY
+    pub captured_unix_secs: u64,  // data_class: INTERNAL_ONLY
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

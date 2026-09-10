@@ -1,11 +1,7 @@
-//! Query-engine tests: part 6.
-
 use super::support::*;
 
-/// Tenant isolation: inbound links from a different tenant are never returned.
-/// This is structurally enforced because upsert_link validates both endpoints
-/// exist in the same-tenant ObjectGraph. This test confirms the BFS inbound
-/// scan only returns same-tenant predecessors.
+/// Structurally enforced: `upsert_link` validates both endpoints exist in
+/// the same-tenant `ObjectGraph`.
 #[test]
 fn inbound_tenant_isolation() {
     let mut g = ObjectGraph::default();
@@ -81,10 +77,7 @@ fn inbound_tenant_isolation() {
     );
 }
 
-/// Cyclic inbound graph does not cause unbounded revisit.
 /// Graph (forming a cycle): ent_a -> ent_b -> ent_c -> ent_a
-/// Inbound from ent_a: should visit ent_c (direct predecessor), then ent_b,
-/// then back to ent_a (already seen), stopping. No infinite loop.
 #[test]
 fn inbound_cycle_no_unbounded_revisit() {
     let mut g = ObjectGraph::default();

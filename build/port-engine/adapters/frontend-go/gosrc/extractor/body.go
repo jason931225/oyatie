@@ -10,18 +10,9 @@ import (
 // The body walk is deliberately SMALL and deliberately COMPLETE. Small, because only a few forms
 // have a translation the engine can defend today. Complete, because everything else is still
 // recorded — as an `unsupported` node naming the Go AST type it stands for — rather than dropped.
-// A dropped construct would make an untranslatable function indistinguishable from an empty one.
-
-// ---------------------------------------------------------------------------------
-// Bodies
-// ---------------------------------------------------------------------------------
-//
-// The body walk is deliberately SMALL and deliberately COMPLETE. Small, because only a few
-// statement and expression forms have a translation the engine can defend today. Complete,
-// because everything else is still recorded — as an `unsupported` node naming the Go AST
-// type it stands for — rather than dropped. A dropped construct would make an
-// untranslatable function indistinguishable from an empty one, and the engine would emit a
-// green, silently wrong body. Recorded, it becomes a refusal the transform can name.
+// A dropped construct would make an untranslatable function indistinguishable from an empty one,
+// and the engine would emit a green, silently wrong body. Recorded, it becomes a refusal the
+// transform can name.
 
 func bodyNode(block *ast.BlockStmt, ctx *extractCtx) node {
 	return node{Kind: kindBody, Children: statementNodes(block.List, ctx)}

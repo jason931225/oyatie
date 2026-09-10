@@ -1,4 +1,4 @@
-//! Suite check (f): the write path against the REAL durable adapter —
+//! The write path against the REAL durable adapter —
 //! kill the process's handle, reopen the file, refold the replay, and
 //! the projection is identical, poisons included.
 
@@ -13,7 +13,10 @@ use data_ontology_kernel::{
 use foundry_edits::{EditSet, OntologyEdit, WireDataClass, WireProperty, WireTier, WireValue};
 use foundry_records_draft::{ActionEnvelope, RecordsLog, SealedEnvelope};
 use foundry_records_sqlite_draft::SqliteRecordsLog;
-use foundry_spine::{ActionSubmission, ProjectionState, apply_sealed, fold_from_scratch, submit};
+use foundry_spine::{
+    ActionSubmission, ApplyOutcome, PoisonReason, ProjectionState, apply_sealed, fold_from_scratch,
+    submit,
+};
 
 fn internal() -> PrivacyDataClass {
     PrivacyDataClass::try_from(DataClass::InternalOnly).unwrap()
@@ -201,5 +204,52 @@ fn kill_reopen_refold_is_byte_identical() {
     let refolded = fold_from_scratch("ten_test", &registry, &replayed);
     assert_eq!(refolded, live, "refold after reopen is byte-identical");
     assert_eq!(refolded.poison.len(), 1);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn a_fold_that_poisoned_never_reports_applied() {
+    let registry = registry();
+    let path = scratch_db("raced-append");
+    let mut log = SqliteRecordsLog::open(&path).unwrap();
+    let mut denials = MemoryDenials::default();
+    let mut projection = ProjectionState::new("ten_test", &registry);
+
+    // The log races ahead of the projection: this entry is appended around
+    // the writer and never folded, so the advisory dry run still probes
+    // ordinal 1 while the real append lands at 2.
+    let raced = ActionEnvelope::new(
+        "ten_test",
+        "ent_r9",
+        "aty_calibrate",
+        "idem_raced",
+        1,
+        vec![0xFF],
+        1_700_000_000_000,
+    )
+    .unwrap();
+    log.append(raced).unwrap();
+
+    let outcome = submit(
+        submission("ent_r1", "idem_1", "Ada"),
+        &mut log,
+        &mut denials,
+        &mut projection,
+    )
+    .expect("the append succeeds; the authoritative fold is what refuses");
+    match outcome {
+        ApplyOutcome::Poisoned { receipt, reason } => {
+            assert!(!receipt.deduplicated);
+            assert_eq!(receipt.ordinal, 2);
+            assert_eq!(
+                reason,
+                PoisonReason::NonDenseOrdinal {
+                    expected: 1,
+                    found: 2
+                }
+            );
+        }
+        other => panic!("a poisoned fold must never report success: {other:?}"),
+    }
     let _ = std::fs::remove_file(&path);
 }

@@ -1,51 +1,22 @@
-//! Registry-view helper — partitions capability entries into discoverable and
-//! invocable subsets using the [`CapabilityStatus`] predicates.
-//!
-//! No I/O, no async, std-only.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Partitions capability entries into their discoverable and invocable
+//! subsets.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use std::collections::BTreeMap;
 
 use crate::{CapabilityId, CapabilityStatus};
 
-/// The result of partitioning a capability collection into its observable
-/// subsets.
-///
-/// Both maps use [`BTreeMap`] so iteration order is deterministic (lexicographic
-/// on [`CapabilityId`], which derives [`Ord`]).
+/// A capability can land in both maps, one, or neither.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegistryViews {
-    /// Capabilities visible to MCP discovery endpoints
-    /// (i.e. [`CapabilityStatus::is_discoverable`] is `true`).
     pub discoverable: BTreeMap<CapabilityId, CapabilityStatus>,
-    /// Capabilities that may be invoked by an authorised principal
-    /// (i.e. [`CapabilityStatus::is_invocable`] is `true`).
     pub invocable: BTreeMap<CapabilityId, CapabilityStatus>,
 }
 
-/// Partition an iterator of `(CapabilityId, CapabilityStatus)` pairs into
-/// [`RegistryViews`].
-///
-/// Each entry is tested against [`CapabilityStatus::is_discoverable`] and
-/// [`CapabilityStatus::is_invocable`]; an entry may appear in both maps, one,
-/// or neither.
-///
-/// # Duplicate IDs
-///
-/// When the same [`CapabilityId`] appears more than once, the **last** entry
-/// wins (consistent with [`BTreeMap::insert`] semantics applied after
-/// deduplication).
-///
-/// # Ordering
-///
-/// Both output maps are [`BTreeMap`]-backed, giving lexicographic ordering on
-/// [`CapabilityId`] regardless of input order.
+/// A repeated [`CapabilityId`] resolves to its last entry, silently.
 pub fn partition_views(
     entries: impl IntoIterator<Item = (CapabilityId, CapabilityStatus)>,
 ) -> RegistryViews {
-    // Deduplicate first: last-writer-wins on duplicate IDs.
     let deduped: BTreeMap<CapabilityId, CapabilityStatus> = entries.into_iter().collect();
 
     let mut discoverable = BTreeMap::new();
@@ -118,11 +89,9 @@ mod tests {
         ];
         let views = partition_views(entries);
 
-        // discoverable: Active only
         assert_eq!(views.discoverable.len(), 1);
         assert!(views.discoverable.contains_key(&id("cap.active")));
 
-        // invocable: Active + Deprecated
         assert_eq!(views.invocable.len(), 2);
         assert!(views.invocable.contains_key(&id("cap.active")));
         assert!(views.invocable.contains_key(&id("cap.deprecated")));

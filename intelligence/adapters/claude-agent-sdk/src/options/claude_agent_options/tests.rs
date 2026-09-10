@@ -1,6 +1,5 @@
 use crate::options::*;
 use crate::session_store::SessionStoreFlushMode;
-use serde_json::Map;
 use serde_json::Value;
 use std::path::PathBuf;
 

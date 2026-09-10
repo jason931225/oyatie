@@ -1,13 +1,7 @@
-//! Adapter closure-proof + reconcile-actuation tests (G002 slice-1b-iii-c).
-//!
-//! The CRITICAL test is `produced_secret_leaf_verifies_against_produced_ca`: it
-//! proves the Secret material the operator mints is INTERNALLY CONSISTENT in the
-//! exact way the PDP consumer's verify path requires — the `tls.crt` leaf's REAL
-//! ECDSA signature verifies under the REAL SubjectPublicKeyInfo extracted from the
-//! produced `ca.crt`. This is the same SPKI-anchored real-signature check
-//! `MtlsContext::from_path` + `TrustBundle::trusted_ca_spki_ders` perform; the
-//! cross-crate keystone (a real rustls handshake) lives in
-//! iam/facade/pdp-app/tests/main_boot_closure.rs.
+//! Proves the Secret material the operator mints is internally consistent the
+//! way the PDP consumer's verify path requires: the leaf's real signature must
+//! verify under the SPKI of the CA produced alongside it. A real rustls
+//! handshake over the same material lives in `pdp-app/tests/main_boot_closure`.
 
 use iam_identity_workload_svid_operator_k8s::{
     CA_CRT_KEY, SvidIssuanceBackend, SvidSecretMaterial, TLS_CRT_KEY, TLS_KEY_KEY, TLS_SECRET_TYPE,
@@ -52,7 +46,6 @@ fn backend() -> TrustdEcdsaIssuanceBackend {
     .expect("CA bootstrap")
 }
 
-/// Extract the single CERTIFICATE block DER from a PEM string.
 fn first_cert_der(pem: &str) -> Vec<u8> {
     for block in Pem::iter_from_buffer(pem.as_bytes()) {
         let block = block.expect("PEM parse");
@@ -67,18 +60,16 @@ fn first_cert_der(pem: &str) -> Vec<u8> {
 fn mint_produces_tls_crt_key_ca_crt_in_consumer_pem_shape() {
     let mut be = backend();
     let material = be.mint(&desired(), 2_000).expect("mint");
-    // The three PEM members are present and well-labeled (the from_path contract).
+    // Names and labels are the `from_path` contract; the consumer looks them
+    // up by exactly these keys.
     assert!(material.tls_crt_pem.contains("-----BEGIN CERTIFICATE-----"));
     assert!(material.tls_key_pem.contains("-----BEGIN PRIVATE KEY-----"));
     assert!(material.ca_crt_pem.contains("-----BEGIN CERTIFICATE-----"));
-    // The leaf is valid for ttl_secs from issuance.
     assert_eq!(material.leaf_not_after_epoch_seconds, 2_000 + 3_600);
 }
 
-/// THE CLOSURE PROOF: the produced `tls.crt` leaf's REAL signature verifies under
-/// the REAL SPKI extracted from the produced `ca.crt` — the exact anchor check the
-/// PDP consumer's verify path performs. A husk (mismatched/empty material) fails
-/// here.
+/// Mismatched or empty material passes every shape check and fails only here,
+/// which is why this asserts on the signature rather than on the bytes.
 #[test]
 fn produced_secret_leaf_verifies_against_produced_ca() {
     let mut be = backend();
@@ -87,19 +78,17 @@ fn produced_secret_leaf_verifies_against_produced_ca() {
     let leaf_der = first_cert_der(&material.tls_crt_pem);
     let ca_der = first_cert_der(&material.ca_crt_pem);
 
-    // The real CA SubjectPublicKeyInfo DER — the value the rustls verify path
-    // consults (mirrors MtlsContext::from_path::ca_anchor_from_der).
+    // The SPKI, not the whole cert: this is the value the rustls verify path
+    // actually anchors against.
     let (_rest, ca_cert) = X509Certificate::from_der(&ca_der).expect("CA DER parse");
     let ca_spki = ca_cert.public_key().raw.to_vec();
 
-    // The leaf's REAL signature must verify under the CA SPKI.
     let (_lrest, leaf) = X509Certificate::from_der(&leaf_der).expect("leaf DER parse");
     let (_srest, spki) =
         x509_parser::x509::SubjectPublicKeyInfo::from_der(&ca_spki).expect("SPKI parse");
     leaf.verify_signature(Some(&spki))
         .expect("produced leaf must verify under the produced CA (closure proof)");
 
-    // The leaf carries the platform SVID URI SAN (the PDP server identity).
     let san = leaf
         .subject_alternative_name()
         .expect("SAN ext")
@@ -114,8 +103,8 @@ fn produced_secret_leaf_verifies_against_produced_ca() {
     );
 }
 
-/// A leaf forged from a DIFFERENT CA must NOT verify under this Secret's `ca.crt`
-/// (negative control on the closure proof — proves the check is real, not a tautology).
+/// The negative control: without it the proof above would pass even if the
+/// verification always returned success.
 #[test]
 fn leaf_from_a_different_ca_does_not_verify_against_this_ca() {
     let mut be_a = backend();
@@ -157,7 +146,6 @@ fn secret_manifest_is_kubernetes_io_tls_with_three_data_members() {
     assert_eq!(manifest["type"], TLS_SECRET_TYPE);
     assert_eq!(manifest["metadata"]["name"], "cloud-iam-pdp-svid");
     assert_eq!(manifest["metadata"]["namespace"], "iam");
-    // base64 of the three PEM members under the standard keys.
     use base64::Engine as _;
     let b64 = |s: &str| base64::engine::general_purpose::STANDARD.encode(s.as_bytes());
     assert_eq!(manifest["data"][TLS_CRT_KEY], b64("crt"));
@@ -170,7 +158,6 @@ fn reconcile_once_issues_on_cold_start_and_noops_when_fresh() {
     let want = desired();
     let mut be = backend();
 
-    // Cold start → Issue + produce material.
     let (report, material) = run_reconcile_once(
         &ObservedState::absent(),
         &want,
@@ -182,7 +169,6 @@ fn reconcile_once_issues_on_cold_start_and_noops_when_fresh() {
     assert!(report.mutated);
     let material = material.expect("issue produces material");
 
-    // Observe the produced leaf; re-reconcile at the same instant → Noop.
     let observed = ObservedState {
         secret: Some(observed_secret_from_leaf_pem(&material.tls_crt_pem).expect("project")),
     };
@@ -198,7 +184,7 @@ fn reconcile_once_issues_on_cold_start_and_noops_when_fresh() {
 fn reconcile_once_rotates_when_within_window() {
     let want = desired();
     let mut be = backend();
-    // A leaf expiring at 2_500; now=2_000 → 500s remaining ≤ 600s window ⇒ Rotate.
+    // 500s of remaining lifetime, inside the 600s rotation window.
     let observed = ObservedState::present(2_500);
     let (report, material) =
         run_reconcile_once(&observed, &want, &mut be, &FixedClock { now: 2_000 })

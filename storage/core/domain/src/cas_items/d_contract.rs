@@ -1,17 +1,15 @@
-/// Stored CAS object metadata.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CasObjectRecord {
-    pub address: TenantScopedBlake3Address, // data_class: INTERNAL_ONLY
-    pub size_bytes: u64,                    // data_class: INTERNAL_ONLY
-    pub kms_boundary: TenantKekBoundary,    // data_class: INTERNAL_ONLY
-    pub worm_policy: CasWormPolicy,         // data_class: INTERNAL_ONLY
-    pub audit_anchor: CasAuditAnchor,       // data_class: INTERNAL_ONLY
-    pub durability: CasDurabilityPolicy,    // data_class: PUBLIC
-    pub user_metadata: BTreeMap<String, String>, // data_class: INTERNAL_ONLY
-    pub stored_at_epoch_seconds: u64,       // data_class: INTERNAL_ONLY
+    pub address: TenantScopedBlake3Address,
+    pub size_bytes: u64,
+    pub kms_boundary: TenantKekBoundary,
+    pub worm_policy: CasWormPolicy,
+    pub audit_anchor: CasAuditAnchor,
+    pub durability: CasDurabilityPolicy,
+    pub user_metadata: BTreeMap<String, String>,
+    pub stored_at_epoch_seconds: u64,
 }
 
-/// Errors emitted by the object-store kernel.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ObjectStoreError {
     InvalidTenantId,
@@ -103,17 +101,9 @@ impl fmt::Display for ObjectStoreError {
 
 impl std::error::Error for ObjectStoreError {}
 
-// =====================================================================
-// Trait
-// =====================================================================
-
-/// Owned object-store/CAS compatibility seam; P1 freezes the sold facade.
-///
-/// Every implementation — transitional adapters and the future owned object
-/// store — implements this trait. The trait shape is the destination CAS
-/// contract, not a vendor bucket/key API mirror. A successful `put_cas` MUST
-/// make the address immediately visible to `head_cas` and `get_cas`; adapters
-/// prove that invariant through `run_object_store_conformance_suite`.
+/// A successful `put_cas` MUST make the address immediately visible to
+/// `head_cas` and `get_cas`; adapters prove that invariant through
+/// `run_object_store_conformance_suite`.
 pub trait ObjectStore: Send + Sync {
     fn put_cas(
         &self,
@@ -132,8 +122,8 @@ pub trait ObjectStore: Send + Sync {
     fn delete_cas(&self, request: CasDeleteRequest) -> Result<(), ObjectStoreError>;
 }
 
-/// Optional diagnostics for adapter evidence. Application code depends on
-/// `ObjectStore`; transitional adapter receipts stay on this separate plane.
+/// Application code depends on `ObjectStore`; transitional adapter receipts
+/// stay on this separate plane.
 pub trait ObjectStoreDiagnostics {
     fn backend_kind(&self) -> ObjectStoreBackendKind;
 
@@ -145,14 +135,9 @@ pub trait ObjectStoreDiagnostics {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObjectStoreConformanceReport {
-    pub checks: Vec<&'static str>, // data_class: PUBLIC
+    pub checks: Vec<&'static str>,
 }
 
-/// Reusable conformance suite for adapter crates. It intentionally exercises
-/// only the stable CAS contract: tenant-scoped addressing, immediate
-/// read-after-write visibility, cross-tenant denial, WORM delete refusal, and
-/// same-payload cross-tenant isolation.
-///
 /// # Errors
 /// Returns the first failed object-store operation or a `BackendUnavailable`
 /// detail when an adapter violates a post-condition.

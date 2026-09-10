@@ -4,15 +4,15 @@ use crate::error::OntologyEngineError;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct EntityTypeId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct LinkTypeId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ActionTypeId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum LinkCardinality {

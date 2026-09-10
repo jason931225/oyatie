@@ -4,8 +4,6 @@
 
 use super::support::*;
 
-/// Two disconnected stars, one query: both components are reached when
-/// their centers are both roots.
 #[test]
 fn additional_roots_expand_disconnected_components() {
     let mut graph = ObjectGraph::default();
@@ -57,8 +55,6 @@ fn additional_roots_expand_disconnected_components() {
     assert_eq!(response.edges.len(), 2);
 }
 
-/// An additional root that does not exist fails closed, same as the
-/// primary; an invalid id shape is rejected at the request boundary.
 #[test]
 fn additional_roots_fail_closed() {
     let mut graph = ObjectGraph::default();
@@ -102,8 +98,6 @@ fn additional_roots_fail_closed() {
     );
 }
 
-/// A duplicate root (repeated, or equal to the primary) is deduplicated —
-/// nodes appear once.
 #[test]
 fn duplicate_roots_deduplicated() {
     let mut graph = ObjectGraph::default();

@@ -14,10 +14,6 @@ fn mandatory_item_cleared_without_evidence_returns_error() {
     assert_eq!(err, HrDomainError::OnboardingItemNotCleared);
 }
 
-// ---------------------------------------------------------------------------
-// [st3] Test: empty checklist → OnboardingItemsRequired error
-// ---------------------------------------------------------------------------
-
 #[test]
 fn empty_checklist_returns_onboarding_items_required_error() {
     let input = OnboardingReadinessInput {
@@ -33,10 +29,6 @@ fn empty_checklist_returns_onboarding_items_required_error() {
 
     assert_eq!(err, HrDomainError::OnboardingItemsRequired);
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: duplicate checklist item kinds → DuplicateOnboardingItem error
-// ---------------------------------------------------------------------------
 
 #[test]
 fn duplicate_checklist_item_kinds_returns_error() {
@@ -55,10 +47,6 @@ fn duplicate_checklist_item_kinds_returns_error() {
     assert_eq!(err, HrDomainError::DuplicateOnboardingItem);
 }
 
-// ---------------------------------------------------------------------------
-// [st3] Test: invalid employee_id → InvalidEmployeeId error
-// ---------------------------------------------------------------------------
-
 #[test]
 fn invalid_employee_id_returns_invalid_employee_id_error() {
     let input = OnboardingReadinessInput {
@@ -71,10 +59,6 @@ fn invalid_employee_id_returns_invalid_employee_id_error() {
 
     assert_eq!(err, HrDomainError::InvalidEmployeeId);
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: invalid tenant_id → InvalidTenantId error
-// ---------------------------------------------------------------------------
 
 #[test]
 fn invalid_tenant_id_returns_invalid_tenant_id_error() {
@@ -89,10 +73,6 @@ fn invalid_tenant_id_returns_invalid_tenant_id_error() {
     assert_eq!(err, HrDomainError::InvalidTenantId);
 }
 
-// ---------------------------------------------------------------------------
-// [st3] Test: invalid legal_entity_id → InvalidLegalEntityId error
-// ---------------------------------------------------------------------------
-
 #[test]
 fn invalid_legal_entity_id_returns_invalid_legal_entity_id_error() {
     let input = OnboardingReadinessInput {
@@ -105,12 +85,6 @@ fn invalid_legal_entity_id_returns_invalid_legal_entity_id_error() {
 
     assert_eq!(err, HrDomainError::InvalidLegalEntityId);
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: only optional items present (no mandatory items) → READY
-//            Optional items do not block the transition; an input with zero
-//            mandatory items but non-empty checklist is allowed to be READY.
-// ---------------------------------------------------------------------------
 
 #[test]
 fn invalid_evidence_ref_on_cleared_mandatory_item_returns_error() {
@@ -128,10 +102,6 @@ fn invalid_evidence_ref_on_cleared_mandatory_item_returns_error() {
 
     assert_eq!(err, HrDomainError::InvalidAuditEvidenceRef);
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: multiple uncleared mandatory items → NOT_READY lists all blockers
-// ---------------------------------------------------------------------------
 
 #[test]
 fn zero_evaluated_at_returns_invalid_evaluated_at_error() {

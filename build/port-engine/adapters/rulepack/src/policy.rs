@@ -1,8 +1,4 @@
 //! Validating the pack's POLICY: what it defers, and how a trait binds its receiver.
-//!
-//! Both are DECISIONS rather than facts recovered from the source, so both must carry a reason.
-//! A decision without one is a guess wearing a label, and the reason is what travels in the pack
-//! digest and therefore into the receipt.
 
 use std::collections::BTreeSet;
 
@@ -13,9 +9,8 @@ use crate::rule::{DeferredKind, DispositionRule, LoadedRule, TraitReceiver};
 
 /// Convert and check the ownership rules.
 ///
-/// A reason is required for the same reason it is on a deferral: this is a decision with a cost
-/// either way, and the reason is what makes the cost reviewable. An id must be unique, because a
-/// decision cites it and two rules answering to one name make a citation ambiguous.
+/// An id must be unique, because a decision cites it and two rules answering to one name make a
+/// citation ambiguous.
 ///
 /// # Errors
 /// [`RulepackError::Schema`] on a missing id, target or reason, and
@@ -76,8 +71,6 @@ pub(crate) fn validate_policy(
                 field: "deferred_kinds[].kind",
             });
         }
-        // A deferral without a reason is an omission wearing a label. The reason is what
-        // makes it reviewable, and it is what travels in the digest.
         if deferred.reason.trim().is_empty() {
             return Err(RulepackError::Schema {
                 field: "deferred_kinds[].reason",
@@ -101,23 +94,6 @@ pub(crate) fn validate_policy(
                 field: "trait_receiver.mode",
             });
         }
-        // A decision without a reason is a guess wearing a label — and this one costs
-        // something either way, so the cost is what the reason has to name.
-        if receiver.reason.trim().is_empty() {
-            return Err(RulepackError::Schema {
-                field: "trait_receiver.reason",
-            });
-        }
-    }
-
-    if let Some(receiver) = trait_receiver {
-        if !matches!(receiver.mode.as_str(), "shared" | "exclusive" | "owned") {
-            return Err(RulepackError::Schema {
-                field: "trait_receiver.mode",
-            });
-        }
-        // A decision without a reason is a guess wearing a label — and this one costs something
-        // either way, so the cost is what the reason has to name.
         if receiver.reason.trim().is_empty() {
             return Err(RulepackError::Schema {
                 field: "trait_receiver.reason",

@@ -1,13 +1,8 @@
-//! Sub-scope registry kernel — pure hierarchy types + validators + ports.
-//!
-//! Wave 15-IMPL-truth-up scaffold; full implementation lands in IP-016 execution.
-//! Enforces cycle refusal, max depth, tenant-boundary preservation, immutable root,
-//! and namespace normalization. Persistence ports live here; adapters in IP-023.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![allow(dead_code)]
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct SubScopeId(pub String); // data_class: INTERNAL_ONLY
+pub struct SubScopeId(pub String);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SubScopeKind {
@@ -22,20 +17,20 @@ pub enum SubScopeKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SubScope {
-    pub id: SubScopeId,             // data_class: INTERNAL_ONLY
-    pub tenant_id: String,          // data_class: INTERNAL_ONLY
-    pub kind: SubScopeKind,         // data_class: INTERNAL_ONLY
-    pub parent: Option<SubScopeId>, // data_class: INTERNAL_ONLY
-    pub path: SubScopePath,         // data_class: INTERNAL_ONLY
+    pub id: SubScopeId,
+    pub tenant_id: String,
+    pub kind: SubScopeKind,
+    pub parent: Option<SubScopeId>,
+    pub path: SubScopePath,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SubScopePath(pub Vec<String>); // data_class: INTERNAL_ONLY
+pub struct SubScopePath(pub Vec<String>);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HierarchyEdge {
-    pub parent: SubScopeId, // data_class: INTERNAL_ONLY
-    pub child: SubScopeId,  // data_class: INTERNAL_ONLY
+    pub parent: SubScopeId,
+    pub child: SubScopeId,
 }
 
 pub trait SubScopeRegistryPort {

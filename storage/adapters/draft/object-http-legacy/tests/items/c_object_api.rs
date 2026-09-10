@@ -1,7 +1,3 @@
-/// `shred_proof_ref` is included in the fingerprint canonical form.  A request
-/// that changes only `shred_proof_ref` while reusing the same idempotency key
-/// must be classified as a fingerprint conflict and return
-/// `IdempotencyKeyReused`.
 #[test]
 fn shred_proof_ref_change_yields_idempotency_key_reused_conflict() {
     let mut catalog = catalog_with_active_bucket();
@@ -11,7 +7,6 @@ fn shred_proof_ref_change_yields_idempotency_key_reused_conflict() {
     put_cloud_storage_object_from_api(&mut catalog, &mut ledger, original.clone())
         .expect("first PUT without shred_proof_ref succeeds");
 
-    // Construct a drifted request: same idempotency key, shred_proof_ref added.
     let mut drifted = original;
     drifted.boundary.request_id = "req-shred-2".to_string();
     drifted.body.encryption.shred_proof_ref = Some("proof/ten_alpha/shred/001".to_string());
@@ -33,8 +28,6 @@ fn shred_proof_ref_change_yields_idempotency_key_reused_conflict() {
     );
 }
 
-/// `IdempotencyKeyReused` maps to HTTP 422 and the retained compatibility
-/// error code string `CLOUD_STORAGE_OBJECT_IDEMPOTENCY_KEY_REUSED`.
 #[test]
 fn idempotency_key_reused_error_maps_to_422_and_canonical_error_code() {
     let mut catalog = catalog_with_active_bucket();
@@ -72,9 +65,6 @@ fn idempotency_key_reused_error_maps_to_422_and_canonical_error_code() {
     assert_eq!(response.error.request_id, "req-ec-2");
 }
 
-/// `peek` returns a `CloudStorageObjectPutIdempotencyEntry` whose
-/// `idempotency_key` field exactly matches the key that was passed to `peek`.
-/// The `Replayed` variant's inner response must equal the stored PUT response.
 #[test]
 fn peek_entry_fields_match_recorded_put_response_exactly() {
     let mut catalog = catalog_with_active_bucket();
@@ -116,8 +106,6 @@ fn peek_entry_fields_match_recorded_put_response_exactly() {
     }
 }
 
-/// Multiple independent idempotency keys on the same ledger are tracked
-/// separately.  A replay on key A does not affect the state of key B.
 #[test]
 fn multiple_independent_keys_on_same_ledger_do_not_interfere() {
     let mut catalog = catalog_with_active_bucket();
@@ -149,14 +137,12 @@ fn multiple_independent_keys_on_same_ledger_do_not_interfere() {
     assert_eq!(ledger.len(), 2);
     assert_eq!(catalog.objects().count(), 2);
 
-    // Replay key-A does not change ledger size or key-B state.
     put_cloud_storage_object_from_api(&mut catalog, &mut ledger, req_a)
         .expect("key-A replay succeeds");
 
     assert_eq!(ledger.len(), 2, "replay must not create a new ledger entry");
     assert_eq!(catalog.objects().count(), 2, "catalog unchanged on replay");
 
-    // peek for key-B is still independently accessible.
     let b_entry = ledger
         .peek(
             "ten_alpha",

@@ -35,3 +35,14 @@ rust_test(
         ":port-engine-toolchain",
     ],
 )
+
+rust_test(
+    name = "port-engine-toolchain-corpus-mirrors-live-toolchain",
+    srcs = glob(["tests/corpus_mirrors_live_toolchain.rs"]),
+    crate = "port_engine_toolchain_corpus_mirrors_live_toolchain",
+    crate_root = "tests/corpus_mirrors_live_toolchain.rs",
+    visibility = ["PUBLIC"],
+    deps = [
+        ":port-engine-toolchain",
+    ],
+)

@@ -1,33 +1,24 @@
-//! # port-engine-hash — receipt digest computation (W0-B Slice 7).
-//!
-//! ADR-0637 D1: the kernel COMPARES digests and never computes them. This adapter owns hashing so
-//! receipt axes (`snapshot_digest`, `engine_digest`, `rulepack_digest`, …) can carry real content
-//! identities rather than prose stubs. Algorithm: SHA-256, spelled `sha256:<lowercase-hex>`.
+//! # port-engine-hash — receipt digest computation.
 #![forbid(unsafe_code)]
 
-/// This crate's own sources, for the engine-identity axis assembled by the facade.
 mod sources;
 pub use sources::CRATE_SOURCES;
 
 use port_engine_api::Digest;
 use sha2::{Digest as Sha2Digest, Sha256};
 
-/// Fail-closed readiness gate. `true` once Slice 7 hashing is present.
 pub const fn w0_ready() -> bool {
     true
 }
 
-/// Digest algorithm label embedded in every produced [`Digest`].
 pub const ALGORITHM: &str = "sha256";
 
-/// Hash `bytes` into a [`Digest`] with a stable `sha256:<hex>` spelling.
 #[must_use]
 pub fn digest_bytes(bytes: &[u8]) -> Digest {
     let hash = Sha256::digest(bytes);
     Digest(format!("{ALGORITHM}:{}", hex_lower(hash.as_ref())))
 }
 
-/// Hash UTF-8 `text` (convenience for rulepack / pin strings).
 #[must_use]
 pub fn digest_str(text: &str) -> Digest {
     digest_bytes(text.as_bytes())
@@ -54,7 +45,6 @@ mod tests {
 
     #[test]
     fn empty_input_has_known_sha256() {
-        // FIPS 180-4 empty-message digest (public constant).
         let d = digest_bytes(b"");
         assert_eq!(
             d.0,

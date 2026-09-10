@@ -101,16 +101,7 @@ fn create_repository_error(
     }
 }
 
-/// Stable planned entrypoint for `cloud.compute.k8s.cluster.create`.
-///
-/// The implementation delegates to the explicit API-boundary function so the
-/// plan symbol remains stable without adding a second validation path.
-pub async fn create_cluster(
-    repository: &impl CloudComputeK8sLifecycleRepository,
-    request: CloudComputeK8sClusterCreateApiRequest,
-) -> Result<CloudComputeK8sClusterCreateSuccessResponse, CloudComputeK8sApiError> {
-    create_cloud_compute_k8s_cluster_from_api(repository, request).await
-}
+pub use crate::create_cloud_compute_k8s_cluster_from_api as create_cluster;
 
 pub async fn create_cluster_with_authorization_verifier(
     repository: &impl CloudComputeK8sLifecycleRepository,

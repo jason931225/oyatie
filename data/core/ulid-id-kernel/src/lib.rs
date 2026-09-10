@@ -1,18 +1,5 @@
-//! ULID id-generator kernel — extends ADR-0053 with a canonical
-//! cross-µservice ULID surface.
-//!
-//! # Context
-//!
-//! Every event id, message id, outbox id, job id, request id across
-//! the 33 µservices uses ULIDs (lexicographically sortable, 128-bit,
-//! Crockford-base32). KSUID and Snowflake are explicitly REJECTED in
-//! favor of ULID because ULID is millisecond-sortable with full random
-//! entropy and has no central allocator.
-//!
-//! # Naming justification
-//!
-//! `shared-ulid-id-kernel` follows BNF v4.1:
-//! `oya-<axis:shared>-<topic:ulid-id>-<layer:kernel>`.
+//! The canonical ULID surface: lexicographically sortable, 128-bit,
+//! Crockford-base32 identifiers with no central allocator.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
@@ -30,25 +17,16 @@ impl Ulid {
     /// symbols are accepted (Crockford-base32 is case-insensitive by spec).
     ///
     /// # Errors
-    /// - `IdGeneratorError::MalformedUlid` when:
-    ///   - length ≠ 26 after uppercasing, or
-    ///   - the first character is outside `'0'..='7'` (timestamp overflow guard —
-    ///     the 48-bit timestamp field uses only 3 bits of the leading base32
-    ///     symbol, so values 8–Z exceed the maximum representable timestamp), or
-    ///   - any byte is outside the Crockford-base32 alphabet.
+    /// `IdGeneratorError::MalformedUlid` when the input is not 26 symbols
+    /// after uppercasing, carries a byte outside the Crockford-base32
+    /// alphabet, or names a timestamp beyond year ~10889.
     pub fn try_new(raw: impl Into<String>) -> Result<Self, IdGeneratorError> {
         let raw = raw.into().to_ascii_uppercase();
         if raw.len() != 26 {
             return Err(IdGeneratorError::MalformedUlid(raw));
         }
-        // Timestamp overflow guard: the first character must be 0–7.
-        // A ULID packs a 48-bit timestamp into the first 10 base32 characters
-        // (50 bits total); the leading character therefore uses only 3 of its
-        // 5 bits.  Characters '8'–'Z' in position 0 imply a timestamp beyond
-        // year ~10889 and are rejected per the ULID spec.
-        match raw.as_bytes()[0] {
-            b'0'..=b'7' => {}
-            _ => return Err(IdGeneratorError::MalformedUlid(raw)),
+        if !has_representable_timestamp(&raw) {
+            return Err(IdGeneratorError::MalformedUlid(raw));
         }
         for byte in raw.as_bytes() {
             if !is_crockford_base32(*byte) {
@@ -64,6 +42,19 @@ impl Ulid {
     }
 }
 
+/// A ULID packs its 48-bit timestamp into the first 10 base32 symbols (50
+/// bits), so the leading symbol carries only 3 of its 5 bits. Anything above
+/// this names a timestamp beyond year ~10889.
+const MAX_TIMESTAMP_LEAD_SYMBOL: u8 = b'7';
+
+fn has_representable_timestamp(raw: &str) -> bool {
+    raw.as_bytes()
+        .first()
+        .is_some_and(|lead| *lead <= MAX_TIMESTAMP_LEAD_SYMBOL && lead.is_ascii_digit())
+}
+
+/// `I`, `L`, `O` and `U` are excluded from the Crockford alphabet: they read
+/// as `1`, `1`, `0` and `V`. The gaps below are deliberate.
 const fn is_crockford_base32(byte: u8) -> bool {
     matches!(
         byte,
@@ -115,8 +106,6 @@ pub struct SeededIdGenerator {
     counter: std::sync::Mutex<u64>,
 }
 
-// Mutex lock panics on thread poisoning — same severity as a panic.
-// ADR-0083 §Tier-3 permits this in reference implementations.
 #[allow(clippy::expect_used)]
 impl IdGenerator for SeededIdGenerator {
     fn new_ulid(&self) -> Result<Ulid, IdGeneratorError> {
@@ -149,7 +138,6 @@ mod tests {
 
     #[test]
     fn ulid_rejects_invalid_crockford_byte() {
-        // 'I' is excluded from Crockford-base32 (looks like 1).
         assert!(matches!(
             Ulid::try_new("01HMZ1234567890ABCDEFGHJKI"),
             Err(IdGeneratorError::MalformedUlid(_))
@@ -174,8 +162,6 @@ mod tests {
         let msg = format!("{err}");
         assert!(msg.contains("adr-0156-ulid-impl"));
     }
-
-    // --- New tests for timestamp overflow and lowercase normalisation ---
 
     #[test]
     fn ulid_rejects_timestamp_overflow() {

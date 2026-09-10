@@ -1,10 +1,6 @@
-//! Tenant RBAC application-layer envelopes.
-//!
-//! This crate prepares metadata-only operations envelopes for later runtime
-//! adapters. It does not run OpenTofu, call oya ops, open SSH sessions, persist
-//! records, emit audit-chain rows, or perform network I/O.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Prepares metadata-only Tenant RBAC envelopes for a later runtime adapter to
+//! execute. Nothing here performs IO: no persistence, no network, no process
+//! execution.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 

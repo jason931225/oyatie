@@ -1,7 +1,5 @@
 use super::common::*;
 
-/// Replayed response preserves the original request identifier. This is the
-/// deterministic-replay contract: the recorded success is returned verbatim.
 #[test]
 fn replayed_response_preserves_first_request_id_not_second_callers() {
     let mut catalog = catalog_with_active_bucket();
@@ -30,8 +28,6 @@ fn replayed_response_preserves_first_request_id_not_second_callers() {
     assert_eq!(catalog.objects().count(), 1);
 }
 
-/// Two principals in one tenant with the same idempotency key string have
-/// independent ledger entries.
 #[test]
 fn composite_key_isolates_principal_scope() {
     let mut catalog = catalog_with_active_bucket();
@@ -102,8 +98,6 @@ fn composite_key_isolates_principal_scope() {
     ));
 }
 
-/// Changing only `shred_proof_ref` while reusing an idempotency key must be a
-/// fingerprint conflict.
 #[test]
 fn shred_proof_ref_change_yields_idempotency_key_reused_conflict() {
     let mut catalog = catalog_with_active_bucket();

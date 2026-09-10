@@ -91,11 +91,12 @@ pub enum ServingPhase {
     Stopped,
 }
 
+/// `active`, `high_water` and `capacity_refusals` are all ordered as
+/// connections, requests, then submitted jobs.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServingSnapshot {
     pub limits: ServingLimits,
     pub phase: ServingPhase,
-    /// Counts are ordered as connections, requests, and submitted jobs.
     pub active: [usize; 3],
     pub high_water: [usize; 3],
     pub capacity_refusals: [u64; 3],

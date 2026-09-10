@@ -1,9 +1,6 @@
-// ADR-0083 Tier 3: integration tests assert invariants with unwrap/expect.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! Black-box allow/deny coverage for the Cedar workload authz gate, exercising
-//! the four Cedar invariants end-to-end: deny-by-default, explicit permit,
-//! forbid-wins, and the lifecycle precondition.
+//! Black-box allow/deny coverage for the Cedar workload authz gate.
 
 use iam_identity_workload_authz_cedar::{
     ActionCondition, CedarWorkloadAuthorizer, Policy, PrincipalCondition, ResourceCondition,

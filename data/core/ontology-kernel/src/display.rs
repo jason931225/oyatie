@@ -12,17 +12,14 @@ use crate::error::OntologyEngineError;
 /// `display_name` and use the rest.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DisplayMetadata {
-    pub display_name: Option<String>, // data_class: INTERNAL_ONLY
-    pub description: Option<String>,  // data_class: INTERNAL_ONLY
-    pub icon: Option<String>,         // data_class: INTERNAL_ONLY
-    pub color: Option<String>,        // data_class: INTERNAL_ONLY
-    pub plural_name: Option<String>,  // data_class: INTERNAL_ONLY
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub plural_name: Option<String>,
 }
 
 impl DisplayMetadata {
-    /// A present field must carry content: blank display strings render as
-    /// nothing while looking configured, so they are refused with the
-    /// field named.
     pub fn validate(&self) -> Result<(), OntologyEngineError> {
         for (field, value) in [
             ("display_name", &self.display_name),
@@ -43,7 +40,6 @@ impl DisplayMetadata {
     }
 }
 
-/// Validate an optional display block, treating `None` as trivially valid.
 pub(crate) fn check_display_integrity(
     display: Option<&DisplayMetadata>,
 ) -> Result<(), OntologyEngineError> {

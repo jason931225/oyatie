@@ -1,23 +1,17 @@
-/// Compatibility write-path durability mode retained until P1 freezes the
-/// canonical storage contract.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum CasWritePath {
     ChainReplication3x,
 }
 
-/// Compatibility repair/space-efficiency mode retained until P1 freezes the
-/// canonical storage contract.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum CasRepairPath {
     LrcErasureCoding,
 }
 
-/// Destination durability policy: 3x chain replication on write, then
-/// background re-encode to LRC erasure coding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CasDurabilityPolicy {
-    pub write_path: CasWritePath,   // data_class: PUBLIC
-    pub repair_path: CasRepairPath, // data_class: PUBLIC
+    pub write_path: CasWritePath,
+    pub repair_path: CasRepairPath,
 }
 
 impl Default for CasDurabilityPolicy {
@@ -55,9 +49,7 @@ impl ObjectStoreBackendKind {
     }
 }
 
-/// Destination-neutral class for a transitional object-store adapter. Concrete
-/// vendor or bridge names live in adapter-local config and evidence records, not
-/// in the stable `ObjectStore` trait shape.
+/// Destination-neutral class for a transitional object-store adapter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum TransitionalAdapterClass {
     ProtocolCompatible,
@@ -76,23 +68,16 @@ impl TransitionalAdapterClass {
     }
 }
 
-/// Receipt boundary for adapters translating the owned CAS port to a
-/// transitional object-store backend.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TransitionalAdapterBoundary {
-    pub adapter_class: TransitionalAdapterClass, // data_class: PUBLIC
-    pub adapter_id: String,                      // data_class: INTERNAL_ONLY
-    pub adapter_namespace: String,               // data_class: INTERNAL_ONLY
-    pub adapter_object_ref: String,              // data_class: INTERNAL_ONLY
-    pub adapter_evidence_ref: String,            // data_class: INTERNAL_ONLY
+    pub adapter_class: TransitionalAdapterClass,
+    pub adapter_id: String,
+    pub adapter_namespace: String,
+    pub adapter_object_ref: String,
+    pub adapter_evidence_ref: String,
 }
 
 impl TransitionalAdapterBoundary {
-    /// Build a transitional adapter boundary.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidTransitionalBoundary` when adapter
-    /// identity or adapter references are malformed.
     pub fn new(
         adapter_class: TransitionalAdapterClass,
         adapter_id: impl Into<String>,
@@ -124,13 +109,13 @@ impl TransitionalAdapterBoundary {
 }
 
 /// One payload chunk in the destination CAS write/read contract. The trait is
-/// chunk-aware so real adapters do not have to expose a vendor bucket/key API or
-/// pretend infinite-scale objects are whole-buffer values.
+/// chunk-aware so real adapters do not have to pretend infinite-scale objects
+/// are whole-buffer values.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CasPayloadChunk {
-    pub ordinal: u32,         // data_class: INTERNAL_ONLY
-    pub size_bytes: u64,      // data_class: INTERNAL_ONLY
-    pub digest: Blake3Digest, // data_class: INTERNAL_ONLY
+    pub ordinal: u32,
+    pub size_bytes: u64,
+    pub digest: Blake3Digest,
 }
 
 /// Chunked CAS payload manifest with a root BLAKE3 digest over the ordered
@@ -138,28 +123,16 @@ pub struct CasPayloadChunk {
 /// flow through `CasPayloadReader` / `CasPayloadSink`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CasPayload {
-    pub total_size_bytes: u64,        // data_class: INTERNAL_ONLY
-    pub root_digest: Blake3Digest,    // data_class: INTERNAL_ONLY
-    pub chunks: Vec<CasPayloadChunk>, // data_class: INTERNAL_ONLY
+    pub total_size_bytes: u64,
+    pub root_digest: Blake3Digest,
+    pub chunks: Vec<CasPayloadChunk>,
 }
 
 impl CasPayload {
-    /// Build a payload manifest from a single in-memory buffer. This helper is
-    /// for tests and small callers; the stable `ObjectStore` trait remains
-    /// reader/sink based.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidPayload` when payload accounting fails.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ObjectStoreError> {
         Self::from_chunks(&[bytes.to_vec()])
     }
 
-    /// Build a payload manifest from ordered chunks.
-    ///
-    /// # Errors
-    /// Returns `ObjectStoreError::InvalidPayload` when chunks are empty, contain
-    /// non-terminal empty chunks, exceed `MAX_PAYLOAD_CHUNK_BYTES`, or overflow
-    /// size accounting.
     pub fn from_chunks(chunks: &[Vec<u8>]) -> Result<Self, ObjectStoreError> {
         if chunks.is_empty() {
             return Err(ObjectStoreError::InvalidPayload);

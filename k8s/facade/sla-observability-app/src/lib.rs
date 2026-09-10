@@ -1,9 +1,4 @@
 //! Managed-Kubernetes SLA observability composition layer.
-//!
-//! This crate wires the SLA observation store to the settled
-//! `ControlPlaneProvisioning` status port from `k8s-control-plane-host-api`.
-//! It deliberately exposes no live Prometheus/Kubernetes dependency; live
-//! metrics scraping is deferred to a future adapter behind the same port.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
@@ -17,19 +12,16 @@ pub use k8s_sla_observability_api::{
 };
 pub use k8s_sla_observability_kernel::{ObservedControlPlaneStatus, SlaPolicy, SlaSummary};
 
-/// Application service for reading control-plane status and producing SLA DTOs.
 pub struct SlaObservabilityService<S> {
     store: S,
 }
 
 impl<S> SlaObservabilityService<S> {
-    /// Build a service from an observation store.
     #[must_use]
     pub const fn new(store: S) -> Self {
         Self { store }
     }
 
-    /// Access the underlying store for composition tests.
     #[must_use]
     pub const fn store(&self) -> &S {
         &self.store
@@ -40,8 +32,6 @@ impl<S> SlaObservabilityService<S>
 where
     S: SlaObservabilityPort,
 {
-    /// Ingest a direct snapshot and return the computed deterministic summary.
-    ///
     /// # Errors
     /// Returns typed fail-closed errors for malformed/unknown cluster identity or
     /// invalid observation windows.
@@ -52,8 +42,6 @@ where
         self.store.ingest_status_snapshot(snapshot).await
     }
 
-    /// Read a summary from the latest ingested observation.
-    ///
     /// # Errors
     /// Returns [`SlaObservabilityError::UnknownCluster`] if no observation exists.
     pub async fn summarize_cluster(
@@ -63,9 +51,6 @@ where
         self.store.summarize_cluster(cluster_ref).await
     }
 
-    /// Read the settled control-plane-host status seam, convert it into an SLA
-    /// snapshot, ingest it, and return the golden-signal summary.
-    ///
     /// `status_window` and `provisioning_latency_millis` are supplied by the
     /// caller/adapter because this lane intentionally does not couple to live
     /// Prometheus or Kubernetes.
@@ -98,19 +83,16 @@ where
     }
 }
 
-/// Build the default in-memory composition root for tests/local bring-up.
 #[must_use]
 pub fn build_inmemory_service() -> SlaObservabilityService<InMemorySlaObservabilityStore> {
     SlaObservabilityService::new(InMemorySlaObservabilityStore::new(SlaPolicy::default()))
 }
 
-/// Map a sibling control-plane-host cluster ref into this bounded context's DTO.
 #[must_use]
 pub fn map_cluster_ref(cluster_ref: &control_plane_host::ClusterRef) -> ClusterRef {
     ClusterRef::new(&cluster_ref.tenant_id, &cluster_ref.cluster_name)
 }
 
-/// Map the sibling control-plane-host lifecycle enum into the SLA observation enum.
 #[must_use]
 pub const fn map_control_plane_status(
     status: control_plane_host::ControlPlaneStatus,

@@ -62,7 +62,6 @@ impl CloudComputeK8sAcceptanceRepository for PgK8sLifecycleRepository {
                 }
                 snapshot
             };
-            // A failed COMMIT acknowledgement cannot establish whether this key committed.
             tx.commit().await.map_err(|_| Error::OutcomeUnknown)?;
             Ok(snapshot)
         })

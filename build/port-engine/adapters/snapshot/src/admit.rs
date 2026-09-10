@@ -112,11 +112,7 @@ pub fn admit_embedded_fixture() -> Result<AdmittedSnapshot, AdmitError> {
     admit_reproducible_pair(bytes, bytes)
 }
 
-/// Admit the embedded v1 fixture: the declaration tree extracted from the hermetic Go corpus.
-///
-/// Same single-byte-source caveat as [`admit_embedded_fixture`] — pairing the artifact with itself
-/// exercises admission without claiming a second extractor run happened. A genuine two-pass
-/// extraction enters through [`admit_reproducible_pair`].
+/// Same single-byte-source caveat as [`admit_embedded_fixture`].
 ///
 /// # Errors
 /// [`AdmitError`] on fixture defect — including a digest that the Rust preimage disagrees with,
@@ -126,8 +122,6 @@ pub fn admit_embedded_fixture_v1() -> Result<AdmittedSnapshot, AdmitError> {
     admit_reproducible_pair(bytes, bytes)
 }
 
-/// Admit the refusal fixture.
-///
 /// This ADMITS — the snapshot is a faithful model of source the translator cannot yet handle, and
 /// a model of hard code is not itself invalid. The refusal belongs downstream, at the transform,
 /// where the construct is named.
@@ -139,8 +133,6 @@ pub fn admit_embedded_fixture_refused_v1() -> Result<AdmittedSnapshot, AdmitErro
     admit_reproducible_pair(bytes, bytes)
 }
 
-/// Admit the ownership-refusal fixture.
-///
 /// # Errors
 /// [`AdmitError`] on fixture defect.
 pub fn admit_embedded_fixture_ownership_v1() -> Result<AdmittedSnapshot, AdmitError> {
@@ -148,8 +140,6 @@ pub fn admit_embedded_fixture_ownership_v1() -> Result<AdmittedSnapshot, AdmitEr
     admit_reproducible_pair(bytes, bytes)
 }
 
-/// Admit the interface-position refusal fixture.
-///
 /// # Errors
 /// [`AdmitError`] on fixture defect.
 pub fn admit_embedded_fixture_interface_v1() -> Result<AdmittedSnapshot, AdmitError> {
@@ -157,8 +147,6 @@ pub fn admit_embedded_fixture_interface_v1() -> Result<AdmittedSnapshot, AdmitEr
     admit_reproducible_pair(bytes, bytes)
 }
 
-/// Admit the failure-convention refusal fixture.
-///
 /// # Errors
 /// [`AdmitError`] on fixture defect.
 pub fn admit_embedded_fixture_failure_v1() -> Result<AdmittedSnapshot, AdmitError> {
@@ -166,8 +154,6 @@ pub fn admit_embedded_fixture_failure_v1() -> Result<AdmittedSnapshot, AdmitErro
     admit_reproducible_pair(bytes, bytes)
 }
 
-/// Admit the earlier version of the upstream-drift pair.
-///
 /// # Errors
 /// [`AdmitError`] on fixture defect.
 pub fn admit_embedded_fixture_drift_before_v1() -> Result<AdmittedSnapshot, AdmitError> {
@@ -175,8 +161,6 @@ pub fn admit_embedded_fixture_drift_before_v1() -> Result<AdmittedSnapshot, Admi
     admit_reproducible_pair(bytes, bytes)
 }
 
-/// Admit the later version of the upstream-drift pair.
-///
 /// # Errors
 /// [`AdmitError`] on fixture defect.
 pub fn admit_embedded_fixture_drift_after_v1() -> Result<AdmittedSnapshot, AdmitError> {

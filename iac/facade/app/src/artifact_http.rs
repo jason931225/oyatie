@@ -7,8 +7,7 @@ pub(super) fn archive_artifact_handler(
     Arc::new(move |request: HttpRequest| {
         // SECOND PEP (supply-chain): the artifact route serves module ZIP bytes,
         // so VERIFY the caller credential and PDP-authorize the DOWNLOAD surface
-        // BEFORE reading any bytes. Fail-closed: missing/invalid → 401, deny/fault
-        // → 403. The transport headers are never trusted as an authz decision.
+        // BEFORE reading any bytes.
         let credential = CallerCredential {
             authorization: request.headers.get("authorization").cloned(),
         };

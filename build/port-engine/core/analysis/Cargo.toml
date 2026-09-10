@@ -6,13 +6,6 @@ rust-version.workspace = true
 publish = false
 license = "Apache-2.0"
 
-# Ownership decision for the owned deterministic port engine (ADR-0637 D1).
-#
-# Go is garbage-collected, so a pointer carries no ownership information. The front end observes
-# facts, the pack declares rules, and this face pairs them — producing a HYPOTHESIS that the target
-# language's borrow checker verifies, never a proof this face could make on its own. See the module
-# docs and docs/programs/k8s-port/census/ownership-escape.md.
-
 [dependencies]
 port-engine-api = { path = "../../ports/api" }
 

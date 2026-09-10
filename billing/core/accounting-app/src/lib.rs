@@ -1,11 +1,7 @@
 //! Accounting journal application layer.
 //!
 //! This crate turns pure accounting-domain outcomes into metadata-only audit
-//! and Workflow dispatch envelopes for later cloud/runtime adapters. It does
-//! not persist ledgers, call Workflow, file taxes, execute payments, or perform
-//! network I/O.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! and Workflow dispatch envelopes for later cloud/runtime adapters.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -24,65 +20,65 @@ const ACCOUNTING_VAT_WORKFLOW_TOPIC: &str = "workflow.accounting.vat.dispatch";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountingAuditEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub journal_id: Classified<JournalId>, // data_class: INTERNAL_ONLY
-    pub approval_evidence_ref: Classified<EvidenceRef>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub body_fingerprint: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub journal_id: Classified<JournalId>,
+    pub approval_evidence_ref: Classified<EvidenceRef>,
+    pub idempotency_key: Classified<String>,
+    pub body_fingerprint: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountingWorkflowDispatchEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub workflow_ref: Classified<WorkflowRef>, // data_class: INTERNAL_ONLY
-    pub return_id: Classified<VatReturnId>, // data_class: INTERNAL_ONLY
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub workflow_ref: Classified<WorkflowRef>,
+    pub return_id: Classified<VatReturnId>,
     pub hometax_export_hash: Classified<EvidenceDigest>, // data_class: FINANCIAL
-    pub required_steps: Classified<Vec<VatWorkflowStep>>, // data_class: INTERNAL_ONLY
-    pub evidence_refs: Classified<Vec<EvidenceRef>>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub body_fingerprint: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub required_steps: Classified<Vec<VatWorkflowStep>>,
+    pub evidence_refs: Classified<Vec<EvidenceRef>>,
+    pub idempotency_key: Classified<String>,
+    pub body_fingerprint: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountingPayrollPostingAuditEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub journal_id: Classified<JournalId>, // data_class: INTERNAL_ONLY
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub journal_id: Classified<JournalId>,
     pub source_payroll_digest: Classified<EvidenceDigest>, // data_class: FINANCIAL
-    pub approval_evidence_ref: Classified<EvidenceRef>, // data_class: INTERNAL_ONLY
-    pub reversal_path_ref: Classified<EvidenceRef>, // data_class: INTERNAL_ONLY
-    pub wage_ledger_refs: Classified<Vec<EvidenceRef>>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub body_fingerprint: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub approval_evidence_ref: Classified<EvidenceRef>,
+    pub reversal_path_ref: Classified<EvidenceRef>,
+    pub wage_ledger_refs: Classified<Vec<EvidenceRef>>,
+    pub idempotency_key: Classified<String>,
+    pub body_fingerprint: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JournalPostOutcome {
-    pub journal: JournalVoucher,                 // data_class: FINANCIAL
-    pub audit_envelope: AccountingAuditEnvelope, // data_class: INTERNAL_ONLY
+    pub journal: JournalVoucher, // data_class: FINANCIAL
+    pub audit_envelope: AccountingAuditEnvelope,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VatWorkflowOutcome {
     pub workflow: Option<VatReturnWorkflow>, // data_class: FINANCIAL
-    pub dispatch_envelope: Option<AccountingWorkflowDispatchEnvelope>, // data_class: INTERNAL_ONLY
+    pub dispatch_envelope: Option<AccountingWorkflowDispatchEnvelope>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountingPayrollPostingOutcome {
     pub evidence: PayrollPostingEvidence, // data_class: FINANCIAL
-    pub audit_envelope: AccountingPayrollPostingAuditEnvelope, // data_class: INTERNAL_ONLY
+    pub audit_envelope: AccountingPayrollPostingAuditEnvelope,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -131,11 +127,8 @@ pub fn record_payroll_posting(
 
 fn journal_audit_envelope(journal: &JournalVoucher) -> AccountingAuditEnvelope {
     let tenant = journal.tenant_id.value.value.as_str();
-    // Body fingerprint over EVERY caller-mutable, financially-material field. A
-    // changed body under the same (tenant, journal_id) logical key yields a
-    // different fingerprint so the store rejects a reused key with a mutated body
-    // (ADR-0592). source_documents are caller-supplied and money-material, so
-    // they are part of the fingerprint.
+    // Selection rule: every caller-mutable, money-material field, including the
+    // caller-supplied source_documents.
     let mut fp_fields: Vec<String> = vec![
         tenant.to_owned(),
         journal.legal_entity_id.value.value.clone(),
@@ -161,12 +154,6 @@ fn journal_audit_envelope(journal: &JournalVoucher) -> AccountingAuditEnvelope {
         legal_entity_id: internal(journal.legal_entity_id.value.clone()),
         journal_id: internal(journal.journal_id.value.clone()),
         approval_evidence_ref: internal(journal.approval_evidence_ref.value.clone()),
-        // SECURITY (ADR-0592): tenant-scoped LOGICAL key. The prior key
-        // `"{journal_id}:1:posted"` omitted the tenant, so two tenants posting
-        // the same journal_id collided and one suppressed the other's audit
-        // record (cross-tenant money-integrity defect, AUTH-005 Wave-2b). The
-        // body fingerprint is a SEPARATE field, not part of the key, so the store
-        // can detect a changed body under a reused logical key.
         idempotency_key: internal(scoped_idempotency_key(
             tenant,
             "journal-posted",
@@ -180,8 +167,7 @@ fn journal_audit_envelope(journal: &JournalVoucher) -> AccountingAuditEnvelope {
 
 fn vat_dispatch_envelope(workflow: &VatReturnWorkflow) -> AccountingWorkflowDispatchEnvelope {
     let tenant = workflow.tenant_id.value.value.as_str();
-    // Fingerprint over every caller-mutable field, including evidence_paths
-    // (ADR-0592): a changed evidence set under a reused key must be detectable.
+    // Selection rule: every caller-mutable field, including evidence_paths.
     let mut fp_fields: Vec<String> = vec![
         tenant.to_owned(),
         workflow.legal_entity_id.value.value.clone(),
@@ -204,9 +190,6 @@ fn vat_dispatch_envelope(workflow: &VatReturnWorkflow) -> AccountingWorkflowDisp
         hometax_export_hash: financial(workflow.hometax_export_hash.value.clone()),
         required_steps: internal(workflow.required_steps.value.clone()),
         evidence_refs: internal(workflow.evidence_paths.value.clone()),
-        // SECURITY (ADR-0592): tenant-scoped LOGICAL key; the body fingerprint is
-        // a SEPARATE field so a reused key with a mutated VAT body is rejected at
-        // the store rather than landing in a different map slot.
         idempotency_key: internal(scoped_idempotency_key(
             tenant,
             "vat-workflow",
@@ -222,9 +205,8 @@ fn payroll_posting_audit_envelope(
     evidence: &PayrollPostingEvidence,
 ) -> AccountingPayrollPostingAuditEnvelope {
     let tenant = evidence.journal.tenant_id.value.value.as_str();
-    // Fingerprint over every caller-mutable, money-material field: the approval
-    // evidence ref and per-line detail are included so a changed posting under a
-    // reused key is detected, not just a changed total (ADR-0592).
+    // Selection rule: every caller-mutable, money-material field, including the
+    // approval evidence ref and per-line detail — not just the totals.
     let mut fp_fields: Vec<String> = vec![
         tenant.to_owned(),
         evidence.journal.legal_entity_id.value.value.clone(),
@@ -255,9 +237,6 @@ fn payroll_posting_audit_envelope(
         approval_evidence_ref: internal(evidence.journal.approval_evidence_ref.value.clone()),
         reversal_path_ref: internal(evidence.reversal_path_ref.value.clone()),
         wage_ledger_refs: internal(evidence.wage_ledger_refs.value.clone()),
-        // SECURITY (ADR-0592): tenant-scoped LOGICAL key; the body fingerprint is
-        // a SEPARATE field so a reused key with a mutated payroll body is rejected
-        // at the store rather than silently inserting a second record.
         idempotency_key: internal(scoped_idempotency_key(
             tenant,
             "payroll-posted",

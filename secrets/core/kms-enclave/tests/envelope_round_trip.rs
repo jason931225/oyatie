@@ -1,8 +1,7 @@
 //! Envelope round-trip + tamper rejection for the enclave kernel.
 //!
-//! Ladder rungs (AMENDMENT 7): unit + property-style. The property sweep uses
-//! a deterministic xorshift generator (proptest is not buckified; the sweep
-//! is reproducible by construction).
+//! The property sweep uses a deterministic xorshift generator: proptest is
+//! not buckified, so the sweep is reproducible by construction instead.
 
 use secrets_kms_enclave::{
     DekId, EnclaveError, EnclaveRoot, KekId, KekMaterial, KekVersion, SealingRootId, TokenError,
@@ -21,7 +20,6 @@ fn kek(id: &str, version: u32) -> KekMaterial {
     .expect("kek generate")
 }
 
-/// Deterministic xorshift64* generator for the property sweeps.
 struct XorShift(u64);
 
 impl XorShift {
@@ -52,8 +50,6 @@ fn kek_wrap_unwrap_round_trip_preserves_dek_crypto() {
     assert_eq!(recovered.kek_id().value(), "kek/ten_alpha");
     assert_eq!(recovered.version().value(), 1);
 
-    // The recovered KEK must unwrap DEKs the original wrapped, and the DEK
-    // must decrypt payloads sealed before the round trip.
     let payload = b"static-stability payload";
     let blob = dek.seal(b"ctx", payload).unwrap();
     let reopened_dek = recovered.unwrap_dek(&wrapped_dek).unwrap();
@@ -73,7 +69,6 @@ fn token_encode_decode_round_trip() {
     assert_eq!(decoded.kek_id().value(), "kek/ten_alpha");
     assert_eq!(decoded.kek_version(), 3);
 
-    // The decoded token still unwraps.
     let recovered = sealing_root.unwrap_kek(&decoded).unwrap();
     assert_eq!(recovered.version().value(), 3);
 }
@@ -149,13 +144,11 @@ fn wrong_root_rejects_by_binding_then_crypto() {
     let material = kek("kek/ten_alpha", 1);
     let token = root_a.wrap_kek(&material).unwrap();
 
-    // Different root id: rejected at the binding check.
     assert!(matches!(
         root_b.unwrap_kek(&token),
         Err(EnclaveError::KeyBindingMismatch { .. })
     ));
 
-    // Same id, different key material: rejected by AEAD.
     let impostor = root("cell-a-root");
     assert!(matches!(
         impostor.unwrap_kek(&token),
@@ -184,14 +177,11 @@ fn wrong_kek_and_wrong_version_reject_dek_unwrap() {
 
 #[test]
 fn nonce_uniqueness_across_wraps() {
-    // RandomizedNonceKey draws a fresh nonce per seal; two wraps of the same
-    // KEK must differ in both nonce and ciphertext.
     let sealing_root = root("cell-1-root");
     let material = kek("kek/ten_alpha", 1);
     let token_one = sealing_root.wrap_kek(&material).unwrap();
     let token_two = sealing_root.wrap_kek(&material).unwrap();
     assert_ne!(token_one.encode(), token_two.encode());
-    // Both still unwrap to working KEKs.
     assert!(sealing_root.unwrap_kek(&token_one).is_ok());
     assert!(sealing_root.unwrap_kek(&token_two).is_ok());
 }
@@ -202,12 +192,10 @@ fn strict_decode_rejects_malformed_inputs() {
     let material = kek("kek/ten_alpha", 1);
     let valid = sealing_root.wrap_kek(&material).unwrap().encode();
 
-    // Truncation at every prefix length must fail (never panic).
     for cut in 0..valid.len() {
         assert!(WrappedKekToken::decode(&valid[..cut]).is_err(), "cut {cut}");
     }
 
-    // Trailing bytes rejected.
     let mut trailing = valid.clone();
     trailing.push(0x00);
     assert_eq!(
@@ -215,7 +203,6 @@ fn strict_decode_rejects_malformed_inputs() {
         Err(TokenError::TrailingBytes)
     );
 
-    // Wrong kind: a wrapped-DEK decoded as a KEK token.
     let (_, wrapped_dek) = material
         .generate_dek(DekId::new("dek/obj_1").unwrap())
         .unwrap();
@@ -224,7 +211,6 @@ fn strict_decode_rejects_malformed_inputs() {
         Err(TokenError::WrongKind)
     );
 
-    // Bad magic.
     let mut bad_magic = valid;
     bad_magic[0] = b'X';
     assert_eq!(
@@ -232,6 +218,5 @@ fn strict_decode_rejects_malformed_inputs() {
         Err(TokenError::BadMagic)
     );
 
-    // Empty input.
     assert_eq!(WrappedKekToken::decode(&[]), Err(TokenError::Truncated));
 }

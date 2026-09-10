@@ -45,12 +45,12 @@ fn the_seed_contains_a_permit() {
 }
 
 /// The tenant-isolation belt stays present: the structural cross-tenant
-/// forbid is defense-in-depth the behavioral suite cannot pin — the M3
-/// audit's one surviving (equivalent) mutant deleted it and every test
-/// stayed green, because the sole permit's own tenant conjunct masks
-/// the deletion under today's policy set. Its PRESENCE is therefore
-/// pinned here, mirroring the permit pin, so the belt cannot be
-/// silently removed before some future permit lacks the conjunct.
+/// forbid is defense-in-depth the behavioral suite cannot pin — a mutant
+/// deleting it left every test green, because the sole permit's own
+/// tenant conjunct masks the deletion under today's policy set. Its
+/// PRESENCE is therefore pinned here, mirroring the permit pin, so the
+/// belt cannot be silently removed before some future permit lacks the
+/// conjunct.
 #[test]
 fn the_seed_keeps_the_cross_tenant_forbid() {
     assert!(

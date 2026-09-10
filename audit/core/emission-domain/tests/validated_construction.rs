@@ -1,11 +1,9 @@
-//! Coverage for `CanonicalEnvelope::build`'s validation rules: an empty or
-//! whitespace-only `event_id`, an empty `pack`, an empty `tenant_partition`,
-//! an empty or malformed `period`, and an empty `payload_digest` must each
-//! be rejected with a specific `EmissionDomainError` variant before any
-//! fingerprint work happens.
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` to assert
-// invariants — Tier 3 exemption.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+)]
 
 use audit_emission_domain::{CanonicalEnvelope, EmissionDomainError, Fingerprinter};
 use audit_emission_kernel::ChainCoordinate;
@@ -189,9 +187,6 @@ fn whitespace_only_claimed_fingerprint_is_rejected() {
 
 #[test]
 fn leading_and_trailing_whitespace_on_tenant_partition_is_trimmed_not_distinguished() {
-    // Four whitespace spellings of the same tenant partition must all build
-    // to the identical stored value: none of them may spell a distinct
-    // (shadow) partition.
     let spellings = [
         "tenant-alpha",
         " tenant-alpha",

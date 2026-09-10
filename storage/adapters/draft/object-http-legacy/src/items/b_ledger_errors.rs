@@ -1,16 +1,12 @@
-/// Public projection of a recorded ledger entry.
-///
-/// Does not expose private `CloudStorageObjectPutLedgerEntry` or
-/// `CloudStorageObjectRequestFingerprint`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectPutIdempotencyEntry {
-    pub idempotency_key: String,                  // data_class: INTERNAL_ONLY
-    pub outcome: CloudStorageObjectReplayOutcome, // data_class: INTERNAL_ONLY
+    pub idempotency_key: String,
+    pub outcome: CloudStorageObjectReplayOutcome,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CloudStorageObjectPutIdempotencyLedger {
-    entries: BTreeMap<CloudStorageObjectIdempotencyLedgerKey, CloudStorageObjectPutLedgerEntry>, // data_class: INTERNAL_ONLY
+    entries: BTreeMap<CloudStorageObjectIdempotencyLedgerKey, CloudStorageObjectPutLedgerEntry>,
 }
 
 impl CloudStorageObjectPutIdempotencyLedger {
@@ -22,11 +18,7 @@ impl CloudStorageObjectPutIdempotencyLedger {
         self.entries.is_empty()
     }
 
-    /// Return a public projection of the recorded entry for the given composite key,
-    /// or `None` if no entry has been recorded yet.
-    ///
     /// Does not mutate the ledger. Does not drive the catalog.
-    /// The `outcome` field reflects the *recorded* result, not a re-evaluation.
     pub fn peek(
         &self,
         tenant_id: &str,
@@ -58,21 +50,21 @@ impl CloudStorageObjectPutIdempotencyLedger {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct CloudStorageObjectIdempotencyLedgerKey {
-    tenant_id: String,       // data_class: INTERNAL_ONLY
-    principal_id: String,    // data_class: INTERNAL_ONLY
-    surface: String,         // data_class: INTERNAL_ONLY
-    idempotency_key: String, // data_class: INTERNAL_ONLY
+    tenant_id: String,
+    principal_id: String,
+    surface: String,
+    idempotency_key: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct CloudStorageObjectPutLedgerEntry {
-    fingerprint: CloudStorageObjectRequestFingerprint, // data_class: INTERNAL_ONLY
-    result: CloudStorageObjectPutApiResult,            // data_class: INTERNAL_ONLY
+    fingerprint: CloudStorageObjectRequestFingerprint,
+    result: CloudStorageObjectPutApiResult,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct CloudStorageObjectRequestFingerprint {
-    canonical: String, // data_class: INTERNAL_ONLY
+    canonical: String,
 }
 
 type CloudStorageObjectPutApiResult =
@@ -80,8 +72,8 @@ type CloudStorageObjectPutApiResult =
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectPutSuccessResponse {
-    pub data: CloudStorageObjectRecord, // data_class: INTERNAL_ONLY
-    pub metadata: CloudStorageObjectMetadata, // data_class: INTERNAL_ONLY
+    pub data: CloudStorageObjectRecord,
+    pub metadata: CloudStorageObjectMetadata,
 }
 
 impl CloudStorageObjectPutSuccessResponse {
@@ -97,8 +89,8 @@ impl CloudStorageObjectPutSuccessResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectGetSuccessResponse {
-    pub data: CloudStorageObjectRecord, // data_class: INTERNAL_ONLY
-    pub metadata: CloudStorageObjectMetadata, // data_class: INTERNAL_ONLY
+    pub data: CloudStorageObjectRecord,
+    pub metadata: CloudStorageObjectMetadata,
 }
 
 impl CloudStorageObjectGetSuccessResponse {
@@ -114,53 +106,53 @@ impl CloudStorageObjectGetSuccessResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectMetadata {
-    pub request_id: String, // data_class: INTERNAL_ONLY
+    pub request_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectRecord {
-    pub bucket_id: String,  // data_class: INTERNAL_ONLY
-    pub tenant_id: String,  // data_class: INTERNAL_ONLY
-    pub key: String,        // data_class: INTERNAL_ONLY
-    pub size_bytes: u64,    // data_class: INTERNAL_ONLY
-    pub etag: String,       // data_class: INTERNAL_ONLY
-    pub data_class: String, // data_class: INTERNAL_ONLY
-    pub encryption: CloudStorageObjectEncryptionBindingRecord, // data_class: INTERNAL_ONLY
-    pub stored_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
-    pub last_accessed_at_epoch_seconds: Option<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: u32, // data_class: PUBLIC
+    pub bucket_id: String,
+    pub tenant_id: String,
+    pub key: String,
+    pub size_bytes: u64,
+    pub etag: String,
+    pub data_class: String,
+    pub encryption: CloudStorageObjectEncryptionBindingRecord,
+    pub stored_at_epoch_seconds: u64,
+    pub last_accessed_at_epoch_seconds: Option<u64>,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectEncryptionBindingRecord {
-    pub kms_key: String,                 // data_class: INTERNAL_ONLY
-    pub kms_key_version: u32,            // data_class: INTERNAL_ONLY
-    pub material_ref: String,            // data_class: INTERNAL_ONLY
-    pub ciphertext_ref: String,          // data_class: INTERNAL_ONLY
-    pub kms_encrypt_event_id: String,    // data_class: INTERNAL_ONLY
-    pub purpose: String,                 // data_class: INTERNAL_ONLY
-    pub shred_proof_ref: Option<String>, // data_class: INTERNAL_ONLY
+    pub kms_key: String,
+    pub kms_key_version: u32,
+    pub material_ref: String,
+    pub ciphertext_ref: String,
+    pub kms_encrypt_event_id: String,
+    pub purpose: String,
+    pub shred_proof_ref: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectApiErrorResponse {
-    pub error: CloudStorageObjectApiErrorBody, // data_class: INTERNAL_ONLY
+    pub error: CloudStorageObjectApiErrorBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectApiErrorBody {
-    pub code: String,                                   // data_class: INTERNAL_ONLY
-    pub message: String,                                // data_class: INTERNAL_ONLY
-    pub message_localized: Option<String>,              // data_class: INTERNAL_ONLY
-    pub request_id: String,                             // data_class: INTERNAL_ONLY
-    pub details: Vec<CloudStorageObjectApiErrorDetail>, // data_class: INTERNAL_ONLY
-    pub retry_after_seconds: Option<u64>,               // data_class: INTERNAL_ONLY
+    pub code: String,
+    pub message: String,
+    pub message_localized: Option<String>,
+    pub request_id: String,
+    pub details: Vec<CloudStorageObjectApiErrorDetail>,
+    pub retry_after_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudStorageObjectApiErrorDetail {
-    pub field: String, // data_class: INTERNAL_ONLY
-    pub issue: String, // data_class: INTERNAL_ONLY
+    pub field: String,
+    pub issue: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

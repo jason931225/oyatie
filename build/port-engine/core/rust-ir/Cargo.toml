@@ -6,13 +6,6 @@ rust-version.workspace = true
 publish = false
 license = "Apache-2.0"
 
-# Typed Rust IR and deterministic renderer for the owned deterministic port engine (ADR-0637 D1).
-#
-# The IR is a TREE, not text. Items, statements and expressions are data; `quote!` lowers them to
-# tokens and `syn` parses those tokens back into a `File` that `prettyplease` formats. Nothing in
-# the emit path builds Rust by string formatting, so operator precedence, visibility and doc
-# comments are decided structurally rather than by a `format!` that happens to read correctly.
-
 [dependencies]
 port-engine-api = { path = "../../ports/api" }
 prettyplease = { workspace = true }

@@ -1,5 +1,4 @@
 use super::McpServerConfig;
-use crate::error::Result;
 use crate::status::McpServerToolPolicy;
 use serde::Deserialize;
 use serde::Serialize;
@@ -8,7 +7,6 @@ use serde::de::Deserializer;
 use serde::ser::SerializeMap;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::env;
 
 impl Serialize for McpServerConfig {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>

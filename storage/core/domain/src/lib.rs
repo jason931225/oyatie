@@ -1,10 +1,7 @@
 //! Storage object/CAS domain and in-memory reference engine.
 //!
-//! The crate preserves the existing typed storage model and CAS conformance
-//! behavior while ADR-0719 P0 reconciles storage onto one primary core engine.
-//! Provider types remain source-compatible re-exports from the owner-local
-//! draft port; facade compatibility boundaries remain temporary until P1
-//! freezes the sold protobuf contract.
+//! Provider types are source-compatible re-exports from the owner-local draft
+//! port.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]

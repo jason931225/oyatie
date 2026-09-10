@@ -4,8 +4,6 @@
 //! audit and Workflow dispatch envelopes for later cloud/runtime adapters. It
 //! does not persist data, call Workflow, emit audit-chain records, or perform
 //! network I/O.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -28,91 +26,91 @@ const HR_SENSITIVE_READ_TOPIC: &str = "audit.hr.sensitive-read.policy";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrAuditEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub aggregate_ref: Classified<String>, // data_class: INTERNAL_ONLY
-    pub evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub payload_kind: Classified<String>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub aggregate_ref: Classified<String>,
+    pub evidence_ref: Classified<AuditEvidenceRef>,
+    pub payload_kind: Classified<String>,
+    pub idempotency_key: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrWorkflowDispatchEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub workflow_ref: Classified<WorkflowRef>, // data_class: INTERNAL_ONLY
-    pub obligation_kind: Classified<LaborComplianceObligationKind>, // data_class: INTERNAL_ONLY
-    pub jurisdiction: Classified<Jurisdiction>, // data_class: INTERNAL_ONLY
-    pub required_steps: Classified<Vec<LaborComplianceWorkflowStep>>, // data_class: INTERNAL_ONLY
-    pub evidence_refs: Classified<Vec<AuditEvidenceRef>>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub workflow_ref: Classified<WorkflowRef>,
+    pub obligation_kind: Classified<LaborComplianceObligationKind>,
+    pub jurisdiction: Classified<Jurisdiction>,
+    pub required_steps: Classified<Vec<LaborComplianceWorkflowStep>>,
+    pub evidence_refs: Classified<Vec<AuditEvidenceRef>>,
+    pub idempotency_key: Classified<String>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrLeavePayrollImpactEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub leave_request_id: Classified<LeaveRequestId>, // data_class: INTERNAL_ONLY
-    pub approver_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub decision: Classified<LeaveDecision>, // data_class: INTERNAL_ONLY
-    pub routing_mode: Classified<LeaveRoutingMode>, // data_class: INTERNAL_ONLY
-    pub workflow_ref: Classified<WorkflowRef>, // data_class: INTERNAL_ONLY
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub employee_id: Classified<EmployeeId>,
+    pub leave_request_id: Classified<LeaveRequestId>,
+    pub approver_id: Classified<EmployeeId>,
+    pub decision: Classified<LeaveDecision>,
+    pub routing_mode: Classified<LeaveRoutingMode>,
+    pub workflow_ref: Classified<WorkflowRef>,
     pub payroll_period: Classified<String>, // data_class: FINANCIAL
     pub payroll_impact_kind: Classified<PayrollImpactKind>, // data_class: FINANCIAL
-    pub decision_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub routing_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
+    pub decision_evidence_ref: Classified<AuditEvidenceRef>,
+    pub routing_evidence_ref: Classified<AuditEvidenceRef>,
     pub payroll_impact_evidence_ref: Classified<AuditEvidenceRef>, // data_class: FINANCIAL
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub idempotency_key: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrSensitiveReadEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub actor_employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub subject_employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub actor_employee_id: Classified<EmployeeId>,
+    pub subject_employee_id: Classified<EmployeeId>,
     pub data_kind: Classified<SensitiveHrDataKind>, // data_class: SENSITIVE_PIPA_ART23
-    pub purpose: Classified<SensitiveReadPurpose>, // data_class: INTERNAL_ONLY
-    pub legal_basis: Classified<SensitiveReadLegalBasis>, // data_class: INTERNAL_ONLY
-    pub policy_ref: Classified<PolicyRef>, // data_class: INTERNAL_ONLY
-    pub basis_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub consent_evidence_ref: Classified<Option<AuditEvidenceRef>>, // data_class: INTERNAL_ONLY
-    pub request_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub read_log_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub decision_status: Classified<SensitiveReadDecisionStatus>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub purpose: Classified<SensitiveReadPurpose>,
+    pub legal_basis: Classified<SensitiveReadLegalBasis>,
+    pub policy_ref: Classified<PolicyRef>,
+    pub basis_evidence_ref: Classified<AuditEvidenceRef>,
+    pub consent_evidence_ref: Classified<Option<AuditEvidenceRef>>,
+    pub request_evidence_ref: Classified<AuditEvidenceRef>,
+    pub read_log_evidence_ref: Classified<AuditEvidenceRef>,
+    pub decision_status: Classified<SensitiveReadDecisionStatus>,
+    pub idempotency_key: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardEmployeeCommand {
-    pub employee: EmployeeCreate,        // data_class: PII_IDENTIFYING
-    pub event_id: String,                // data_class: INTERNAL_ONLY
-    pub lifecycle_kind: HrLifecycleKind, // data_class: INTERNAL_ONLY
+    pub employee: EmployeeCreate, // data_class: PII_IDENTIFYING
+    pub event_id: String,
+    pub lifecycle_kind: HrLifecycleKind,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardEmployeeOutcome {
-    pub employee: Employee,                      // data_class: PII_IDENTIFYING
-    pub lifecycle_event: EmployeeLifecycleEvent, // data_class: INTERNAL_ONLY
-    pub audit_envelope: HrAuditEnvelope,         // data_class: INTERNAL_ONLY
+    pub employee: Employee, // data_class: PII_IDENTIFYING
+    pub lifecycle_event: EmployeeLifecycleEvent,
+    pub audit_envelope: HrAuditEnvelope,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LaborWorkflowPlanOutcome {
-    pub obligations: Vec<LaborComplianceObligation>, // data_class: INTERNAL_ONLY
-    pub workflow_dispatches: Vec<HrWorkflowDispatchEnvelope>, // data_class: INTERNAL_ONLY
+    pub obligations: Vec<LaborComplianceObligation>,
+    pub workflow_dispatches: Vec<HrWorkflowDispatchEnvelope>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

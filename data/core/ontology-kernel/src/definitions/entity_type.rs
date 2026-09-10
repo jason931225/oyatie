@@ -11,37 +11,35 @@ use super::identifiers::{EntityTypeId, validate_ontology_tenant};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EntityTypePropertyDefinition {
-    pub name: String,       // data_class: INTERNAL_ONLY
-    pub tier: PropertyTier, // data_class: INTERNAL_ONLY
+    pub name: String,
+    pub tier: PropertyTier,
     pub data_class: PrivacyDataClass,
-    pub required: bool, // data_class: INTERNAL_ONLY
+    pub required: bool,
     /// Declared value type; `None` is the legacy string contract. Once
-    /// `Some`, immutable across revisions (see `check_schema_compatibility`).
-    pub value_type: Option<ValueTypeDeclaration>, // data_class: INTERNAL_ONLY
-    /// Rendering hints; freely evolvable, never part of the frozen quadruple.
-    pub display: Option<crate::display::DisplayMetadata>, // data_class: INTERNAL_ONLY
+    /// `Some`, immutable across revisions (see `check_property_compatibility`).
+    pub value_type: Option<ValueTypeDeclaration>,
+    pub display: Option<crate::display::DisplayMetadata>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EntityTypeDefinition {
-    pub tenant_id: String,                             // data_class: INTERNAL_ONLY
-    pub id: EntityTypeId,                              // data_class: INTERNAL_ONLY
-    pub display_name: Classified<String>,              // data_class: INTERNAL_ONLY
-    pub properties: Vec<EntityTypePropertyDefinition>, // data_class: INTERNAL_ONLY
-    pub revision: u32,                                 // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub id: EntityTypeId,
+    pub display_name: Classified<String>,
+    pub properties: Vec<EntityTypePropertyDefinition>,
+    pub revision: u32,
     /// Optional pillar annotation for org/person isolation (Bominal-ADR-0132).
     /// `None` means the entity type is pillar-agnostic and does not
     /// participate in cross-pillar link rejection.
-    pub pillar: Option<OntologyPillar>, // data_class: INTERNAL_ONLY
+    pub pillar: Option<OntologyPillar>,
     /// Name of the property that identifies instances of this type. Must
     /// name a declared `required` property; immutable once set (re-keying a
     /// population is a breaking change). `None` means instances are keyed
     /// only by their `ent_`-prefixed id.
-    pub primary_key_property: Option<String>, // data_class: INTERNAL_ONLY
-    /// Rendering hints; freely evolvable.
-    pub display: Option<crate::display::DisplayMetadata>, // data_class: INTERNAL_ONLY
+    pub primary_key_property: Option<String>,
+    pub display: Option<crate::display::DisplayMetadata>,
     /// Name of the property rendered as the default human-readable label.
     /// Must name a declared property; freely changeable across revisions.
-    pub title_property: Option<String>, // data_class: INTERNAL_ONLY
+    pub title_property: Option<String>,
 }
 
 impl EntityTypePropertyDefinition {
@@ -65,7 +63,6 @@ impl EntityTypePropertyDefinition {
         })
     }
 
-    /// Attach rendering hints. Returns `self` for chaining.
     pub fn with_display(mut self, display: crate::display::DisplayMetadata) -> Self {
         self.display = Some(display);
         self
@@ -124,7 +121,6 @@ impl EntityTypeDefinition {
         self
     }
 
-    /// Attach rendering hints. Returns `self` for chaining.
     pub fn with_display(mut self, display: crate::display::DisplayMetadata) -> Self {
         self.display = Some(display);
         self

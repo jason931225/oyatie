@@ -1,8 +1,7 @@
-// Archive lifecycle remains object behavior, not a standalone product owner.
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ArchiveVaultName {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -21,33 +20,33 @@ pub enum ArchiveVaultState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ArchiveVaultCreate {
-    pub resource_id: String,                  // data_class: INTERNAL_ONLY
-    pub tenant_id: String,                    // data_class: INTERNAL_ONLY
-    pub name: String,                         // data_class: INTERNAL_ONLY
-    pub region: String,                       // data_class: PUBLIC
-    pub residency: ResidencyClass,            // data_class: INTERNAL_ONLY
-    pub tier: ArchiveTier,                    // data_class: PUBLIC
-    pub encryption: EncryptionMode,           // data_class: PUBLIC
-    pub kms_key: Option<String>,              // data_class: INTERNAL_ONLY
-    pub allowed_data_classes: Vec<DataClass>, // data_class: INTERNAL_ONLY
-    pub state: ArchiveVaultState,             // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64,        // data_class: INTERNAL_ONLY
+    pub resource_id: String,
+    pub tenant_id: String,
+    pub name: String,
+    pub region: String,
+    pub residency: ResidencyClass,
+    pub tier: ArchiveTier,
+    pub encryption: EncryptionMode,
+    pub kms_key: Option<String>,
+    pub allowed_data_classes: Vec<DataClass>,
+    pub state: ArchiveVaultState,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ArchiveVault {
-    pub resource_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub name: Classified<ArchiveVaultName>,  // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>,      // data_class: PUBLIC
-    pub residency: Classified<ResidencyClass>, // data_class: INTERNAL_ONLY
-    pub tier: Classified<ArchiveTier>,       // data_class: PUBLIC
-    pub encryption: Classified<EncryptionMode>, // data_class: PUBLIC
-    pub kms_key: Classified<Option<KmsKeyId>>, // data_class: INTERNAL_ONLY
-    pub allowed_data_classes: Classified<BTreeSet<PrivacyDataClass>>, // data_class: INTERNAL_ONLY
-    pub state: Classified<ArchiveVaultState>, // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,     // data_class: PUBLIC
+    pub resource_id: Classified<ResourceId>,
+    pub tenant_id: Classified<String>,
+    pub name: Classified<ArchiveVaultName>,
+    pub region: Classified<RegionCode>,
+    pub residency: Classified<ResidencyClass>,
+    pub tier: Classified<ArchiveTier>,
+    pub encryption: Classified<EncryptionMode>,
+    pub kms_key: Classified<Option<KmsKeyId>>,
+    pub allowed_data_classes: Classified<BTreeSet<PrivacyDataClass>>,
+    pub state: Classified<ArchiveVaultState>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 impl ArchiveVaultName {

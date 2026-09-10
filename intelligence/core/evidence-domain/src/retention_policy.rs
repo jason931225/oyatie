@@ -1,44 +1,29 @@
-//! Retention policy domain types for M04-P04 evidence-retention-audit.
-//!
-//! Encodes how long evidence records must be retained under a given
-//! regulatory schedule.  Pure value types — no I/O, no serde, std-only.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! How long evidence must be retained under a given regulatory schedule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-/// The minimum number of calendar days evidence must be retained.
-///
-/// A value of zero is invalid; callers must supply a positive duration.
+/// A count of calendar days. Unvalidated on its own; [`RetentionPolicy`] is
+/// what rejects zero and below-minimum values.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RetentionDays(pub u32);
 
 impl RetentionDays {
-    /// Returns the inner day count.
     pub fn as_u32(self) -> u32 {
         self.0
     }
 }
 
-/// Regulatory schedule that governs how evidence is retained.
-///
-/// Each named variant maps to a product-level retention duty rather than a
-/// jurisdiction identifier. The `Custom` variant is provided for extension
-/// without breaking the enum; callers should prefer a named variant wherever
-/// one exists.
+/// Each named variant is a product-level retention duty, not a jurisdiction.
+/// `Custom` exists so a new duty does not have to break the enum; prefer a
+/// named variant wherever one exists.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum RegulatorySchedule {
-    /// Standard evidence record — 3-year minimum (1 095 days).
     EvidenceRecordThreeYear,
-    /// Processing activity record — 3-year minimum (1 095 days).
     ProcessingActivityRecordThreeYear,
-    /// Custom schedule; duration is caller-supplied.
     Custom,
 }
 
 impl RegulatorySchedule {
-    /// Default minimum retention period prescribed by the schedule.
-    ///
-    /// Returns `None` for `Custom` because the duration is caller-defined.
+    /// `None` for `Custom`, whose duration only the caller knows.
     pub fn default_retention_days(self) -> Option<RetentionDays> {
         match self {
             RegulatorySchedule::EvidenceRecordThreeYear => Some(RetentionDays(1_095)),
@@ -51,20 +36,14 @@ impl RegulatorySchedule {
 /// Errors produced when constructing a [`RetentionPolicy`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RetentionPolicyError {
-    /// The supplied retention duration is zero, which is never valid.
     ZeroRetentionDays,
-    /// `Custom` schedule requires an explicit `RetentionDays` value.
     MissingCustomDuration,
-    /// The supplied duration is shorter than the schedule's mandatory minimum.
     BelowScheduleMinimum {
         supplied: RetentionDays,
         minimum: RetentionDays,
     },
 }
 
-/// A validated retention policy binding a [`RegulatorySchedule`] to a
-/// concrete [`RetentionDays`] duration.
-///
 /// # Invariants
 /// - `retention_days` > 0 always.
 /// - `retention_days` ≥ `schedule.default_retention_days()` when the
@@ -76,20 +55,16 @@ pub struct RetentionPolicy {
 }
 
 impl RetentionPolicy {
-    /// Returns the regulatory schedule bound to this policy.
     pub fn schedule(&self) -> RegulatorySchedule {
         self.schedule
     }
 
-    /// Returns the validated retention duration.
     pub fn retention_days(&self) -> RetentionDays {
         self.retention_days
     }
 
-    /// Construct a [`RetentionPolicy`] from a schedule and an explicit
-    /// duration, enforcing all invariants. This is the ONLY way to obtain a
-    /// `RetentionPolicy` (struct fields are private), so the documented
-    /// invariants always hold for any value of this type.
+    /// The only constructor, which is what makes the invariants above hold
+    /// for every value of this type.
     pub fn new(
         schedule: RegulatorySchedule,
         retention_days: RetentionDays,
@@ -111,8 +86,7 @@ impl RetentionPolicy {
         })
     }
 
-    /// Construct a [`RetentionPolicy`] using the schedule's prescribed
-    /// default minimum.  Fails for `Custom` (no default exists).
+    /// Fails for `Custom`, which prescribes no default.
     pub fn from_schedule_default(
         schedule: RegulatorySchedule,
     ) -> Result<Self, RetentionPolicyError> {

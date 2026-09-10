@@ -11,22 +11,14 @@ use crate::link::KnowledgeGraphLinkInstance;
 /// `Both` is the union; edges are emitted in canonical `from→to` orientation in all cases.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TraversalDirection {
-    /// Follow edges in the forward (from→to) direction. Default.
     #[default]
     Outbound,
-    /// Follow edges in the reverse (to→from) direction.
     Inbound,
-    /// Follow edges in both directions.
     Both,
 }
 
-/// Hard cap for source-level recursive traversal in this preview foundation.
 pub const MAX_QUERY_DEPTH: u32 = 16;
-
-/// Hard cap on nodes returned in a single query result to bound blast radius.
 pub const MAX_QUERY_RESULT_NODES: usize = 1_000;
-
-/// Hard cap on edges returned in a single query result to bound blast radius.
 pub const MAX_QUERY_RESULT_EDGES: usize = 5_000;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -36,16 +28,14 @@ pub struct KnowledgeGraphQueryResponse {
     pub nodes: Vec<KnowledgeGraphNode>, // data_class: INTERNAL_ONLY
     pub edges: Vec<KnowledgeGraphEdge>, // data_class: INTERNAL_ONLY
     pub observed_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
-    /// True when the result was truncated by node or edge cardinality caps.
-    /// Callers must treat a truncated result as incomplete. // data_class: INTERNAL_ONLY
-    pub result_truncated: bool,
+    /// Callers must treat a truncated result as incomplete.
+    pub result_truncated: bool, // data_class: INTERNAL_ONLY
     /// Present exactly when `result_truncated`: resume the walk by passing
     /// this cursor on the next request. Pages partition the full result by
     /// deterministic emission order (each page internally canonical-sorted);
     /// the cursor is exact against an unchanged store — the engine replays
     /// the same walk and continues past the emissions already returned.
-    /// data_class: INTERNAL_ONLY
-    pub next_cursor: Option<QueryCursor>,
+    pub next_cursor: Option<QueryCursor>, // data_class: INTERNAL_ONLY
 }
 
 /// Deterministic resumption point for a capped query: how many node and
@@ -89,7 +79,7 @@ pub enum KnowledgeGraphQueryError {
     InvalidQueryId,
     InvalidEntityId,
     InvalidEdgeTypeId,
-    /// `max_depth` is structurally invalid (e.g. zero).
+    /// `max_depth` is zero.
     InvalidMaxDepth,
     /// `max_depth` exceeds [`MAX_QUERY_DEPTH`]; reduce the requested depth.
     DepthCeilingExceeded,
@@ -100,8 +90,6 @@ pub enum KnowledgeGraphQueryError {
     DanglingLinkEndpoint {
         entity_id: String,
     },
-    /// A consent grant id in `consented_edge_type_ids` is structurally invalid
-    /// (e.g. missing the `lty_` prefix).
     MalformedConsentGrantId {
         id: String,
     },

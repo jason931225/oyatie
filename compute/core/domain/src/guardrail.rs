@@ -51,25 +51,25 @@ pub struct ComputeTenantCellGuardrailCreate {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ComputeTenantCellGuardrail {
-    pub tenant_id: Classified<String>,  // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>, // data_class: PUBLIC
-    pub primary_cell_id: Classified<CellId>, // data_class: PUBLIC
-    pub vm_instance_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub vm_iam_role: Classified<IamRoleId>, // data_class: INTERNAL_ONLY
-    pub vm_runtime_isolation: Classified<ComputeWorkloadIsolation>, // data_class: PUBLIC
-    pub k8s_cluster_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub k8s_service_account_ref: Classified<String>, // data_class: INTERNAL_ONLY
-    pub k8s_private_control_plane: Classified<bool>, // data_class: PUBLIC
-    pub k8s_pod_security_restricted: Classified<bool>, // data_class: PUBLIC
-    pub k8s_topology_spread_required: Classified<bool>, // data_class: PUBLIC
-    pub k8s_runtime_isolation: Classified<ComputeWorkloadIsolation>, // data_class: PUBLIC
-    pub function_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub function_service_account_ref: Classified<String>, // data_class: INTERNAL_ONLY
-    pub function_runtime_isolation: Classified<ComputeWorkloadIsolation>, // data_class: PUBLIC
-    pub audit_evidence_ref: Classified<String>, // data_class: INTERNAL_ONLY
-    pub scheduling_evidence_ref: Classified<String>, // data_class: INTERNAL_ONLY
-    pub identity_evidence_refs: Classified<Vec<String>>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub tenant_id: Classified<String>,
+    pub region: Classified<RegionCode>,
+    pub primary_cell_id: Classified<CellId>,
+    pub vm_instance_id: Classified<ResourceId>,
+    pub vm_iam_role: Classified<IamRoleId>,
+    pub vm_runtime_isolation: Classified<ComputeWorkloadIsolation>,
+    pub k8s_cluster_id: Classified<ResourceId>,
+    pub k8s_service_account_ref: Classified<String>,
+    pub k8s_private_control_plane: Classified<bool>,
+    pub k8s_pod_security_restricted: Classified<bool>,
+    pub k8s_topology_spread_required: Classified<bool>,
+    pub k8s_runtime_isolation: Classified<ComputeWorkloadIsolation>,
+    pub function_id: Classified<ResourceId>,
+    pub function_service_account_ref: Classified<String>,
+    pub function_runtime_isolation: Classified<ComputeWorkloadIsolation>,
+    pub audit_evidence_ref: Classified<String>,
+    pub scheduling_evidence_ref: Classified<String>,
+    pub identity_evidence_refs: Classified<Vec<String>>,
+    pub schema_version: Classified<u32>,
 }
 
 impl ComputeWorkloadIsolation {
