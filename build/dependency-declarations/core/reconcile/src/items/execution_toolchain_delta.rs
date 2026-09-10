@@ -1,3 +1,8 @@
+/// Direction of an execution-channel transition.
+///
+/// The semver directions classify stable-to-stable moves only. Nightly dates
+/// order among themselves; a stable and a dated nightly do not order at all,
+/// and that pair is reported as `ChannelChanged` rather than ranked.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExecutionVersionDelta {
     Unchanged,
@@ -5,6 +10,9 @@ pub enum ExecutionVersionDelta {
     ForwardMinor,
     ForwardMajor,
     Downgrade,
+    NightlyDateForward,
+    NightlyDateBackward,
+    ChannelChanged,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -113,10 +121,33 @@ fn parse_state(
     })
 }
 
-fn execution_delta(protected: &Version, candidate: &Version) -> ExecutionVersionDelta {
+fn execution_delta(
+    protected: &ExecutionChannel,
+    candidate: &ExecutionChannel,
+) -> ExecutionVersionDelta {
     if candidate == protected {
-        ExecutionVersionDelta::Unchanged
-    } else if candidate < protected {
+        return ExecutionVersionDelta::Unchanged;
+    }
+    match (protected, candidate) {
+        (ExecutionChannel::Stable(protected), ExecutionChannel::Stable(candidate)) => {
+            stable_delta(protected, candidate)
+        }
+        (ExecutionChannel::DatedNightly(protected), ExecutionChannel::DatedNightly(candidate)) => {
+            if candidate > protected {
+                ExecutionVersionDelta::NightlyDateForward
+            } else {
+                ExecutionVersionDelta::NightlyDateBackward
+            }
+        }
+        (ExecutionChannel::Stable(_), ExecutionChannel::DatedNightly(_))
+        | (ExecutionChannel::DatedNightly(_), ExecutionChannel::Stable(_)) => {
+            ExecutionVersionDelta::ChannelChanged
+        }
+    }
+}
+
+fn stable_delta(protected: &Version, candidate: &Version) -> ExecutionVersionDelta {
+    if candidate < protected {
         ExecutionVersionDelta::Downgrade
     } else if candidate.major > protected.major {
         ExecutionVersionDelta::ForwardMajor

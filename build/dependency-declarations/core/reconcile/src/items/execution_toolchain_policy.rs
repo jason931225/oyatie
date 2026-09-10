@@ -2,10 +2,10 @@ const PATCH_ONLY_COMPONENTS: [&str; 2] = ["clippy", "rustfmt"];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PatchOnlyExecutionToolchainDecision {
-    Unchanged(Version),
+    Unchanged(ExecutionChannel),
     ForwardPatch {
-        protected: Version,
-        candidate: Version,
+        protected: ExecutionChannel,
+        candidate: ExecutionChannel,
     },
 }
 
@@ -15,8 +15,8 @@ pub enum PatchOnlyExecutionToolchainRefusal {
     NonMinimalProfile(ToolchainSide, ExecutionToolchainProfile),
     TargetsChanged(BTreeSet<String>, BTreeSet<String>),
     MsrvChanged(Version, Version),
-    ExecutionBelowMsrv(Version, Version),
-    VersionDeltaNotAdmitted(ExecutionVersionDelta, Version, Version),
+    ExecutionBelowMsrv(ExecutionChannel, Version),
+    VersionDeltaNotAdmitted(ExecutionVersionDelta, ExecutionChannel, ExecutionChannel),
 }
 
 pub fn apply_patch_only_execution_toolchain_policy(
@@ -38,7 +38,11 @@ pub fn apply_patch_only_execution_toolchain_policy(
             analysis.candidate.msrv.clone(),
         ));
     }
-    if analysis.candidate.execution < analysis.candidate.msrv {
+    if !analysis
+        .candidate
+        .execution
+        .meets_msrv(&analysis.candidate.msrv)
+    {
         return Err(PatchOnlyExecutionToolchainRefusal::ExecutionBelowMsrv(
             analysis.candidate.execution.clone(),
             analysis.candidate.msrv.clone(),
@@ -124,6 +128,18 @@ impl fmt::Display for DeclarationRefusal {
                 write!(
                     formatter,
                     "`{field}` value `{value}` is not an exact stable version"
+                )
+            }
+            Self::InvalidNightlyDate(field, value) => {
+                write!(
+                    formatter,
+                    "`{field}` value `{value}` is not an exact dated nightly `nightly-YYYY-MM-DD`"
+                )
+            }
+            Self::FloatingNightlyChannel(field, value) => {
+                write!(
+                    formatter,
+                    "`{field}` value `{value}` floats; an exact dated nightly `nightly-YYYY-MM-DD` is required"
                 )
             }
             Self::UnsupportedValue(field, value) => {
