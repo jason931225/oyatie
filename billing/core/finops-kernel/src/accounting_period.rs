@@ -29,7 +29,8 @@ pub enum PeriodCloseState {
     Open,
     /// Period is pending final review; soft-locked (no new postings allowed).
     PendingReview,
-    /// Permanently closed — the close is irreversible.
+    /// Closed — no further postings permitted. The close is not enforced as
+    /// irreversible: `state` is public and there is no reopen guard.
     Closed,
 }
 

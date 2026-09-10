@@ -135,23 +135,16 @@ impl UnknownPayrollPeriod {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     // ── PayrollPeriod ────────────────────────────────────────────────────────
 
     #[test]
-    fn payroll_period_wire_strings_are_distinct() {
-        let strings: HashSet<_> = [
-            PayrollPeriod::Daily,
-            PayrollPeriod::Weekly,
-            PayrollPeriod::BiWeekly,
-            PayrollPeriod::Monthly,
-            PayrollPeriod::Quarterly,
-        ]
-        .iter()
-        .map(|p| p.as_str())
-        .collect();
-        assert_eq!(strings.len(), 5);
+    fn payroll_period_wire_strings_are_pinned() {
+        assert_eq!(PayrollPeriod::Daily.as_str(), "daily");
+        assert_eq!(PayrollPeriod::Weekly.as_str(), "weekly");
+        assert_eq!(PayrollPeriod::BiWeekly.as_str(), "bi_weekly");
+        assert_eq!(PayrollPeriod::Monthly.as_str(), "monthly");
+        assert_eq!(PayrollPeriod::Quarterly.as_str(), "quarterly");
     }
 
     #[test]
@@ -186,17 +179,11 @@ mod tests {
     // ── PayCycleKind ─────────────────────────────────────────────────────────
 
     #[test]
-    fn pay_cycle_kind_wire_strings_are_distinct() {
-        let strings: HashSet<_> = [
-            PayCycleKind::Weekly,
-            PayCycleKind::BiWeekly,
-            PayCycleKind::SemiMonthly,
-            PayCycleKind::Monthly,
-        ]
-        .iter()
-        .map(|k| k.as_str())
-        .collect();
-        assert_eq!(strings.len(), 4);
+    fn pay_cycle_kind_wire_strings_are_pinned() {
+        assert_eq!(PayCycleKind::Weekly.as_str(), "weekly");
+        assert_eq!(PayCycleKind::BiWeekly.as_str(), "bi_weekly");
+        assert_eq!(PayCycleKind::SemiMonthly.as_str(), "semi_monthly");
+        assert_eq!(PayCycleKind::Monthly.as_str(), "monthly");
     }
 
     #[test]
@@ -210,17 +197,11 @@ mod tests {
     // ── PayslipStatus ────────────────────────────────────────────────────────
 
     #[test]
-    fn payslip_status_wire_strings_are_distinct() {
-        let strings: HashSet<_> = [
-            PayslipStatus::Draft,
-            PayslipStatus::Approved,
-            PayslipStatus::Dispatched,
-            PayslipStatus::Voided,
-        ]
-        .iter()
-        .map(|s| s.as_str())
-        .collect();
-        assert_eq!(strings.len(), 4);
+    fn payslip_status_wire_strings_are_pinned() {
+        assert_eq!(PayslipStatus::Draft.as_str(), "draft");
+        assert_eq!(PayslipStatus::Approved.as_str(), "approved");
+        assert_eq!(PayslipStatus::Dispatched.as_str(), "dispatched");
+        assert_eq!(PayslipStatus::Voided.as_str(), "voided");
     }
 
     #[test]
