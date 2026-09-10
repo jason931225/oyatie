@@ -62,7 +62,6 @@ impl PgK8sLifecycleRuntimeContract {
         })
     }
 
-    #[must_use]
     pub fn serving_roles(&self) -> impl ExactSizeIterator<Item = &str> {
         self.serving_roles.iter().map(String::as_str)
     }

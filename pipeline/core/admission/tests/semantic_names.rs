@@ -143,7 +143,7 @@ fn real_reindeer_qualification_is_pinned_offline_and_fail_closed() {
         "      - uses: dtolnay/rust-toolchain@21dc36fb71dd22e3317045c0c31a3f4249868b17\n",
         "        with: { toolchain: \"nightly-2026-05-22\", components: \"clippy\" }\n",
         "      - uses: dtolnay/rust-toolchain@21dc36fb71dd22e3317045c0c31a3f4249868b17\n",
-        "        with: { toolchain: \"1.98.0\" }",
+        "        with: { toolchain: \"nightly-2026-09-10\" }",
     );
 
     assert_eq!(
@@ -154,16 +154,16 @@ fn real_reindeer_qualification_is_pinned_offline_and_fail_closed() {
     assert_eq!(
         job.matches("toolchain: \"nightly-2026-05-22\"").count(),
         1,
-        "Reindeer qualification must declare the pinned nightly exactly once"
+        "Reindeer qualification must declare the pinned qualification nightly exactly once"
     );
     assert_eq!(
         job.matches(ordered_toolchains).count(),
         1,
-        "Reindeer qualification must install nightly before stable"
+        "Reindeer qualification must install the qualification nightly before the execution toolchain"
     );
     assert!(
         !workflow.contains("RUSTUP_TOOLCHAIN"),
-        "the workflow must not override the stable default toolchain"
+        "the workflow must not override the default toolchain"
     );
 
     for fact in [
