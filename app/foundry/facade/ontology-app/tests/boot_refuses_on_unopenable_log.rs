@@ -1,12 +1,3 @@
-//! Boot is fail-closed. A configured durable path that cannot be opened is
-//! a BOOT REFUSAL — never an in-memory fallback, never a degraded serve —
-//! and the action log and the denial trail must be two distinct stores, so
-//! a refusal can never land in the log it was refused from.
-//!
-//! Operator procedure: a refusal here names the offending path in its typed
-//! error. Fix the path or its permissions and restart; the process holds no
-//! state of its own, so there is nothing to recover.
-
 use std::path::PathBuf;
 
 use foundry_ontology_app::{BootError, Config, compose};
@@ -20,6 +11,10 @@ fn temp_path(case: &str, slot: &str) -> PathBuf {
             .expect("system clock is after the epoch")
             .as_nanos()
     ))
+}
+
+fn a_path_that_cannot_be_opened(under: &std::path::Path) -> PathBuf {
+    under.join("no-such-directory").join("log.sqlite")
 }
 
 struct Paths {
@@ -42,8 +37,6 @@ impl Paths {
             action_log: self.action.clone(),
             denial_log: self.denial.clone(),
             tenants: vec!["ten_test".into()],
-            // No operators: deny-all serving is the honest posture for a
-            // process whose surfaces this suite never authenticates to.
             operators: Vec::new(),
         }
     }
@@ -71,9 +64,7 @@ fn a_clean_configuration_boots() {
 fn an_unopenable_action_log_refuses_boot() {
     let paths = Paths::new("unopenable-action");
     let mut config = paths.config();
-    // A path whose parent does not exist cannot be opened, and inventing one
-    // would be the process deciding where durable state lives.
-    config.action_log = paths.action.join("no-such-directory").join("log.sqlite");
+    config.action_log = a_path_that_cannot_be_opened(&paths.action);
     let refused = compose(&config).expect_err("an unopenable action log refuses boot");
     assert!(
         matches!(refused, BootError::ActionLogUnopenable { .. }),
@@ -85,7 +76,7 @@ fn an_unopenable_action_log_refuses_boot() {
 fn an_unopenable_denial_log_refuses_boot() {
     let paths = Paths::new("unopenable-denial");
     let mut config = paths.config();
-    config.denial_log = paths.denial.join("no-such-directory").join("log.sqlite");
+    config.denial_log = a_path_that_cannot_be_opened(&paths.denial);
     let refused = compose(&config).expect_err("an unopenable denial log refuses boot");
     assert!(
         matches!(refused, BootError::DenialLogUnopenable { .. }),
@@ -109,8 +100,6 @@ fn an_empty_tenant_roster_refuses_boot() {
     let paths = Paths::new("no-tenants");
     let mut config = paths.config();
     config.tenants = Vec::new();
-    // The log cannot enumerate tenants, so the roster IS the served set; an
-    // empty one would serve nothing while reporting ready.
     assert_eq!(
         compose(&config).expect_err("an empty roster refuses boot"),
         BootError::NoTenantsConfigured

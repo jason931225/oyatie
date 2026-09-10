@@ -1,20 +1,3 @@
-//! Lag must be measured against the log, not against a snapshot of it.
-//!
-//! `sync_status` read its head from `TenantState.entries`, the boot mirror.
-//! That vector is assigned once in `compose` and never appended to, so the
-//! head was frozen while `applied_ordinal` only grew: the saturating
-//! subtraction was identically zero for the life of the process. Every
-//! consumer inherited it — `/readyz` could not detect a projection behind its
-//! log, and `foundry_projection_lag` was a gauge that could not move, which
-//! is why the freshness objective was deleted rather than shipped over it.
-//!
-//! A second writer appending to the same durable log is the cheapest way to
-//! DRIVE the signal here, but it is not the argument that the signal matters:
-//! `AppState` declares SQLite single-writer. The in-contract breach is that
-//! `append_with_receipt` commits before `apply_sealed` runs, so a panic
-//! between them leaves this process permanently one behind for its lifetime,
-//! with no second writer anywhere.
-
 mod facade_support;
 mod failing_log;
 mod out_of_band;
@@ -82,11 +65,6 @@ async fn the_exported_gauge_reports_the_real_lag() {
     );
 }
 
-/// A tenant that could not be sampled must be COUNTED, not scored as zero.
-///
-/// Without this the two totals are indistinguishable from healthy: a lag of
-/// zero because every tenant is caught up, and a lag of zero because no
-/// tenant could be read, render identically.
 #[tokio::test]
 async fn a_tenant_that_cannot_be_sampled_is_counted_as_unknown() {
     let fixture = Fixture::new("lag-unknown");
@@ -136,13 +114,6 @@ async fn the_totals_are_sums_over_every_served_tenant() {
     );
 }
 
-/// The lag total ACCUMULATES across tenants.
-///
-/// One tenant cannot tell `total += x` from `total = x`. Two tenants with
-/// EQUAL lag cannot tell a sum of entries from a count of tenants, nor from
-/// an accumulation clamped to one per tenant. Unequal lag tells all three
-/// apart, which is what the help text's "entries … summed over served
-/// tenants" actually claims.
 #[tokio::test]
 async fn the_lag_total_accumulates_across_tenants() {
     let fixture = Fixture::new("lag-two-lagging");
@@ -150,13 +121,7 @@ async fn the_lag_total_accumulates_across_tenants() {
     config.tenants = vec!["ten_acme".into(), "ten_second".into()];
     let state = foundry_ontology_app::compose(&config).expect("boots");
 
-    // ASYMMETRIC on purpose. Two tenants one behind each cannot tell a sum of
-    // ENTRIES from a count of affected TENANTS — both give two — and the help
-    // text promises entries. Two behind plus one behind gives three, which no
-    // per-tenant count and no clamped accumulation can produce.
-    out_of_band::append_for(&fixture.action_log_path(), "ten_acme", "idem_acme_1");
-    out_of_band::append_for(&fixture.action_log_path(), "ten_acme", "idem_acme_2");
-    out_of_band::append_for(&fixture.action_log_path(), "ten_second", "idem_second");
+    append_unequally(&fixture.action_log_path(), "idem_lag");
 
     let seen = foundry_ontology_app::observation::observe(&state);
     assert_eq!(
@@ -170,26 +135,13 @@ async fn the_lag_total_accumulates_across_tenants() {
     );
 }
 
-/// The poison total accumulates across tenants too.
-///
-/// Seeded BEFORE boot, so the fold consumes them and refuses them: that is a
-/// poison, where the same bytes appended after boot would have been lag.
-/// Unequal counts per tenant, so a clamped or per-tenant accumulation cannot
-/// produce the total either.
 #[tokio::test]
 async fn the_poison_total_accumulates_across_tenants() {
     let fixture = Fixture::new("poison-two-tenants");
     let mut config = fixture.config();
     config.tenants = vec!["ten_acme".into(), "ten_second".into()];
 
-    // Asymmetric for the same reason as the lag total above.
-    out_of_band::append_for(&fixture.action_log_path(), "ten_acme", "idem_poison_acme_1");
-    out_of_band::append_for(&fixture.action_log_path(), "ten_acme", "idem_poison_acme_2");
-    out_of_band::append_for(
-        &fixture.action_log_path(),
-        "ten_second",
-        "idem_poison_second",
-    );
+    append_unequally(&fixture.action_log_path(), "idem_poison");
 
     let state = foundry_ontology_app::compose(&config).expect("boots over poisoned logs");
     let seen = foundry_ontology_app::observation::observe(&state);
@@ -204,28 +156,9 @@ async fn the_poison_total_accumulates_across_tenants() {
     );
 }
 
-/// EVERY gauge comes from one observation, asserted exactly.
-///
-/// With an always-failing log every pass agrees, so one pass and three are
-/// indistinguishable; a head that fails once separates them. The assertion is
-/// exact rather than a disjunction over acceptable pairs, for two reasons a
-/// disjunction got wrong. An alternative arm admitting `unknown 0` green-lit
-/// a revert that merely consumed the first failure elsewhere — a warm-up read
-/// before the passes — because that arm is unreachable under one read per
-/// tenant per scrape and absorbed the world where it is not. And a pair
-/// covering only lag and unknown left `foundry_poisoned_entries` free to walk
-/// out of the shared observation, while its own help text on the wire claims
-/// the unknown gauge qualifies it.
-///
-/// The fixture seeds one poisoned entry so the third element is a real zero:
-/// a tenant that could not be read contributes nothing to ANY total, and a
-/// zero that no tenant could have contributed to proves nothing.
 #[tokio::test]
 async fn the_gauges_are_one_observation_not_several() {
     let fixture = Fixture::new("lag-torn-snapshot");
-    // Seeded before boot, so this tenant genuinely carries a poison. Without
-    // it the poisoned total is zero under every implementation and the third
-    // element below would be vacuous.
     out_of_band::append_for(&fixture.action_log_path(), "ten_acme", "idem_torn_poison");
     // The seed must ACTUALLY poison, or the third element below is vacuous:
     // every implementation renders zero when there is no poison to report,
@@ -257,4 +190,16 @@ async fn the_gauges_are_one_observation_not_several() {
          no total and is counted once as unknown; any other triple means the \
          gauges did not come from one observation of one tenant\n{body}"
     );
+}
+
+const ENTRIES_BEHIND_ON_ACME: usize = 2;
+const ENTRIES_BEHIND_ON_SECOND: usize = 1;
+
+fn append_unequally(log: &std::path::Path, key_prefix: &str) {
+    for entry in 1..=ENTRIES_BEHIND_ON_ACME {
+        out_of_band::append_for(log, "ten_acme", &format!("{key_prefix}_acme_{entry}"));
+    }
+    for entry in 1..=ENTRIES_BEHIND_ON_SECOND {
+        out_of_band::append_for(log, "ten_second", &format!("{key_prefix}_second_{entry}"));
+    }
 }

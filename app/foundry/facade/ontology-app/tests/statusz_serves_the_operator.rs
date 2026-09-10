@@ -1,18 +1,3 @@
-//! `/statusz` answers, and answers only what the caller may already see.
-//!
-//! It shipped as a hardcoded refusal whose stated reason — "no policy
-//! decision point is composed" — stopped being true the moment one was: every
-//! read route calls `state.pep.decide`. A stub is a reasonable thing to ship;
-//! a stub whose explanation has rotted is a claim the process makes about
-//! itself and does not check.
-//!
-//! What it serves is deliberately a UNION OF THINGS ALREADY VISIBLE to the
-//! same caller — the loaded policy version, the aggregate observation that
-//! `/metrics` publishes unauthenticated, and the entity types `/v1/types`
-//! already returns them. It is a typed operator view, not a new disclosure,
-//! and it is authorized anyway because the fields it will grow (attestations,
-//! seed digests) are not public.
-
 mod facade_support;
 mod failing_log;
 mod out_of_band;
@@ -62,9 +47,6 @@ async fn an_operator_reads_the_status_surface() {
     );
 }
 
-/// It is authorized, not merely authenticated — the same bar `/v1/audit` and
-/// `/v1/types` are held to, because the fields this surface will grow are
-/// not public even though today's are.
 #[tokio::test]
 async fn a_roleless_caller_is_refused_the_status_surface() {
     let fixture = Fixture::new("statusz-roleless");
@@ -77,11 +59,6 @@ async fn a_roleless_caller_is_refused_the_status_surface() {
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
 }
 
-/// And it reports the lag it actually has, not a constant.
-///
-/// A status surface that cannot move is the same defect the freshness
-/// objective was deleted for, one layer up: an operator reading it would
-/// learn nothing about the state it names.
 #[tokio::test]
 async fn the_status_surface_reports_a_lag_that_moves() {
     let fixture = Fixture::new("statusz-lag");
@@ -136,12 +113,6 @@ async fn the_status_surface_reports_a_poison_it_actually_has() {
     );
 }
 
-/// A wedged tenant must not hang the surface that explains the wedge.
-///
-/// `/statusz` is what an operator reaches for when the process is stuck, and
-/// stuck means a tenant lock held across a long replay. Waiting on that lock
-/// would make the diagnostic unavailable exactly when it is needed, so this
-/// surface tries and reports what it could not read rather than blocking.
 #[tokio::test]
 async fn a_contended_tenant_is_reported_not_waited_on() {
     let fixture = Fixture::new("statusz-contended");
@@ -175,12 +146,6 @@ async fn a_contended_tenant_is_reported_not_waited_on() {
     drop(held);
 }
 
-/// An unreadable store is reported as unreadable, not as busy or as zero.
-///
-/// The two unread causes are separate fields because they mean opposite
-/// things — a lock held is a service in use, a head that will not read is a
-/// store failing — and an operator triaging from this surface needs to know
-/// which one they have.
 #[tokio::test]
 async fn an_unreadable_store_is_reported_as_such() {
     let fixture = Fixture::new("statusz-unreadable");
@@ -202,11 +167,6 @@ async fn an_unreadable_store_is_reported_as_such() {
     );
 }
 
-/// The same two gates the other tenant-wide views run.
-///
-/// Authorization alone let a credential naming an unserved tenant read this
-/// surface, which `/v1/audit` and `/v1/types` both refuse. The module claimed
-/// that bar before the code met it.
 #[tokio::test]
 async fn a_credential_for_an_unserved_tenant_is_refused() {
     let fixture = Fixture::new("statusz-unserved");
@@ -223,8 +183,6 @@ async fn a_credential_for_an_unserved_tenant_is_refused() {
     );
 }
 
-/// A foreign tenant is refused, on the surface whose whole argument is a
-/// tenancy one.
 #[tokio::test]
 async fn a_foreign_tenant_is_refused_the_status_surface() {
     let fixture = Fixture::new("statusz-foreign");
@@ -272,11 +230,6 @@ async fn the_status_counts_the_roster_and_reads_the_callers_own_tenant() {
 /// availability is part of the read surface's availability, and a refusal
 /// here already counts via `authorized`. Counting only the refusals would
 /// depress the ratio for a surface that answered.
-///
-/// The cost is real and stated in the objective: an operator polling this
-/// endpoint moves the read SLI, so the ratio reflects polling frequency as
-/// well as service health. Whether a control-plane surface belongs in a data
-/// SLI at all is a question for the objective, not for this handler.
 #[tokio::test]
 async fn a_served_status_counts_as_a_served_read() {
     let fixture = Fixture::new("statusz-counts");

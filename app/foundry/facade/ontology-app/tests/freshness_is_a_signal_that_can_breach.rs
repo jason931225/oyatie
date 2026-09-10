@@ -1,18 +1,3 @@
-//! The freshness objective, over a signal that can actually breach.
-//!
-//! An earlier objective over `foundry_projection_lag` was DELETED rather than
-//! reworded, because the lag was derived from a boot-time mirror and was
-//! identically zero: an indicator that could never breach is declared
-//! coverage providing none. The head is durable now, so the signal moves.
-//!
-//! It is exported as a single boolean rather than left to a query joining the
-//! lag and unknown gauges. Two reasons. The join needs `ignoring(__name__)`
-//! label matching whose behaviour nothing in this repo can execute against,
-//! so it would ship as a reviewed reading rather than a tested one. And the
-//! process already computes the predicate for `/readyz`: exporting the same
-//! one makes the objective and the probe agree by construction rather than by
-//! two expressions that must be kept in step.
-
 mod facade_support;
 mod failing_log;
 mod out_of_band;
@@ -45,10 +30,6 @@ async fn a_lagging_process_does_not_report_fresh() {
     );
 }
 
-/// A tenant nobody could read is not evidence of freshness.
-///
-/// This is the half a lag-only indicator gets wrong: an unreadable tenant
-/// contributes nothing to the lag total, so `lag == 0` would score it good.
 #[tokio::test]
 async fn an_unobserved_tenant_does_not_report_fresh() {
     let fixture = Fixture::new("fresh-unobserved");
@@ -139,13 +120,6 @@ async fn a_busy_tenant_among_others_is_not_reported_stale() {
     drop(held);
 }
 
-/// But a roster NOBODY could read is not fresh — it is not measured.
-///
-/// Reads hold the tenant mutex across a full replay, so a hung store holds it
-/// indefinitely and every pass sees contention. "Every tenant we could read is
-/// caught up" is then true of the empty set, and without this the objective
-/// would score a wedged process 100% fresh, silently, for as long as it stayed
-/// wedged — while `/readyz` refused every probe.
 #[tokio::test]
 async fn a_process_that_observed_nothing_is_not_fresh() {
     let fixture = Fixture::new("fresh-wedged");
@@ -174,7 +148,6 @@ async fn a_process_that_observed_nothing_is_not_fresh() {
     drop(held);
 }
 
-/// The exposition splits the two causes it used to sum.
 #[tokio::test]
 async fn the_exposition_distinguishes_busy_from_unreadable() {
     let fixture = Fixture::new("fresh-split-causes");

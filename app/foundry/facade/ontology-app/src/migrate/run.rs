@@ -1,34 +1,8 @@
-//! `POST /v1/migrations/run` — execute a plan to its fixpoint.
-//!
-//! The executing half of the migration surfaces, and the one that WRITES. It
-//! is gated on `Invoke` rather than `Use`, and every refusal returns before
-//! the runner is reached: a migration that half-ran and then refused is worse
-//! than one that never started, because the operator's next decision is made
-//! against a population no plan describes.
-//!
-//! THE AUTHORITY IS THE CALLER'S OWN DECISION — and precisely which part of
-//! it, because the looser claim was wrong. `MigrationAuthority` carries a
-//! `decision_id`, the surfaces allowed and an autonomy tier, and the runner
-//! stamps all three onto every upcast it writes. Only the decision and the
-//! principal come from the PDP: `authz.rs` fills `allowed_surfaces` and
-//! `autonomy_tier` with process constants on every Allow, so calling the
-//! whole struct "the PDP's answer" would tell the next reader that two of its
-//! fields carry an authority they do not.
-//!
-//! What must never happen is a `decision_id` this process invented. That puts
-//! an authorization into the durable record that no policy engine granted —
-//! an audit trail asserting a decision was made when none was — and nothing
-//! downstream notices, because the kernel only checks the id is non-empty.
-//! The suite pins it by VALUE against the seeded generator, having twice been
-//! written in shapes that a fabrication satisfied.
-//!
-//! On `Invoke` versus `Use`: no credential this process can mint holds one
-//! without the other, because `foundry-policies.cedar` scopes both permits to
-//! `Role::"foundry-operator"`. That is a property of the policy rather than a
-//! gap in these tests, and it is why the gate is pinned by a roleless caller
-//! writing nothing rather than by a caller who may read but not act. The
-//! surfaces stay distinct because the POLICY may one day separate them, and a
-//! write asking for read permission would then be a silent escalation.
+//! Only `decision_id` and `principal_id` come from the PDP — `authz.rs` fills
+//! `allowed_surfaces` and `autonomy_tier` with process constants on every
+//! Allow — and a `decision_id` this process invented would put into the
+//! durable record an authorization no policy engine granted, which nothing
+//! downstream notices because the kernel only checks it is non-empty.
 
 use std::sync::Arc;
 
@@ -45,14 +19,6 @@ use crate::composition::AppState;
 use crate::pdp::Surface;
 use crate::reads::{TENANT_SCOPED_RESOURCE, refuse};
 
-/// What one run did and where the population stands after it.
-///
-/// EVERY field the runner reports, not a chosen three. A run that stopped
-/// short is the case an operator most needs to see, and it is invisible in a
-/// body carrying only totals: `fixpoint` is the verdict, and `refused`,
-/// `conflicted` and `poisoned` are the three ways an object can be owed and
-/// stay owed. Reporting the flattering subset would have made a store outage
-/// mid-migration look like a completed one.
 #[derive(Debug, Serialize)]
 pub(crate) struct RunBody {
     pub(crate) total: u64,       // data_class: INTERNAL_ONLY
@@ -109,7 +75,6 @@ pub async fn run(State(state): State<Arc<AppState>>, headers: HeaderMap, body: S
         );
     };
 
-    // The credential's tenant, checked rather than substituted.
     if request.tenant_id != caller.tenant_id {
         state.metrics.submit_refused();
         return refuse(

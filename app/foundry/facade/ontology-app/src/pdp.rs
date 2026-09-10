@@ -1,19 +1,3 @@
-//! The policy enforcement point: this process decides by the checked-in
-//! Cedar seed, evaluated by the platform's own engine.
-//!
-//! Two choices are load-bearing. First, the seed is compiled into the
-//! binary with `include_str!` and strict-validated at load, so a policy set
-//! that does not compile is a boot refusal rather than a surface that
-//! silently permits nothing. Second, the process never re-states the
-//! seed's conditions in Rust: a hand-written grant table would make the
-//! served posture something other than the validated one, and the
-//! checked-in policy would become decoration.
-//!
-//! The slug bridge is the bundle's own `action_map`. The platform's
-//! authorization contract slug-checks request actions, so an engine action
-//! id like `InvokeAction` can never be a request action; the map is where
-//! contract slugs meet engine ids, and an unmapped slug fails closed.
-
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -22,17 +6,13 @@ use policy_pdp_kernel::{PdpRuntimeConfig, PdpRuntimeGuard, PolicyBundle, PolicyD
 use shared_platform_contracts_kernel::pdp::PolicyVersion;
 use shared_ulid_id_kernel::SeededIdGenerator;
 
-/// The surfaces this process authorizes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Surface {
-    /// Submitting an Action — the write path.
     Invoke,
-    /// Reading the ontology — the surface the shell's module card gates on.
     Use,
 }
 
 impl Surface {
-    /// The contract slug this surface presents to the PDP.
     pub const fn slug(self) -> &'static str {
         match self {
             Self::Invoke => "foundry.ontology.invoke",
@@ -54,16 +34,11 @@ impl Surface {
 const SCHEMA_SRC: &str = include_str!("../../../cedar/foundry.cedarschema");
 const POLICIES_SRC: &str = include_str!("../../../cedar/foundry-policies.cedar");
 
-/// The operations console is the only surface the seed grants.
 pub const OPS_CONSOLE: &str = "ops-console";
 
-/// Why the enforcement point refused.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PepError {
-    /// The bundle failed to compile or strict-validate; nothing is loaded.
     BundleRejected { detail: String },
-    /// The PDP answered Deny, or refused to answer. Both are refusals: the
-    /// port's own contract says every error is fail-closed.
     Denied,
 }
 
@@ -78,9 +53,6 @@ impl std::fmt::Display for PepError {
     }
 }
 
-/// Build the bundle this process serves from. The action map is the whole
-/// slug bridge: `invoke` reaches the existing engine action, `use` is
-/// identity because the seed declares it under its contract name.
 fn bundle(version: &str) -> Result<PolicyBundle, PepError> {
     Ok(PolicyBundle {
         version: PolicyVersion::new(version).map_err(|error| PepError::BundleRejected {
@@ -104,8 +76,6 @@ fn bundle(version: &str) -> Result<PolicyBundle, PepError> {
     })
 }
 
-/// Compile and strict-validate the seed, then serve from it behind the
-/// runtime guard (deadline, circuit, decision metrics, unwind capture).
 pub fn load_guarded(version: &str) -> Result<PdpRuntimeGuard, PepError> {
     let pdp = CedarPdp::load(
         &bundle(version)?,

@@ -1,16 +1,6 @@
-//! The `foundry-ontology` binary entrypoint.
-//!
-//! Boots from the environment and drains gracefully on SIGTERM or ctrl-c.
-//! The start-up path is panic-free: every failure is a structured log line
-//! and a non-zero exit. A durable store that cannot be opened is a boot
-//! refusal, never a degraded serve — and there is no shutdown-time
-//! persistence duty, because appends are transactional and the projection is
-//! disposable derived state rebuilt by replay at the next boot.
-
 use foundry_ontology_app::{Config, compose, observability, router};
 use tracing::{error, info};
 
-/// Resolve on SIGTERM (pod termination) or ctrl-c (local runs).
 async fn shutdown_signal() {
     let ctrl_c = async {
         if tokio::signal::ctrl_c().await.is_err() {

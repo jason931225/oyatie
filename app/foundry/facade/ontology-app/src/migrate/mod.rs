@@ -1,24 +1,11 @@
-//! The migration surfaces and the wire vocabulary they share.
+//! The tenant is the CREDENTIAL's on both migration surfaces. A plan whose
+//! own `tenant_id` disagrees is refused rather than rewritten.
 //!
-//! `POST /v1/migrations/attest` reports what a plan still owes; it is a READ
-//! dressed as a POST and mutates nothing. `POST /v1/migrations/run` executes
-//! one, and is a write. Each lives in its own module; what they SHARE is the
-//! plan on the wire, and it is shared rather than copied so that a rule
-//! landing on one cannot silently miss the other.
-//!
-//! THE TENANT IS THE CREDENTIAL'S. `MigrationPlan` carries its own
-//! `tenant_id`, and the write path settled what that means: nothing in the
-//! body may move the tenant. A plan whose tenant disagrees with the
-//! credential is refused rather than silently rewritten — a caller who names
-//! the wrong tenant has asked a question this process should not answer.
-//!
-//! That check is DEFENCE IN DEPTH on both surfaces and is not what stops a
-//! cross-tenant access; claiming otherwise would misdirect the next reader to
-//! the wrong control. The PDP refuses a caller whose credential does not
-//! carry the tenant, and `tenant_of` resolves the tenant by
-//! `caller.tenant_id` unconditionally, so the body cannot select one. Delete
-//! the check and a foreign plan still refuses, with a worse diagnostic — which
-//! is the reason to keep it.
+//! That check is DEFENCE IN DEPTH, not the control that stops a cross-tenant
+//! access: the PDP refuses a caller whose credential does not carry the
+//! tenant, and `tenant_of` resolves by `caller.tenant_id` unconditionally, so
+//! deleting the check would still refuse a foreign plan — with a worse
+//! diagnostic, which is the reason to keep it.
 
 pub(crate) mod attest;
 pub(crate) mod run;
@@ -30,13 +17,6 @@ use foundry_spine::{
     DefaultValue, MigrationPlan, UpcastTransform, ValueConversion, migration_attestation,
 };
 
-/// UNKNOWN FIELDS ARE REFUSED, and the omission was nearly catastrophic.
-/// With `transforms` defaulting and an unknown key discarded, a one-character
-/// typo — `"transform"` — yielded an empty transform list, a `validate` whose
-/// transform loop passes vacuously, and `{"fixpoint":true,"pending":[]}`: a
-/// green light to skip a migration that is owed. The write path has held this
-/// law since it shipped, four lines above the tenancy rule this module took
-/// from the same file.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PlanRequest {
@@ -113,22 +93,6 @@ impl WireDefault {
 }
 
 impl WireTransform {
-    /// The VARIANT is observable here; the VALUE it carries is not. The
-    /// distinction is exact and was got wrong once, so it is written down.
-    ///
-    /// The variant is checked: `check_transform` compares the target's
-    /// declared scalar against `DefaultValue::scalar_type()`, which is a
-    /// function of the variant alone. That check is invisible against an
-    /// UNTYPED target, which carries the legacy String contract under which
-    /// every non-string default is incompatible and they all refuse alike —
-    /// so the suite declares a typed property for the arms to be told apart.
-    ///
-    /// The value is not: `computed_target` returns early when the target
-    /// property is present — a default fills an absence and never overwrites
-    /// — and when it is absent, any value at all yields a computed target. So
-    /// `pending` cannot depend on which constant the arm produced.
-    /// `POST /v1/migrations/run` is where that becomes observable, because
-    /// there the value is written; it is pinned there, not pretended here.
     fn into_domain(self) -> Result<UpcastTransform, &'static str> {
         Ok(match self {
             WireTransform::CopyAs { from, to } => UpcastTransform::CopyAs { from, to },

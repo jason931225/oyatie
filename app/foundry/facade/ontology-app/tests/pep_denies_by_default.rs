@@ -1,20 +1,3 @@
-//! The policy enforcement point: this process decides by the checked-in
-//! Cedar seed, evaluated by the platform's own engine, or it refuses.
-//!
-//! The load-bearing test here is the ALLOW path. A deny-only suite would
-//! pass just as happily against a PEP that denies everything — including a
-//! PEP broken by a context-type mismatch, where the seed compares
-//! `context.autonomy_tier <= 1` as a Cedar `Long` while the request carries
-//! JSON. If that conversion were lossy the permit would never fire and the
-//! process would deny every caller while looking correctly fail-closed.
-//! So: one Allow proven end to end, then the denials around it.
-//!
-//! Operator procedure: a 403 with gate `Authorization` means the PDP
-//! returned Deny or refused. `/statusz` reports `loaded_policy_version`;
-//! compare it against the bundle you expect. A boot refusal here means the
-//! seed did not strict-validate — the process never serves a policy set it
-//! could not compile.
-
 use foundry_ontology_app::{Caller, PepError, PolicyEnforcementPoint, Surface};
 
 fn pep() -> PolicyEnforcementPoint {
@@ -79,9 +62,6 @@ fn a_cross_tenant_caller_is_refused_on_both_surfaces() {
 
 #[test]
 fn an_unknown_principal_is_denied_by_default() {
-    // No role: this process must not invent membership for whoever asks,
-    // or the seed's `principal is Principal in Role::"foundry-operator"`
-    // clause would be vacuous and the permit would cover the world.
     let stranger = Caller {
         tenant_id: "ten_acme".into(),
         principal_id: "prn_nobody".into(),

@@ -1,17 +1,3 @@
-//! `POST /v1/actions` — the write surface.
-//!
-//! The order here is the whole security argument, and it runs
-//! authenticate → authorize → submit. Nothing reaches the log before a
-//! policy decision exists, and the decision this process hands the writer
-//! is the PDP's own, so the appended entry is attributable to the
-//! authorization that permitted it.
-//!
-//! This handler never decides what an object may carry. It converts the
-//! request, and the registry — through the writer's gates and the fold's
-//! re-check — decides everything else. A refusal is reported with the gate
-//! that produced it so an operator knows whether to look at the roster,
-//! the seed, or the schema.
-
 use std::sync::Arc;
 
 use axum::Json;
@@ -28,7 +14,6 @@ use crate::composition::AppState;
 use crate::dto::{RefusalBody, SubmitRequest, SubmitResponse};
 use crate::pdp::Surface;
 
-/// Submit one Action.
 pub async fn submit_action(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -120,12 +105,6 @@ pub async fn submit_action(
 
     let (log, denial_log, projection) = tenant.write_handles();
     let outcome = submit(submission, log, denial_log, projection);
-    // Every submission lands in exactly one of served or refused, including
-    // the ones refused before the writer was reached — an availability
-    // denominator that omitted authorization failures would report a number
-    // flatter than the service. A POISONED outcome counts as served: the log
-    // accepted it and the projection refused it by law, which is the system
-    // working, not an outage.
     match &outcome {
         Ok(_) => state.metrics.submit_served(),
         Err(_) => state.metrics.submit_refused(),
@@ -145,11 +124,9 @@ pub async fn submit_action(
             poison_reason: Some(format!("{reason:?}")),
         })
         .into_response(),
-        Err(WriteError::Refused(refused)) => refuse(
-            StatusCode::FORBIDDEN,
-            &format!("{:?}", refused.gate).to_lowercase(),
-            refused.cause,
-        ),
+        Err(WriteError::Refused(refused)) => {
+            refuse(StatusCode::FORBIDDEN, refused.gate.label(), refused.cause)
+        }
         // A divergent reuse of a spent key is the caller's conflict to
         // resolve, not something to retry into.
         Err(WriteError::Log(RecordsLogError::IdempotencyConflict { .. })) => refuse(
@@ -157,28 +134,8 @@ pub async fn submit_action(
             "log",
             "this idempotency key is already spent on different content",
         ),
-        // The OTHER variant means the opposite thing. A storage fault is the
-        // service failing, not the caller colliding with themselves, and it
-        // is the one LOG failure here that a retry of the same bytes may get
-        // past. (Not the only retryable refusal on this surface: a PDP
-        // timeout or open circuit collapses to 403 at `authz.rs:79-82`, which
-        // `authorizer_outage_is_deny`'s header settles as deliberate — no
-        // test exercises a timeout or an open circuit.)
-        //
-        // The arm is COARSER than the error it answers: `Storage` funnels
-        // every `rusqlite` failure, so a transient lock and a corrupt page
-        // arrive identically and cannot be told apart here. 503 is chosen for
-        // the common transient case; the message promises nothing about a
-        // retry, because for the corrupt case no retry will help.
-        //
-        // The detail is not echoed. The 403 above echoes `refused.cause` and
-        // the 200 echoes `poison_reason`, both INTERNAL_ONLY, so operator
-        // reachability is not the axis. `refused.cause` is an authored
-        // `&'static str`; `poison_reason` renders kernel errors whose STRING
-        // payloads are the caller's own submitted names, going back to that
-        // caller — the rest are ordinals, wire tags and revisions. Neither
-        // carries anything from this process's environment.
-        // `rusqlite::Error` does: it is unbounded and path-bearing.
+        // The detail is deliberately not echoed: unlike the causes the other
+        // arms echo, `rusqlite::Error` is unbounded and path-bearing.
         Err(WriteError::Log(RecordsLogError::Storage { .. })) => refuse(
             StatusCode::SERVICE_UNAVAILABLE,
             "log",
@@ -194,10 +151,6 @@ pub async fn submit_action(
 /// a retry arrived as divergent content under a spent key and conflicted
 /// instead of deduplicating. Nothing about how the payload is built may
 /// depend on state the request cannot see.
-///
-/// This surface therefore writes whole records. Partial-update semantics
-/// belong to their own action type, declared in the registry, rather than
-/// to a facade inferring intent from what it happens to know.
 fn edits_for(request: &SubmitRequest) -> Result<EditSet, ()> {
     let properties: Vec<WireProperty> = request
         .properties
@@ -219,9 +172,6 @@ fn edits_for(request: &SubmitRequest) -> Result<EditSet, ()> {
     EditSet::new(vec![edit]).map_err(|_| ())
 }
 
-/// The entity type the seeded registry declares. The surface admits one
-/// type while the registry is compiled in; the Ontology Manager vertical
-/// owns making that a runtime choice.
 const SEEDED_ENTITY_TYPE: &str = "ety_record";
 
 fn refuse(status: StatusCode, gate: &str, cause: &str) -> Response {

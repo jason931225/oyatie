@@ -12,18 +12,14 @@
 
 use std::collections::BTreeSet;
 
-/// One objective, in the shape the corpus grammar expects.
 pub struct SloSpec {
-    /// Kebab file stem; the payload is `<name>.generated.openslo.yaml`.
-    pub name: &'static str, // data_class: INTERNAL_ONLY
-    pub display_name: &'static str, // data_class: INTERNAL_ONLY
-    pub sli_class: &'static str,    // data_class: INTERNAL_ONLY
-    pub description: &'static str,  // data_class: INTERNAL_ONLY
-    /// Prometheus expression for the numerator.
-    pub good_query: &'static str, // data_class: INTERNAL_ONLY
-    /// Prometheus expression for the denominator.
-    pub total_query: &'static str, // data_class: INTERNAL_ONLY
-    pub target: &'static str,       // data_class: INTERNAL_ONLY
+    pub name: &'static str,              // data_class: INTERNAL_ONLY
+    pub display_name: &'static str,      // data_class: INTERNAL_ONLY
+    pub sli_class: &'static str,         // data_class: INTERNAL_ONLY
+    pub description: &'static str,       // data_class: INTERNAL_ONLY
+    pub good_query: &'static str,        // data_class: INTERNAL_ONLY
+    pub total_query: &'static str,       // data_class: INTERNAL_ONLY
+    pub target: &'static str,            // data_class: INTERNAL_ONLY
     pub objective_display: &'static str, // data_class: INTERNAL_ONLY
     /// Whether the ratio's sources are cumulative counters. False for a
     /// gauge-backed objective: declaring a gauge cumulative tells a consumer
@@ -32,12 +28,6 @@ pub struct SloSpec {
 }
 
 impl SloSpec {
-    /// The metrics this objective names, SCANNED OUT OF THE QUERIES rather
-    /// than declared beside them. An earlier revision kept a hand-maintained
-    /// list: changing a query while leaving the list stale produced an
-    /// objective naming a deleted metric with the suite still green, because
-    /// the check validated its own input instead of the thing it existed to
-    /// guarantee.
     pub fn referenced_metrics(&self) -> BTreeSet<String> {
         const PREFIX: &str = "foundry_";
         let mut found = BTreeSet::new();
@@ -45,50 +35,37 @@ impl SloSpec {
             let mut consumed = 0;
             while let Some(at) = query[consumed..].find(PREFIX) {
                 let start = consumed + at;
-                // A hit must begin a token. Without this, the recording-rule
-                // idiom `job:foundry_read_served_total:rate5m` yields the
-                // exported substring and the objective passes while naming a
-                // series the process never emits. Rejecting it leaves that
-                // rule UNVALIDATED rather than validated: this scanner can
-                // only check names the process itself exports, and a rule
-                // lives in the evaluator's config, not here. An objective
-                // built entirely from rules therefore recovers nothing and
-                // fails the emptiness check, which is the honest answer.
-                let preceded_by_token_char = query[..start]
-                    .chars()
-                    .next_back()
-                    .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':');
-                let tail = &query[start..];
-                let end = tail
-                    .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
-                    .unwrap_or(tail.len());
-                if !preceded_by_token_char {
-                    // Nor may it be a prefix of a longer recording-rule name.
-                    let followed_by_colon = tail[end..].starts_with(':');
-                    if !followed_by_colon {
-                        found.insert(tail[..end].to_owned());
-                    }
+                let end = start + metric_name_len(&query[start..]);
+                if is_whole_metric_name(query, start, end) {
+                    found.insert(query[start..end].to_owned());
                 }
-                consumed = start + end;
+                consumed = end;
             }
         }
         found
     }
 }
 
+fn is_metric_name_char(character: char) -> bool {
+    character.is_ascii_alphanumeric() || character == '_'
+}
+
+fn metric_name_len(tail: &str) -> usize {
+    tail.find(|character: char| !is_metric_name_char(character))
+        .unwrap_or(tail.len())
+}
+
+fn is_whole_metric_name(query: &str, start: usize, end: usize) -> bool {
+    let continues_a_token = query[..start]
+        .chars()
+        .next_back()
+        .is_some_and(|character| is_metric_name_char(character) || character == ':');
+    let prefixes_a_recording_rule = query[end..].starts_with(':');
+    !continues_a_token && !prefixes_a_recording_rule
+}
+
 const SERVICE: &str = "foundry-ontology";
 
-/// The objectives this vertical declares. Each names only metrics
-/// `metrics::objective_eligible_metrics` reports — which is narrower than
-/// what the process exports, deliberately.
-/// The freshness objective is declared over `foundry_projection_caught_up`
-/// rather than over the lag gauge directly.
-///
-/// The lag alone is not the question. A scrape where no tenant could be read
-/// reports `lag 0`, and scoring that as fresh is the failure this module
-/// exists to prevent — so the indicator is the process's own predicate,
-/// which is zero for a lagging process and zero for an unobserved one.
-///
 /// Exporting the predicate rather than joining two gauges in the query is
 /// deliberate: the join needs `ignoring(__name__)` label matching that
 /// nothing here can execute against, and it would let the objective drift
@@ -164,9 +141,6 @@ pub static SLOS: &[SloSpec] = &[
     },
 ];
 
-/// Render one objective as its OpenSLO payload. Pure: the same spec always
-/// produces the same bytes, which is what makes the golden comparison a
-/// test rather than a snapshot.
 pub fn render_openslo(spec: &SloSpec) -> String {
     format!(
         "# Generated from `app/foundry/facade/ontology-app/src/slo.rs`. Do not hand-edit:\n\
@@ -220,16 +194,18 @@ pub fn render_openslo(spec: &SloSpec) -> String {
     )
 }
 
-/// Indent a description into a YAML literal block at four spaces.
+const YAML_BLOCK_INDENT: &str = "    ";
+const DESCRIPTION_WRAP_COLUMN: usize = 72;
+
 fn wrap_block(text: &str) -> String {
     text.split_whitespace()
         .fold(Vec::<String>::new(), |mut lines, word| {
             match lines.last_mut() {
-                Some(line) if line.len() + 1 + word.len() <= 72 => {
+                Some(line) if line.len() + 1 + word.len() <= DESCRIPTION_WRAP_COLUMN => {
                     line.push(' ');
                     line.push_str(word);
                 }
-                _ => lines.push(format!("    {word}")),
+                _ => lines.push(format!("{YAML_BLOCK_INDENT}{word}")),
             }
             lines
         })

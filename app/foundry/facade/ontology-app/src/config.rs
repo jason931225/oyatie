@@ -1,35 +1,22 @@
-//! The environment contract. Every field is explicit: this process invents
-//! no paths, no tenants and no listen address beyond a loopback default, so
-//! a misconfiguration is a refusal at boot rather than a surprise in
-//! production.
-
 use std::path::PathBuf;
 
 use crate::auth::OperatorCredential;
 
-/// Everything the process needs to serve, resolved before anything opens.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
     /// The address the listener binds. Loopback by default — exposure is a
     /// deployment decision, never a default.
     pub listen_addr: String, // data_class: INTERNAL_ONLY
-    /// The durable action log.
     pub action_log: PathBuf, // data_class: INTERNAL_ONLY
-    /// The durable denial trail — a SEPARATE store, so a refusal can never
-    /// land in the log it was refused from.
     pub denial_log: PathBuf, // data_class: INTERNAL_ONLY
     /// The tenants this process serves. `RecordsLog` cannot enumerate
     /// tenants, so the roster IS the served set.
     pub tenants: Vec<String>, // data_class: INTERNAL_ONLY
-    /// The operators this process recognizes. Absent means deny-all
-    /// serving — never an open surface, and never a boot failure.
     pub operators: Vec<OperatorCredential>, // data_class: SECRET
 }
 
-/// Why the environment was rejected.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ConfigError {
-    /// A required variable is absent or empty.
     Missing { variable: &'static str },
 }
 
@@ -50,8 +37,6 @@ const TENANTS: &str = "OYATIE_FOUNDRY_ONTOLOGY_TENANTS";
 const OPERATORS: &str = "OYATIE_FOUNDRY_ONTOLOGY_OPERATORS";
 
 impl Config {
-    /// Read the environment. Absent required values refuse; they are never
-    /// defaulted into a path this process chose for itself.
     pub fn from_env() -> Result<Self, ConfigError> {
         Ok(Self {
             listen_addr: non_empty(LISTEN_ADDR).unwrap_or_else(|| "127.0.0.1:8090".into()),
@@ -80,35 +65,33 @@ fn non_empty(variable: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// `OYATIE_FOUNDRY_ONTOLOGY_OPERATORS` as
-/// `token:tenant:principal:role|role,...`. An unparsable entry is dropped
-/// rather than guessed at: a half-understood credential must not become a
-/// recognized one.
 fn operators_from_env() -> Vec<OperatorCredential> {
     non_empty(OPERATORS)
         .unwrap_or_default()
         .split(',')
-        .filter_map(|entry| {
-            let mut fields = entry.trim().split(':');
-            let token = fields.next()?.trim();
-            let tenant_id = fields.next()?.trim();
-            let principal_id = fields.next()?.trim();
-            if token.is_empty() || tenant_id.is_empty() || principal_id.is_empty() {
-                return None;
-            }
-            Some(OperatorCredential {
-                token: token.to_owned(),
-                tenant_id: tenant_id.to_owned(),
-                principal_id: principal_id.to_owned(),
-                roles: fields
-                    .next()
-                    .unwrap_or_default()
-                    .split('|')
-                    .map(str::trim)
-                    .filter(|role| !role.is_empty())
-                    .map(ToOwned::to_owned)
-                    .collect(),
-            })
-        })
+        .filter_map(parse_operator)
         .collect()
+}
+
+fn parse_operator(entry: &str) -> Option<OperatorCredential> {
+    let mut fields = entry.trim().split(':');
+    let token = fields.next()?.trim();
+    let tenant_id = fields.next()?.trim();
+    let principal_id = fields.next()?.trim();
+    if token.is_empty() || tenant_id.is_empty() || principal_id.is_empty() {
+        return None;
+    }
+    Some(OperatorCredential {
+        token: token.to_owned(),
+        tenant_id: tenant_id.to_owned(),
+        principal_id: principal_id.to_owned(),
+        roles: fields
+            .next()
+            .unwrap_or_default()
+            .split('|')
+            .map(str::trim)
+            .filter(|role| !role.is_empty())
+            .map(ToOwned::to_owned)
+            .collect(),
+    })
 }

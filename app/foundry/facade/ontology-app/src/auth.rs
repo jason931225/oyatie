@@ -1,20 +1,5 @@
-//! Who is calling, established from the credential alone.
-//!
-//! The tenant, the principal and the roles all come from the presented
-//! token — never from a header, a path segment or the request body. That
-//! is the difference between a surface that authorizes and one that asks
-//! callers who they would like to be: a caller holding tenant A's token
-//! cannot address tenant B by saying so, because nothing in the request
-//! can move the tenant.
-//!
-//! Token comparison is constant-time over the whole roster. A short-circuit
-//! compare leaks a prefix oracle, and checking only until the first
-//! mismatch would let a caller learn a token one byte at a time.
-
 use crate::authz::Caller;
 
-/// One operator the process will recognize. Configuration, not policy: the
-/// seed decides what an operator may DO; this only decides who they are.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OperatorCredential {
     pub token: String,        // data_class: SECRET
@@ -35,7 +20,6 @@ impl OperatorCredential {
     }
 }
 
-/// Extract the bearer token from an `Authorization` header value.
 pub fn bearer_token(header: Option<&str>) -> Option<&str> {
     header?
         .strip_prefix("Bearer ")
@@ -43,9 +27,10 @@ pub fn bearer_token(header: Option<&str>) -> Option<&str> {
         .filter(|token| !token.is_empty())
 }
 
-/// Resolve a presented token to its caller, in constant time with respect
-/// to the roster: every credential is compared, and the comparison itself
-/// does not stop at the first differing byte.
+/// Constant time with respect to the ROSTER: the loop deliberately has no
+/// `break` and assigns `found` instead of returning, so the work done does
+/// not reveal a matching credential's position. An early return would be a
+/// timing oracle, not an optimization.
 pub fn authenticate(operators: &[OperatorCredential], presented: &str) -> Option<Caller> {
     let mut found: Option<&OperatorCredential> = None;
     for operator in operators {

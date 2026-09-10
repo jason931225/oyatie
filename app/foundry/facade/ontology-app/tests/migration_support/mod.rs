@@ -1,9 +1,3 @@
-//! Shared scaffolding for the migration surfaces.
-//!
-//! Lifted out of the first suite because the file reached the 300-line budget
-//! with the tests the review asked for still unwritten, and a second suite
-//! needs the same registry evolution and the same POST helper.
-
 use foundry_records_draft::RecordsLog;
 use foundry_records_sqlite_draft::SqliteRecordsLog;
 
@@ -91,7 +85,6 @@ pub(crate) fn state_with_two_revisions(config: &Config) -> AppState {
     state
 }
 
-/// POST a plan to the RUN surface.
 pub(crate) async fn run(
     session: &Session,
     token: Option<&str>,
@@ -100,7 +93,6 @@ pub(crate) async fn run(
     post_plan(session, token, plan, "/v1/migrations/run").await
 }
 
-/// POST a plan to the ATTEST surface.
 pub(crate) async fn attest(
     session: &Session,
     token: Option<&str>,
@@ -109,9 +101,6 @@ pub(crate) async fn attest(
     post_plan(session, token, plan, "/v1/migrations/attest").await
 }
 
-/// POST a plan to one of the migration surfaces. The shared harness posts
-/// only to `/v1/actions`, and widening it would have touched sixteen call
-/// sites in four unrelated files for two new routes.
 async fn post_plan(
     session: &Session,
     token: Option<&str>,
@@ -134,7 +123,6 @@ async fn post_plan(
         .await
 }
 
-/// A plan whose `tenant_id` names the caller's own tenant.
 pub(crate) fn plan_for(tenant_id: &str) -> String {
     format!(
         r#"{{"tenant_id":"{tenant_id}","entity_type":"ety_record","from_revision":1,
@@ -172,9 +160,6 @@ pub(crate) fn state_with_engine_only_evolved(config: &Config) -> AppState {
     state
 }
 
-/// A durable head, read from the store itself rather than from anything the
-/// process reports about itself. Both logs are named by the `Config` the test
-/// composed, so no shared harness has to grow an accessor for them.
 fn head_of(path: &std::path::Path) -> u64 {
     SqliteRecordsLog::open(path)
         .expect("the log opens")

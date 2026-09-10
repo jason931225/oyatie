@@ -1,12 +1,3 @@
-//! The HTTP surface this process serves: two probes, the exposition, an
-//! operator status endpoint, and the ontology read and write routes.
-//!
-//! `/statusz` refused unconditionally while no policy decision point was
-//! composed. One is, and has been for several lanes — so it now authorizes
-//! like the other tenant-wide views (`authorized` then `tenant_of`) and
-//! answers. Its deny-by-default posture is unchanged; what changed is that
-//! there is finally something to deny BY.
-
 use std::sync::Arc;
 
 use axum::Router;
@@ -18,7 +9,6 @@ use axum::routing::{get, post};
 use crate::composition::AppState;
 use crate::metrics::prometheus_text;
 
-/// Build the router over composed state.
 pub fn router(state: AppState) -> Router {
     router_from(Arc::new(state))
 }
@@ -53,26 +43,14 @@ async fn healthz() -> impl IntoResponse {
     (StatusCode::OK, "ok\n")
 }
 
-/// Readiness: every tenant's fold has consumed its whole log, AND every
-/// tenant could be read. Poison never enters this answer.
-///
-/// The three refusals are distinct and say so. Behind, unreadable, and busy
-/// are all "not ready", and collapsing them would name a state the process
-/// never observed — the failure this surface's own signal was rebuilt to
-/// stop. A busy tenant in particular WAS observable; only this pass missed
-/// it, which is why it is not reported as unobserved.
-///
-/// Readiness fails closed on all three where the freshness indicator does not
+/// Fails closed on all three causes where the freshness indicator does not
 /// fail closed on contention: one retried 503 is cheap, and an error budget
 /// spent on the service being used is not.
 ///
 /// ORDER IS PART OF THE ANSWER, and contention comes last because it is the
-/// only one of the three that is not a fault. A process that is genuinely
-/// behind AND happens to hold a lock has measured a fault; reporting it as
-/// contended would name a non-fault for a state the process did observe,
-/// which is the mirror of the error this surface was split up to stop.
-/// Mixed states are pinned per adjacent pair, so the priority cannot be
-/// reordered silently.
+/// only one of the three that is not a fault: a process genuinely behind
+/// that also holds a lock has measured a fault, and reporting it as
+/// contended would name a non-fault for a state the process did observe.
 async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let seen = crate::observation::observe(&state);
     if seen.is_caught_up() {
@@ -92,8 +70,6 @@ async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     }
 }
 
-/// Metrics carry no tenant labels: the exposition surface is unauthenticated
-/// by design, so it must not become a tenancy oracle.
 async fn metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     (StatusCode::OK, prometheus_text(&state))
 }

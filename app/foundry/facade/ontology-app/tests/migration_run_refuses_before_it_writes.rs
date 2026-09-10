@@ -1,10 +1,3 @@
-//! `POST /v1/migrations/run` — what it refuses, and what it leaves behind.
-//!
-//! Split from the executing suite because both outgrew one file. A refusal on
-//! a WRITING surface has two halves and the second is the one that matters:
-//! the status is visible, and "changed nothing" is what the operator finds out
-//! only later. Every test here asserts both.
-
 mod facade_support;
 mod migration_support;
 
@@ -134,8 +127,6 @@ async fn a_plan_naming_another_tenant_is_refused_before_it_runs() {
     );
     assert_eq!(action_head(&config), actions, "and nothing ran: {body}");
 }
-/// An invalid plan touches nothing. `run_to_fixpoint` validates first and
-/// this asserts the consequence, not the call.
 #[tokio::test]
 async fn an_invalid_plan_touches_nothing() {
     let fixture = Fixture::new("run-invalid");
@@ -157,13 +148,11 @@ async fn an_invalid_plan_touches_nothing() {
     assert!(body.contains("UnknownEntityType"), "{body}");
     assert_eq!(action_head(&config), actions, "and nothing ran: {body}");
 }
-/// EVERY exit this surface takes is counted, and counted as a WRITE.
-///
-/// All nine of them: the surface mutates, so its outcomes belong to the
-/// submission counters and not the read ones — an operator watching write
-/// volume must see a migration in it. An earlier version of this test claimed
-/// "every exit" while exercising five, leaving four `submit_refused()` calls
-/// deletable with the suite still green.
+/// Every exit this surface takes is counted, and counted as a WRITE: the
+/// surface mutates, so its outcomes belong to the submission counters and not
+/// the read ones. The unserved-roster exit is the one this cannot reach — a
+/// foreign credential is refused earlier, by the PDP — so it has the separate
+/// fixture below.
 ///
 /// Exact totals rather than "greater than", because a site that stops
 /// counting cannot then hide behind one that starts, and because counting a
@@ -180,51 +169,51 @@ async fn every_exit_is_counted_against_the_write_meters() {
         r#"{"kind":"copy_as","from":"note","to":"nickname"}"#,
         r#"{"kind":"convert_as","from":"note","to":"nickname","conversion":"nope"}"#,
     );
-    let outcomes = [
-        // Served.
-        run(&session, token, &plan_for("ten_acme")).await.0,
-        // No credential, then one this process does not recognise.
-        run(&session, None, &plan_for("ten_acme")).await.0,
-        run(&session, Some("not-a-token"), &plan_for("ten_acme"))
-            .await
-            .0,
-        // A body that is not a plan.
-        run(&session, token, "{not a plan").await.0,
-        // A credential the policy refuses.
-        run(
-            &session,
+    let cases: [(&str, Option<&str>, String); 9] = [
+        ("a served run", token, plan_for("ten_acme")),
+        ("no credential", None, plan_for("ten_acme")),
+        (
+            "a credential this process does not recognise",
+            Some("not-a-token"),
+            plan_for("ten_acme"),
+        ),
+        ("a body that is not a plan", token, "{not a plan".to_owned()),
+        (
+            "a roleless credential the policy refuses",
             Some(fixture.roleless_token()),
-            &plan_for("ten_acme"),
-        )
-        .await
-        .0,
-        // A plan naming a tenant the credential does not carry.
-        run(&session, token, &plan_for("ten_other")).await.0,
-        // A credential whose own tenant this process does not serve.
-        run(
-            &session,
-            Some(fixture.foreign_token()),
-            &plan_for("ten_other"),
-        )
-        .await
-        .0,
-        // A transform vocabulary this process does not perform.
-        run(&session, token, &unknown_conversion).await.0,
-        // A plan the registry refuses.
-        run(
-            &session,
+            plan_for("ten_acme"),
+        ),
+        (
+            "a plan naming a tenant the credential does not carry",
             token,
-            &plan_for("ten_acme").replace("ety_record", "ety_absent"),
-        )
-        .await
-        .0,
+            plan_for("ten_other"),
+        ),
+        (
+            "a foreign credential the policy refuses",
+            Some(fixture.foreign_token()),
+            plan_for("ten_other"),
+        ),
+        (
+            "a transform vocabulary this process does not perform",
+            token,
+            unknown_conversion,
+        ),
+        (
+            "a plan the registry refuses",
+            token,
+            plan_for("ten_acme").replace("ety_record", "ety_absent"),
+        ),
     ];
+    let mut outcomes = Vec::with_capacity(cases.len());
+    for (name, credential, body) in &cases {
+        outcomes.push((*name, run(&session, *credential, body).await.0));
+    }
 
-    assert_eq!(outcomes[0], StatusCode::OK, "the served run");
-    assert!(
-        outcomes[1..].iter().all(|status| status.is_client_error()),
-        "the other eight must all refuse: {outcomes:?}"
-    );
+    let (served_name, served_status) = outcomes[0];
+    assert_eq!(served_status, StatusCode::OK, "{served_name}");
+    for (name, status) in &outcomes[1..] {
+        assert!(status.is_client_error(), "{name} must refuse, got {status}");
+    }
     let metrics = scrape(&session).await;
     assert_eq!(
         value_of(&metrics, "foundry_action_submit_served_total"),
@@ -270,13 +259,6 @@ async fn a_credential_for_an_unserved_tenant_is_refused_and_counted() {
     );
 }
 
-/// A plan naming an action the registry does not hold is refused HERE.
-///
-/// The behavioural claim behind the `validate` change, at the surface it is
-/// about. Before it, this plan passed validation, reached the writer, and was
-/// refused one object at a time as a bare `refused` count with no reason in
-/// it — while `attest` answered the same plan with pending objects, the
-/// fixpoint claim over an unexecutable plan that module forbids itself.
 #[tokio::test]
 async fn a_plan_naming_an_unregistered_action_is_refused_before_it_writes() {
     let fixture = Fixture::new("run-unregistered-action");

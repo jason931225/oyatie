@@ -1,13 +1,3 @@
-//! The wire shapes of the read surface, and the one conversion that keeps
-//! them honest.
-//!
-//! Values are converted from the kernel carrier variant by variant. A
-//! `Debug` rendering would put `String("Ada")` on the wire where `Ada` was
-//! written, is explicitly not a stable format, and would discard the
-//! classification the `Classified` carrier exists to preserve — so the
-//! conversion here is total and exhaustive, and a new kernel variant
-//! breaks it at compile time rather than silently degrading.
-
 use data_ontology_kernel::PropertyValue;
 use serde::Serialize;
 
@@ -23,18 +13,11 @@ use serde::Serialize;
 /// appearing to.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum RevisionPin {
-    /// A single well-formed `revision=N`.
     Pinned(u32),
-    /// Absent, malformed, out of range, or repeated — all one answer, so
-    /// the surface never distinguishes them for a caller who has not yet
-    /// been authorized.
     Unusable,
 }
 
 impl RevisionPin {
-    /// Parse `revision` out of a raw query string. Total: every input
-    /// yields a value, and nothing here can reject a request.
-    ///
     /// Canonical form only: the key and value are matched literally and
     /// are NOT percent-decoded, so `?%72evision=1` and `?revision=%31`
     /// are `Unusable`. That is a real narrowing against a typed
@@ -68,33 +51,17 @@ impl RevisionPin {
     }
 }
 
-/// One property as the wire carries it: the value, its declared type, and
-/// the classification the kernel attached to it.
-///
-/// The value is converted variant by variant, NEVER by `Debug`. A `Debug`
-/// rendering would put `String("Ada")` on the wire where `Ada` was
-/// written, is explicitly not a stable format, and would discard the
-/// classification the carrier exists to preserve.
 #[derive(Debug, Serialize)]
 pub(crate) struct PropertyBody {
-    /// The kernel's static variant label — a reader needs it to interpret
-    /// the value without guessing from JSON shape.
     pub(crate) value_type: &'static str, // data_class: INTERNAL_ONLY
-    /// The kernel's canonical classification label (`INTERNAL_ONLY`,
-    /// `PII_IDENTIFYING`, …) — the same vocabulary the `data_class`
-    /// annotations use. NOT a `Debug` rendering: that is not a stable
-    /// format, and this is a public wire field.
     pub(crate) data_class: &'static str, // data_class: INTERNAL_ONLY
     pub(crate) value: serde_json::Value, // data_class: PROPERTY_VALUE_PRIVACY_CLASS
 }
 
 #[derive(Debug, Serialize)]
 pub(crate) struct PinnedObjectBody {
-    pub(crate) object_ref: String,    // data_class: TENANT_SCOPED
-    pub(crate) written_revision: u32, // data_class: INTERNAL_ONLY
-    /// `current` or `upcast_pending` — the latter is not a fault; it says
-    /// the object predates a revision and no migration has carried it
-    /// forward yet.
+    pub(crate) object_ref: String,         // data_class: TENANT_SCOPED
+    pub(crate) written_revision: u32,      // data_class: INTERNAL_ONLY
     pub(crate) upcast_state: &'static str, // data_class: INTERNAL_ONLY
     pub(crate) properties: std::collections::BTreeMap<String, PropertyBody>, // data_class: PROPERTY_VALUE_PRIVACY_CLASS
 }
@@ -143,15 +110,13 @@ pub(crate) struct HistoryRow {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct AuditRow {
-    pub(crate) ordinal: u64,        // data_class: INTERNAL_ONLY
-    pub(crate) object_ref: String,  // data_class: TENANT_SCOPED
-    pub(crate) action_type: String, // data_class: INTERNAL_ONLY
-    /// `applied` or `poisoned` — a poisoned entry is reported, never
-    /// hidden, and its reason is a typed label rather than a value.
-    pub(crate) disposition: &'static str, // data_class: INTERNAL_ONLY
+    pub(crate) ordinal: u64,                  // data_class: INTERNAL_ONLY
+    pub(crate) object_ref: String,            // data_class: TENANT_SCOPED
+    pub(crate) action_type: String,           // data_class: INTERNAL_ONLY
+    pub(crate) disposition: &'static str,     // data_class: INTERNAL_ONLY
     pub(crate) poison_reason: Option<String>, // data_class: INTERNAL_ONLY
-    pub(crate) principal_id: Option<String>, // data_class: TENANT_SCOPED
-    pub(crate) decision_id: Option<String>, // data_class: INTERNAL_ONLY
+    pub(crate) principal_id: Option<String>,  // data_class: TENANT_SCOPED
+    pub(crate) decision_id: Option<String>,   // data_class: INTERNAL_ONLY
 }
 
 #[derive(Debug, Serialize)]

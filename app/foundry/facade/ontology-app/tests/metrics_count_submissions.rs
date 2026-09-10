@@ -1,19 +1,3 @@
-//! What the WRITE surface counts, one site at a time.
-//!
-//! Split from the read-surface counting tests because the two surfaces have
-//! independent refusal ladders and the combined file outgrew the changed-file
-//! budget. The split is along that seam, not an arbitrary line.
-//!
-//! Every case pins one site by a `+1`: the multi-request cases scrape before
-//! and after, and the three single-request cases assert the absolute value
-//! against a fresh session's zero, which is the same delta from a known base.
-//! Either way, deleting any single counting call fails a case that names its
-//! site. An aggregate
-//! total would pass with one site counting twice and another never — which
-//! was the prior state of these assertions. As on the read surface, the
-//! cross-tenant case is a second exercise of the policy-denial site rather
-//! than a pin of its own: the forbid fires before the roster is read.
-
 mod facade_support;
 use facade_support as support;
 
@@ -32,9 +16,6 @@ async fn an_accepted_submission_increments_served_and_not_refused() {
 }
 #[tokio::test]
 async fn a_refusal_before_the_writer_still_counts_against_availability() {
-    // The denominator must include authorization failures. A submission
-    // refused for want of a credential never reaches the writer, and an
-    // availability number that omitted it would be flatter than the service.
     let fixture = Fixture::new("metrics-submit-anon");
     let session = fixture.session();
     let (status, _) = session.post(None, WRITE).await;
@@ -100,7 +81,6 @@ async fn the_writer_outcome_counts_on_both_arms() {
         "a writer-level refusal must count against availability"
     );
 }
-/// Every pre-writer refusal on the write surface, pinned individually.
 #[tokio::test]
 async fn each_submit_refusal_site_counts_exactly_once() {
     let fixture = Fixture::new("metrics-submit-sites");

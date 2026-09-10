@@ -1,16 +1,3 @@
-//! The read surface: pinned object reads, per-object history, the
-//! governance audit view, and the type registry.
-//!
-//! Every read is authorized by the read action, separately from the write
-//! action — a read-only operator must be able to open what the shell
-//! renders for them. Reads serve the in-memory fold; the durable indexed
-//! store is a separate lane's evidence and nothing here claims it.
-//!
-//! Operator procedure: a pinned read that reports `UpcastPending` is not a
-//! fault — the object was written under an earlier revision and the
-//! migration that would carry it forward has not run for it yet. A
-//! `409` on a pin means the revision was never accepted for that type.
-
 #[path = "facade_support/mod.rs"]
 mod support;
 
@@ -44,9 +31,6 @@ async fn an_object_reads_back_at_the_revision_it_was_written_under() {
         !body.contains("String("),
         "no Debug rendering may reach the wire: {body}"
     );
-    // The classification travels with the value, in the kernel's canonical
-    // vocabulary — not a Debug rendering of the carrier, which is both
-    // unstable and unreadable to a client.
     assert!(
         body.contains(r#""data_class":"INTERNAL_ONLY""#),
         "the classification label must be canonical: {body}"
@@ -171,7 +155,6 @@ async fn a_roleless_caller_reads_nothing() {
         StatusCode::FORBIDDEN,
         "the read action is its own authority; recognition is not permission"
     );
-    // The write surface refuses the same caller, for the same reason.
     let (write, _) = post(
         &fixture,
         Some(fixture.roleless_token()),
@@ -205,10 +188,6 @@ async fn the_tenant_wide_views_are_authorized_not_merely_authenticated() {
 
 #[tokio::test]
 async fn an_anonymous_caller_is_refused_before_the_query_is_judged() {
-    // The revision parameter is validated INSIDE the handler, after
-    // authentication. If it were an extractor precondition, an anonymous
-    // caller would learn the shape of the API from a 400 before ever being
-    // asked for a credential.
     let fixture = Fixture::new("read-anon-noquery");
     let (status, _) = get(&fixture, None, "/v1/objects/ent_alpha").await;
     assert_eq!(
@@ -216,7 +195,6 @@ async fn an_anonymous_caller_is_refused_before_the_query_is_judged() {
         StatusCode::UNAUTHORIZED,
         "authentication comes before parameter validation"
     );
-    // With a credential, the same request is a typed surface refusal.
     let (with_credential, body) = get(
         &fixture,
         Some(fixture.operator_token()),

@@ -1,18 +1,3 @@
-//! History and audit must show what this process just accepted.
-//!
-//! `TenantState.entries` is built once in `compose` and never appended to:
-//! `write_handles` lends out the action log, the denial trail and the
-//! projection, never the mirror. So a long-running process serves history and
-//! audit from a snapshot of its own boot, and a write it accepted seconds ago
-//! is absent from both — with `200 OK`, not an error.
-//!
-//! The object read is unaffected because it serves the projection, which the
-//! write path does update. That asymmetry is why this survived: every read
-//! test used the per-request helpers, which recompose `AppState` and re-read
-//! the mirror from the log on every call, resetting the state the defect
-//! lives in. Only a harness driving several requests through ONE composed
-//! process can see it.
-
 mod facade_support;
 mod failing_log;
 use facade_support as support;
@@ -67,9 +52,6 @@ async fn a_live_write_is_visible_to_the_audit_trail_within_the_same_process() {
     );
 }
 
-/// Reading the log can fail, and a refusal this surface never counts is a
-/// hole in the availability denominator — the defect #2372 spent five
-/// revisions closing on every other refusing site.
 #[tokio::test]
 async fn a_log_that_cannot_be_read_refuses_and_counts() {
     let fixture = Fixture::new("views-log-unreadable");

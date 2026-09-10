@@ -1,17 +1,3 @@
-//! Appending to a tenant's durable log behind the process's back.
-//!
-//! Shared rather than copied. Two files need it — the lag totals and the
-//! readiness refusals — and a duplicated writer is the arrangement where one
-//! copy is fixed and the other silently stops producing the state it names,
-//! which is the rule `failing_log` states about its own double.
-//!
-//! This is the cheapest way to DRIVE a projection behind its log; it is not
-//! the argument that the state matters. `AppState` declares SQLite
-//! single-writer, so the in-contract breach is elsewhere:
-//! `append_with_receipt` commits before `apply_sealed` runs, and a panic
-//! between them leaves this process permanently one behind for its lifetime
-//! with no second writer anywhere.
-
 use foundry_records_draft::{ActionEnvelope, RecordsLog};
 use foundry_records_sqlite_draft::SqliteRecordsLog;
 

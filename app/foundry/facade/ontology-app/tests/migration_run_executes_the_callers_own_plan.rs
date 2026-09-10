@@ -1,18 +1,3 @@
-//! `POST /v1/migrations/run` — execute a plan to its fixpoint.
-//!
-//! The executing half. Unlike attest this WRITES, so it is gated on `Invoke`
-//! and every refusal must leave the log exactly as it found it: a migration
-//! that half-ran and then refused is worse than one that never started,
-//! because the operator's next decision is made against a population no plan
-//! describes.
-//!
-//! THE AUTHORITY IS THE CALLER'S OWN DECISION. `MigrationAuthority` carries a
-//! `decision_id` and the surfaces the decision allows, and the runner stamps
-//! them onto every upcast it writes. Minting one from anything other than the
-//! PDP's answer for THIS caller on THIS surface would put a fabricated
-//! authorization into the durable record — an audit trail that says a
-//! decision was made when none was.
-
 mod facade_support;
 mod migration_support;
 
@@ -55,10 +40,6 @@ async fn an_operator_runs_a_plan_to_its_fixpoint() {
     .await;
 
     assert_eq!(status, StatusCode::OK, "{body}");
-    // The EXACT body. A field asserted at the one value it takes in the one
-    // test that reads it is not pinned — a constant equal to that value
-    // survives, which is the defect this suite already had to correct once
-    // for `decision_id`. Every number here is a claim.
     assert_eq!(
         body,
         r#"{"total":2,"upcast":1,"pending":0,"refused":0,"conflicted":0,"unavailable":0,"poisoned":0,"fixpoint":true}"#
@@ -77,22 +58,6 @@ async fn an_operator_runs_a_plan_to_its_fixpoint() {
     );
 }
 
-/// The upcast carries the decision the PDP MINTED FOR THIS RUN.
-///
-/// Two earlier shapes of this test both failed, and the way they failed is
-/// the point. "Differs from the write's decision" is satisfied by a hardcoded
-/// constant. "Two runs carry two decisions" is satisfied by any locally
-/// minted counter — a `format!("dcn_forged_{n}")` in the handler survives it
-/// while writing a fabricated authorization into every durable upcast. Both
-/// assert VARIABILITY; neither asserts PROVENANCE, and only provenance is the
-/// claim.
-///
-/// The process authorizes through a `SeededIdGenerator`, whose whole purpose
-/// is determinism: decision N is `01hmz` followed by N. So the id is
-/// predictable BY VALUE, and the claim becomes exact — the write is the
-/// first decision this process made, the run is the second, and the upcast
-/// must carry the second. A constant fails it, a private counter fails it,
-/// and reusing the write's decision fails it by carrying the first.
 #[tokio::test]
 async fn the_upcast_carries_the_decision_the_pdp_minted_for_this_run() {
     let fixture = Fixture::new("run-attribution");
@@ -117,13 +82,14 @@ async fn the_upcast_carries_the_decision_the_pdp_minted_for_this_run() {
     );
 }
 
-/// The decision id this process's PDP mints on its `n`th authorization.
-///
-/// `SeededIdGenerator` renders `01HMZ` followed by the zero-padded counter;
-/// the surface lowercases it. Binding to the generator rather than to a
-/// literal keeps the assertion about provenance rather than about a string.
+const SEEDED_ID_PREFIX: &str = "01hmz";
+const SEEDED_ID_COUNTER_WIDTH: usize = 21;
+
 fn nth_decision(n: u64) -> String {
-    format!("01hmz{n:021}")
+    format!(
+        "{SEEDED_ID_PREFIX}{n:0width$}",
+        width = SEEDED_ID_COUNTER_WIDTH
+    )
 }
 
 #[tokio::test]

@@ -1,25 +1,8 @@
-//! The read surface: pinned object reads, per-object history, the
-//! governance audit view, and the type registry.
-//!
-//! Every read is authorized by the READ action, separately from the write
-//! action — a read-only operator must be able to open what the shell
-//! renders for them, and recognizing a credential is not the same as
-//! permitting it.
-//!
 //! Cross-tenant refusals are deliberately indistinguishable from one
 //! another: a caller outside the tenant gets the same answer whether the
 //! object exists or not, because a distinguishable "not found" would make
 //! this surface an existence oracle for a tenant the caller was never
 //! entitled to ask about.
-//!
-//! Reads serve the in-memory fold. History and audit additionally replay the
-//! durable log on every request rather than the boot snapshot they once read,
-//! so they show what this process has APPLIED — history the applied entries
-//! for one object, audit those plus the poisons, which are accepted with 200
-//! and excluded from history by law. That read can fail, and both refuse 503
-//! rather than serve a view they could not read. The
-//! durable indexed store is a separate lane's evidence; nothing here
-//! claims `store == fold(log)`.
 
 use std::sync::Arc;
 
@@ -39,8 +22,6 @@ use crate::read_dto::{
     AuditRow, EntityTypeRow, HistoryRow, PinnedObjectBody, PropertyBody, RevisionPin, json_value,
 };
 
-/// Authenticate, then authorize the read action. Both failures are the
-/// caller's answer; neither reveals whether the addressed object exists.
 pub(crate) fn authorized(
     state: &AppState,
     headers: &HeaderMap,
@@ -74,7 +55,6 @@ pub(crate) fn authorized(
     Ok(caller)
 }
 
-/// The tenant is the credential's; a caller can never read another's.
 pub(crate) fn tenant_of<'a>(
     state: &'a AppState,
     caller: &Caller,
@@ -89,7 +69,6 @@ pub(crate) fn tenant_of<'a>(
     })
 }
 
-/// `GET /v1/objects/{object_ref}?revision=N`
 pub async fn object(
     State(state): State<Arc<AppState>>,
     Path(object_ref): Path<String>,
@@ -159,8 +138,6 @@ pub async fn object(
     }
 }
 
-/// Current entries, or the refusal that says why not — counted here so
-/// neither caller can forget to.
 fn entries_or_refuse(
     state: &AppState,
     tenant: &crate::composition::TenantState,
@@ -176,7 +153,6 @@ fn entries_or_refuse(
     })
 }
 
-/// `GET /v1/objects/{object_ref}/history`
 pub async fn history(
     State(state): State<Arc<AppState>>,
     Path(object_ref): Path<String>,
@@ -211,10 +187,7 @@ pub async fn history(
     Json(rows).into_response()
 }
 
-/// `GET /v1/audit`
 pub async fn audit(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    // The audit view is tenant-wide, so it is authorized against the
-    // tenant itself rather than any one object.
     let caller = match authorized(&state, &headers, TENANT_SCOPED_RESOURCE) {
         Ok(caller) => caller,
         Err(response) => return *response,
@@ -252,8 +225,6 @@ pub async fn audit(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Re
     Json(rows).into_response()
 }
 
-/// `GET /v1/types` — the registry the writer stamps against, so a reader
-/// knows which revisions exist to pin. This is the Ontology Manager seam.
 pub async fn types(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let caller = match authorized(&state, &headers, TENANT_SCOPED_RESOURCE) {
         Ok(caller) => caller,
