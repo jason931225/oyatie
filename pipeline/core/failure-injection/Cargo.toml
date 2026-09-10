@@ -1,0 +1,14 @@
+[package]
+name = "pipeline-failure-injection"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+publish = false
+license = "Apache-2.0"
+
+[dependencies]
+pipeline-retained-reference = { path = "../retained-reference" }
+pipeline-revision-view = { path = "../revision-view" }
+
+[lints]
+workspace = true
