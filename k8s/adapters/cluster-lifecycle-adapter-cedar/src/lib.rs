@@ -1,30 +1,5 @@
 //! Cedar RBAC adapter for managed-K8s cluster lifecycle admission.
-//!
-//! Mirrors `k8s/adapters/tenant-quota-adapter-cedar`'s `QuotaRbacAuthorizer`:
-//! it wires RBAC authorization for cluster create operations on top of the
-//! EXISTING `iam-identity-workload-authz-cedar` `CedarWorkloadAuthorizer`. It
-//! does NOT reinvent Cedar wiring.
-//!
-//! ## Design (ADR-0376 / ADR-0183 / ADR-0007)
-//!
-//! - **Cedar default-deny**: with no matching `permit`, access is denied.
-//! - **Tenant-admin creates own-tenant clusters**: a TenantAdmin principal
-//!   (`cluster:write` scope) may create a cluster for their own tenant only
-//!   (Cedar same-tenant policy plus adapter defense-in-depth guard).
-//! - **Platform creates any tenant's cluster**: a PlatformOperator
-//!   (`cluster:platform:write` scope) may create for any tenant.
-//! - **Cross-tenant create denied**: the verified principal's tenant is
-//!   authoritative; a request for another tenant is denied unless the principal
-//!   holds the platform scope.
-//!
-//! ## Usage
-//!
-//! ```rust,ignore
-//! let authz = ClusterLifecycleRbacAuthorizer::new_with_default_policies()?;
-//! authz.authorize_cluster_create(&principal, "ten_acme")?;
-//! ```
 
-// ADR-0083 Tier-3: panic-free on the request path.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -36,19 +11,13 @@ use iam_identity_workload_domain::{
     Action, AuthorizationRequest, ClaimValue, Resource, WorkloadPrincipal,
 };
 
-/// Cedar scope a platform operator presents to create clusters for any tenant.
 const PLATFORM_CLUSTER_SCOPE: &str = "cluster:platform:write";
-/// The Cedar resource type for a managed cluster.
 const CLUSTER_RESOURCE_TYPE: &str = "ManagedCluster";
-/// The Cedar action for a cluster create.
 const CLUSTER_CREATE_ACTION: &str = "cluster:Create";
 
-/// Errors from the Cedar RBAC authorizer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RbacAuthzError {
-    /// Policy compilation failed.
     PolicyBuild(String),
-    /// The request was denied by Cedar (or the cross-tenant guard).
     Denied(String),
 }
 
@@ -65,17 +34,12 @@ impl std::fmt::Display for RbacAuthzError {
 
 impl std::error::Error for RbacAuthzError {}
 
-/// Cedar-backed RBAC authorizer for cluster lifecycle admission.
-///
-/// Wraps `CedarWorkloadAuthorizer` with cluster-lifecycle policies. Cedar
-/// default-deny guarantees that absent policies = deny.
+/// Cedar default-deny guarantees that absent policies = deny.
 pub struct ClusterLifecycleRbacAuthorizer {
     inner: CedarWorkloadAuthorizer,
 }
 
 impl ClusterLifecycleRbacAuthorizer {
-    /// Build with explicit policies (test / custom policy injection path).
-    ///
     /// # Errors
     /// Returns [`RbacAuthzError::PolicyBuild`] if any policy fails to compile.
     pub fn with_policies(policies: Vec<Policy>) -> Result<Self, RbacAuthzError> {
@@ -84,26 +48,12 @@ impl ClusterLifecycleRbacAuthorizer {
         Ok(Self { inner })
     }
 
-    /// Build with the default cluster-lifecycle RBAC policies (production path).
-    ///
-    /// Policies implement:
-    /// - TenantAdmin (`cluster:write`) can create clusters for their own tenant.
-    /// - PlatformOperator (`cluster:platform:write`) can create for any tenant.
-    ///
-    /// Tenant-role cross-tenant create is denied by Cedar policy and by the
-    /// adapter's defense-in-depth guard.
-    ///
     /// # Errors
     /// Returns [`RbacAuthzError::PolicyBuild`] if policy compilation fails.
     pub fn new_with_default_policies() -> Result<Self, RbacAuthzError> {
         Self::with_policies(default_cluster_policies())
     }
 
-    /// Authorize a cluster create operation for `target_tenant_id`.
-    ///
-    /// The principal must hold the appropriate scope for their role, AND
-    /// (for TenantAdmin) their `tenant_id` must match `target_tenant_id`.
-    ///
     /// # Errors
     /// Returns [`RbacAuthzError::Denied`] if Cedar (or the cross-tenant guard)
     /// denies the request.
@@ -133,14 +83,12 @@ impl ClusterLifecycleRbacAuthorizer {
 
 fn default_cluster_policies() -> Vec<Policy> {
     vec![
-        // TenantAdmin: create clusters for own tenant only.
         Policy::permit("cluster-create-tenant-admin")
             .when_principal(PrincipalCondition::HasScope("cluster:write".into()))
             .for_action(ActionCondition::Equals(CLUSTER_CREATE_ACTION.into()))
             .for_resource(ResourceCondition::SameTenantAsPrincipal {
                 resource_type: CLUSTER_RESOURCE_TYPE.into(),
             }),
-        // PlatformOperator: create clusters for any tenant.
         Policy::permit("cluster-create-platform-operator")
             .when_principal(PrincipalCondition::HasScope(PLATFORM_CLUSTER_SCOPE.into()))
             .for_action(ActionCondition::Equals(CLUSTER_CREATE_ACTION.into()))

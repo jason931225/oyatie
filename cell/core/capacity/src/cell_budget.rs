@@ -1,56 +1,33 @@
-//! Cell-level capacity budget (M03-P01-IP-005 delta-1).
-//!
-//! A `CellBudget` declares the maximum number of reservations a single cell
-//! may hold for a given `CapacityClass`. The admission rule
-//! `admit_cell_reservation` enforces this ceiling and provides the
-//! cell-isolation evidence required by the cloud.region/AZ/cell taxonomy.
-//!
-//! Design constraints (Directive 4):
-//! - No I/O, no async, no provider-specific deps.
-//! - All invariants expressed as pure functions over plain data.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Cell-level capacity budget.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use crate::{CapacityClass, ReservationId};
 
-/// Opaque identifier for a cell within a region.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CellId(pub String);
 
-/// Maximum reservations a cell may hold for one `CapacityClass`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellBudget {
-    /// data_class: INTERNAL_ONLY
     pub cell_id: CellId,
-    /// data_class: INTERNAL_ONLY
     pub class: CapacityClass,
-    /// data_class: INTERNAL_ONLY
     pub max_reservations: u32,
-    /// data_class: INTERNAL_ONLY
     pub active_reservation_count: u32,
 }
 
 impl CellBudget {
-    /// Remaining reservation slots for this cell + class combination.
     pub fn remaining(&self) -> u32 {
         self.max_reservations
             .saturating_sub(self.active_reservation_count)
     }
 }
 
-/// A thin request type used by `admit_cell_reservation`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellReservationRequest {
-    /// data_class: INTERNAL_ONLY
     pub reservation_id: ReservationId,
-    /// data_class: INTERNAL_ONLY
     pub cell_id: CellId,
-    /// data_class: INTERNAL_ONLY
     pub class: CapacityClass,
 }
 
-/// Errors produced by cell-budget admission.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CellBudgetError {
     EmptyReservationId,
@@ -83,9 +60,6 @@ impl CellBudgetError {
     }
 }
 
-/// Admit a new reservation against a slice of `CellBudget` entries.
-///
-/// Returns `Ok(())` when the cell has capacity; `Err` otherwise.
 /// Does **not** mutate the budgets — callers record the committed
 /// reservation separately.
 pub fn admit_cell_reservation(
@@ -184,7 +158,6 @@ mod tests {
 
     #[test]
     fn class_isolation_respected() {
-        // GPU budget present; CPU request for same cell should be rejected (no CPU budget).
         let r = req("rsv-1", "cell-kr1-a-01", CapacityClass::Cpu);
         let bs = vec![budget("cell-kr1-a-01", CapacityClass::Gpu, 8, 2)];
         assert!(matches!(

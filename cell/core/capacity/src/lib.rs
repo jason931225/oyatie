@@ -1,14 +1,4 @@
-//! Cloud capacity-management kernel (M03-P02-IP-003 / M03-P01-IP-005 delta-1).
-//!
-//! Pure I/O-free types + admission rules for reservation, quota, and
-//! per-region capacity envelopes. Provider-specific quota APIs live in
-//! adapter crates; the kernel only enforces invariants:
-//! - A reservation cannot exceed its region quota.
-//! - A region cannot accept more reservations than its declared cell budget.
-//! - Capacity classes (cpu / memory / disk / gpu) are tracked independently.
-//!
-//! The `cell_budget` module adds cell-level admission (`CellBudget` /
-//! `admit_cell_reservation`) required by M03-P01-IP-005 cell-isolation evidence.
+//! Cloud capacity-management kernel.
 
 pub mod cell_budget;
 pub use cell_budget::{
@@ -51,14 +41,10 @@ pub struct ReservationId(pub String);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CapacityQuota {
-    // data_class: INTERNAL_ONLY
-    pub region: RegionId, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub class: CapacityClass, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub limit_units: u64, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub used_units: u64, // data_class: INTERNAL_ONLY
+    pub region: RegionId,
+    pub class: CapacityClass,
+    pub limit_units: u64,
+    pub used_units: u64,
 }
 
 impl CapacityQuota {
@@ -69,14 +55,10 @@ impl CapacityQuota {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Reservation {
-    // data_class: INTERNAL_ONLY
-    pub id: ReservationId, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub region: RegionId, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub class: CapacityClass, // data_class: INTERNAL_ONLY
-    // data_class: INTERNAL_ONLY
-    pub units: u64, // data_class: INTERNAL_ONLY
+    pub id: ReservationId,
+    pub region: RegionId,
+    pub class: CapacityClass,
+    pub units: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -230,7 +212,6 @@ mod tests {
 
     #[test]
     fn class_isolation_does_not_cross_count() {
-        // CPU quota is full, but GPU reservation is allowed.
         let r = r("rsv-gpu", "kr1", CapacityClass::Gpu, 1);
         let qs = vec![
             q("kr1", CapacityClass::Cpu, 100, 100),

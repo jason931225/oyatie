@@ -59,43 +59,43 @@ impl CloudRegionApiErrorCode {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionApiBoundaryContext {
-    pub request_id: String, // data_class: INTERNAL_ONLY
-    pub tenant_id: String,  // data_class: INTERNAL_ONLY
+    pub request_id: String,
+    pub tenant_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionApiPrincipal {
-    pub tenant_id: String,    // data_class: INTERNAL_ONLY
-    pub principal_id: String, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub principal_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionApiAuthorization {
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub principal_id: String,          // data_class: INTERNAL_ONLY
-    pub decision_id: String,           // data_class: INTERNAL_ONLY
-    pub allowed_surfaces: Vec<String>, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub decision_id: String,
+    pub allowed_surfaces: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionListApiRequest {
-    pub boundary: CloudRegionApiBoundaryContext, // data_class: INTERNAL_ONLY
-    pub principal: CloudRegionApiPrincipal,      // data_class: INTERNAL_ONLY
-    pub authorization: CloudRegionApiAuthorization, // data_class: INTERNAL_ONLY
+    pub boundary: CloudRegionApiBoundaryContext,
+    pub principal: CloudRegionApiPrincipal,
+    pub authorization: CloudRegionApiAuthorization,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudAzListApiRequest {
-    pub path_region_code: String,                   // data_class: PUBLIC
-    pub boundary: CloudRegionApiBoundaryContext,    // data_class: INTERNAL_ONLY
-    pub principal: CloudRegionApiPrincipal,         // data_class: INTERNAL_ONLY
-    pub authorization: CloudRegionApiAuthorization, // data_class: INTERNAL_ONLY
+    pub path_region_code: String,
+    pub boundary: CloudRegionApiBoundaryContext,
+    pub principal: CloudRegionApiPrincipal,
+    pub authorization: CloudRegionApiAuthorization,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionListSuccessResponse {
-    pub data: Vec<CloudRegionRecord>,     // data_class: PUBLIC
-    pub metadata: CloudRegionApiMetadata, // data_class: INTERNAL_ONLY
+    pub data: Vec<CloudRegionRecord>,
+    pub metadata: CloudRegionApiMetadata,
 }
 
 impl CloudRegionListSuccessResponse {
@@ -111,8 +111,8 @@ impl CloudRegionListSuccessResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudAzListSuccessResponse {
-    pub data: Vec<CloudAzRecord>,         // data_class: PUBLIC
-    pub metadata: CloudRegionApiMetadata, // data_class: INTERNAL_ONLY
+    pub data: Vec<CloudAzRecord>,
+    pub metadata: CloudRegionApiMetadata,
 }
 
 impl CloudAzListSuccessResponse {
@@ -128,85 +128,85 @@ impl CloudAzListSuccessResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionApiMetadata {
-    pub request_id: String, // data_class: INTERNAL_ONLY
+    pub request_id: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionRecord {
-    pub code: String,                                        // data_class: PUBLIC
-    pub display_name: String,                                // data_class: PUBLIC
-    pub regulatory_packs: Vec<CloudRegionRegulatoryPackRef>, // data_class: PUBLIC
-    pub azs: Vec<CloudRegionAzRef>,                          // data_class: PUBLIC
-    pub state: String,                                       // data_class: PUBLIC
-    pub provider_facing: bool,                               // data_class: PUBLIC
-    pub residency_strictness: String,                        // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64,                       // data_class: PUBLIC
-    pub schema_version: u32,                                 // data_class: PUBLIC
+    pub code: String,
+    pub display_name: String,
+    pub regulatory_packs: Vec<CloudRegionRegulatoryPackRef>,
+    pub azs: Vec<CloudRegionAzRef>,
+    pub state: String,
+    pub provider_facing: bool,
+    pub residency_strictness: String,
+    pub created_at_epoch_seconds: u64,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionRegulatoryPackRef {
-    pub value: String, // data_class: PUBLIC
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionAzRef {
-    pub value: String, // data_class: PUBLIC
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionPowerZoneRef {
-    pub value: String, // data_class: PUBLIC
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionCellRef {
-    pub value: String, // data_class: PUBLIC
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudAzRecord {
-    pub code: String,                              // data_class: PUBLIC
-    pub region_code: String,                       // data_class: PUBLIC
-    pub power_zones: Vec<CloudRegionPowerZoneRef>, // data_class: PUBLIC
-    pub cells: Vec<CloudRegionCellRef>,            // data_class: PUBLIC
-    pub cell_isolation_evidence: Vec<CloudCellIsolationEvidenceRecord>, // data_class: PUBLIC
-    pub state: String,                             // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64,             // data_class: PUBLIC
-    pub schema_version: u32,                       // data_class: PUBLIC
+    pub code: String,
+    pub region_code: String,
+    pub power_zones: Vec<CloudRegionPowerZoneRef>,
+    pub cells: Vec<CloudRegionCellRef>,
+    pub cell_isolation_evidence: Vec<CloudCellIsolationEvidenceRecord>,
+    pub state: String,
+    pub created_at_epoch_seconds: u64,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellIsolationEvidenceRecord {
-    pub cell_id: String,                // data_class: PUBLIC
-    pub region_code: String,            // data_class: PUBLIC
-    pub az_code: String,                // data_class: PUBLIC
-    pub state: String,                  // data_class: PUBLIC
-    pub tenant_density: String,         // data_class: PUBLIC
-    pub allowed_residency: Vec<String>, // data_class: PUBLIC
-    pub evidence_ref: String,           // data_class: PUBLIC
-    pub schema_version: u32,            // data_class: PUBLIC
+    pub cell_id: String,
+    pub region_code: String,
+    pub az_code: String,
+    pub state: String,
+    pub tenant_density: String,
+    pub allowed_residency: Vec<String>,
+    pub evidence_ref: String,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionApiErrorResponse {
-    pub error: CloudRegionApiErrorBody, // data_class: INTERNAL_ONLY
+    pub error: CloudRegionApiErrorBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionApiErrorBody {
-    pub code: String,                            // data_class: INTERNAL_ONLY
-    pub message: String,                         // data_class: INTERNAL_ONLY
-    pub message_localized: Option<String>,       // data_class: INTERNAL_ONLY
-    pub request_id: String,                      // data_class: INTERNAL_ONLY
-    pub details: Vec<CloudRegionApiErrorDetail>, // data_class: INTERNAL_ONLY
-    pub retry_after_seconds: Option<u64>,        // data_class: INTERNAL_ONLY
+    pub code: String,
+    pub message: String,
+    pub message_localized: Option<String>,
+    pub request_id: String,
+    pub details: Vec<CloudRegionApiErrorDetail>,
+    pub retry_after_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionApiErrorDetail {
-    pub field: String, // data_class: INTERNAL_ONLY
-    pub issue: String, // data_class: INTERNAL_ONLY
+    pub field: String,
+    pub issue: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -18,16 +18,11 @@ pub use k8s_sla_observability_kernel::{
     summarize_sla,
 };
 
-/// A short alias for the boxed, `Send` future every async port method returns.
 pub type BoxFuture<'a, T> = Pin<Box<dyn core::future::Future<Output = T> + Send + 'a>>;
 
-/// Stable, tenant-scoped reference to the managed Kubernetes cluster whose SLA
-/// is being summarized.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ClusterRef {
-    /// Tenant that owns the cluster.
-    pub tenant_id: String, // data_class: TENANT_SCOPED
-    /// Tenant-unique cluster name.
+    pub tenant_id: String,    // data_class: TENANT_SCOPED
     pub cluster_name: String, // data_class: TENANT_SCOPED
 }
 
@@ -52,20 +47,23 @@ impl fmt::Display for ClusterRef {
     }
 }
 
-/// Observation-store errors. Unknown/missing clusters fail closed here.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SlaObservabilityError {
-    /// Empty tenant or cluster name.
-    InvalidClusterRef { cluster_ref: String },
-    /// No observation is known for the requested cluster.
-    UnknownCluster { cluster_ref: String },
-    /// Kernel rejected the observation/policy.
+    InvalidClusterRef {
+        cluster_ref: String,
+    },
+    UnknownCluster {
+        cluster_ref: String,
+    },
     Kernel(SlaKernelError),
-    /// Downstream control-plane-host read failed; detail is normalized by the app
-    /// layer so the API crate does not depend on a sibling API crate.
-    ControlPlane { detail: String }, // data_class: INTERNAL_ONLY
-    /// The observation store failed internally (for example, poisoned in-memory lock).
-    Store { detail: String }, // data_class: INTERNAL_ONLY
+    /// `detail` is normalized by the app layer so the API crate does not depend
+    /// on a sibling API crate.
+    ControlPlane {
+        detail: String,
+    },
+    Store {
+        detail: String,
+    },
 }
 
 impl fmt::Display for SlaObservabilityError {
@@ -94,11 +92,10 @@ impl From<SlaKernelError> for SlaObservabilityError {
     }
 }
 
-/// Status-window DTO accepted by `ingest_status_snapshot`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StatusWindow {
-    pub total_status_samples: u64,   // data_class: INTERNAL_ONLY
-    pub healthy_status_samples: u64, // data_class: INTERNAL_ONLY
+    pub total_status_samples: u64,
+    pub healthy_status_samples: u64,
 }
 
 impl StatusWindow {
@@ -111,17 +108,15 @@ impl StatusWindow {
     }
 }
 
-/// Snapshot DTO for ingestion from control-plane-host status reads or tests.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ControlPlaneSlaSnapshot {
     pub cluster_ref: ClusterRef, // data_class: TENANT_SCOPED
     pub control_plane_status: ObservedControlPlaneStatus, // data_class: TENANT_SCOPED
-    pub status_window: StatusWindow, // data_class: INTERNAL_ONLY
-    pub provisioning_latency_millis: Option<u64>, // data_class: INTERNAL_ONLY
+    pub status_window: StatusWindow,
+    pub provisioning_latency_millis: Option<u64>,
 }
 
 impl ControlPlaneSlaSnapshot {
-    /// Construct a snapshot directly.
     #[must_use]
     pub fn new(
         cluster_ref: ClusterRef,
@@ -137,7 +132,6 @@ impl ControlPlaneSlaSnapshot {
         }
     }
 
-    /// Convert into the pure kernel observation shape.
     #[must_use]
     pub fn into_observation(self) -> SlaObservation {
         SlaObservation::new(
@@ -166,7 +160,6 @@ pub trait SlaObservabilityPort: Send + Sync {
     ) -> BoxFuture<'a, Result<SlaSummary, SlaObservabilityError>>;
 }
 
-/// Fail-closed validation shared by adapters/apps.
 pub fn validate_cluster_ref(cluster_ref: &ClusterRef) -> Result<(), SlaObservabilityError> {
     if cluster_ref.is_well_formed() {
         Ok(())
@@ -185,7 +178,6 @@ pub struct ClusterKey {
 }
 
 impl ClusterKey {
-    /// Build a key from a validated cluster reference.
     #[must_use]
     pub fn from_ref(cluster_ref: &ClusterRef) -> Self {
         Self {

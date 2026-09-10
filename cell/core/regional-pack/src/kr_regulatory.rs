@@ -1,46 +1,26 @@
 //! KR regulatory binding types for PIPA Article-23 sensitive data classification
 //! and CSAP control evidence references.
-//!
-//! Implements M04-P02-IP-001 (merge-variant delta-1): smallest net-new types
-//! merged into `regional-pack-domain`; no new crate scaffolding.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-/// PIPA (개인정보 보호법) Article-23 sensitive personal data classification.
-///
-/// Art-23 prohibits processing of sensitive categories without explicit consent
-/// or a specific statutory basis. Each variant maps to one Art-23 sensitive
-/// category. The `General` variant covers non-sensitive personal data governed
-/// by the general PIPA provisions.
+/// PIPA Art-23 prohibits processing of sensitive categories without explicit
+/// consent or a specific statutory basis.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PipaDataClassification {
-    /// Non-sensitive personal data (PIPA general provisions).
     General,
-    /// Ideology or belief (사상·신념) — Art-23(1).
     IdeologyOrBelief,
-    /// Trade-union membership or political party affiliation (노동조합·정당의 가입·탈퇴) — Art-23(1).
     UnionOrPartyMembership,
-    /// Political views (정치적 견해) — Art-23(1).
     PoliticalViews,
-    /// Health or medical information (건강·성생활 등에 관한 정보) — Art-23(1).
     HealthOrMedical,
-    /// Biometric or genetic data (생체인식정보·유전정보) — Art-23(1).
     BiometricOrGenetic,
-    /// Criminal record (범죄경력자료) — Art-23(1).
     CriminalRecord,
-    /// Race or ethnicity (인종·민족) — Art-23(1) sensitive scope per KR policy baseline.
     RaceOrEthnicity,
 }
 
 impl PipaDataClassification {
-    /// Returns `true` when the classification requires explicit consent or a
-    /// statutory exception under PIPA Art-23.
     pub fn is_sensitive(self) -> bool {
         !matches!(self, Self::General)
     }
 
-    /// Returns the canonical Korean statutory label for this classification.
     pub fn statutory_label(self) -> &'static str {
         match self {
             Self::General => "일반개인정보",
@@ -55,17 +35,12 @@ impl PipaDataClassification {
     }
 }
 
-/// Binding of a regional pack to KR-specific regulatory controls.
-///
-/// A `KrRegulatoryBinding` asserts that the named `pack_id` has been audited
-/// against PIPA Art-23 and CSAP, and records the CSAP evidence reference.
+/// Asserts that the named `pack_id` has been audited against PIPA Art-23 and
+/// CSAP.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KrRegulatoryBinding {
-    /// Pack identifier (must match `RegionalPack::id` prefix `pack-`).
     pack_id: String,
-    /// PIPA classification for the primary data processed by this pack.
     pipa_classification: PipaDataClassification,
-    /// CSAP control-evidence reference (non-empty).
     csap_evidence_ref: String,
 }
 
@@ -76,7 +51,6 @@ pub enum KrRegulatoryBindingError {
 }
 
 impl KrRegulatoryBinding {
-    /// Create and validate a new `KrRegulatoryBinding`.
     pub fn new(
         pack_id: String,
         pipa_classification: PipaDataClassification,
@@ -95,17 +69,14 @@ impl KrRegulatoryBinding {
         })
     }
 
-    /// Returns the pack identifier.
     pub fn pack_id(&self) -> &str {
         &self.pack_id
     }
 
-    /// Returns the PIPA data classification.
     pub fn pipa_classification(&self) -> PipaDataClassification {
         self.pipa_classification
     }
 
-    /// Returns the CSAP control-evidence reference.
     pub fn csap_evidence_ref(&self) -> &str {
         &self.csap_evidence_ref
     }
@@ -150,10 +121,6 @@ mod tests {
         }
     }
 
-    /// Synthetic-violation test: validates the RaceOrEthnicity variant is correctly
-    /// classified as sensitive and returns the canonical Art-23 statutory label.
-    /// Without this variant, callers must misclassify race/ethnicity data as General,
-    /// producing incorrect consent/audit labeling.
     #[test]
     fn race_or_ethnicity_is_sensitive_with_canonical_label() {
         let cls = PipaDataClassification::RaceOrEthnicity;

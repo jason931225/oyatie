@@ -48,102 +48,102 @@ pub enum TenantDensityClass {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegionCreate {
-    pub code: String,                         // data_class: PUBLIC
-    pub display_name: String,                 // data_class: PUBLIC
-    pub regulatory_packs: Vec<String>,        // data_class: PUBLIC
-    pub state: RegionState,                   // data_class: PUBLIC
-    pub provider_facing: bool,                // data_class: PUBLIC
-    pub residency_strictness: ResidencyClass, // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64,        // data_class: PUBLIC
+    pub code: String,
+    pub display_name: String,
+    pub regulatory_packs: Vec<String>,
+    pub state: RegionState,
+    pub provider_facing: bool,
+    pub residency_strictness: ResidencyClass,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudRegion {
-    pub code: Classified<RegionCode>,              // data_class: PUBLIC
-    pub display_name: Classified<String>,          // data_class: PUBLIC
-    pub regulatory_packs: Classified<Vec<String>>, // data_class: PUBLIC
-    pub azs: Classified<Vec<AzCode>>,              // data_class: PUBLIC
-    pub state: Classified<RegionState>,            // data_class: PUBLIC
-    pub provider_facing: Classified<bool>,         // data_class: PUBLIC
-    pub residency_strictness: Classified<ResidencyClass>, // data_class: PUBLIC
-    pub region_ref: Classified<RegionRef>,         // data_class: INTERNAL_ONLY
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: PUBLIC
-    pub schema_version: Classified<u32>,           // data_class: PUBLIC
+    pub code: Classified<RegionCode>,
+    pub display_name: Classified<String>,
+    pub regulatory_packs: Classified<Vec<String>>,
+    pub azs: Classified<Vec<AzCode>>,
+    pub state: Classified<RegionState>,
+    pub provider_facing: Classified<bool>,
+    pub residency_strictness: Classified<ResidencyClass>,
+    pub region_ref: Classified<RegionRef>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudAzCreate {
-    pub code: String,                  // data_class: PUBLIC
-    pub region_code: String,           // data_class: PUBLIC
-    pub physical_ref: String,          // data_class: INTERNAL_ONLY
-    pub power_zones: Vec<String>,      // data_class: PUBLIC
-    pub state: AzState,                // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64, // data_class: PUBLIC
+    pub code: String,
+    pub region_code: String,
+    pub physical_ref: String,
+    pub power_zones: Vec<String>,
+    pub state: AzState,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudAz {
-    pub code: Classified<AzCode>,                  // data_class: PUBLIC
-    pub region_code: Classified<RegionCode>,       // data_class: PUBLIC
-    pub physical_ref: Classified<String>,          // data_class: INTERNAL_ONLY
-    pub power_zones: Classified<Vec<String>>,      // data_class: PUBLIC
-    pub cells: Classified<Vec<CellId>>,            // data_class: PUBLIC
-    pub state: Classified<AzState>,                // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: PUBLIC
-    pub schema_version: Classified<u32>,           // data_class: PUBLIC
+    pub code: Classified<AzCode>,
+    pub region_code: Classified<RegionCode>,
+    pub physical_ref: Classified<String>,
+    pub power_zones: Classified<Vec<String>>,
+    pub cells: Classified<Vec<CellId>>,
+    pub state: Classified<AzState>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CellCapacity {
-    pub compute_vcpu: u64, // data_class: INTERNAL_ONLY
-    pub memory_gb: u64,    // data_class: INTERNAL_ONLY
-    pub ssd_tb: u64,       // data_class: INTERNAL_ONLY
-    pub gpu_count: u64,    // data_class: INTERNAL_ONLY
+    pub compute_vcpu: u64,
+    pub memory_gb: u64,
+    pub ssd_tb: u64,
+    pub gpu_count: u64,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CellUtilization {
-    pub compute_vcpu_used: u64, // data_class: INTERNAL_ONLY
-    pub memory_gb_used: u64,    // data_class: INTERNAL_ONLY
-    pub ssd_tb_used: u64,       // data_class: INTERNAL_ONLY
-    pub gpu_count_used: u64,    // data_class: INTERNAL_ONLY
+    pub compute_vcpu_used: u64,
+    pub memory_gb_used: u64,
+    pub ssd_tb_used: u64,
+    pub gpu_count_used: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCellCreate {
-    pub id: String,                             // data_class: PUBLIC
-    pub region_code: String,                    // data_class: PUBLIC
-    pub az_code: String,                        // data_class: PUBLIC
-    pub state: CloudCellState,                  // data_class: PUBLIC
-    pub tenant_density: TenantDensityClass,     // data_class: PUBLIC
-    pub allowed_residency: Vec<ResidencyClass>, // data_class: PUBLIC
-    pub capacity: CellCapacity,                 // data_class: INTERNAL_ONLY
-    pub utilization: CellUtilization,           // data_class: INTERNAL_ONLY
-    pub hsm_partition_ref: String,              // data_class: INTERNAL_ONLY
-    pub created_at_epoch_seconds: u64,          // data_class: PUBLIC
+    pub id: String,
+    pub region_code: String,
+    pub az_code: String,
+    pub state: CloudCellState,
+    pub tenant_density: TenantDensityClass,
+    pub allowed_residency: Vec<ResidencyClass>,
+    pub capacity: CellCapacity,
+    pub utilization: CellUtilization,
+    pub hsm_partition_ref: String,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CloudCell {
-    pub id: Classified<CellId>,                         // data_class: PUBLIC
-    pub region_code: Classified<RegionCode>,            // data_class: PUBLIC
-    pub az_code: Classified<AzCode>,                    // data_class: PUBLIC
-    pub state: Classified<CloudCellState>,              // data_class: PUBLIC
-    pub tenant_density: Classified<TenantDensityClass>, // data_class: PUBLIC
-    pub allowed_residency: Classified<Vec<ResidencyClass>>, // data_class: PUBLIC
-    pub capacity: Classified<CellCapacity>,             // data_class: INTERNAL_ONLY
-    pub utilization: Classified<CellUtilization>,       // data_class: INTERNAL_ONLY
-    pub hsm_partition_ref: Classified<String>,          // data_class: INTERNAL_ONLY
-    pub created_at_epoch_seconds: Classified<u64>,      // data_class: PUBLIC
-    pub schema_version: Classified<u32>,                // data_class: PUBLIC
+    pub id: Classified<CellId>,
+    pub region_code: Classified<RegionCode>,
+    pub az_code: Classified<AzCode>,
+    pub state: Classified<CloudCellState>,
+    pub tenant_density: Classified<TenantDensityClass>,
+    pub allowed_residency: Classified<Vec<ResidencyClass>>,
+    pub capacity: Classified<CellCapacity>,
+    pub utilization: Classified<CellUtilization>,
+    pub hsm_partition_ref: Classified<String>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TenantCellRouteRequest {
-    pub tenant_id: String,                            // data_class: INTERNAL_ONLY
-    pub home_region_code: String,                     // data_class: INTERNAL_ONLY
-    pub residency_class: ResidencyClass,              // data_class: INTERNAL_ONLY
-    pub required_density: Option<TenantDensityClass>, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub home_region_code: String,
+    pub residency_class: ResidencyClass,
+    pub required_density: Option<TenantDensityClass>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -1,18 +1,5 @@
 //! QuotaDecision PORT + DTOs for managed-K8s tenant quota.
-//!
-//! This crate defines the **port** (trait) that cluster-lifecycle calls before
-//! provisioning any cluster. It is the stable seam between the quota service
-//! and its callers; the implementation lives in `adapter-cedar` / `adapter-inmemory`.
-//!
-//! ## Design (ADR-0376 / ADR-0155 / ADR-0007)
-//!
-//! - `QuotaDecisionPort` — the trait with `check_quota(request) -> QuotaDecision`.
-//! - DTOs: `QuotaDto`, `UsageDto` — the JSON-serialisable shapes for the admin
-//!   REST API (`PUT/GET /tenants/{id}/quota`, `GET /tenants/{id}/usage`).
-//! - Cedar default-deny: the port contract requires that any implementation
-//!   deny by default when no explicit quota record exists.
 
-// ADR-0083 Tier-3: panic-free on the request path.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -23,10 +10,6 @@ pub use k8s_tenant_quota_kernel::{
     TenantQuota, TenantUsage, evaluate,
 };
 
-// ============================================================
-// QuotaDecision PORT
-// ============================================================
-
 /// The port cluster-lifecycle calls before provisioning a cluster.
 ///
 /// Implementations MUST be:
@@ -36,50 +19,35 @@ pub use k8s_tenant_quota_kernel::{
 /// - **Fail-closed**: any store error is surfaced as `QuotaPortError`, never as
 ///   a silent allow.
 pub trait QuotaDecisionPort {
-    /// Check whether the provisioning request is within the tenant's quota.
-    ///
     /// # Errors
     /// Returns [`QuotaPortError`] on persistence failure or tenant-not-found.
     fn check_quota(&self, request: &ProvisionRequest) -> Result<QuotaDecision, QuotaPortError>;
 }
 
-/// The port for reading and writing quota records (admin plane).
 pub trait QuotaAdminPort {
-    /// Set or replace the quota for a tenant (within plan ceiling).
-    ///
     /// # Errors
     /// Returns [`QuotaPortError`] on validation or persistence failure.
     fn set_quota(&self, quota: TenantQuota) -> Result<(), QuotaPortError>;
 
-    /// Read the quota record for a tenant.
-    ///
     /// # Errors
     /// Returns [`QuotaPortError::NotFound`] when no record exists,
     /// or [`QuotaPortError::Persistence`] on store failure.
     fn get_quota(&self, tenant_id: &TenantId) -> Result<TenantQuota, QuotaPortError>;
 
-    /// Read current usage for a tenant.
-    ///
     /// # Errors
     /// Returns [`QuotaPortError::NotFound`] when no record exists,
     /// or [`QuotaPortError::Persistence`] on store failure.
     fn get_usage(&self, tenant_id: &TenantId) -> Result<TenantUsage, QuotaPortError>;
 
-    /// Record updated usage for a tenant (called by provisioning pipeline).
-    ///
     /// # Errors
     /// Returns [`QuotaPortError`] on persistence failure.
     fn set_usage(&self, usage: TenantUsage) -> Result<(), QuotaPortError>;
 }
 
-/// Errors returned by the quota port implementations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum QuotaPortError {
-    /// No quota record found for the given tenant.
     NotFound(String),
-    /// A persistence / store failure.
     Persistence(String),
-    /// A validation error from the kernel model.
     Validation(String),
 }
 
@@ -101,30 +69,16 @@ impl From<QuotaModelError> for QuotaPortError {
     }
 }
 
-// ============================================================
-// DTOs (admin REST API surface)
-// ============================================================
-
-/// DTO for setting or reading a tenant's quota via the REST API.
-///
-/// Maps 1:1 to [`TenantQuota`]; used for JSON serialisation at the HTTP layer.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct QuotaDto {
-    /// Tenant id.
     pub tenant_id: String,
-    /// Maximum concurrent clusters.
     pub max_clusters: u32,
-    /// Maximum nodes per cluster.
     pub max_nodes_per_cluster: u32,
-    /// Maximum vCPU per cluster.
     pub max_vcpu_per_cluster: u32,
-    /// Maximum RAM (GiB) per cluster.
     pub max_ram_gib_per_cluster: u32,
 }
 
 impl QuotaDto {
-    /// Convert this DTO into a kernel [`TenantQuota`].
-    ///
     /// # Errors
     /// Returns [`QuotaPortError::Validation`] if the values fail kernel validation.
     pub fn into_quota(self) -> Result<TenantQuota, QuotaPortError> {
@@ -151,18 +105,12 @@ impl From<TenantQuota> for QuotaDto {
     }
 }
 
-/// DTO for reading a tenant's current cluster resource usage.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UsageDto {
-    /// Tenant id.
     pub tenant_id: String,
-    /// Current number of provisioned clusters.
     pub current_clusters: u32,
-    /// Maximum nodes observed in any single cluster.
     pub max_nodes_in_any_cluster: u32,
-    /// Maximum vCPU observed in any single cluster.
     pub max_vcpu_in_any_cluster: u32,
-    /// Maximum RAM (GiB) observed in any single cluster.
     pub max_ram_gib_in_any_cluster: u32,
 }
 
@@ -178,12 +126,9 @@ impl From<TenantUsage> for UsageDto {
     }
 }
 
-/// Response body for a quota check (used by cluster-lifecycle callers).
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct QuotaCheckResponse {
-    /// Whether provisioning is allowed.
     pub allowed: bool,
-    /// Denial reason, if `allowed == false`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deny_reason: Option<String>,
 }

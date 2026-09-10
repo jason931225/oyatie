@@ -1,15 +1,4 @@
 //! Cloud IaC application entrypoint composition.
-//!
-//! This crate is the app/composition-root layer for the local Cloud IaC
-//! OpenTofu module-registry service. It wires health/liveness probes plus the
-//! existing module-registry runtime assembly into the canonical Hyper adapter
-//! without importing `tokio`, `hyper`, or provider SDKs directly.
-//!
-//! Current scope is intentionally narrow: a runnable local app process and a
-//! bounded loopback harness. It does not implement production authentication,
-//! persistence, production object storage, signed releases, OpenTofu plan/apply,
-//! provider calls, cloud provisioning, FD-001 tenant workload hosting, or a
-//! deployed Kubernetes/Argo CD rollout.
 
 #![forbid(unsafe_code)]
 
