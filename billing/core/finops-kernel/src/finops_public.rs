@@ -1,13 +1,9 @@
-//! Public-GA FinOps surface (M05-P01-IP-003 `report_public`).
-//!
-//! Produces a tenant-visible cost summary from an internal `CostReport`.
-//! The raw `total_spend_micros` is normalised to a `spend_cents` integer
-//! (truncated) so the public surface never exposes sub-cent precision.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Public-GA FinOps surface: the tenant-visible projection of a `CostReport`.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use crate::{CostReport, FinopsError, ReportPeriod};
+
+const MICROS_PER_CENT: u128 = 10_000;
 
 /// Schema version for this public summary shape.
 pub const FINOPS_PUBLIC_SCHEMA_VERSION: u32 = 1;
@@ -15,18 +11,11 @@ pub const FINOPS_PUBLIC_SCHEMA_VERSION: u32 = 1;
 /// Tenant-visible cost summary — no sub-cent precision exposed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PublicCostSummary {
-    // data_class: PUBLIC
     pub report_id: String,
-    // data_class: PUBLIC
     pub period: ReportPeriod,
-    // data_class: PUBLIC
     pub period_start_unix_ms: u64,
-    // data_class: PUBLIC
     pub period_end_unix_ms: u64,
-    /// Spend truncated to whole cents (micros / 10_000).
-    // data_class: PUBLIC
     pub spend_cents: u128,
-    // data_class: PUBLIC
     pub schema_version: u32,
 }
 
@@ -47,7 +36,7 @@ pub fn report_public(r: &CostReport) -> Result<PublicCostSummary, FinopsError> {
         period: r.period,
         period_start_unix_ms: r.period_start_unix_ms,
         period_end_unix_ms: r.period_end_unix_ms,
-        spend_cents: r.total_spend_micros / 10_000,
+        spend_cents: r.total_spend_micros / MICROS_PER_CENT,
         schema_version: FINOPS_PUBLIC_SCHEMA_VERSION,
     })
 }
@@ -75,7 +64,6 @@ mod tests {
         assert_eq!(s.period, ReportPeriod::Monthly);
         assert_eq!(s.period_start_unix_ms, 1_000);
         assert_eq!(s.period_end_unix_ms, 2_000);
-        // 1_234_567_890 / 10_000 = 123_456 (truncated)
         assert_eq!(s.spend_cents, 123_456);
         assert_eq!(s.schema_version, FINOPS_PUBLIC_SCHEMA_VERSION);
     }
@@ -107,7 +95,6 @@ mod tests {
 
     #[test]
     fn report_public_sub_cent_truncated() {
-        // 9_999 micros < 1 cent => truncates to 0
         let r = report("r1", 1_000, 2_000, 9_999);
         let s = report_public(&r).unwrap();
         assert_eq!(s.spend_cents, 0);

@@ -1,14 +1,9 @@
 //! Accounting journal in-memory storage adapter reference.
 //!
 //! SECURITY/OPERATIONS: NOT FOR PRODUCTION. This adapter is a volatile,
-//! process-local reference implementation for accounting journal metadata
-//! storage seams. It records app-layer journal audit, payroll posting audit,
-//! and VAT Workflow dispatch envelopes so later durable ledger storage,
-//! Postgres/RLS, and cloud adapters have a tested contract. It does not persist
-//! to durable ledger storage, execute Workflow, submit VAT filings, execute
-//! payments, call Payroll, emit audit-chain events, or deploy cloud I/O.
-//! ADR-0083 Tier 3: tests legitimately use assertion helpers under the
-//! `cfg(test)` exemption.
+//! process-local reference implementation of the accounting journal storage
+//! port; `AccountingStorageCapabilities` below records what it does and does
+//! not attach.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -39,13 +34,6 @@ pub struct AccountingStorageCapabilities {
 }
 
 /// In-memory reference store for accounting metadata records.
-///
-/// SECURITY (ADR-0592): the map is keyed by the LOGICAL idempotency key
-/// (`idem-v2:<tenant>:<scope>:<primary_ref>`), NOT by a fingerprinted key. The
-/// body fingerprint is persisted as a separate field on the record. This lets a
-/// changed body submitted under a reused logical key collide in the SAME map
-/// slot, where `put_record` compares fingerprints and refuses the mismatch —
-/// instead of landing in a different slot and silently inserting a second record.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InMemoryAccountingJournalStore {
     records_by_idempotency_key: BTreeMap<String, AccountingStoredRecord>,
@@ -137,10 +125,9 @@ impl AccountingJournalStoragePort for InMemoryAccountingJournalStore {
     fn put_record(&mut self, record: AccountingStoredRecord) -> Result<(), AccountingStorageError> {
         validate_idempotency_key(&record.idempotency_key)?;
         if let Some(existing) = self.records_by_idempotency_key.get(&record.idempotency_key) {
-            // SECURITY (ADR-0592): a key collision with a DIFFERENT body
-            // fingerprint is a changed command under a reused key, not a safe
-            // replay. Returning the prior outcome would silently substitute a
-            // different command, so refuse it distinctly from a true replay.
+            // A reused key carrying a DIFFERENT fingerprint is a changed
+            // command, not a replay: returning the stored outcome would
+            // silently substitute it, so refuse distinctly instead.
             if existing.body_fingerprint != record.body_fingerprint {
                 return Err(AccountingStorageError::IdempotencyKeyBodyMismatch {
                     key: record.idempotency_key,

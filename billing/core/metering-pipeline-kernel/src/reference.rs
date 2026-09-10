@@ -1,8 +1,6 @@
-//! The in-memory reference sink — the executable specification of the
-//! D-14 idempotent metering sink, proven by [`crate::conformance`] in
-//! this crate's tests. NOT a production store: no durability across
-//! process restart — the durable sink arrives via the G03 `data`
-//! port behind the same trait.
+//! Executable specification of the idempotent metering sink, proven by
+//! [`crate::conformance`] in this crate's tests. NOT a production store: no
+//! durability across process restart.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -11,7 +9,6 @@ use crate::{
     DedupKey, IngestOutcome, LatenessPolicy, MeteringPipelineError, MeteringSink, UsageRecord,
 };
 
-/// In-memory reference implementation of [`MeteringSink`].
 #[derive(Debug)]
 pub struct InMemorySink {
     policy: LatenessPolicy,
@@ -19,7 +16,6 @@ pub struct InMemorySink {
 }
 
 impl InMemorySink {
-    /// An empty sink under the given lateness policy.
     #[must_use]
     pub fn new(policy: LatenessPolicy) -> Self {
         Self {
@@ -28,7 +24,7 @@ impl InMemorySink {
         }
     }
 
-    /// Number of stored records (operator/test visibility).
+    /// Exposed for operator and test visibility.
     ///
     /// # Errors
     /// Returns [`MeteringPipelineError::SinkUnavailable`] when the store
@@ -37,8 +33,6 @@ impl InMemorySink {
         Ok(self.locked()?.len())
     }
 
-    /// Whether the sink holds no records.
-    ///
     /// # Errors
     /// Returns [`MeteringPipelineError::SinkUnavailable`] when the store
     /// lock is poisoned.

@@ -92,10 +92,6 @@ fn payroll_posting_emits_accounting_audit_event() {
         "audit/accounting/payroll/reversal"
     );
     assert_eq!(outcome.audit_envelope.wage_ledger_refs.value.len(), 1);
-    // SECURITY (ADR-0592): tenant-scoped LOGICAL key (scheme + tenant + scope +
-    // primary_ref). The body fingerprint is a SEPARATE field, NOT embedded in the
-    // key — embedding it would make a changed body land in a different store slot
-    // and defeat the body-mismatch check.
     let key = &outcome.audit_envelope.idempotency_key.value;
     assert_eq!(
         key, "idem-v2:ten_acme:payroll-posted:jrn_payroll_2026_01",

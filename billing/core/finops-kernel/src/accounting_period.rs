@@ -1,22 +1,12 @@
-//! Accounting period model for M07-P03-accounting merge-variant delta-1.
-//!
-//! Introduces `AccountingPeriod` (fiscal-period boundaries + K-GAAP kind) and
-//! `PeriodCloseState` (the lifecycle gate that prevents posting to a closed
-//! period). Complements the existing `ReportPeriod` / `PublicCostSummary`
-//! surface without duplicating `Currency` or `JournalEntryStatus`.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
+//! Accounting-period boundaries and the close lifecycle that gates posting.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 /// K-GAAP accounting period kind (월마감 = Monthly, 연마감 = Annual).
-///
-/// Mirrors the period-close vocabulary in the M07/P03 phase spec without
-/// depending on any external crate — std-only.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum AccountingPeriodKind {
-    /// 월마감 — end-of-month close.
     Monthly,
-    /// 연마감 — end-of-year close (supersedes all monthly closes in the year).
+    /// The annual close supersedes every monthly close in the same year — a
+    /// K-GAAP rule this type records but does not yet enforce.
     Annual,
 }
 
@@ -36,16 +26,15 @@ impl AccountingPeriodKind {
 /// once it is `Closed` — any attempt must return `PeriodCloseError::PeriodAlreadyClosed`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum PeriodCloseState {
-    /// Period is open; journal entries may be posted.
     Open,
     /// Period is pending final review; soft-locked (no new postings allowed).
     PendingReview,
-    /// Period is permanently closed; no further postings permitted.
+    /// Closed — no further postings permitted. The close is not enforced as
+    /// irreversible: `state` is public and there is no reopen guard.
     Closed,
 }
 
 impl PeriodCloseState {
-    /// Returns `true` when posting to this period is allowed.
     pub fn allows_posting(self) -> bool {
         matches!(self, Self::Open)
     }
@@ -55,13 +44,13 @@ impl PeriodCloseState {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountingPeriod {
     /// Unique stable ID for this period (e.g. `"ap_2025_03"`, `"ap_2025_annual"`).
-    pub period_id: String, // data_class: INTERNAL_ONLY
-    pub kind: AccountingPeriodKind, // data_class: INTERNAL_ONLY
+    pub period_id: String,
+    pub kind: AccountingPeriodKind,
     /// Inclusive start of period in Unix milliseconds.
-    pub start_unix_ms: u64, // data_class: INTERNAL_ONLY
+    pub start_unix_ms: u64,
     /// Exclusive end of period in Unix milliseconds.
-    pub end_unix_ms: u64, // data_class: INTERNAL_ONLY
-    pub state: PeriodCloseState,    // data_class: INTERNAL_ONLY
+    pub end_unix_ms: u64,
+    pub state: PeriodCloseState,
 }
 
 /// Errors from accounting-period operations.
