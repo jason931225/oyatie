@@ -113,7 +113,9 @@ mod tests {
     fn fingerprint_hex_roundtrip() {
         let f = Fingerprint::of_str("hello world");
         let hex = f.to_hex();
-        assert_eq!(hex.len(), Fingerprint::HEX_LEN);
+        // The literal, not HEX_LEN: a u64 is exactly 16 hex digits, and
+        // comparing the constant to itself would pass at any width.
+        assert_eq!(hex.len(), 16);
         assert_eq!(Fingerprint::from_hex(&hex).unwrap(), f);
         assert!(Fingerprint::from_hex("xyz").is_err());
         assert!(Fingerprint::from_hex("zzzzzzzzzzzzzzzz").is_err());
