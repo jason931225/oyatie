@@ -1,10 +1,8 @@
 //! The walk, generic in where its graph comes from.
 //!
-//! The traversal law — depth ceiling, edge filter, freshness floor,
-//! consent gate, dangling-endpoint refusal, node and edge caps, cursor
-//! paging — is written ONCE here. A source supplies only three things:
-//! whether a node exists (and its type), its outbound edges, and its
-//! inbound edges.
+//! The traversal law is written ONCE here. A source supplies only three
+//! things: whether a node exists (and its type), its outbound edges, and
+//! its inbound edges.
 //!
 //! That split is the point. The in-memory index and the durable
 //! projection store are then two sources over one law, so every merged
@@ -16,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::contract::*;
 use crate::link::KnowledgeGraphLinkInstance;
-use crate::request::KnowledgeGraphQueryRequest;
+use crate::request::{EdgeConsent, KnowledgeGraphQueryRequest};
 
 /// Where a walk reads its graph.
 pub(crate) trait GraphSource {
@@ -28,19 +26,43 @@ pub(crate) trait GraphSource {
         entity_id: &str,
     ) -> Result<Option<KnowledgeGraphNode>, KnowledgeGraphQueryError>;
 
-    /// Edges leaving `entity_id`.
     fn outbound(
         &self,
         tenant_id: &str,
         entity_id: &str,
     ) -> Result<Vec<KnowledgeGraphLinkInstance>, KnowledgeGraphQueryError>;
 
-    /// Edges arriving at `entity_id`.
     fn inbound(
         &self,
         tenant_id: &str,
         entity_id: &str,
     ) -> Result<Vec<KnowledgeGraphLinkInstance>, KnowledgeGraphQueryError>;
+}
+
+fn passes_edge_filter(link: &KnowledgeGraphLinkInstance, edge_filter: &BTreeSet<&str>) -> bool {
+    edge_filter.is_empty() || edge_filter.contains(link.edge_type_id.as_str())
+}
+
+fn is_fresh_enough(link: &KnowledgeGraphLinkInstance, floor_epoch_seconds: u64) -> bool {
+    link.observed_at_epoch_seconds >= floor_epoch_seconds
+}
+
+fn consent_permits(link: &KnowledgeGraphLinkInstance, consent: &EdgeConsent) -> bool {
+    consent.permits(link.edge_type_id.as_str())
+}
+
+fn neighbour_of(link: &KnowledgeGraphLinkInstance, arrived_from: &str) -> String {
+    if link.from_entity_id == arrived_from {
+        link.to_entity_id.clone()
+    } else {
+        link.from_entity_id.clone()
+    }
+}
+
+fn sorted_page<T: Ord>(emissions: impl Iterator<Item = T>) -> Vec<T> {
+    let mut page: Vec<T> = emissions.collect();
+    page.sort();
+    page
 }
 
 fn insert_node<S: GraphSource>(
@@ -146,23 +168,15 @@ pub(crate) fn walk<S: GraphSource>(
         };
 
         for link in outbound.into_iter().chain(inbound) {
-            if !edge_filter.is_empty() && !edge_filter.contains(link.edge_type_id.as_str()) {
-                continue;
-            }
-            if link.observed_at_epoch_seconds < request.freshness_floor_epoch_seconds {
-                continue;
-            }
-            if !request.edge_consent.permits(link.edge_type_id.as_str()) {
+            if !passes_edge_filter(&link, &edge_filter)
+                || !is_fresh_enough(&link, request.freshness_floor_epoch_seconds)
+                || !consent_permits(&link, &request.edge_consent)
+            {
                 continue;
             }
             endpoints_exist(source, &link)?;
 
-            // The neighbour is whichever side we arrived from.
-            let neighbor_id = if link.from_entity_id == entity_id {
-                link.to_entity_id.clone()
-            } else {
-                link.from_entity_id.clone()
-            };
+            let neighbor_id = neighbour_of(&link, &entity_id);
 
             // Node cap: an edge whose neighbour cannot be emitted would
             // leave a dangling endpoint in the response, so stop first.
@@ -174,7 +188,6 @@ pub(crate) fn walk<S: GraphSource>(
                 result_truncated = true;
                 break 'bfs;
             }
-            // Canonical from->to orientation regardless of direction.
             if edges.insert(link.as_contract_edge()) {
                 edge_order.push(link.as_contract_edge());
             }
@@ -190,19 +203,15 @@ pub(crate) fn walk<S: GraphSource>(
         }
     }
 
-    // Page = the emission-order slice past the cursor, canonically
-    // sorted within the page. Pages partition the full result.
     let skip_nodes = usize::try_from(cursor.nodes_emitted).unwrap_or(usize::MAX);
     let skip_edges = usize::try_from(cursor.edges_emitted).unwrap_or(usize::MAX);
-    let mut page_nodes: Vec<KnowledgeGraphNode> = node_order
-        .iter()
-        .skip(skip_nodes)
-        .filter_map(|id| nodes.get(id.as_str()).cloned())
-        .collect();
-    page_nodes.sort();
-    let mut page_edges: Vec<KnowledgeGraphEdge> =
-        edge_order.iter().skip(skip_edges).cloned().collect();
-    page_edges.sort();
+    let page_nodes = sorted_page(
+        node_order
+            .iter()
+            .skip(skip_nodes)
+            .filter_map(|id| nodes.get(id.as_str()).cloned()),
+    );
+    let page_edges = sorted_page(edge_order.iter().skip(skip_edges).cloned());
     let next_cursor = result_truncated.then_some(QueryCursor {
         nodes_emitted: node_order.len() as u64,
         edges_emitted: edge_order.len() as u64,

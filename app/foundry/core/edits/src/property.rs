@@ -9,8 +9,8 @@ pub enum WirePropertyError {
     NotTrimmedPropertyName,
 }
 
-/// The six property tiers, u8-tagged for the wire. The numbering is
-/// byte-law from birth; golden vectors freeze it in the codec lane.
+/// The property tiers, u8-tagged for the wire. The numbering is byte-law
+/// from birth; `edit_vocabulary.rs` freezes it.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum WireTier {
     Scalar,
@@ -46,13 +46,10 @@ impl WireTier {
     }
 }
 
-/// The privacy-program data classes, u8-tagged for the wire. Exactly the
-/// privacy-program label set — operational labels (`AUDIT`, `SECRET`) and
-/// subject markers (`CHILDREN`) are unrepresentable on the wire by
-/// construction. The platform's own label mapping is many-to-one, so the
-/// boundary conversion (a later spine lane) owns picking the canonical
-/// in-memory class per label; this numbering must never assume
-/// bijectivity with any in-memory enum.
+/// The privacy-program data classes, u8-tagged for the wire. The
+/// platform's own label mapping is many-to-one, so the boundary
+/// conversion owns picking the canonical in-memory class per label; this
+/// numbering must never assume bijectivity with any in-memory enum.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum WireDataClass {
     Public,
@@ -108,8 +105,7 @@ impl WireDataClass {
         }
     }
 
-    /// The privacy-program label this tag carries, the platform's stable
-    /// vocabulary for the class.
+    /// The platform's stable vocabulary for the class.
     pub const fn label(self) -> &'static str {
         match self {
             Self::Public => "PUBLIC",
@@ -129,7 +125,6 @@ impl WireDataClass {
     }
 }
 
-/// One named, classified, typed value on the wire.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct WireProperty {
     pub name: String,              // data_class: INTERNAL_ONLY
@@ -139,7 +134,6 @@ pub struct WireProperty {
 }
 
 impl WireProperty {
-    /// Construct a validated wire property; refusals are fail-closed.
     pub fn new(
         name: impl Into<String>,
         tier: WireTier,

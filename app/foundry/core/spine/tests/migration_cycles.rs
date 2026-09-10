@@ -34,9 +34,6 @@ fn registry() -> OntologyEngine {
             registry.evolve_entity_type(definition).unwrap();
         }
     }
-    // The plan's action, as the seed registers one. `validate` requires it to
-    // EXIST and not merely to parse, so a registry without it is a fixture
-    // less faithful than production rather than a smaller one.
     registry
         .register_action_type(
             ActionTypeDefinition::new(

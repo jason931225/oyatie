@@ -29,7 +29,6 @@ pub struct ObjectBinding {
 /// kernel-cardinality-checked link state.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProjectionState {
-    /// The tenant this projection is scoped to.
     pub tenant_id: String, // data_class: INTERNAL_ONLY
     /// The registry snapshot this projection was seeded with, held
     /// verbatim so a checkpoint can prove it resumes against the SAME
@@ -40,7 +39,6 @@ pub struct ProjectionState {
     /// written ONLY through `register_link_instance`, so kernel
     /// cardinality law holds by construction.
     pub engine: OntologyEngine, // data_class: INTERNAL_ONLY
-    /// The projected object entities.
     pub objects: ObjectGraph, // data_class: PROPERTY_VALUE_PRIVACY_CLASS
     /// Per-object bindings, keyed by `object_ref`.
     pub bindings: BTreeMap<String, ObjectBinding>, // data_class: INTERNAL_ONLY

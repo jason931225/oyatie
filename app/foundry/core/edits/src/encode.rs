@@ -1,10 +1,6 @@
 //! Canonical encoding: the ONLY byte spelling of each value.
 //!
-//! Canon, frozen for `wire_format_version` 1 by the golden vectors:
-//! little-endian fixed-width integers; `u32` length-prefixed UTF-8
-//! strings; doubles as the [`WireDouble`](crate::WireDouble) monotone
-//! `u64` key; struct fields in `BTreeMap` (ascending byte) order; no
-//! presence bytes — v1 has no optional wire field, and a presence byte
+//! No presence bytes: v1 has no optional wire field, and a presence byte
 //! is the rule an optional field brings WITH it in the version that
 //! first carries one. An existing version's layout is NEVER mutated;
 //! evolution mints the next version.

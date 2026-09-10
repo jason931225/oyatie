@@ -1,8 +1,7 @@
 //! The migration attestation: the honest V1 completion fence — fixpoint
 //! is `pending == 0` over a full rescan by the ONE predicate the runner
 //! scans with, and per-object poisons are surfaced, never hidden behind
-//! the fixpoint claim. The in-log completion fence arrives with
-//! registry-in-the-log (design of record, ruling 7).
+//! the fixpoint claim.
 
 use data_ontology_kernel::EntityTypeId;
 
@@ -14,7 +13,6 @@ use super::runner::{computed_target, pending_objects};
 /// Where one plan stands over one tenant's projection.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MigrationAttestation {
-    /// No object of the plan's type owes any computed target.
     pub fixpoint: bool, // data_class: INTERNAL_ONLY
     /// The objects still owed, in deterministic order.
     pub pending: Vec<String>, // data_class: INTERNAL_ONLY

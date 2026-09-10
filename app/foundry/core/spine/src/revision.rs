@@ -1,11 +1,11 @@
 //! Reader pinning: one pure view over the projection and the kernel's
 //! retained revision history. Behind the pin the view filters down to the
-//! pinned vocabulary — lossless under additive-only evolution, and the
-//! per-object deprecation window D80 names. Ahead of the pin the view shows
-//! honest absence: a value the log never carried is never synthesized at
-//! read. Refusals are typed; a read never touches the poison ledger. With
-//! a matching plan, [`UpcastState`] is refined by the SAME predicate the
-//! runner scans with; without one, written-below-pin is pending.
+//! pinned vocabulary — lossless under additive-only evolution. Ahead of the
+//! pin the view shows honest absence: a value the log never carried is
+//! never synthesized at read. Refusals are typed; a read never touches the
+//! poison ledger. With a matching plan, [`UpcastState`] is refined by the
+//! SAME predicate the runner scans with; without one, written-below-pin is
+//! pending.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -31,10 +31,7 @@ pub struct PinnedObject {
     /// The object's applied properties, filtered to the names the pinned
     /// definition declares. Every value is log-derived.
     pub properties: BTreeMap<String, ObjectProperty>, // data_class: PROPERTY_VALUE_PRIVACY_CLASS
-    /// The schema revision the writer stamped on the object's last applied
-    /// envelope.
-    pub written_revision: u32, // data_class: INTERNAL_ONLY
-    /// Standing of this object relative to the pin.
+    pub written_revision: u32,     // data_class: INTERNAL_ONLY
     pub upcast_state: UpcastState, // data_class: INTERNAL_ONLY
 }
 
@@ -51,15 +48,7 @@ pub enum ViewError {
 }
 
 /// The object at `object_ref` as a reader pinned at `pinned` sees it.
-///
-/// Pure over (projection facts, retained definitions):
-///
-/// | Case | Result |
-/// |---|---|
-/// | `pinned` > written revision | stored properties (pin declares a superset under additive law), [`UpcastState::UpcastPending`] |
-/// | `pinned` <= written revision | properties filtered to the pinned vocabulary, [`UpcastState::Current`] |
-/// | no binding for `object_ref` | [`ViewError::UnknownObject`] |
-/// | `pinned` never accepted | [`ViewError::UnretainedRevision`] |
+/// Pure over (projection facts, retained definitions).
 ///
 /// With a plan whose entity type matches the object and whose
 /// `to_revision` is the pin, `UpcastPending` is refined by the SAME

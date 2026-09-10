@@ -1,10 +1,5 @@
-//! Query-engine tests: part 3.
-
 use super::support::*;
 
-// ---- ST2: DepthCeilingExceeded error variant ----
-/// ST2-a: max_depth > MAX_QUERY_DEPTH must be rejected with the new
-/// DepthCeilingExceeded variant, NOT with InvalidMaxDepth.
 #[test]
 fn max_depth_above_ceiling_returns_depth_ceiling_exceeded_not_invalid_max_depth() {
     let result = KnowledgeGraphQueryRequest::new(
@@ -18,7 +13,6 @@ fn max_depth_above_ceiling_returns_depth_ceiling_exceeded_not_invalid_max_depth(
         EdgeConsent::Unrestricted,
         TraversalDirection::Outbound,
     );
-    // DepthCeilingExceeded variant must exist and be returned here
     assert_eq!(
         result,
         Err(KnowledgeGraphQueryError::DepthCeilingExceeded),
@@ -26,8 +20,6 @@ fn max_depth_above_ceiling_returns_depth_ceiling_exceeded_not_invalid_max_depth(
     );
 }
 
-/// ST2-b: max_depth == MAX_QUERY_DEPTH (exactly at ceiling) must be
-/// accepted — Ok result, not an error.
 #[test]
 fn max_depth_at_ceiling_is_accepted() {
     assert!(
@@ -47,9 +39,6 @@ fn max_depth_at_ceiling_is_accepted() {
     );
 }
 
-/// ST2-c: max_depth == 0 must still return InvalidMaxDepth (not
-/// DepthCeilingExceeded), preserving the existing structural-invalidity
-/// distinction.
 #[test]
 fn max_depth_zero_returns_invalid_max_depth_not_depth_ceiling_exceeded() {
     assert_eq!(
@@ -69,8 +58,6 @@ fn max_depth_zero_returns_invalid_max_depth_not_depth_ceiling_exceeded() {
     );
 }
 
-// ST1 acceptance: a malformed consent grant id (no `lty_` prefix) must be
-// rejected with `MalformedConsentGrantId`.
 #[test]
 fn malformed_consent_grant_id_rejected() {
     let result = KnowledgeGraphQueryRequest::new(
@@ -93,8 +80,6 @@ fn malformed_consent_grant_id_rejected() {
     );
 }
 
-// ST1 acceptance: a well-formed consent grant id (`lty_partner`) must be
-// accepted without error.
 #[test]
 fn well_formed_consent_grant_id_accepted() {
     let result = KnowledgeGraphQueryRequest::new(
@@ -114,8 +99,6 @@ fn well_formed_consent_grant_id_accepted() {
     );
 }
 
-// The consent law lives on the type: a granted posture permits exactly
-// its named grants, and an unrestricted posture permits every edge.
 #[test]
 fn edge_consent_permits_exactly_the_named_grants() {
     let granted = EdgeConsent::granted(vec!["lty_partner", "lty_member"]);
@@ -128,16 +111,6 @@ fn edge_consent_permits_exactly_the_named_grants() {
     assert!(EdgeConsent::Unrestricted.permits("lty_owns"));
 }
 
-// ST2 acceptance: when a non-empty consent scope is supplied, the BFS must
-// prune edges whose edge_type_id is absent from the scope, so downstream
-// nodes reachable only via those edges are absent from the response.
-//
-// Graph:
-//   ent_root --lty_partner--> ent_b --lty_partner--> ent_c
-//   ent_root --lty_member-->  ent_d
-// Scope: ["lty_partner"]
-// Expected: ent_b and ent_c present; ent_d absent.
-//           lty_partner edges present; lty_member edge absent.
 #[test]
 fn consent_filter_prunes_non_consented_edges() {
     let g = consent_graph();

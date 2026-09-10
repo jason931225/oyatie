@@ -1,8 +1,3 @@
-//! Runner convergence law: the pending predicate owes only objects whose
-//! computed targets differ from their current values; every upcast is an
-//! ordinary UpsertProperties submitted through the ONE writer and stamped
-//! at head; reruns converge — value fixpoint, drift-sensitive keys.
-
 #[allow(dead_code)]
 #[path = "migration_support/mod.rs"]
 mod support;

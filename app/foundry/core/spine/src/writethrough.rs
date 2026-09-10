@@ -31,8 +31,6 @@ use crate::emission::poison_label;
 use crate::fold::{FoldOutcome, apply_sealed};
 use crate::state::ProjectionState;
 
-/// Why the runner stopped. The projection is never wedged by this — the
-/// log can always be refolded.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WriteThroughError {
     /// The store refused the mirror of this ordinal. Entries before it
@@ -114,8 +112,6 @@ fn registered_links(sealed: &SealedEnvelope, object_ref: &str) -> Vec<ProjectedL
         .collect()
 }
 
-/// The projected view of one object: the kernel entity plus the fold's
-/// binding facts.
 fn projected(state: &ProjectionState, object_ref: &str) -> Option<ProjectedObject> {
     let binding = state.bindings.get(object_ref)?;
     let entity = state.objects.get(&state.tenant_id, object_ref)?;

@@ -1,10 +1,10 @@
-//! Migration plans: the typed, total declaration of one D80 upcast — which
+//! Migration plans: the typed, total declaration of one upcast — which
 //! entity type, from which retained revision to the registry head, through
 //! which transforms. Every conversion is total (no parses); targets are
 //! optional non-key properties of the head revision; sources must exist at
-//! the from-revision, not merely at head. The plan digest is FNV-1a-64 over
-//! canonical bytes — fixed width over unbounded inputs, so the runner's
-//! per-object idempotency key can never overflow the envelope cap.
+//! the from-revision, not merely at head. The plan digest is fixed width
+//! over unbounded inputs, so the runner's per-object idempotency key can
+//! never overflow the envelope cap.
 
 mod attest;
 mod dependencies;
@@ -27,12 +27,12 @@ pub use runner::{
 use value::Fnv1a64;
 pub use value::{DefaultValue, ValueConversion};
 
-/// One per-property upcast step.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UpcastTransform {
-    /// Copy `from` verbatim into `to`; declarations must be identical.
-    CopyAs { from: String, to: String }, // data_class: INTERNAL_ONLY
-    /// Totally convert `from` into `to`.
+    CopyAs {
+        from: String, // data_class: INTERNAL_ONLY
+        to: String,   // data_class: INTERNAL_ONLY
+    },
     ConvertAs {
         from: String,                // data_class: INTERNAL_ONLY
         to: String,                  // data_class: INTERNAL_ONLY
@@ -70,50 +70,58 @@ pub struct MigrationPlan {
     pub transforms: Vec<UpcastTransform>, // data_class: INTERNAL_ONLY
 }
 
-/// Typed refusals of plan validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PlanError {
-    /// `entity_type` is not an `ety_`-prefixed id.
     InvalidEntityType,
-    /// `action_type` is not an `aty_`-prefixed id.
     InvalidActionType,
     /// No definition registered under `(tenant_id, entity_type)`.
     UnknownEntityType,
     /// Registered, but against a different entity type: the writer stamps
     /// the revision from the action's own type, so such a plan mis-stamps
-    /// every upcast it writes.
+    /// every upcast it writes — accepted rather than poisoned, and
+    /// silently wrong on every later refold.
     ActionNotBoundToEntityType,
     /// No definition registered under `(tenant_id, action_type)`. Every
     /// upcast it would submit is refused one at a time by the writer's own
     /// gate — a bare count with no reason in it.
     UnknownActionType,
     /// The registry head is not the plan's `to_revision` — evolve first.
-    RegistryHeadMismatch { head: u32 },
+    RegistryHeadMismatch {
+        head: u32,
+    },
     /// `from_revision` must be strictly below `to_revision`.
     RevisionsNotAscending,
     /// The named revision was never accepted for this entity type.
-    UnretainedRevision { revision: u32 },
-    /// A transform reads a property the from-revision does not declare.
-    SourceAbsent { name: String },
+    UnretainedRevision {
+        revision: u32,
+    },
+    SourceAbsent {
+        name: String,
+    },
     /// A transform writes a property the head revision does not declare.
-    TargetAbsent { name: String },
+    TargetAbsent {
+        name: String,
+    },
     /// Targets must be optional; required-at-head stays a kernel lane.
-    TargetRequired { name: String },
+    TargetRequired {
+        name: String,
+    },
     /// Neither side of a transform may name the primary-key property.
-    PrimaryKeyTouched { name: String },
-    /// Two transforms write the same target.
-    DuplicateTarget { name: String },
-    /// The transform is not total over the declared types.
-    TypeIncompatible { target: String },
+    PrimaryKeyTouched {
+        name: String,
+    },
+    DuplicateTarget {
+        name: String,
+    },
+    TypeIncompatible {
+        target: String,
+    },
     /// Cross-property dependencies must be acyclic to reach a fixpoint.
     CyclicTransforms,
 }
 
 impl MigrationPlan {
-    /// Refuse everything the runner must never be handed. Per-transform
-    /// check order is pinned: duplicate target, primary key, target
-    /// declared, target optional, source primary key, source declared,
-    /// type compatibility.
+    /// Refuse everything the runner must never be handed.
     pub fn validate(&self, registry: &OntologyEngine) -> Result<(), PlanError> {
         if self.from_revision >= self.to_revision {
             return Err(PlanError::RevisionsNotAscending);
@@ -129,19 +137,12 @@ impl MigrationPlan {
             });
         }
         // After the entity type resolves, so a plan wrong about both hears
-        // the more fundamental refusal. EXISTENCE, not shape: checking the id
-        // parses and stopping let an unregistered action through both
-        // surfaces — `attest` answered it with pending objects, and `run`
-        // refused every object one at a time as a count with no reason in it.
+        // the more fundamental refusal.
         let action_id = data_ontology_kernel::ActionTypeId::new(self.action_type.clone())
             .map_err(|_| PlanError::InvalidActionType)?;
         let action = registry
             .action_type(&self.tenant_id, &action_id)
             .ok_or(PlanError::UnknownActionType)?;
-        // BOUND to this entity type, not merely present: the writer stamps
-        // `schema_revision` from the ACTION's type, so an action bound
-        // elsewhere writes envelopes at another type's head — accepted rather
-        // than poisoned, and silently wrong on every later refold.
         if action.entity_type != type_id {
             return Err(PlanError::ActionNotBoundToEntityType);
         }
@@ -169,7 +170,6 @@ impl MigrationPlan {
         dependencies::check(&self.transforms)
     }
 
-    /// FNV-1a-64 over the plan's canonical bytes, as 16 hex characters.
     pub fn digest16(&self) -> String {
         let mut digest = Fnv1a64::new();
         for field in [
@@ -234,6 +234,14 @@ fn scalar_of(declaration: &ValueTypeDeclaration) -> Option<ScalarType> {
     }
 }
 
+/// An undeclared target value type carries the legacy String contract.
+fn target_scalar(target: &EntityTypePropertyDefinition) -> Option<ScalarType> {
+    match &target.value_type {
+        None => Some(ScalarType::String),
+        Some(declaration) => scalar_of(declaration),
+    }
+}
+
 fn source_checked<'a>(
     from_definition: &'a EntityTypeDefinition,
     primary_key: Option<&str>,
@@ -267,17 +275,14 @@ fn check_transform(
         } => {
             let source = source_checked(from_definition, primary_key, from)?;
             let source_scalar = source.value_type.as_ref().and_then(scalar_of);
-            let target_scalar = target.value_type.as_ref().and_then(scalar_of);
             let total = match conversion {
-                // An untyped target keeps the legacy String contract.
                 ValueConversion::IntegerToString => {
                     source_scalar == Some(ScalarType::Integer)
-                        && (target_scalar == Some(ScalarType::String)
-                            || target.value_type.is_none())
+                        && target_scalar(target) == Some(ScalarType::String)
                 }
                 ValueConversion::BooleanToInteger => {
                     source_scalar == Some(ScalarType::Boolean)
-                        && target_scalar == Some(ScalarType::Integer)
+                        && target_scalar(target) == Some(ScalarType::Integer)
                 }
             };
             if !total {
@@ -285,12 +290,7 @@ fn check_transform(
             }
         }
         UpcastTransform::DefaultTo { value, .. } => {
-            let satisfied = match &target.value_type {
-                // Untyped declarations carry the legacy String contract.
-                None => matches!(value, DefaultValue::String(_)),
-                Some(declaration) => scalar_of(declaration) == Some(value.scalar_type()),
-            };
-            if !satisfied {
+            if target_scalar(target) != Some(value.scalar_type()) {
                 return Err(incompatible());
             }
         }

@@ -1,5 +1,3 @@
-//! Query-engine tests: part 2.
-
 use super::support::*;
 
 #[test]
@@ -29,12 +27,6 @@ fn upsert_link_updates_observed_time_for_same_tenant_edge_key() {
     assert_eq!(response.edges.len(), 1);
 }
 
-// ---- ST1: result-cardinality ceilings + result_truncated signal ----
-/// ST1-a: A star graph with leaf_count > MAX_QUERY_RESULT_NODES triggers
-/// truncation.  The response MUST set result_truncated = true and return
-/// at most MAX_QUERY_RESULT_NODES + 1 nodes (cap + root).  Running the
-/// same query twice MUST return identical node and edge counts
-/// (determinism guarantee).
 #[test]
 fn node_cap_triggers_result_truncated_deterministically() {
     let cap = MAX_QUERY_RESULT_NODES; // constant must exist
@@ -98,7 +90,6 @@ fn node_cap_triggers_result_truncated_deterministically() {
     let r1 = engine.query_graph_slice(&g, req.clone()).unwrap();
     let r2 = engine.query_graph_slice(&g, req).unwrap();
 
-    // result_truncated field must exist and be true
     assert!(
         r1.result_truncated,
         "first run: node cap must set result_truncated"
@@ -107,7 +98,6 @@ fn node_cap_triggers_result_truncated_deterministically() {
         r2.result_truncated,
         "second run: node cap must set result_truncated"
     );
-    // determinism: identical counts across repeated calls
     assert_eq!(
         r1.nodes.len(),
         r2.nodes.len(),
@@ -118,7 +108,6 @@ fn node_cap_triggers_result_truncated_deterministically() {
         r2.edges.len(),
         "edge count must be deterministic"
     );
-    // returned node set must not exceed cap + root
     assert!(
         r1.nodes.len() <= cap + 1,
         "nodes must not exceed cap + root"
@@ -126,9 +115,6 @@ fn node_cap_triggers_result_truncated_deterministically() {
     assert_every_edge_endpoint_is_returned(&r1);
 }
 
-/// ST1-b: A star graph with leaf_count > MAX_QUERY_RESULT_EDGES triggers
-/// truncation via the edge ceiling.  result_truncated must be true and
-/// the returned edge count must not exceed MAX_QUERY_RESULT_EDGES.
 #[test]
 fn edge_cap_triggers_result_truncated() {
     let edge_cap = MAX_QUERY_RESULT_EDGES; // constant must exist
@@ -200,8 +186,6 @@ fn edge_cap_triggers_result_truncated() {
     );
 }
 
-/// ST1-c: A small graph (3 nodes, 2 edges) — well under both caps —
-/// MUST return result_truncated = false and complete results.
 #[test]
 fn under_cap_query_returns_complete_results_with_result_truncated_false() {
     let g = graph();
@@ -233,7 +217,6 @@ fn under_cap_query_returns_complete_results_with_result_truncated_false() {
         .query_graph_slice(&g, request("ent_root", vec![], 2, 0))
         .unwrap();
 
-    // result_truncated field must exist and be false for small graphs
     assert!(
         !response.result_truncated,
         "under-cap result must not be truncated"

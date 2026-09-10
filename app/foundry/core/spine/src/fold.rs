@@ -3,15 +3,14 @@
 //! the SAME function, so `projection == fold(log)` holds by construction.
 //!
 //! Per entry the fold is all-or-nothing: edits land on staged copies and
-//! commit together, or the whole entry poisons with a typed reason
-//! derived only from (log bytes, registry snapshot) — state untouched,
-//! the ordinal still advanced. A poison never wedges the fold.
+//! commit together, or the whole entry poisons and nothing changes.
 
-use foundry_edits::{DecodeError, OntologyEdit, decode_action_record};
-use foundry_records_draft::SealedEnvelope;
+use foundry_edits::{ActionRecord, DecodeError, OntologyEdit, decode_action_record};
+use foundry_records_draft::{ActionEnvelope, SealedEnvelope};
 
 use data_ontology_kernel::{
-    ActionTypeId, EntityTypeId, LinkTypeId, ObjectEntity, ObjectGraphError, OntologyEngineError,
+    ActionTypeId, EntityTypeId, LinkTypeId, ObjectEntity, ObjectGraph, ObjectGraphError,
+    OntologyEngine, OntologyEngineError,
 };
 
 use crate::boundary::{self, BoundaryError};
@@ -22,12 +21,13 @@ use crate::state::{ObjectBinding, ProjectionState};
 /// fold.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PoisonReason {
-    /// The envelope's tenant is not this projection's tenant.
     TenantMismatch,
     /// Per-tenant ordinals are dense from 1; a gap or repeat is a log
     /// integrity failure, not something to guess around.
-    NonDenseOrdinal { expected: u64, found: u64 },
-    /// The payload bytes are not a canonical ActionRecord.
+    NonDenseOrdinal {
+        expected: u64,
+        found: u64,
+    },
     Decode(DecodeError),
     /// The embedded receipt disagrees with the envelope it rides in.
     ReceiptMismatch,
@@ -40,14 +40,14 @@ pub enum PoisonReason {
     /// The envelope's schema revision was never accepted for the object's
     /// entity type in this registry snapshot — un-poisons on refold after
     /// the evolution lands.
-    UnknownRevision { revision: u32 },
-    /// An edit targets an object the projection does not hold.
+    UnknownRevision {
+        revision: u32,
+    },
     MissingObject,
     /// The post-edit object failed instance conformance.
     Conformance(OntologyEngineError),
     /// The kernel refused the link (unknown type, cardinality).
     Link(OntologyEngineError),
-    /// The kernel refused the object shape.
     Object(ObjectGraphError),
 }
 
@@ -58,8 +58,7 @@ pub enum FoldOutcome {
     Poisoned(PoisonReason),
 }
 
-/// Fold one sealed envelope into the projection. Total: never errors,
-/// never wedges.
+/// Fold one sealed envelope into the projection.
 pub fn apply_sealed(state: &mut ProjectionState, sealed: &SealedEnvelope) -> FoldOutcome {
     match fold_entry(state, sealed) {
         Ok(()) => FoldOutcome::Applied,
@@ -71,8 +70,6 @@ pub fn apply_sealed(state: &mut ProjectionState, sealed: &SealedEnvelope) -> Fol
     }
 }
 
-/// Fold a full replay from scratch: a fresh projection folded over
-/// `entries` in order.
 pub fn fold_from_scratch<'a>(
     tenant_id: &str,
     registry: &data_ontology_kernel::OntologyEngine,
@@ -117,7 +114,28 @@ fn fold_entry(state: &mut ProjectionState, sealed: &SealedEnvelope) -> Result<()
         .check_action_parameter_conformance(&state.tenant_id, &action_id, &parameters)
         .map_err(PoisonReason::Parameters)?;
 
-    // Stage: every edit lands on copies, committed together or not at all.
+    let staged = stage_edits(state, envelope, &record)?;
+    check_revision_binding(
+        state,
+        staged.entity_type.as_deref(),
+        envelope.schema_revision,
+    )?;
+    commit(state, staged, envelope, &record, ordinal);
+    Ok(())
+}
+
+/// Every edit lands on copies, committed together or not at all.
+struct StagedEntry {
+    objects: ObjectGraph,
+    engine: OntologyEngine,
+    entity_type: Option<String>,
+}
+
+fn stage_edits(
+    state: &ProjectionState,
+    envelope: &ActionEnvelope,
+    record: &ActionRecord,
+) -> Result<StagedEntry, PoisonReason> {
     let mut staged_objects = state.objects.clone();
     let mut staged_engine = state.engine.clone();
     let mut entity_type: Option<String> = state
@@ -186,30 +204,50 @@ fn fold_entry(state: &mut ProjectionState, sealed: &SealedEnvelope) -> Result<()
         }
     }
 
-    // Revision binding: the envelope's stamped revision must have been
-    // ACCEPTED for the object's entity type in this registry snapshot.
-    if let Some(declared) = &entity_type {
-        let revision_known = EntityTypeId::new(declared.clone())
-            .ok()
-            .and_then(|id| {
-                state.engine.entity_type_at_revision(
-                    &state.tenant_id,
-                    &id,
-                    envelope.schema_revision,
-                )
-            })
-            .is_some();
-        if !revision_known {
-            return Err(PoisonReason::UnknownRevision {
-                revision: envelope.schema_revision,
-            });
-        }
-    }
+    Ok(StagedEntry {
+        objects: staged_objects,
+        engine: staged_engine,
+        entity_type,
+    })
+}
 
-    // Commit.
-    state.objects = staged_objects;
-    state.engine = staged_engine;
-    if let Some(declared) = entity_type {
+/// The envelope's stamped revision must have been ACCEPTED for the
+/// object's entity type in this registry snapshot.
+fn check_revision_binding(
+    state: &ProjectionState,
+    entity_type: Option<&str>,
+    schema_revision: u32,
+) -> Result<(), PoisonReason> {
+    let Some(declared) = entity_type else {
+        return Ok(());
+    };
+    let revision_known = EntityTypeId::new(declared.to_owned())
+        .ok()
+        .and_then(|id| {
+            state
+                .engine
+                .entity_type_at_revision(&state.tenant_id, &id, schema_revision)
+        })
+        .is_some();
+    if revision_known {
+        Ok(())
+    } else {
+        Err(PoisonReason::UnknownRevision {
+            revision: schema_revision,
+        })
+    }
+}
+
+fn commit(
+    state: &mut ProjectionState,
+    staged: StagedEntry,
+    envelope: &ActionEnvelope,
+    record: &ActionRecord,
+    ordinal: u64,
+) {
+    state.objects = staged.objects;
+    state.engine = staged.engine;
+    if let Some(declared) = staged.entity_type {
         state.bindings.insert(
             envelope.object_ref.clone(),
             ObjectBinding {
@@ -226,5 +264,4 @@ fn fold_entry(state: &mut ProjectionState, sealed: &SealedEnvelope) -> Result<()
         .or_default()
         .push(ordinal);
     state.applied_ordinal = ordinal;
-    Ok(())
 }

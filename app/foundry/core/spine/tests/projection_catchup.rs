@@ -69,10 +69,9 @@ fn catch_up_resumes_where_the_store_stopped_rather_than_restarting() {
 #[test]
 fn a_rebuilt_store_equals_an_incrementally_written_one() {
     let registry = registry();
-    // The MIXED log, not the plain one. This is the only test comparing the
-    // incremental plane against the rebuilt one, and over three bare objects
-    // the claim is vacuous on both edges and poison: the link assertion below
-    // compared `[] == []`, and no poison existed to disagree about.
+    // The MIXED log, not the plain one: over three bare objects the claim
+    // is vacuous on both edges and poison — the link assertion below would
+    // compare `[] == []`, and no poison would exist to disagree about.
     let log = mixed_log();
 
     let mut incremental = MemoryProjectionStore::default();
@@ -208,8 +207,7 @@ fn the_oracle_rejects_a_store_holding_more_than_the_fold() {
     // The oracle is this suite's definition of correct, so it needs its
     // own proof that it can fail. Iterating only the fold's bindings
     // shows the store holds everything it should and never that it holds
-    // nothing MORE — which is how a row retained from another log stayed
-    // invisible through a whole review round.
+    // nothing MORE, so a row retained from another log is invisible.
     assert_agrees_with_fold(
         &store,
         &fold_from_scratch(TENANT, &registry, log[..2].iter()),
@@ -230,8 +228,7 @@ fn the_oracle_rejects_a_ledger_that_differs_only_in_reason() {
     .expect("poisoned at 2");
 
     // Same head, same objects, same poison COUNT — one different reason
-    // at the same ordinal. A count comparison cannot see it, which is
-    // the finding this suite failed to cover twice.
+    // at the same ordinal. A count comparison cannot see it.
     let other = fold_from_scratch(
         TENANT,
         &registry,

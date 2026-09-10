@@ -225,15 +225,11 @@ pub(crate) fn mixed_log() -> Vec<SealedEnvelope> {
 /// The oracle both planes are held to: `fold(log)` is the definition of
 /// correct, not a second hand-written expectation that could drift.
 ///
-/// Two things it must do that an earlier version did not, both the same
-/// kind of failure — an assertion that cannot tell right from wrong is
-/// not coverage:
-///
-/// * the poison ledger is compared BY ORDINAL AND REASON, not by count;
-/// * the object set is compared for EQUALITY. Iterating only the fold's
-///   own bindings proves the store holds everything it should and never
-///   that it holds nothing MORE, so a row retained from another log —
-///   the exact defect this suite exists to catch — was invisible.
+/// The poison ledger is compared by ordinal AND reason rather than by
+/// count, and the object set for EQUALITY: iterating only the fold's own
+/// bindings proves the store holds everything it should and never that
+/// it holds nothing MORE, so a row retained from another log would be
+/// invisible.
 ///
 /// Edges are not compared here: the fold keeps link instances in the
 /// kernel engine rather than in a set this module can cheaply

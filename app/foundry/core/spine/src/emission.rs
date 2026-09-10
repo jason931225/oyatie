@@ -2,12 +2,8 @@
 //! the action log's applied and poisoned entries and the denial trail
 //! each become [`FoundryAuditEvent`]s for the foundry audit port.
 //!
-//! Derivation is pure over (projection, log entries) — recomputable at
-//! any moment, like every other view — and honest: each consumed entry
-//! lands in exactly one of (events, underivable), never on the floor. An
-//! entry whose payload decodes as neither wire shape has no attribution,
-//! and the port's fail-closed construction is the law, so the typed
-//! [`Underivable`] channel is forced, not optional.
+//! Derivation is pure over (projection, log entries), recomputable at
+//! any moment like every other view.
 
 use foundry_audit_draft::{AuditDisposition, AuditPortError, FoundryAuditEvent};
 use foundry_edits::{decode_action_record, decode_denial_record};
@@ -16,17 +12,13 @@ use foundry_records_draft::SealedEnvelope;
 use crate::fold::PoisonReason;
 use crate::state::ProjectionState;
 
-/// The event type a refused submission files under. The declared
-/// happened-event vocabulary (`reading.calibrated`) is reserved for
-/// events that happened; a denial is the fact that one did not.
+/// Filed instead of a declared event type, which names something that
+/// happened; a denial is the fact that one did not.
 pub const DENIED_AUDIT_EVENT_TYPE: &str = "foundry.submission.denied";
 
-/// The event type a consumed-but-refused log entry files under — same
-/// reasoning: the declared event never occurred.
+/// Filed instead of a declared event type, for the same reason.
 pub const POISONED_AUDIT_EVENT_TYPE: &str = "foundry.entry.poisoned";
 
-/// One consumed entry that could not become an audit event, with the
-/// deterministic reason.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Underivable {
     pub ordinal: u64,              // data_class: INTERNAL_ONLY
@@ -43,7 +35,6 @@ pub enum UnderivableReason {
     EventRefused(AuditPortError),
 }
 
-/// What derivation produced.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DerivedEvents {
     pub events: Vec<FoundryAuditEvent>, // data_class: INTERNAL_ONLY

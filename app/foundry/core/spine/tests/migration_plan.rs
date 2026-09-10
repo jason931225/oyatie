@@ -1,9 +1,5 @@
-//! Migration-plan law: a plan validates only against the registry head it
-//! names, every source must exist at the from-revision and every target
-//! must be an optional non-key property at the to-revision, transforms are
-//! type-checked with no parses, and the plan digest is fixed-width over
-//! unbounded inputs so the runner's idempotency key can never overflow the
-//! envelope cap.
+//! Migration-plan law: what `MigrationPlan::validate` refuses, in the
+//! order it refuses it, and the digest's fixed width.
 
 mod migration_plan_support;
 
@@ -145,6 +141,38 @@ fn primary_key_is_untouchable_from_either_side() {
 }
 
 #[test]
+fn plan_validation_reports_the_first_violation_in_pinned_order() {
+    assert_eq!(
+        plan(vec![
+            UpcastTransform::DefaultTo {
+                to: "grade".into(),
+                value: DefaultValue::String("F".into()),
+            },
+            copy("ghost_source", "grade"),
+        ])
+        .validate(&registry()),
+        Err(PlanError::DuplicateTarget {
+            name: "grade".into()
+        }),
+        "a duplicate target is reported before that transform's source is looked at"
+    );
+    assert_eq!(
+        plan(vec![copy("ghost_source", "serial")]).validate(&registry()),
+        Err(PlanError::PrimaryKeyTouched {
+            name: "serial".into()
+        }),
+        "the TARGET's primary-key guard fires before the source is examined"
+    );
+    assert_eq!(
+        plan(vec![copy("serial", "ghost")]).validate(&registry()),
+        Err(PlanError::TargetAbsent {
+            name: "ghost".into()
+        }),
+        "the target must be declared before either side of the source is checked"
+    );
+}
+
+#[test]
 fn duplicate_targets_are_refused() {
     assert_eq!(
         plan(vec![
@@ -166,7 +194,6 @@ fn duplicate_targets_are_refused() {
 
 #[test]
 fn type_incompatibility_is_refused_with_no_parses() {
-    // ConvertAs source kind must match the conversion input.
     assert_eq!(
         plan(vec![UpcastTransform::ConvertAs {
             from: "flag".into(),
@@ -178,7 +205,6 @@ fn type_incompatibility_is_refused_with_no_parses() {
             target: "score_text".into()
         })
     );
-    // A default must satisfy the target's declared scalar.
     assert_eq!(
         plan(vec![UpcastTransform::DefaultTo {
             to: "score_copy".into(),
@@ -189,7 +215,6 @@ fn type_incompatibility_is_refused_with_no_parses() {
             target: "score_copy".into()
         })
     );
-    // CopyAs demands identical declarations; typed -> untyped is a retype.
     assert_eq!(
         plan(vec![copy("score", "grade")]).validate(&registry()),
         Err(PlanError::TypeIncompatible {
@@ -224,15 +249,6 @@ fn action_type_must_be_a_well_formed_action_id() {
     );
 }
 
-/// A plan naming an action the registry does not hold is refused HERE, not
-/// one object at a time by the writer.
-///
-/// `validate` checked the id's shape and stopped. A plan naming an
-/// unregistered action therefore passed, `attest` answered with pending
-/// objects for a plan the runner cannot execute — the fixpoint claim that
-/// module says it must never make — and `run` reached the writer, which
-/// refused every object individually and reported a bare count with no
-/// reason in it.
 #[test]
 fn an_action_the_registry_does_not_hold_is_refused() {
     let mut plan = plan(Vec::new());
@@ -245,13 +261,6 @@ fn an_action_the_registry_does_not_hold_is_refused() {
     );
 }
 
-/// An action bound to a DIFFERENT entity type is refused.
-///
-/// Existence is not enough. The writer stamps `schema_revision` from the
-/// action's own entity type, so a plan migrating `ety_reading` under an
-/// action bound elsewhere writes durable envelopes carrying that other
-/// type's head — accepted rather than poisoned, and silently wrong on every
-/// later refold.
 #[test]
 fn an_action_bound_to_another_entity_type_is_refused() {
     let mut engine = registry();

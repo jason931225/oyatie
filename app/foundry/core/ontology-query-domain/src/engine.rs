@@ -14,7 +14,6 @@ pub struct KnowledgeGraphQueryEngine {
     inbound: BTreeMap<KnowledgeGraphLinkInboundKey, KnowledgeGraphLinkInstance>, // data_class: INTERNAL_ONLY
 }
 
-/// Primary (outbound) index key: (tenant, from, edge_type, to).
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct KnowledgeGraphLinkKey {
     tenant_id: String,
@@ -23,7 +22,6 @@ struct KnowledgeGraphLinkKey {
     to_entity_id: String,
 }
 
-/// Secondary (inbound) index key: (tenant, to, edge_type, from).
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct KnowledgeGraphLinkInboundKey {
     tenant_id: String,
@@ -136,8 +134,6 @@ impl KnowledgeGraphLinkInstance {
     }
 }
 
-/// The in-memory index as a graph source: objects from the caller's
-/// `ObjectGraph`, edges from this engine's own two indexes.
 struct InMemorySource<'a> {
     engine: &'a KnowledgeGraphQueryEngine,
     graph: &'a ObjectGraph,

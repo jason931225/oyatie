@@ -3,9 +3,6 @@
 use crate::edit::EditSet;
 use crate::property::WireProperty;
 
-/// The current wire format version. An existing version's layout is never
-/// mutated; evolution mints the next version, and golden vectors freeze
-/// each one forever in the codec lane.
 pub const WIRE_FORMAT_VERSION: u16 = 1;
 
 /// Why a payload root was refused at construction.
@@ -15,9 +12,7 @@ pub enum RecordError {
     NotTrimmed { field: &'static str },
 }
 
-/// One applied Action, as its payload bytes describe it: the embedded
-/// invocation receipt (attribution as in-payload convention — the port
-/// stays content-agnostic), the submitted parameters, and the edits.
+/// One applied Action, as its payload bytes describe it.
 ///
 /// Every field is a pure function of (request, decision, edit): the spine
 /// never reads a clock or mints an id, so `occurred_at_epoch_ms` derives
@@ -36,8 +31,6 @@ pub struct ActionRecord {
 }
 
 impl ActionRecord {
-    /// Construct a validated record at [`WIRE_FORMAT_VERSION`]; identity
-    /// fields must be trimmed and non-blank.
     pub fn new(
         principal_id: impl Into<String>,
         decision_id: impl Into<String>,
@@ -83,8 +76,6 @@ pub struct DenialRecord {
 }
 
 impl DenialRecord {
-    /// Construct a validated denial at [`WIRE_FORMAT_VERSION`]; every
-    /// identity field must be trimmed and non-blank.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         gate: impl Into<String>,

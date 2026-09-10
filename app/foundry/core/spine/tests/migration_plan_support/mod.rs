@@ -1,9 +1,4 @@
 //! Fixtures for the plan-validation suite.
-//!
-//! Lifted out because the suite reached the 300-line budget with a registry
-//! that did not register the plan's action — a fixture less faithful than
-//! production, and the reason `validate` could accept an action the registry
-//! never held without any test noticing.
 
 use data_boundary_kernel::{DataClass, PrivacyDataClass};
 use data_ontology_kernel::{
@@ -69,9 +64,9 @@ pub(crate) fn registry() -> OntologyEngine {
     engine
         .evolve_entity_type(definition(2, rev2_properties()))
         .unwrap();
-    // The plan's action, registered as the seed registers one. Without it
-    // this fixture was less faithful than production and could not have
-    // noticed `validate` accepting an action the registry never held.
+    // The plan's action, as the seed registers one. `validate` requires it
+    // to EXIST and not merely to parse, so a registry without it is a
+    // fixture less faithful than production rather than a smaller one.
     engine.register_action_type(action()).unwrap();
     engine
 }

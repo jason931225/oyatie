@@ -1,10 +1,4 @@
 //! Sync status as the DURABLE store reports it.
-//!
-//! `ProjectionState::sync_status` answers for an in-memory fold — what
-//! this process has consumed. An operator asking "has the index caught
-//! up?" needs the other answer: what survives a restart. Those differ
-//! exactly when a projector has folded entries it has not yet mirrored,
-//! which is the window a lag surface exists to reveal.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use data_boundary_kernel::{DataClass, PrivacyDataClass};

@@ -1,18 +1,4 @@
 //! The durable projection as a graph source.
-//!
-//! This is the whole point of the traversal split: the same walk that
-//! serves the in-memory index now serves the store the projector
-//! actually fills, so a query answers from replayed truth rather than
-//! from whatever a caller happened to load into memory.
-//!
-//! Two conversions live here and nowhere else. **Time:** the store
-//! records `observed_at_epoch_ms` (the log's own unit) while the
-//! traversal's freshness floor is in seconds, so edges are converted on
-//! the way out — the floor comparison itself stays untouched in the
-//! walk. **Failure:** a store read that fails becomes
-//! `KnowledgeGraphQueryError::Source`, never an empty result; a
-//! traversal that swallowed an outage would report a smaller graph as
-//! though it were the whole truth.
 
 use foundry_projection_draft::{ProjectedLink, ProjectionStore};
 
@@ -20,7 +6,6 @@ use crate::contract::{KnowledgeGraphNode, KnowledgeGraphQueryError};
 use crate::link::KnowledgeGraphLinkInstance;
 use crate::traversal::GraphSource;
 
-/// A [`GraphSource`] backed by the durable projection store.
 pub struct StoreGraphSource<'a> {
     store: &'a dyn ProjectionStore,
 }
@@ -101,9 +86,6 @@ impl GraphSource for StoreGraphSource<'_> {
     }
 }
 
-/// Traverse the DURABLE projection: the same walk the in-memory engine
-/// runs, over the store the projector fills. No engine instance is
-/// needed — the graph is whatever has been replayed into the store.
 pub fn query_graph_slice_from_store(
     store: &dyn ProjectionStore,
     request: crate::request::KnowledgeGraphQueryRequest,

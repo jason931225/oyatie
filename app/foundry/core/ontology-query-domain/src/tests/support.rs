@@ -147,13 +147,6 @@ pub(super) fn assert_every_edge_endpoint_is_returned(response: &KnowledgeGraphQu
     }
 }
 
-// ---- Consent grant scope (ST1 + ST2) — RED tests ----
-// These tests reference:
-//   * the `consented_edge_type_ids` parameter added to `KnowledgeGraphQueryRequest::new`
-//   * the `KnowledgeGraphQueryError::MalformedConsentGrantId` variant
-//   * the `consent_filter()` helper method on `KnowledgeGraphQueryRequest`
-//   * the BFS consent gate in `KnowledgeGraphQueryEngine::query_graph_slice`
-// None of the above exist yet, so these tests MUST fail to compile (red stage).
 /// Builds a consent-scoped graph used by the consent gate tests:
 ///   ent_root --lty_partner--> ent_b --lty_partner--> ent_c
 ///   ent_root --lty_member-->  ent_d
@@ -198,7 +191,6 @@ pub(super) fn consent_engine(g: &ObjectGraph) -> KnowledgeGraphQueryEngine {
     engine
 }
 
-// ---- TraversalDirection: Inbound / Both tests ----
 /// Builds a directed chain graph for direction traversal tests:
 ///   ent_pred --lty_owns--> ent_root --lty_owns--> ent_succ
 ///

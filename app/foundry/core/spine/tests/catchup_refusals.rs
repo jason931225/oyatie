@@ -202,3 +202,14 @@ fn a_log_beginning_at_ordinal_zero_is_refused() {
     );
     assert_eq!(store.applied_head(TENANT).unwrap(), 0, "and wrote nothing");
 }
+
+/// Log compaction is unimplemented. When it lands, the retention boundary
+/// needs a SNAPSHOT of the fold taken AT that ordinal — not a guard on some
+/// other arm. `LogDoesNotStartAtOne` is the arm a compacted log reaches, and
+/// a guard placed anywhere else lets the mirror run against a fresh fold and
+/// write poisons derived from where the log was cut rather than from the log.
+#[test]
+#[ignore = "log compaction is unimplemented; the doc above pins where its guard belongs"]
+fn log_compaction_snapshots_at_the_retention_boundary() {
+    todo!("no compaction surface exists to fold a snapshot against yet")
+}
