@@ -191,9 +191,10 @@ fn split_generics(parameters: &str) -> (&str, &str) {
     (parameters, "")
 }
 
-/// Identifier words in `text` that no `::` qualifies, so `std::io::Write`
-/// contributes `std` and not `Write`. A bound naming another crate's trait
-/// therefore cannot be read as a mention of the trait being implemented.
+/// Identifier words in `text` that no foreign path qualifies, so
+/// `std::io::Write` contributes `std` and not `Write`. A path rooted at
+/// `crate`, `self` or `super` names this crate's own item, so its last segment
+/// is a mention like a bare one; a bound naming another crate's trait is not.
 fn unqualified_words(text: &str) -> Vec<&str> {
     let mut found = Vec::new();
     let mut start = None;
@@ -219,9 +220,30 @@ fn push_unqualified<'text>(
     end: usize,
     found: &mut Vec<&'text str>,
 ) {
-    if !text[..begin].ends_with("::") {
+    if matches!(
+        path_root(&text[..begin]),
+        None | Some("crate" | "self" | "super")
+    ) {
         found.push(&text[begin..end]);
     }
+}
+
+/// The first segment of the `::`-joined path that ends at `prefix`, or `None`
+/// when nothing qualifies what follows it.
+fn path_root(prefix: &str) -> Option<&str> {
+    let mut rest = prefix;
+    let mut root = None;
+    while let Some(head) = rest.strip_suffix("::") {
+        let start = head
+            .char_indices()
+            .rev()
+            .take_while(|(_, character)| character.is_ascii_alphanumeric() || *character == '_')
+            .last()
+            .map_or(head.len(), |(index, _)| index);
+        root = Some(&head[start..]);
+        rest = &head[..start];
+    }
+    root
 }
 
 fn words(text: &str) -> impl Iterator<Item = &str> {

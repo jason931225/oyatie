@@ -273,3 +273,28 @@ fn a_stub_word_inside_a_body_on_the_header_line_is_not_the_target() {
     let port = "pub trait CellStore {}\nimpl CellStore for PostgresCellStore { fn get(&self) { NotImplementedYet::refuse() } }\n";
     assert!(refusals(&[added(PORT, port)]).is_empty());
 }
+
+#[test]
+fn a_mention_rooted_at_this_crate_forwards_like_a_bare_one() {
+    for port in [
+        "pub trait CellStore {}\nimpl CellStore for Arc<dyn crate::CellStore + Send> {}\n",
+        "pub trait CellStore {}\nimpl<T: crate::CellStore + ?Sized> CellStore for Arc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: super::CellStore> super::CellStore for Box<T> {}\n",
+        "pub trait CellStore {}\nimpl<T: self::CellStore> self::CellStore for Rc<T> {}\n",
+        "pub trait CellStore {}\nimpl<T> CellStore for Arc<T>\nwhere\n    T: crate::CellStore + ?Sized,\n{\n}\n",
+        "pub trait CellStore {}\nimpl<T:CellStore> CellStore for Arc<T> {}\n",
+    ] {
+        assert_eq!(refusals(&[added(PORT, port)]).len(), 1, "{port:?}");
+    }
+
+    let port = added(PORT, "pub trait Write {}\n");
+    let foreign = added(ADAPTER, "impl<W: std::io::Write> Write for LogSink<W> {}\n");
+    assert!(refusals(&[port, foreign]).is_empty());
+
+    let named = added(PORT, "pub trait CellStore {}\n");
+    let other_crate = added(
+        ADAPTER,
+        "impl<T: mycrate::CellStore> CellStore for Arc<T> {}\n",
+    );
+    assert!(refusals(&[named, other_crate]).is_empty());
+}
