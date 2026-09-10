@@ -137,7 +137,7 @@ fn validate_checkout(
 fn validate_toolchain(step: &str, job: &str) -> Result<(), String> {
     ensure(
         direct_entries(step, 8) == [("with", "")]
-            && matches!(direct_entries(step, 10).as_slice(), [("toolchain", _)]),
+            && matches!(direct_entries(step, 10).as_slice(), [("toolchain", c)] if !c.is_empty()),
         format!("{job} toolchain step must be pinned and closed"),
     )
 }

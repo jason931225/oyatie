@@ -7,10 +7,10 @@ use std::process::ExitCode;
 use dependency_declarations_reconcile::analyze_execution_toolchain_transition;
 use pipeline_admission::{
     base_admission_violations, cargo_entrypoints, cargo_manifest_for_crate_path,
-    cargo_manifest_violations, changed_layout_violations, draft_dependency_violations,
-    git_change_paths_from_name_status_z, owner_core_regression_violations,
-    proto_package_violations, workspace_draft_dependency_violations,
-    workspace_membership_violations,
+    cargo_manifest_violations, changed_layout_violations, channel_literal_violations,
+    declared_channel, draft_dependency_violations, git_change_paths_from_name_status_z,
+    owner_core_regression_violations, proto_package_violations,
+    workspace_draft_dependency_violations, workspace_membership_violations,
 };
 use pipeline_repository_draft::RepositoryRead;
 use pipeline_repository_git_draft::GitRepository;
@@ -65,6 +65,16 @@ fn run() -> Result<(), String> {
         Err(refusal) => violations.push(format!(
             "rust-toolchain.toml: execution toolchain analysis refused: {refusal}"
         )),
+    }
+    if let Ok(channel) = declared_channel(&candidate_toolchain_contents) {
+        for path in changes
+            .layout_candidates
+            .iter()
+            .filter(|path| path.ends_with(".rs"))
+        {
+            let contents = repository.blob_text(&head, path)?;
+            violations.extend(channel_literal_violations(&channel, path, &contents));
+        }
     }
     violations.extend(owner_core_regression_violations(
         &changes,

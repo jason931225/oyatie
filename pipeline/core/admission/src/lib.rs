@@ -21,8 +21,8 @@ pub use cadence::{
 };
 pub use commit_range::{CommitFact, SignatureState, signing_violations};
 pub use execution_toolchain::{
-    TOOLCHAIN_PIN_KEYS, ToolchainPin, declared_channel, execution_channel_violations,
-    workflow_toolchain_pins,
+    TOOLCHAIN_PIN_KEYS, ToolchainPin, channel_literal_violations, declared_channel,
+    execution_channel_violations, workflow_toolchain_pins,
 };
 pub use fanin::{
     FanIn, fan_in_ok, gate_value, live_postgres_cells_ok, occupancy_ok, postgres_ok, postsubmit_ok,

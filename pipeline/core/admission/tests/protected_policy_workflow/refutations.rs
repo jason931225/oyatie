@@ -105,3 +105,30 @@ fn change_gates_rejects_input_execution_and_output_mutations() {
         assert!(validate_workflow(&mutated).is_err(), "{from}");
     }
 }
+
+/// GitHub's YAML resolves a block-style value; a line-oriented reader sees an
+/// empty entry. The value is derived, never named, so this stays true across
+/// a channel bump.
+#[test]
+fn every_protected_job_rejects_a_block_style_toolchain_pin() {
+    let yaml = workflow();
+    for spec in JOBS {
+        let body = job_body(&yaml, spec).expect("protected job body");
+        let pin = body
+            .lines()
+            .find(|line| line.starts_with("          toolchain: "))
+            .expect("protected job pins a toolchain")
+            .to_owned();
+        let channel = pin
+            .trim_start()
+            .strip_prefix("toolchain: ")
+            .expect("pin value");
+        let blocked = format!("          toolchain:\n            {channel}");
+        let mutated = mutate_job(&yaml, spec, &pin, &blocked);
+        assert!(
+            validate_workflow(&mutated).is_err(),
+            "{}: a block-style pin must not read as pinned",
+            spec.id
+        );
+    }
+}

@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use pipeline_admission::{
-    TOOLCHAIN_PIN_KEYS, declared_channel, execution_channel_violations, workflow_toolchain_pins,
+    TOOLCHAIN_PIN_KEYS, channel_literal_violations, declared_channel, execution_channel_violations,
+    workflow_toolchain_pins,
 };
 
 fn repo_root() -> PathBuf {
@@ -84,14 +85,14 @@ fn a_drifted_pin_is_refused_and_named_by_file_and_line() {
     let pins = workflow_toolchain_pins("lint.yml", workflow);
     assert_eq!(pins.len(), 1, "one pin must be read from the fixture");
     assert_eq!(pins[0].job, "lint");
-    let violations = execution_channel_violations("1.98.0", &pins);
+    let violations = execution_channel_violations("9.9.9", &pins);
     assert_eq!(violations.len(), 1, "the drifted pin must be refused");
     assert!(
         violations[0].starts_with("lint.yml:6:"),
         "the refusal must name file and line: {}",
         violations[0]
     );
-    assert!(violations[0].contains("1.97.0") && violations[0].contains("1.98.0"));
+    assert!(violations[0].contains("1.97.0") && violations[0].contains("9.9.9"));
 }
 
 #[test]
@@ -99,13 +100,13 @@ fn an_install_superseded_later_in_the_same_job_is_left_to_its_own_gate() {
     let workflow = concat!(
         "jobs:\n  qualify:\n    steps:\n",
         "      - with: { toolchain: \"nightly-2026-05-22\", components: \"clippy\" }\n",
-        "      - with: { toolchain: \"1.98.0\" }\n",
+        "      - with: { toolchain: \"9.9.9\" }\n",
         "  lint:\n    steps:\n",
         "      - with: { toolchain: \"nightly-2026-05-22\" }\n",
     );
     let pins = workflow_toolchain_pins("presubmit.yml", workflow);
     assert_eq!(pins.len(), 3);
-    let violations = execution_channel_violations("1.98.0", &pins);
+    let violations = execution_channel_violations("9.9.9", &pins);
     assert_eq!(
         violations.len(),
         1,
@@ -116,9 +117,9 @@ fn an_install_superseded_later_in_the_same_job_is_left_to_its_own_gate() {
 
 #[test]
 fn a_deny_action_rust_version_is_never_shadowed() {
-    let workflow = "jobs:\n  deny:\n    steps:\n      - with:\n          rust-version: \"1.97.0\"\n          rust-version: \"1.98.0\"\n";
+    let workflow = "jobs:\n  deny:\n    steps:\n      - with:\n          rust-version: \"1.97.0\"\n          rust-version: \"9.9.9\"\n";
     let violations =
-        execution_channel_violations("1.98.0", &workflow_toolchain_pins("d.yml", workflow));
+        execution_channel_violations("9.9.9", &workflow_toolchain_pins("d.yml", workflow));
     assert_eq!(violations.len(), 1, "{violations:?}");
     assert!(violations[0].contains("rust-version:"));
 }
@@ -134,7 +135,7 @@ fn a_dated_nightly_is_a_channel_the_gate_can_carry() {
     );
     assert!(execution_channel_violations("nightly-2026-09-09", &pins).is_empty());
     assert_eq!(
-        execution_channel_violations("1.98.0", &pins).len(),
+        execution_channel_violations("9.9.9", &pins).len(),
         1,
         "a nightly where a stable is declared is drift"
     );
@@ -160,10 +161,8 @@ fn a_pin_whose_value_the_scanner_cannot_read_is_itself_a_violation() {
         "jobs:\n  layout:\n    steps:\n      - uses: install\n",
         "        with:\n          toolchain:\n            \"1.42.0\"\n",
     );
-    let violations = execution_channel_violations(
-        "1.98.0",
-        &workflow_toolchain_pins("presubmit.yml", workflow),
-    );
+    let violations =
+        execution_channel_violations("9.9.9", &workflow_toolchain_pins("presubmit.yml", workflow));
     assert!(
         violations
             .iter()
@@ -205,12 +204,55 @@ fn an_install_that_ran_work_before_being_replaced_is_still_judged() {
         "jobs:\n  qualify:\n    steps:\n",
         "      - with: { toolchain: \"1.42.0\" }\n",
         "      - run: cargo build\n",
-        "      - with: { toolchain: \"1.98.0\" }\n",
+        "      - with: { toolchain: \"9.9.9\" }\n",
     );
     let violations =
-        execution_channel_violations("1.98.0", &workflow_toolchain_pins("p.yml", workflow));
+        execution_channel_violations("9.9.9", &workflow_toolchain_pins("p.yml", workflow));
     assert!(
         violations.iter().any(|line| line.contains("1.42.0")),
         "an install used before replacement must be judged: {violations:?}"
     );
+}
+
+/// A synthetic channel throughout: writing the live one here would make this
+/// file the very duplicate the rule refuses.
+#[test]
+fn a_rust_literal_equal_to_the_declared_channel_is_refused() {
+    let source = "const A: &str = \"9.9.9\";\nconst B: &str = \"9.9.10\";\n";
+    let violations = channel_literal_violations("9.9.9", "t.rs", source);
+    assert_eq!(
+        violations
+            .iter()
+            .map(|v| v.split(':').nth(1).unwrap())
+            .collect::<Vec<_>>(),
+        ["1"],
+        "only the line equal to the channel is refused: {violations:?}"
+    );
+}
+
+#[test]
+fn a_literal_that_differs_from_the_channel_is_an_oracle_and_is_untouched() {
+    let source = "assert_eq!(delta(\"9.9.8\", \"9.9.10\"), Forward);\n";
+    let violations = channel_literal_violations("9.9.9", "t.rs", source);
+    assert!(
+        violations.is_empty(),
+        "a comparison oracle must survive the rule: {violations:?}"
+    );
+}
+
+#[test]
+fn a_channel_embedded_in_a_byte_string_declaration_is_still_a_duplicate() {
+    let source = "const F: &[u8] = b\"[toolchain]\\nchannel = \\\"9.9.9\\\"\\n\";\n";
+    let violations = channel_literal_violations("9.9.9", "h.rs", source);
+    assert!(
+        !violations.is_empty(),
+        "an embedded declaration is the clearest duplicate: {violations:?}"
+    );
+}
+
+#[test]
+fn a_source_that_derives_the_channel_is_clean() {
+    let source = "let channel = declared_channel(include_str!(\"../rust-toolchain.toml\"))?;\n";
+    let violations = channel_literal_violations("9.9.9", "d.rs", source);
+    assert!(violations.is_empty(), "{violations:?}");
 }
