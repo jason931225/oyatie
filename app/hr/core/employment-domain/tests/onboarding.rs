@@ -5,8 +5,4 @@ use hr_employment_domain::{
     OnboardingDecision, OnboardingReadinessInput, evaluate_onboarding_readiness,
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 include!(concat!(env!("OUT_DIR"), "/onboarding.generated.rs"));

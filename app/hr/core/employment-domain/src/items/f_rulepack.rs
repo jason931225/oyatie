@@ -10,56 +10,56 @@ pub enum HrRulepackSourceKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrRulepackSourceInput {
-    pub source_kind: HrRulepackSourceKind, // data_class: INTERNAL_ONLY
-    pub source_ref: String,                // data_class: INTERNAL_ONLY
-    pub official_url: String,              // data_class: PUBLIC
-    pub version_label: String,             // data_class: INTERNAL_ONLY
-    pub effective_date: String,            // data_class: INTERNAL_ONLY
-    pub retrieved_at_epoch_seconds: u64,   // data_class: INTERNAL_ONLY
-    pub evidence_ref: String,              // data_class: INTERNAL_ONLY
-    pub digest: String,                    // data_class: INTERNAL_ONLY
+    pub source_kind: HrRulepackSourceKind,
+    pub source_ref: String,
+    pub official_url: String,
+    pub version_label: String,
+    pub effective_date: String,
+    pub retrieved_at_epoch_seconds: u64,
+    pub evidence_ref: String,
+    pub digest: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrStatutoryRulepackManifestInput {
-    pub rulepack_ref: String,                 // data_class: INTERNAL_ONLY
-    pub jurisdiction: Jurisdiction,           // data_class: INTERNAL_ONLY
-    pub source_version: String,               // data_class: INTERNAL_ONLY
-    pub effective_date: String,               // data_class: INTERNAL_ONLY
-    pub approval_evidence_ref: String,        // data_class: INTERNAL_ONLY
-    pub sources: Vec<HrRulepackSourceInput>,  // data_class: INTERNAL_ONLY
-    pub labor_workflow_engine_attached: bool, // data_class: PUBLIC
-    pub payroll_calculation_attached: bool,   // data_class: PUBLIC
-    pub filing_rail_attached: bool,           // data_class: PUBLIC
-    pub cloud_deployment_attached: bool,      // data_class: PUBLIC
+    pub rulepack_ref: String,
+    pub jurisdiction: Jurisdiction,
+    pub source_version: String,
+    pub effective_date: String,
+    pub approval_evidence_ref: String,
+    pub sources: Vec<HrRulepackSourceInput>,
+    pub labor_workflow_engine_attached: bool,
+    pub payroll_calculation_attached: bool,
+    pub filing_rail_attached: bool,
+    pub cloud_deployment_attached: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrRulepackSource {
-    pub source_kind: Classified<HrRulepackSourceKind>, // data_class: INTERNAL_ONLY
-    pub source_ref: Classified<String>,                // data_class: INTERNAL_ONLY
-    pub official_url: Classified<String>,              // data_class: PUBLIC
-    pub version_label: Classified<String>,             // data_class: INTERNAL_ONLY
-    pub effective_date: Classified<RulepackEffectiveDate>, // data_class: INTERNAL_ONLY
-    pub retrieved_at_epoch_seconds: Classified<u64>,   // data_class: INTERNAL_ONLY
-    pub evidence_ref: Classified<AuditEvidenceRef>,    // data_class: INTERNAL_ONLY
-    pub digest: Classified<RulepackSourceDigest>,      // data_class: INTERNAL_ONLY
+    pub source_kind: Classified<HrRulepackSourceKind>,
+    pub source_ref: Classified<String>,
+    pub official_url: Classified<String>,
+    pub version_label: Classified<String>,
+    pub effective_date: Classified<RulepackEffectiveDate>,
+    pub retrieved_at_epoch_seconds: Classified<u64>,
+    pub evidence_ref: Classified<AuditEvidenceRef>,
+    pub digest: Classified<RulepackSourceDigest>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrStatutoryRulepackManifest {
-    pub rulepack_ref: Classified<RulepackRef>, // data_class: INTERNAL_ONLY
-    pub jurisdiction: Classified<Jurisdiction>, // data_class: INTERNAL_ONLY
-    pub source_version: Classified<String>,    // data_class: INTERNAL_ONLY
-    pub effective_date: Classified<RulepackEffectiveDate>, // data_class: INTERNAL_ONLY
-    pub approval_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub sources: Classified<Vec<HrRulepackSource>>, // data_class: INTERNAL_ONLY
-    pub source_count: Classified<usize>,       // data_class: PUBLIC
-    pub labor_workflow_engine_attached: Classified<bool>, // data_class: PUBLIC
-    pub payroll_calculation_attached: Classified<bool>, // data_class: PUBLIC
-    pub filing_rail_attached: Classified<bool>, // data_class: PUBLIC
-    pub cloud_deployment_attached: Classified<bool>, // data_class: PUBLIC
-    pub schema_version: Classified<u32>,       // data_class: PUBLIC
+    pub rulepack_ref: Classified<RulepackRef>,
+    pub jurisdiction: Classified<Jurisdiction>,
+    pub source_version: Classified<String>,
+    pub effective_date: Classified<RulepackEffectiveDate>,
+    pub approval_evidence_ref: Classified<AuditEvidenceRef>,
+    pub sources: Classified<Vec<HrRulepackSource>>,
+    pub source_count: Classified<usize>,
+    pub labor_workflow_engine_attached: Classified<bool>,
+    pub payroll_calculation_attached: Classified<bool>,
+    pub filing_rail_attached: Classified<bool>,
+    pub cloud_deployment_attached: Classified<bool>,
+    pub schema_version: Classified<u32>,
 }
 
 pub fn build_hr_statutory_rulepack_manifest(

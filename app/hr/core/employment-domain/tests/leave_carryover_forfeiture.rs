@@ -5,10 +5,6 @@ use hr_employment_domain::{
     HrDomainError, LeaveCarryoverForfeitureInput, evaluate_leave_carryover_forfeiture,
 };
 
-// ---------------------------------------------------------------------------
-// Helper: valid baseline input
-// ---------------------------------------------------------------------------
-
 include!(concat!(
     env!("OUT_DIR"),
     "/leave_carryover_forfeiture.generated.rs"

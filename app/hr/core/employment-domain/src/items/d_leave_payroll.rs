@@ -21,48 +21,48 @@ pub enum PayrollImpactKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LeavePayrollImpactInput {
-    pub leave_request_id: String,               // data_class: INTERNAL_ONLY
-    pub tenant_id: String,                      // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,                // data_class: INTERNAL_ONLY
-    pub employee_id: String,                    // data_class: INTERNAL_ONLY
-    pub approver_id: String,                    // data_class: INTERNAL_ONLY
-    pub decision: LeaveDecision,                // data_class: INTERNAL_ONLY
-    pub routing_mode: LeaveRoutingMode,         // data_class: INTERNAL_ONLY
-    pub start_date: String,                     // data_class: INTERNAL_ONLY
-    pub end_date: String,                       // data_class: INTERNAL_ONLY
+    pub leave_request_id: String,
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub employee_id: String,
+    pub approver_id: String,
+    pub decision: LeaveDecision,
+    pub routing_mode: LeaveRoutingMode,
+    pub start_date: String,
+    pub end_date: String,
     pub payroll_period: String,                 // data_class: FINANCIAL
     pub payroll_impact_kind: PayrollImpactKind, // data_class: FINANCIAL
-    pub workflow_ref: String,                   // data_class: INTERNAL_ONLY
-    pub rulepack_ref: String,                   // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: String,        // data_class: INTERNAL_ONLY
-    pub decision_evidence_ref: String,          // data_class: INTERNAL_ONLY
-    pub routing_evidence_ref: String,           // data_class: INTERNAL_ONLY
-    pub payroll_impact_evidence_ref: String,    // data_class: FINANCIAL
-    pub decided_at_epoch_seconds: u64,          // data_class: INTERNAL_ONLY
+    pub workflow_ref: String,
+    pub rulepack_ref: String,
+    pub rulepack_effective_date: String,
+    pub decision_evidence_ref: String,
+    pub routing_evidence_ref: String,
+    pub payroll_impact_evidence_ref: String, // data_class: FINANCIAL
+    pub decided_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LeavePayrollImpactPlan {
-    pub leave_request_id: Classified<LeaveRequestId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>,              // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>,   // data_class: INTERNAL_ONLY
-    pub employee_id: Classified<EmployeeId>,          // data_class: INTERNAL_ONLY
-    pub approver_id: Classified<EmployeeId>,          // data_class: INTERNAL_ONLY
-    pub decision: Classified<LeaveDecision>,          // data_class: INTERNAL_ONLY
-    pub routing_mode: Classified<LeaveRoutingMode>,   // data_class: INTERNAL_ONLY
-    pub start_date: Classified<String>,               // data_class: INTERNAL_ONLY
-    pub end_date: Classified<String>,                 // data_class: INTERNAL_ONLY
-    pub payroll_period: Classified<String>,           // data_class: FINANCIAL
+    pub leave_request_id: Classified<LeaveRequestId>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub employee_id: Classified<EmployeeId>,
+    pub approver_id: Classified<EmployeeId>,
+    pub decision: Classified<LeaveDecision>,
+    pub routing_mode: Classified<LeaveRoutingMode>,
+    pub start_date: Classified<String>,
+    pub end_date: Classified<String>,
+    pub payroll_period: Classified<String>, // data_class: FINANCIAL
     pub payroll_impact_kind: Classified<PayrollImpactKind>, // data_class: FINANCIAL
-    pub workflow_ref: Classified<WorkflowRef>,        // data_class: INTERNAL_ONLY
-    pub rulepack_ref: Classified<RulepackRef>,        // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: Classified<RulepackEffectiveDate>, // data_class: INTERNAL_ONLY
-    pub decision_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub routing_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
+    pub workflow_ref: Classified<WorkflowRef>,
+    pub rulepack_ref: Classified<RulepackRef>,
+    pub rulepack_effective_date: Classified<RulepackEffectiveDate>,
+    pub decision_evidence_ref: Classified<AuditEvidenceRef>,
+    pub routing_evidence_ref: Classified<AuditEvidenceRef>,
     pub payroll_impact_evidence_ref: Classified<AuditEvidenceRef>, // data_class: FINANCIAL
-    pub idempotency_key: Classified<String>,          // data_class: INTERNAL_ONLY
-    pub decided_at_epoch_seconds: Classified<u64>,    // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,              // data_class: PUBLIC
+    pub idempotency_key: Classified<String>,
+    pub decided_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 pub fn plan_leave_payroll_impact(

@@ -14,10 +14,6 @@ fn valid_input() -> LeaveCarryoverForfeitureInput {
     }
 }
 
-// ---------------------------------------------------------------------------
-// (a) balance <= cap → zero forfeiture
-// ---------------------------------------------------------------------------
-
 #[test]
 fn balance_at_or_below_cap_zero_forfeiture() {
     let proj = evaluate_leave_carryover_forfeiture(valid_input())
@@ -47,10 +43,6 @@ fn balance_exactly_at_cap_zero_forfeiture() {
     assert_eq!(proj.carried_over_units.value, 10.0);
     assert_eq!(proj.forfeited_units.value, 0.0);
 }
-
-// ---------------------------------------------------------------------------
-// (b) balance > cap → forfeited = balance - cap, carried_over = cap
-// ---------------------------------------------------------------------------
 
 #[test]
 fn balance_above_cap_splits_correctly() {
@@ -82,10 +74,6 @@ fn balance_far_above_cap_correct_split() {
     assert_eq!(proj.carried_over_units.value, 15.0);
     assert_eq!(proj.forfeited_units.value, 10.0);
 }
-
-// ---------------------------------------------------------------------------
-// (c) floor enforcement when balance < floor
-// ---------------------------------------------------------------------------
 
 #[test]
 fn balance_below_floor_floor_granted() {
@@ -138,10 +126,6 @@ fn balance_equals_floor_equals_cap_zero_forfeiture() {
     assert_eq!(proj.forfeited_units.value, 0.0);
 }
 
-// ---------------------------------------------------------------------------
-// (d) cap < floor → CarryOverCapBelowFloor
-// ---------------------------------------------------------------------------
-
 #[test]
 fn financial_class_on_all_unit_fields() {
     let proj = evaluate_leave_carryover_forfeiture(valid_input()).expect("projection");
@@ -184,10 +168,6 @@ fn financial_class_on_all_unit_fields() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Idempotency key format
-// ---------------------------------------------------------------------------
-
 #[test]
 fn idempotency_key_format() {
     let proj = evaluate_leave_carryover_forfeiture(valid_input()).expect("projection");
@@ -197,10 +177,6 @@ fn idempotency_key_format() {
         "idempotency_key must be tenant:emp:date:rulepack"
     );
 }
-
-// ---------------------------------------------------------------------------
-// Schema version
-// ---------------------------------------------------------------------------
 
 #[test]
 fn schema_version_is_1_and_public() {
@@ -214,7 +190,3 @@ fn schema_version_is_1_and_public() {
         DataClass::Public
     );
 }
-
-// ---------------------------------------------------------------------------
-// Identifier validation
-// ---------------------------------------------------------------------------

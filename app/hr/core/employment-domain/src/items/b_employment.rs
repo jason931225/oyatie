@@ -24,43 +24,43 @@ pub enum HrLifecycleKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EmployeeCreate {
-    pub employee_id: String,                      // data_class: INTERNAL_ONLY
-    pub tenant_id: String,                        // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,                  // data_class: INTERNAL_ONLY
-    pub person_ref: String,                       // data_class: PII_IDENTIFYING
-    pub manager_id: Option<String>,               // data_class: INTERNAL_ONLY
-    pub employment_status: EmploymentStatus,      // data_class: INTERNAL_ONLY
-    pub tenant_tier_snapshot: TenantTierSnapshot, // data_class: INTERNAL_ONLY
-    pub audit_evidence_ref: String,               // data_class: INTERNAL_ONLY
-    pub data_class: Option<PrivacyDataClass>,     // data_class: INTERNAL_ONLY
-    pub version: u32,                             // data_class: INTERNAL_ONLY
+    pub employee_id: String,
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub person_ref: String, // data_class: PII_IDENTIFYING
+    pub manager_id: Option<String>,
+    pub employment_status: EmploymentStatus,
+    pub tenant_tier_snapshot: TenantTierSnapshot,
+    pub audit_evidence_ref: String,
+    pub data_class: Option<PrivacyDataClass>,
+    pub version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Employee {
-    pub employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>,     // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub person_ref: Classified<PersonRef>,   // data_class: PII_IDENTIFYING
-    pub manager_id: Classified<Option<EmployeeId>>, // data_class: INTERNAL_ONLY
-    pub employment_status: Classified<EmploymentStatus>, // data_class: INTERNAL_ONLY
-    pub tenant_tier_snapshot: Classified<TenantTierSnapshot>, // data_class: INTERNAL_ONLY
-    pub audit_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub data_class: Classified<PrivacyDataClass>, // data_class: INTERNAL_ONLY
-    pub version: Classified<u32>,            // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>,     // data_class: PUBLIC
+    pub employee_id: Classified<EmployeeId>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub person_ref: Classified<PersonRef>, // data_class: PII_IDENTIFYING
+    pub manager_id: Classified<Option<EmployeeId>>,
+    pub employment_status: Classified<EmploymentStatus>,
+    pub tenant_tier_snapshot: Classified<TenantTierSnapshot>,
+    pub audit_evidence_ref: Classified<AuditEvidenceRef>,
+    pub data_class: Classified<PrivacyDataClass>,
+    pub version: Classified<u32>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EmployeeLifecycleEvent {
-    pub event_id: Classified<HrEventId>, // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub lifecycle_kind: Classified<HrLifecycleKind>, // data_class: INTERNAL_ONLY
-    pub audit_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub event_id: Classified<HrEventId>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub employee_id: Classified<EmployeeId>,
+    pub lifecycle_kind: Classified<HrLifecycleKind>,
+    pub audit_evidence_ref: Classified<AuditEvidenceRef>,
+    pub idempotency_key: Classified<String>,
+    pub schema_version: Classified<u32>,
 }
 
 impl Employee {

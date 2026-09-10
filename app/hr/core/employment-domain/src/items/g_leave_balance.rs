@@ -1,40 +1,40 @@
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeaveBalanceAccrualInput {
-    pub tenant_id: String,               // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,         // data_class: INTERNAL_ONLY
-    pub employee_id: String,             // data_class: INTERNAL_ONLY
-    pub payroll_period: String,          // data_class: FINANCIAL
-    pub prior_accrued_units: f64,        // data_class: FINANCIAL
-    pub accrual_units: f64,              // data_class: FINANCIAL
-    pub deduction_units: f64,            // data_class: FINANCIAL
-    pub carry_over_cap_units: f64,       // data_class: FINANCIAL
-    pub rulepack_ref: String,            // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: String, // data_class: INTERNAL_ONLY
-    pub accrual_evidence_ref: String,    // data_class: INTERNAL_ONLY
-    pub deduction_evidence_ref: String,  // data_class: INTERNAL_ONLY
-    pub decided_at_epoch_seconds: u64,   // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub employee_id: String,
+    pub payroll_period: String,    // data_class: FINANCIAL
+    pub prior_accrued_units: f64,  // data_class: FINANCIAL
+    pub accrual_units: f64,        // data_class: FINANCIAL
+    pub deduction_units: f64,      // data_class: FINANCIAL
+    pub carry_over_cap_units: f64, // data_class: FINANCIAL
+    pub rulepack_ref: String,
+    pub rulepack_effective_date: String,
+    pub accrual_evidence_ref: String,
+    pub deduction_evidence_ref: String,
+    pub decided_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeaveBalanceLedgerProjection {
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub employee_id: Classified<EmployeeId>,
     pub payroll_period: Classified<String>, // data_class: FINANCIAL
     pub prior_accrued_units: Classified<f64>, // data_class: FINANCIAL
-    pub accrual_units: Classified<f64>,  // data_class: FINANCIAL
-    pub deduction_units: Classified<f64>, // data_class: FINANCIAL
+    pub accrual_units: Classified<f64>,     // data_class: FINANCIAL
+    pub deduction_units: Classified<f64>,   // data_class: FINANCIAL
     pub resulting_balance_units: Classified<f64>, // data_class: FINANCIAL
     pub carried_over_units: Classified<f64>, // data_class: FINANCIAL
-    pub forfeited_units: Classified<f64>, // data_class: FINANCIAL
+    pub forfeited_units: Classified<f64>,   // data_class: FINANCIAL
     pub carry_over_cap_units: Classified<f64>, // data_class: FINANCIAL
-    pub rulepack_ref: Classified<RulepackRef>, // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: Classified<RulepackEffectiveDate>, // data_class: INTERNAL_ONLY
-    pub accrual_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub deduction_evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub decided_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub rulepack_ref: Classified<RulepackRef>,
+    pub rulepack_effective_date: Classified<RulepackEffectiveDate>,
+    pub accrual_evidence_ref: Classified<AuditEvidenceRef>,
+    pub deduction_evidence_ref: Classified<AuditEvidenceRef>,
+    pub idempotency_key: Classified<String>,
+    pub decided_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 pub fn evaluate_leave_balance_accrual(

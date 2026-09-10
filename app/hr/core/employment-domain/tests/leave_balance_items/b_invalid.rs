@@ -12,10 +12,6 @@ fn test_carry_over_cap_exceeded_returns_error() {
     assert_eq!(err, HrDomainError::CarryOverCapExceeded);
 }
 
-// ---------------------------------------------------------------------------
-// Negative balance guard
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_negative_balance_returns_error() {
     let err = evaluate_leave_balance_accrual(LeaveBalanceAccrualInput {
@@ -28,10 +24,6 @@ fn test_negative_balance_returns_error() {
 
     assert_eq!(err, HrDomainError::NegativeLeaveBalance);
 }
-
-// ---------------------------------------------------------------------------
-// Invalid accrual units
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_invalid_accrual_units_negative() {
@@ -55,10 +47,6 @@ fn test_invalid_prior_accrued_units_nan() {
     assert_eq!(err, HrDomainError::InvalidAccrualUnits);
 }
 
-// ---------------------------------------------------------------------------
-// Evidence ref validation
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_invalid_evidence_ref_rejected() {
     let err = evaluate_leave_balance_accrual(LeaveBalanceAccrualInput {
@@ -70,10 +58,6 @@ fn test_invalid_evidence_ref_rejected() {
     assert_eq!(err, HrDomainError::InvalidAuditEvidenceRef);
 }
 
-// ---------------------------------------------------------------------------
-// Rulepack ref validation
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_invalid_rulepack_ref_rejected() {
     let err = evaluate_leave_balance_accrual(LeaveBalanceAccrualInput {
@@ -84,10 +68,6 @@ fn test_invalid_rulepack_ref_rejected() {
 
     assert_eq!(err, HrDomainError::InvalidRulepackRef);
 }
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_invalid_tenant_id_rejected() {
@@ -136,10 +116,6 @@ fn test_zero_decided_at_returns_invalid_decision_timestamp() {
     assert_eq!(err, HrDomainError::InvalidDecisionTimestamp);
 }
 
-// ---------------------------------------------------------------------------
-// [RED] payroll period and rulepack date validation
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_invalid_payroll_period_returns_error() {
     // month 99 is not a valid calendar month
@@ -164,10 +140,6 @@ fn test_invalid_rulepack_effective_date_returns_error() {
     assert_eq!(err, HrDomainError::InvalidRulepackEffectiveDate);
 }
 
-// ---------------------------------------------------------------------------
-// [RED] deduction evidence ref validation
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_deduction_evidence_ref_empty_suffix_rejected() {
     // deduction_evidence_ref with only the prefix and no suffix
@@ -191,10 +163,6 @@ fn test_deduction_evidence_ref_credential_like_rejected() {
 
     assert_eq!(err, HrDomainError::InvalidAuditEvidenceRef);
 }
-
-// ---------------------------------------------------------------------------
-// [RED] accrual unit domain invariants
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_infinite_carry_over_cap_returns_invalid_accrual_units() {
@@ -239,7 +207,3 @@ fn test_negative_deduction_units_returns_invalid_accrual_units() {
 
     assert_eq!(err, HrDomainError::InvalidAccrualUnits);
 }
-
-// ---------------------------------------------------------------------------
-// [RED] happy-path: DataClass on all financial output fields
-// ---------------------------------------------------------------------------
