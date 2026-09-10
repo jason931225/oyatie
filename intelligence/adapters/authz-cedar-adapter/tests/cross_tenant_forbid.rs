@@ -1,7 +1,7 @@
 //! Adversarial corpus for cross-tenant isolation: near-miss tenant ids that
 //! must not be treated as a match.
 //!
-//! The rule under attack is `cloud-intelligence-forbid-cross-tenant-inference`
+//! The rule under attack is `cloud-intelligence-forbid-cross-tenant-any-action`
 //! in `intelligence/cedar/cloud-intelligence.cedar`.
 use intelligence_authz_cedar_adapter::CedarAuthzGate;
 use intelligence_kernel::{

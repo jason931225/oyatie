@@ -27,6 +27,11 @@
 // EVERY action is tenant-scoped: a principal may only act against its own per-tenant
 // key pool (the isolation unit, brief §6). Realm membership is an ADDITIONAL gate on
 // admin/audit, never a substitute for the tenant check.
+//
+// This supersedes the previous "Admin/audit are realm-scoped, not tenant-scoped."
+// ReadAudit is included deliberately: a cross-tenant SIEM read is an exception path,
+// and per the isolation rule below exception paths are modeled as their own
+// action/resource, not as a tenant hole in a rule that every other action relies on.
 
 // --- Ingress data plane: tenant-scoped inference ---
 
@@ -153,6 +158,12 @@ forbid (
 // reached another tenant's key pool with every rule above satisfied. The forbid now
 // carries no action filter — realm membership gates WHICH actions a principal may
 // perform, and this rule gates WHOSE resources it may perform them against.
+//
+// Dropping the filter re-scopes FOUR actions from cross-tenant Allow to Deny, not
+// just the RefreshKeyPool hole that prompted it: ReadPoolStatus leaks another
+// tenant's pool state, ListModels addresses another tenant's Subscription, and
+// ReadAudit reads another tenant's audit trail. Each is the same isolation unit.
+// All six are pinned in tests/permits_same_tenant.rs, both directions.
 //
 // There is no internal bypass: the per-tenant key pool is the isolation unit, and
 // exception paths must be modeled as separate actions/resources.

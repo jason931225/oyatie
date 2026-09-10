@@ -1,10 +1,15 @@
-//! D7 — positive cases: same-tenant SelectSeat permits.
+//! D7 — positive cases: the Cedar adapter does NOT default-deny every request.
 //!
-//! These tests confirm the Cedar adapter does NOT default-deny EVERY request —
-//! the same-tenant permit rule (`intelligence-app-ingress-chat-same-tenant`) must
-//! fire when principal_tenant == resource_tenant and the principal is in the
-//! IngressRealm (which v1 hardcodes for `AuthzAction::SelectSeat`).
-use intelligence_authz_cedar_adapter::CedarAuthzGate;
+//! `cloud-intelligence-ingress-chat-same-tenant` must fire when the tenants match
+//! and the principal is in the IngressRealm. The tail of the file pins all six
+//! policy actions in both directions against the widened cross-tenant forbid.
+use std::collections::{BTreeSet, HashMap, HashSet};
+
+use cedar_policy::{
+    Authorizer, Context, Decision, Entities, Entity, EntityUid, PolicySet, Request,
+    RestrictedExpression,
+};
+use intelligence_authz_cedar_adapter::{CedarAuthzGate, DEFAULT_POLICY_TEXT};
 use intelligence_kernel::{
     AgentId, AuthzAction, AuthzDecision, AuthzGate, AuthzRequest, Provider, TenantId,
 };
@@ -144,18 +149,26 @@ fn same_tenant_admin_actions_still_allowed_after_cross_tenant_widening() {
 }
 
 #[test]
-fn cross_tenant_is_forbidden_for_every_action() {
-    // The complement of the test above: no action escapes the tenant boundary.
+fn cross_tenant_is_forbidden_for_every_kernel_action() {
+    // The complement of the test above, over the actions `decide()` can reach.
+    // The `match` is the fence: a fourth `AuthzAction` variant stops compiling
+    // here instead of escaping, which the array literal alone would allow.
+    // ponytail: the fence forces an edit, it does not derive membership.
     let g = gate();
     let pt = TenantId::new("acme").unwrap();
     let rt = TenantId::new("evil-corp").unwrap();
     let a = AgentId::new("admin:acme").unwrap();
     let mut leaked: Vec<&str> = Vec::new();
-    for (label, action) in [
-        ("RefreshToken", AuthzAction::RefreshToken),
-        ("InvalidateSeat", AuthzAction::InvalidateSeat),
-        ("SelectSeat", AuthzAction::SelectSeat),
+    for action in [
+        AuthzAction::RefreshToken,
+        AuthzAction::InvalidateSeat,
+        AuthzAction::SelectSeat,
     ] {
+        let label = match action {
+            AuthzAction::RefreshToken => "RefreshToken",
+            AuthzAction::InvalidateSeat => "InvalidateSeat",
+            AuthzAction::SelectSeat => "SelectSeat",
+        };
         let r = AuthzRequest {
             principal_tenant: &pt,
             principal_agent: &a,
@@ -170,5 +183,117 @@ fn cross_tenant_is_forbidden_for_every_action() {
     assert!(
         leaked.is_empty(),
         "these actions crossed the tenant boundary: {leaked:?}",
+    );
+}
+
+/// Every action the bundled policy names, with the realm that permits it.
+/// `decide()` reaches only `InvokeChatCompletion` and `RefreshKeyPool`; the
+/// widened forbid re-scoped the other four, so they are driven at Cedar here.
+const REALM_BY_ACTION: [(&str, &str); 6] = [
+    ("InvokeChatCompletion", "IngressRealm"),
+    ("InvokeEmbeddings", "IngressRealm"),
+    ("ListModels", "IngressRealm"),
+    ("ReadPoolStatus", "AdminRealm"),
+    ("RefreshKeyPool", "AdminRealm"),
+    ("ReadAudit", "AuditReader"),
+];
+
+/// Action names as they appear in the policy text, independent of the table.
+fn actions_named_by_policy() -> BTreeSet<String> {
+    DEFAULT_POLICY_TEXT
+        .split("Action::\"")
+        .skip(1)
+        .filter_map(|rest| rest.split_once('"'))
+        .map(|(name, _)| name.to_owned())
+        .collect()
+}
+
+#[test]
+fn realm_table_covers_exactly_the_policy_actions() {
+    // Two independent sources: the table above and the policy text. A seventh
+    // or renamed action fails here rather than slipping past the pin below.
+    let tabled: BTreeSet<String> = REALM_BY_ACTION
+        .iter()
+        .map(|(action, _)| (*action).to_owned())
+        .collect();
+    assert_eq!(actions_named_by_policy(), tabled);
+}
+
+const PROBE_PRINCIPAL: &str = r#"Workload::"probe-agent""#;
+const PROBE_RESOURCE: &str = r#"Subscription::"probe-resource""#;
+
+fn uid(literal: &str) -> EntityUid {
+    literal.parse().unwrap()
+}
+
+fn tenant_entity(literal: &str, tenant: &str, parents: HashSet<EntityUid>) -> Entity {
+    let attrs = HashMap::from([(
+        "tenant_id".to_owned(),
+        RestrictedExpression::new_string(tenant.to_owned()),
+    )]);
+    Entity::new(uid(literal), attrs, parents).unwrap()
+}
+
+fn cedar_allows(action: &str, realm: &str, principal_tenant: &str, resource_tenant: &str) -> bool {
+    let policy_set: PolicySet = DEFAULT_POLICY_TEXT.parse().expect("bundled policy parses");
+    let role = uid(&format!(r#"Role::"{realm}""#));
+    let entities = Entities::empty()
+        .add_entities(
+            [
+                tenant_entity(
+                    PROBE_PRINCIPAL,
+                    principal_tenant,
+                    HashSet::from([role.clone()]),
+                ),
+                tenant_entity(PROBE_RESOURCE, resource_tenant, HashSet::new()),
+                Entity::new(role, HashMap::new(), HashSet::new()).unwrap(),
+            ],
+            None,
+        )
+        .unwrap();
+    let request = Request::new(
+        uid(PROBE_PRINCIPAL),
+        uid(&format!(r#"Action::"{action}""#)),
+        uid(PROBE_RESOURCE),
+        Context::empty(),
+        None,
+    )
+    .unwrap();
+    Authorizer::new()
+        .is_authorized(&request, &policy_set, &entities)
+        .decision()
+        == Decision::Allow
+}
+
+#[test]
+fn every_policy_action_is_denied_across_tenants() {
+    // Includes ReadAudit: a SIEM reader holding AuditReader and a foreign tenant
+    // is denied. That is the deliberate re-scoping, not an accident of the
+    // widening, and this is where it is pinned.
+    let mut leaked: Vec<&str> = Vec::new();
+    for (action, realm) in REALM_BY_ACTION {
+        if cedar_allows(action, realm, "acme", "evil-corp") {
+            leaked.push(action);
+        }
+    }
+    assert!(
+        leaked.is_empty(),
+        "these actions crossed the tenant boundary: {leaked:?}",
+    );
+}
+
+#[test]
+fn every_policy_action_is_allowed_within_one_tenant() {
+    // The other direction: without it a forbid broad enough to deny everything
+    // satisfies the test above, and an outage reads as a pass.
+    let mut denied: Vec<&str> = Vec::new();
+    for (action, realm) in REALM_BY_ACTION {
+        if !cedar_allows(action, realm, "acme", "acme") {
+            denied.push(action);
+        }
+    }
+    assert!(
+        denied.is_empty(),
+        "same-tenant actions wrongly denied: {denied:?}",
     );
 }
