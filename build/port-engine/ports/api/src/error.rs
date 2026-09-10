@@ -10,57 +10,40 @@ use crate::identity::{PAIR_SEPARATOR, RegionId, RuleId, UnitId};
 pub enum PortError {
     /// A language slug did not match the one it was paired against.
     LanguageMismatch {
-        /// What the consumer required.
         expected: String, // data_class: INTERNAL_ONLY
-        /// What it was handed.
-        actual: String, // data_class: INTERNAL_ONLY
+        actual: String,   // data_class: INTERNAL_ONLY
     },
     /// The source model emitted the same unit id twice, so step order is ambiguous.
     DuplicateUnit {
-        /// The repeated id.
         unit: UnitId, // data_class: INTERNAL_ONLY
     },
     /// `rules_for` returned a rule the pack does not declare.
     UndeclaredRule {
-        /// The unit it was returned for.
         unit: UnitId, // data_class: INTERNAL_ONLY
-        /// The undeclared rule.
         rule: RuleId, // data_class: INTERNAL_ONLY
     },
     /// `rules_for` returned pack-declared rules in an order that is not the pack's own.
     RuleOrderViolation {
-        /// The unit `rules_for` was asked about.
         unit: UnitId, // data_class: INTERNAL_ONLY
-        /// The rule that arrived out of pack order (or a second time).
         rule: RuleId, // data_class: INTERNAL_ONLY
     },
     /// A renderer's emitted region set was not exactly the IR's region set.
     RegionSetMismatch {
-        /// Regions the IR declared that the renderer did not emit.
-        missing: BTreeSet<RegionId>, // data_class: INTERNAL_ONLY
-        /// Regions the renderer emitted that the IR did not declare.
+        missing: BTreeSet<RegionId>,    // data_class: INTERNAL_ONLY
         unexpected: BTreeSet<RegionId>, // data_class: INTERNAL_ONLY
     },
-    /// A [`TargetIr`] declared the same region identity twice.
     DuplicateRegion {
-        /// The repeated region identity.
         region: RegionId, // data_class: INTERNAL_ONLY
     },
-    /// A [`RulePack`] declared the same rule identity twice.
     DuplicateRule {
-        /// The repeated rule identity.
         rule: RuleId, // data_class: INTERNAL_ONLY
     },
-    /// A renderer refused for a reason of its own.
     Render {
-        /// The renderer's own description of its refusal.
         detail: String, // data_class: INTERNAL_ONLY
     },
     /// A [`LanguagePair`] cannot address a rule namespace unambiguously.
     AmbiguousLanguagePair {
-        /// The source slug as supplied.
         source: String, // data_class: INTERNAL_ONLY
-        /// The target slug as supplied.
         target: String, // data_class: INTERNAL_ONLY
     },
 }

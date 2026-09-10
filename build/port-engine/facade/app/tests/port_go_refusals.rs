@@ -1,23 +1,16 @@
 //! The refusal proofs: real Go the engine declines to translate, and what it says about it.
 //!
-//! Each class has its OWN corpus, and that is the finding rather than the arrangement. One corpus
-//! carrying several classes proves whichever package the transform reaches first and leaves the
-//! rest untested while looking tested — which is exactly what happened when the statement and
-//! ownership refusals shared a fixture.
+//! Each class has its OWN corpus: one corpus carrying several classes proves whichever package the
+//! transform reaches first and leaves the rest untested while looking tested.
 //!
-//! What each assertion checks is that the message NAMES the thing: the construct, the site, the
-//! position, and where the missing analysis belongs. A refusal that only says no is a refusal
-//! nobody can act on.
+//! Every assertion checks that the message NAMES the thing — the construct, the site, the position,
+//! and where the missing analysis belongs.
 
 use port_engine_app::driver;
 
-/// A failing return that carries a COMPUTED value beside the failure.
-///
-/// The source returns both; the target returns one or the other. Discarding the companion is sound
-/// exactly when it is the zero value — the convention says a caller may not read it after a failure
-/// — and is a silent loss of work when it is not. So the engine admits literals and the absent
-/// value, and refuses anything computed rather than deciding that some expression is "obviously"
-/// zero.
+/// Discarding the companion value is sound exactly when it is the zero value, and a silent loss of
+/// work when it is not — so the engine admits literals and the absent value, and refuses anything
+/// computed rather than deciding that some expression is "obviously" zero.
 #[test]
 fn a_failing_return_that_carries_a_value_is_refused_with_its_reason() {
     let err = driver::port_go_refused_failure()
@@ -38,7 +31,6 @@ fn a_failing_return_that_carries_a_value_is_refused_with_its_reason() {
     );
 }
 
-/// and none for a result. Emitting a box there would be choosing an owner on the source's behalf.
 #[test]
 fn an_interface_in_an_undeclared_position_is_refused_with_its_reason() {
     let err = driver::port_go_refused_interface()
@@ -59,7 +51,6 @@ fn an_interface_in_an_undeclared_position_is_refused_with_its_reason() {
     );
 }
 
-/// refuse anything a front end would actually produce.
 #[test]
 fn the_refusal_corpus_is_refused_by_name() {
     let err = driver::port_go_refused().expect_err("the refusal corpus must not translate");
@@ -75,7 +66,6 @@ fn the_refusal_corpus_is_refused_by_name() {
     );
 }
 
-/// hold.
 #[test]
 fn an_escaping_receiver_is_refused_with_its_reason() {
     let err =

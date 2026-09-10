@@ -1,4 +1,4 @@
-//! CLI dispatch: every command reachable, and usage on anything else.
+//! CLI dispatch: what each command does with a valid invocation, and usage on anything else.
 
 use std::process::ExitCode;
 
@@ -14,16 +14,24 @@ fn help_and_ready_succeed() {
     assert_eq!(run(&args(&["ready"])), ExitCode::SUCCESS);
 }
 
+/// Every command in `cli::COMMANDS` reaches its handler.
+///
+/// Kept in step with that list by hand, because an integration test cannot see a `pub(crate)`
+/// const; `usage_lists_exactly_the_dispatchable_commands` is what holds the list itself honest.
 #[test]
-fn slice14_commands_succeed() {
+fn every_command_succeeds_on_a_valid_invocation() {
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    assert_eq!(run(&args(&["pin"])), ExitCode::SUCCESS);
+    assert_eq!(run(&args(&["emit-stub"])), ExitCode::SUCCESS);
+    assert_eq!(run(&args(&["emit-syn"])), ExitCode::SUCCESS);
     assert_eq!(run(&args(&["digest", "port-engine"])), ExitCode::SUCCESS);
     assert_eq!(run(&args(&["rulepack"])), ExitCode::SUCCESS);
     assert_eq!(run(&args(&["plan"])), ExitCode::SUCCESS);
     assert_eq!(run(&args(&["admit-snapshot"])), ExitCode::SUCCESS);
     assert_eq!(run(&args(&["declarations"])), ExitCode::SUCCESS);
     assert_eq!(run(&args(&["port-go"])), ExitCode::SUCCESS);
+    assert_eq!(run(&args(&["region-digests"])), ExitCode::SUCCESS);
     assert_eq!(run(&args(&["dispositions"])), ExitCode::SUCCESS);
     assert_eq!(
         run(&args(&["port-go-source"])),
@@ -56,6 +64,14 @@ fn slice14_commands_succeed() {
     let _ = std::fs::remove_dir_all(out.parent().expect("parent"));
 }
 
+/// `survey` reaches its handler; an unreadable path is a run failure, not a usage one.
+#[test]
+fn survey_reaches_its_handler() {
+    let missing = std::env::temp_dir().join("pe-cli-no-such-snapshot.json");
+    let missing = missing.to_string_lossy().into_owned();
+    assert_eq!(run(&args(&["survey", &missing])), ExitCode::from(1));
+}
+
 #[test]
 fn unknown_command_is_usage() {
     assert_eq!(run(&args(&["not-a-command"])), ExitCode::from(2));
@@ -69,4 +85,9 @@ fn digest_without_arg_is_usage() {
 #[test]
 fn materialize_canary_without_arg_is_usage() {
     assert_eq!(run(&args(&["materialize-canary"])), ExitCode::from(2));
+}
+
+#[test]
+fn survey_without_arg_is_usage() {
+    assert_eq!(run(&args(&["survey"])), ExitCode::from(2));
 }

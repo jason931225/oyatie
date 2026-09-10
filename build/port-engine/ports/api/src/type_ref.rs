@@ -1,37 +1,25 @@
-//! A source type, as a tree.
-//!
-//! Until now a type reached the engine as a flat SPELLING — `int`, `[]byte`,
-//! `map[string][]*Foo` — and the pack answered by matching that spelling against a table. That
-//! works exactly as long as every type in the corpus is either primitive or has its own table
-//! entry, and it fails in three ways at once on a real corpus: a composite type needs an entry per
-//! shape rather than per constructor, a type from another package resolves to nothing because the
-//! table is keyed by unqualified text, and two packages that each declare a `Point` collide.
-//!
-//! So a type is a tree here, and it is the same UNIFORM NODE the declaration tree uses: `kind` is
-//! a value rather than a variant, so a second source language needs a second rule pack and not a
-//! second seam. The engine compares these strings and never interprets them — `slice` is not a
-//! sequence to the engine, it is a key the pack answers for.
+//! A source type, as a tree rather than as a flat spelling.
+
+const KIND_BASIC: &str = "basic";
+const KIND_NAMED: &str = "named";
 
 /// One node of a source type.
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct TypeRef {
-    /// What kind of type this is, as an opaque slug: `basic`, `named`, `pointer`, `slice`, and so
-    /// on. The pack decides what each means. // data_class: INTERNAL_ONLY
-    pub kind: String,
+    /// What kind of type this is, as an opaque slug the pack decides the meaning of.
+    pub kind: String, // data_class: INTERNAL_ONLY
     /// The type's own name, for the kinds that have one. Empty otherwise.
     pub name: String, // data_class: INTERNAL_ONLY
     /// The package that declares this type, for the kinds that have one.
     ///
-    /// This is what makes a named type ADDRESSABLE. Without it, a reference to another package's
-    /// type is indistinguishable from a local one, and two packages declaring the same name are
-    /// indistinguishable from each other — so the resolution silently picks one.
+    /// Without it two packages declaring the same name are indistinguishable, so the resolution
+    /// silently picks one.
     pub package: String, // data_class: INTERNAL_ONLY
     /// Type arguments, in significant order: an element type, a key and a value, a parameter list.
     pub args: Vec<TypeRef>,
 }
 
 impl TypeRef {
-    /// A type of `kind` with no name, package, or arguments.
     pub fn of(kind: impl Into<String>) -> Self {
         Self {
             kind: kind.into(),
@@ -42,16 +30,15 @@ impl TypeRef {
     /// A primitive named type: `int`, `bool`, `string`.
     pub fn basic(name: impl Into<String>) -> Self {
         Self {
-            kind: "basic".to_owned(),
+            kind: KIND_BASIC.to_owned(),
             name: name.into(),
             ..Self::default()
         }
     }
 
-    /// A named type declared by a package.
     pub fn named(package: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
-            kind: "named".to_owned(),
+            kind: KIND_NAMED.to_owned(),
             name: name.into(),
             package: package.into(),
             ..Self::default()
@@ -67,8 +54,11 @@ impl TypeRef {
         }
     }
 
-    /// `true` when this node carries no information at all — the shape a declaration without a
-    /// type has.
+    /// `true` when `kind`, `name` and `args` are all empty — the shape a declaration without a type
+    /// has.
+    ///
+    /// `package` is deliberately NOT consulted. This predicate decides the present/absent marker in
+    /// the snapshot digest preimage, so widening it would move every digest already recorded.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.kind.is_empty() && self.name.is_empty() && self.args.is_empty()
@@ -77,8 +67,7 @@ impl TypeRef {
     /// The type's fully-qualified identity, for the kinds that have one: `package.Name`.
     ///
     /// Empty when the type has no name. A bare name is deliberately NOT returned for an unpackaged
-    /// type: a qualified key and an unqualified one must not collide in the same table, because
-    /// that is the collision this whole type exists to prevent.
+    /// type: a qualified key and an unqualified one must not collide in the same table.
     #[must_use]
     pub fn qualified(&self) -> String {
         match (self.package.is_empty(), self.name.is_empty()) {

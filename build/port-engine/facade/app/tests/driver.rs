@@ -1,10 +1,10 @@
-//! Driver composition smoke: every seam reachable from the facade.
+//! Driver composition smoke: the canary path end to end, and every adapter reporting itself wired.
 
 use port_engine_app::driver::*;
 use port_engine_app::receipt_codec::matches_golden;
 
 #[test]
-fn slice14_driver_wiring_is_ready() {
+fn driver_wiring_is_ready() {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     assert!(w0_ready());
@@ -61,10 +61,10 @@ fn slice14_driver_wiring_is_ready() {
         Some(port_engine_emit::CANARY_FILENAME)
     );
     let _ = std::fs::remove_dir_all(out.parent().expect("parent"));
-    let (_pin, rust_ir, frontend, hash, rulepack, snapshot, identity, toolchain, transform, emit) =
+    let (pin, rust_ir, frontend, hash, rulepack, snapshot, identity, toolchain, transform, emit) =
         adapter_readiness();
     assert!(
-        rust_ir
+        pin && rust_ir
             && frontend
             && hash
             && rulepack

@@ -1,11 +1,5 @@
 //! What the engine IS, for the receipt's `engine_digest` axis.
 //!
-//! The enumeration lives here because this is the only crate that legitimately sees the whole
-//! engine. Every other crate is below something; the facade is above everything, so listing the
-//! parts here points the same way the dependency graph already does. An adapter reaching into
-//! `core/` and `facade/` to read their sources would invert that — and would also put files outside
-//! its own package into its build inputs, which no package-relative glob can express.
-//!
 //! Each crate embeds only what it OWNS, as `CRATE_SOURCES`. This joins them; `port-engine-identity`
 //! decides what hashing the join means.
 
@@ -13,9 +7,9 @@ use port_engine_identity::CrateSources;
 
 /// Every crate the engine is built from, with the sources each one owns.
 ///
-/// Order is fixed and alphabetical by crate name. It is part of the preimage, so a reordering would
-/// move the digest without the engine changing — which would be a false `Explained`, the mirror of
-/// the false `Unchanged` this axis exists to stop.
+/// The order is part of the preimage, so a reordering would move the digest without the engine
+/// changing — a false `Explained`, the mirror of the false `Unchanged` this axis exists to stop.
+/// Sorted by crate name, held there by `engine_crates_are_sorted_by_crate_name`.
 #[must_use]
 pub fn engine_crates() -> Vec<CrateSources<'static>> {
     vec![
@@ -32,11 +26,11 @@ pub fn engine_crates() -> Vec<CrateSources<'static>> {
         ("port-engine-kernel", port_engine_kernel::CRATE_SOURCES),
         ("port-engine-rulepack", port_engine_rulepack::CRATE_SOURCES),
         ("port-engine-rust-ir", port_engine_rust_ir::CRATE_SOURCES),
+        ("port-engine-snapshot", port_engine_snapshot::CRATE_SOURCES),
         (
             "port-engine-source-pin",
             port_engine_source_pin::CRATE_SOURCES,
         ),
-        ("port-engine-snapshot", port_engine_snapshot::CRATE_SOURCES),
         (
             "port-engine-toolchain",
             port_engine_toolchain::CRATE_SOURCES,

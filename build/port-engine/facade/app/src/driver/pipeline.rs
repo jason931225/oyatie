@@ -1,4 +1,4 @@
-//! The canary pipeline: pin → admit → plan → transform → emit → six-axis receipt.
+//! The canary pipeline: pin → admit → plan → transform → emit → receipt.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -23,10 +23,10 @@ use port_engine_transform::{TransformError, apply, apply_with_provenance, saniti
 
 use crate::receipt_codec::{emit_tree_digest, format_receipt, matches_golden};
 
-use crate::driver::report::{PipelineError, PipelineReport};
+use crate::driver::report::{PipelineError, PipelineReport, bind_receipt, bind_report};
 use crate::driver::smoke::smoke_admit_snapshot;
 
-/// Admit → plan → transform → RustIr (Slice 11 smoke without emit/receipt).
+/// Admit → plan → transform → RustIr, without emit or receipt.
 ///
 /// # Errors
 /// [`PipelineError`] on admit/rulepack/plan/transform refusal.
@@ -38,7 +38,7 @@ pub fn smoke_transform() -> Result<usize, PipelineError> {
     Ok(ir.regions().len())
 }
 
-/// Run pin → admit → plan → transform → syn emit → six-axis receipt.
+/// Run pin → admit → plan → transform → syn emit → receipt.
 ///
 /// # Errors
 /// [`PipelineError`] on any stage refusal.
@@ -55,38 +55,17 @@ pub fn smoke_pipeline() -> Result<PipelineReport, PipelineError> {
         .render_rust_ir(&transformed.ir)
         .map_err(PipelineError::Emit)?;
 
-    let receipt = Receipt {
+    let receipt = bind_receipt(
+        "pipeline",
         pin,
-        snapshot_digest: admitted.artifact_digest().clone(),
-        engine_digest: engine_digest(),
-        rulepack_digest: pack.digest(),
-        toolchain_digest: toolchain_digest(),
-        // The renderer reports its own identity and version; the digest is taken of THAT
-        // rather than of a label, so the axis moves when the formatter does.
-        formatter_digest: digest_str(&renderer.formatter_digest().0),
-    };
-    if !receipt.incomplete_axes().is_empty() {
-        return Err(PipelineError::Emit(port_engine_api::PortError::Render {
-            detail: format!(
-                "pipeline receipt incomplete axes: {:?}",
-                receipt.incomplete_axes()
-            ),
-        }));
-    }
+        admitted.artifact_digest().clone(),
+        &pack,
+        &renderer,
+    )?;
 
-    Ok(PipelineReport {
-        plan_steps: plan.steps.len(),
-        emit_regions: emitted.len(),
-        emit_digest: emit_tree_digest(&emitted),
-        region_units: transformed.region_units,
-        dispositions: transformed.dispositions,
-        emitted,
-        receipt,
-    })
+    Ok(bind_report(plan.steps.len(), transformed, emitted, receipt))
 }
 
-/// Transform + syn emit (Slice 12 `render` entrypoint).
-///
 /// # Errors
 /// [`PipelineError`] on admit/rulepack/plan/transform/emit refusal.
 pub fn smoke_render() -> Result<(usize, Digest), PipelineError> {
@@ -96,7 +75,7 @@ pub fn smoke_render() -> Result<(usize, Digest), PipelineError> {
 
 /// Re-run the pipeline twice and classify with kernel [`verify`](port_engine_kernel::verify).
 ///
-/// Identical six axes + identical emit bytes → `Unchanged` / Green (W0-B Slice 6 acceptance).
+/// Identical axes + identical emit bytes → `Unchanged` / Green.
 ///
 /// # Errors
 /// [`PipelineError`] on pipeline failure, or unexpected verdict.

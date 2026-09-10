@@ -1,9 +1,8 @@
 //! Facade driver wiring: composes the kernel entry points with the adapters.
 //!
-//! The facade is the only face allowed to depend on everything — composing the engine is its job.
 //! Each module here is one composition: `smoke` proves a seam is inhabited, `pipeline` runs the
-//! canary path, `port_go` runs the Go corpus, `report` carries what a run produced and how it can
-//! refuse.
+//! canary path, `port_go` runs the Go corpus, `probe` surveys source the engine has never seen, and
+//! `report` carries what a run produced and how it can refuse.
 
 mod pipeline;
 mod port_go;
@@ -27,10 +26,8 @@ pub use smoke::{
     smoke_plan, smoke_render_stub, smoke_rulepack, smoke_syn_quote_render, smoke_toolchain_digest,
 };
 
-/// Re-export neutral kernel entry points for downstream CLI wiring.
 pub use port_engine_kernel::{Verdict, emit, plan, verify};
 
-/// Fail-closed readiness: every adapter and core face reports itself wired.
 #[must_use]
 pub const fn w0_ready() -> bool {
     port_engine_api::w0_ready()

@@ -1,9 +1,3 @@
-//! Six-axis receipt end-to-end demos for W0-B Slice 9 (ADR-0637 D2 / receipt axes).
-//!
-//! Builds complete [`Receipt`] values from the fleet pin + Slice 7–9 digests (hash, rulepack,
-//! admitted snapshot, engine identity, dual-home toolchain), emits previous/current trees via
-//! empty and syn/quote paths, and classifies with [`port_engine_kernel::verify`].
-
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -16,26 +10,27 @@ use port_engine_snapshot::AdmitError;
 
 use crate::driver;
 
-/// One named verify scenario and its outcome.
+/// The closed scenario vocabulary, named once so a scenario cannot be built under a name
+/// [`scenario_matches`] does not answer for.
+const UNCHANGED: &str = "unchanged";
+const EXPLAINED: &str = "explained";
+const UNEXPLAINED: &str = "unexplained";
+const INCOMPLETE: &str = "incomplete";
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScenarioResult {
-    /// Scenario name (`unchanged` / `explained` / `unexplained` / `incomplete`).
     pub name: &'static str,
-    /// Kernel verification outcome.
     pub verification: Verification,
 }
 
-/// Aggregate of the four W0 receipt scenarios.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SixAxisReport {
     /// Fleet pin identity used on every complete receipt.
     pub pin: String,
-    /// Per-scenario results in declaration order.
     pub scenarios: Vec<ScenarioResult>,
 }
 
 impl SixAxisReport {
-    /// True when every scenario matched its expected verdict/delta class.
     #[must_use]
     pub fn all_expected(&self) -> bool {
         self.scenarios.iter().all(scenario_matches)
@@ -44,11 +39,11 @@ impl SixAxisReport {
 
 fn scenario_matches(s: &ScenarioResult) -> bool {
     match s.name {
-        "unchanged" => {
+        UNCHANGED => {
             s.verification.verdict == Verdict::Green
                 && matches!(s.verification.delta, Delta::Unchanged)
         }
-        "explained" => {
+        EXPLAINED => {
             s.verification.verdict == Verdict::Green
                 && matches!(
                     &s.verification.delta,
@@ -57,11 +52,11 @@ fn scenario_matches(s: &ScenarioResult) -> bool {
                             && axes.contains(&ReceiptAxis::Snapshot)
                 )
         }
-        "unexplained" => {
+        UNEXPLAINED => {
             s.verification.verdict == Verdict::Red
                 && matches!(s.verification.delta, Delta::Unexplained { .. })
         }
-        "incomplete" => {
+        INCOMPLETE => {
             s.verification.verdict == Verdict::Red
                 && matches!(s.verification.delta, Delta::IncompleteReceipt { .. })
         }
@@ -88,14 +83,12 @@ fn scenario_receipt(
     }
 }
 
-/// Prove the closed receipt axis set is exactly six (compile-time contract surface).
+/// How many axes the closed set holds. `port-engine-api` asserts the six at compile time.
 #[must_use]
 pub fn receipt_axis_count() -> usize {
     RECEIPT_AXES.len()
 }
 
-/// Emit empty-stub region bytes via kernel [`emit`](port_engine_kernel::emit).
-///
 /// # Errors
 /// [`PortError`] from the empty renderer / kernel emit seam.
 pub fn emit_empty_tree(formatter: &str) -> Result<BTreeMap<RegionId, Vec<u8>>, PortError> {
@@ -107,8 +100,8 @@ pub fn emit_empty_tree(formatter: &str) -> Result<BTreeMap<RegionId, Vec<u8>>, P
 /// Emit region bytes through the typed IR and the real formatter.
 ///
 /// Takes an ITEM rather than a source string. The scenario this drives compares two emits whose
-/// only difference is the formatter axis, so what it needs is the same tree rendered twice — and
-/// a string argument would have made "the same tree" a claim about two parses rather than a fact.
+/// only difference is the formatter axis, so what it needs is the same tree rendered twice — and a
+/// string argument would have made "the same tree" a claim about two parses rather than a fact.
 ///
 /// # Errors
 /// [`PortError`] from item assembly or [`RustRenderer::render_rust_ir`].
@@ -118,7 +111,6 @@ pub fn emit_typed_tree(item: RustItem) -> Result<BTreeMap<RegionId, Vec<u8>>, Po
     RustRenderer::new().render_rust_ir(&ir)
 }
 
-/// The stub item the e2e scenarios render.
 #[must_use]
 pub fn stub_item() -> RustItem {
     RustItem::Function(RustFn {
@@ -132,22 +124,12 @@ pub fn stub_item() -> RustItem {
     })
 }
 
-/// Typed refusal from the Slice 9 e2e harness.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum E2eError {
-    /// Rulepack could not load.
     Rulepack(RulepackError),
-    /// Snapshot admission refused.
     Admit(AdmitError),
-    /// Emit / render refused.
     Port(PortError),
-    /// A scenario did not match its expected verdict class.
-    Unexpected {
-        /// Scenario name.
-        name: &'static str,
-        /// Debug form of the actual verification.
-        actual: String,
-    },
+    Unexpected { name: &'static str, actual: String },
 }
 
 impl fmt::Display for E2eError {
@@ -165,8 +147,6 @@ impl fmt::Display for E2eError {
 
 impl std::error::Error for E2eError {}
 
-/// Run the four six-axis receipt scenarios and refuse if any expectation misses.
-///
 /// # Errors
 /// [`E2eError`] on rulepack/admit/emit failure or unexpected verdict.
 pub fn run_six_axis_e2e() -> Result<SixAxisReport, E2eError> {
@@ -215,19 +195,19 @@ pub fn run_six_axis_e2e() -> Result<SixAxisReport, E2eError> {
 
     let scenarios = vec![
         ScenarioResult {
-            name: "unchanged",
+            name: UNCHANGED,
             verification: verify(&receipt_empty, &empty_a, &receipt_empty, &empty_b),
         },
         ScenarioResult {
-            name: "explained",
+            name: EXPLAINED,
             verification: verify(&receipt_empty, &empty_a, &receipt_syn, &rendered),
         },
         ScenarioResult {
-            name: "unexplained",
+            name: UNEXPLAINED,
             verification: verify(&receipt_empty, &empty_a, &receipt_empty, &rendered),
         },
         ScenarioResult {
-            name: "incomplete",
+            name: INCOMPLETE,
             verification: verify(&receipt_empty, &empty_a, &receipt_incomplete, &rendered),
         },
     ];
@@ -250,7 +230,7 @@ mod tests {
 
     #[test]
     fn six_axis_e2e_matches_expected_verdicts() {
-        let report = run_six_axis_e2e().expect("slice9 e2e must hold");
+        let report = run_six_axis_e2e().expect("the receipt e2e must hold");
         assert!(report.all_expected());
         assert_eq!(report.scenarios.len(), 4);
         assert!(!report.pin.is_empty());
@@ -267,5 +247,16 @@ mod tests {
         assert!(r.engine_digest.0.starts_with("sha256:"));
         assert!(r.rulepack_digest.0.starts_with("sha256:"));
         assert!(r.toolchain_digest.0.starts_with("sha256:"));
+    }
+
+    /// Every scenario the harness builds is one [`scenario_matches`] answers for.
+    ///
+    /// The `_ => false` arm turns an unanswered name into a silent failure rather than a loud one,
+    /// so the named constants are the only names allowed through.
+    #[test]
+    fn every_scenario_name_is_answered_for() {
+        let report = run_six_axis_e2e().expect("the receipt e2e must hold");
+        let names: Vec<&str> = report.scenarios.iter().map(|s| s.name).collect();
+        assert_eq!(names, vec![UNCHANGED, EXPLAINED, UNEXPLAINED, INCOMPLETE]);
     }
 }

@@ -26,8 +26,6 @@ use crate::receipt_codec::{emit_tree_digest, format_receipt, matches_golden};
 use crate::driver::report::PlanSmokeError;
 use crate::driver::report::RulepackModel;
 
-/// Load the fleet upstream pin (adapter boundary).
-///
 /// # Errors
 /// Propagates [`port_engine_source_pin::PinError`] from the pin loader.
 pub fn fleet_pin() -> Result<String, port_engine_source_pin::PinError> {
@@ -35,8 +33,6 @@ pub fn fleet_pin() -> Result<String, port_engine_source_pin::PinError> {
     Ok(receipt_pin(&pin))
 }
 
-/// Smoke the render seam with the Slice 3 empty renderer stub.
-///
 /// # Errors
 /// Propagates [`port_engine_api::PortError`] from [`port_engine_kernel::emit`].
 pub fn smoke_render_stub() -> Result<(), port_engine_api::PortError> {
@@ -46,7 +42,7 @@ pub fn smoke_render_stub() -> Result<(), port_engine_api::PortError> {
     Ok(())
 }
 
-/// Smoke the Slice 5 syn/quote typed emit path (not the fail-closed dyn Renderer).
+/// Smoke the syn/quote typed emit path (not the fail-closed dyn Renderer).
 ///
 /// # Errors
 /// Propagates [`port_engine_api::PortError`] from [`RustRenderer::render_rust_ir`].
@@ -74,13 +70,12 @@ pub fn smoke_syn_quote_render() -> Result<(), port_engine_api::PortError> {
     Ok(())
 }
 
-/// Hash UTF-8 text via the Slice 7 hashing adapter.
 #[must_use]
 pub fn smoke_digest(text: &str) -> Digest {
     digest_str(text)
 }
 
-/// Load embedded fixture-gated rulepack v0; return digest + selecting-fixture count.
+/// Load the embedded fixture-gated rulepack; return digest + selecting-fixture count.
 ///
 /// # Errors
 /// Propagates [`RulepackError`] from the rulepack loader.
@@ -100,8 +95,6 @@ pub fn smoke_plan() -> Result<usize, PlanSmokeError> {
     Ok(plan.steps.len())
 }
 
-/// Admit the hermetic OOB bootstrap snapshot fixture (Slice 8).
-///
 /// # Errors
 /// Propagates [`AdmitError`] from snapshot admission.
 pub fn smoke_admit_snapshot() -> Result<AdmittedSnapshot, AdmitError> {
@@ -109,9 +102,6 @@ pub fn smoke_admit_snapshot() -> Result<AdmittedSnapshot, AdmitError> {
 }
 
 /// Admit the v1 Go-corpus snapshot and summarise what each unit declares.
-///
-/// Returns `(unit_id, declaration_count)` in model order, plus the admitted snapshot, so the CLI
-/// can show that the engine is now reading a real declaration tree rather than bare unit ids.
 ///
 /// # Errors
 /// Propagates [`AdmitError`] — including the digest mismatch that a drift between the Go
@@ -129,13 +119,11 @@ pub fn smoke_declarations() -> Result<(AdmittedSnapshot, Vec<(String, usize)>), 
     Ok((admitted, summary))
 }
 
-/// Slice 9 engine identity digest.
 #[must_use]
 pub fn smoke_engine_digest() -> Digest {
     engine_digest()
 }
 
-/// Slice 9 dual-home toolchain corpus digest.
 #[must_use]
 pub fn smoke_toolchain_digest() -> Digest {
     toolchain_digest()

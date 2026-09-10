@@ -31,7 +31,6 @@ rust_binary(
     ],
 )
 
-# CLI dispatch: every command reachable, and usage on anything else.
 rust_test(
     name = "port-engine-app-cli",
     srcs = glob(["tests/cli.rs"]),
@@ -43,7 +42,6 @@ rust_test(
     ],
 )
 
-# Driver composition smoke: every seam reachable from the facade.
 rust_test(
     name = "port-engine-app-driver",
     srcs = glob(["tests/driver.rs"]),
@@ -102,8 +100,6 @@ rust_test(
     ],
 )
 
-# The two fences on the `engine_digest` axis: that the manifest is the whole engine, and that the
-# digest moves when the manifest does. Neither is worth anything without the other.
 rust_test(
     name = "port-engine-app-engine-digest",
     srcs = glob(["tests/engine_digest.rs"]),
@@ -117,8 +113,6 @@ rust_test(
     ],
 )
 
-# Re-porting a MOVED upstream: Green AND Explained, with exactly the snapshot axis. The property a
-# continuously maintained port rests on, and the one determinism alone does not cover.
 rust_test(
     name = "port-engine-app-port-go-upstream-drift",
     srcs = glob(["tests/port_go_upstream_drift.rs"]),
