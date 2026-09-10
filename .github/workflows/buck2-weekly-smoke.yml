@@ -174,9 +174,16 @@ jobs:
           # that one asks whether rustls can PARSE the key, this asks whether
           # the far end ACCEPTS the identity. It runs last because a connect
           # failure here is indistinguishable from a rejected identity.
+          #
+          # `-verify_return_error` is what makes this a check. Without it
+          # s_client completes the handshake and exits 0 whatever -CAfile says:
+          # measured against a live host, a randomly generated CA and the real
+          # one both return 0, so a stale OYATIE_CACHE_CA_CERT would pass here
+          # and kill the build at the rustls handshake instead.
           if ! echo | timeout 20 openssl s_client -connect "${CACHE_ENDPOINT}" \
                  -cert "${RUNNER_TEMP}/cache-creds/client.pem" \
-                 -CAfile "${RUNNER_TEMP}/cache-creds/ca.crt" >/dev/null 2>&1; then
+                 -CAfile "${RUNNER_TEMP}/cache-creds/ca.crt" \
+                 -verify_return_error >/dev/null 2>&1; then
             echo "the cache did not accept this client certificate; building without the cache"
             echo "wired=no" >> "$GITHUB_OUTPUT"
             exit 0
