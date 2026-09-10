@@ -168,3 +168,7 @@ fn identifier(text: &str) -> Option<String> {
     let starts_alpha = name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_');
     (starts_alpha && !name.is_empty()).then_some(name)
 }
+
+#[cfg(test)]
+#[path = "port_implementation_tests.rs"]
+mod tests;

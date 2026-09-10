@@ -4,8 +4,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use pipeline_admission::{
-    ChangedSource, cargo_manifest_violations, changed_layout_violations, file_budget_violations,
-    git_change_paths_from_name_status_z, layout_violations, port_implementation_violations,
+    cargo_manifest_violations, changed_layout_violations, file_budget_violations,
+    git_change_paths_from_name_status_z, layout_violations,
 };
 
 fn repo_root() -> PathBuf {
@@ -209,15 +209,6 @@ fn emitted_admission_diagnostics_are_semantic() {
     assert!(manifest.contains("required integration-test discovery"));
     assert!(manifest.contains("stable item-scanner `build.rs`"));
     assert_semantic("manifest diagnostic", &manifest);
-
-    let port = port_implementation_violations(&[ChangedSource {
-        path: "cell/ports/placement/src/store.rs",
-        head: b"pub trait CellStore {}\n",
-        base: None,
-    }])
-    .join("\n");
-    assert!(port.contains("port `CellStore` is defined without an implementation"));
-    assert_semantic("port-implementation diagnostic", &port);
 
     let change =
         git_change_paths_from_name_status_z(b"A\0app/ledger/OWNERS\0A\0app/ledger/README.md\0")

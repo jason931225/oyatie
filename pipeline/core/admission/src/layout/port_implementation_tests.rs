@@ -3,7 +3,7 @@
 //! Every fixture is a single-line literal, so no line of this file begins with
 //! a `trait` item and the file cannot trip the rule it pins.
 
-use pipeline_admission::{ChangedSource, port_implementation_violations};
+use super::*;
 
 const PORT: &str = "cell/ports/placement/src/store.rs";
 const ADAPTER: &str = "cell/adapters/postgres/src/lib.rs";
@@ -143,5 +143,15 @@ fn only_rust_sources_are_read() {
             "pub trait CellStore {}\n"
         )])
         .is_empty()
+    );
+}
+
+#[test]
+fn the_refusal_names_no_decision_identifier() {
+    let refused = refusals(&[added(PORT, "pub trait CellStore {}\n")]).join("\n");
+    assert!(!refused.is_empty(), "no refusal to inspect");
+    assert!(
+        !refused.contains("ADR-") && !refused.contains("D-"),
+        "{refused}"
     );
 }
