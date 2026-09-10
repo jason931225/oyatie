@@ -63,10 +63,10 @@ pub(super) const GRANDFATHERED: &[(&str, &str)] = &[
 ];
 
 /// Silent primitives that already stood inside a classified struct, as
-/// `(path, "Struct.field")`. Four of the five files holding these are past the
-/// 300-line file budget, so touching one to add the missing class costs the
-/// lane a budget refusal: these are real holes that no lane can currently
-/// close, recorded here so the live set stays empty and a NEW hole is refused.
+/// `(path, "Struct.field")`. Every one outside `cell/core/regional-pack` sits
+/// in a file past the 300-line budget, so touching it to add the missing class
+/// costs the lane a budget refusal. Recorded here so the live set stays empty
+/// and a NEW hole is refused.
 pub(super) const GRANDFATHERED_HOLES: &[(&str, &str)] = &[
     (
         "app/application/facade/application-app/src/lib.rs",
@@ -103,6 +103,10 @@ pub(super) const GRANDFATHERED_HOLES: &[(&str, &str)] = &[
     (
         "intelligence/core/capability-domain/src/lib.rs",
         "Capability.id",
+    ),
+    (
+        "intelligence/core/evidence-domain/src/lib.rs",
+        "EvidenceHashInput.timestamp_epoch_seconds",
     ),
     (
         "intelligence/core/mcp-gateway-domain/src/lib.rs",

@@ -15,7 +15,7 @@ fn holes(text: &str) -> Vec<String> {
 }
 
 #[test]
-fn a_tenth_parallel_definition_is_refused_outside_the_canonical_crate() {
+fn a_new_parallel_definition_is_refused_outside_the_canonical_crate() {
     let refusals = home(OUTSIDE, "pub enum RouteDataClass {\n    Public,\n}\n");
     assert_eq!(refusals.len(), 1, "{refusals:?}");
     let refusal = &refusals[0];
@@ -200,4 +200,52 @@ fn a_new_hole_in_a_file_that_already_has_one_is_still_refused() {
         "{}",
         refusals[0]
     );
+}
+
+#[test]
+fn a_neighbours_annotation_does_not_vouch_for_the_field_below_it() {
+    let text = "pub struct Row {\n    pub id: Classified<String>,\n    \
+                pub action: Action, // data_class: INTERNAL_ONLY\n    pub email: String,\n}\n";
+    let refusals = holes(text);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(refusals[0].contains("Row.email"), "{}", refusals[0]);
+}
+
+#[test]
+fn a_declaration_outside_a_comment_is_not_an_annotation() {
+    let text =
+        "pub struct Row {\n    pub id: Classified<String>,\n    pub data_class: String,\n}\n";
+    let refusals = holes(text);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(refusals[0].contains("Row.data_class"), "{}", refusals[0]);
+}
+
+#[test]
+fn a_generic_struct_head_does_not_hide_its_fields() {
+    for head in [
+        "pub struct Row<T> {",
+        "pub struct Row<'a> {",
+        "pub struct Row<'a, T: Debug> {",
+    ] {
+        let text = format!("{head}\n    pub id: Classified<String>,\n    pub email: String,\n}}\n");
+        let refusals = holes(&text);
+        assert_eq!(refusals.len(), 1, "{head}: {refusals:?}");
+        assert!(refusals[0].contains("Row.email"), "{head}: {}", refusals[0]);
+    }
+}
+
+#[test]
+fn a_struct_nested_in_a_module_ends_at_its_own_brace() {
+    let siblings = "mod m {\n    pub struct A {\n        pub id: Classified<String>,\n    }\n    \
+                    pub struct B {\n        pub email: String,\n    }\n}\n";
+    assert!(
+        holes(siblings).is_empty(),
+        "a silent sibling must not be read as a field of the classified struct above it: {:?}",
+        holes(siblings)
+    );
+    let nested = "mod m {\n    pub struct A {\n        pub id: Classified<String>,\n        \
+                  pub email: String,\n    }\n}\n";
+    let refusals = holes(nested);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(refusals[0].contains("A.email"), "{}", refusals[0]);
 }

@@ -11,10 +11,10 @@ use known::{CANONICAL_CRATE, GRANDFATHERED, GRANDFATHERED_HOLES};
 
 /// Refuse a NEW `DataClass`-shaped enum declared outside the canonical crate.
 ///
-/// Nine such enums already exist and each one is a chance for a centrally
-/// added variant to go missing locally. A narrower set is legitimate, but it
-/// has to be expressed in terms of the canonical vocabulary rather than
-/// retyped beside it, so the tenth parallel definition is refused here.
+/// Every parallel definition is a chance for a centrally added variant to go
+/// missing locally. A narrower set is legitimate, but it has to be expressed
+/// in terms of the canonical vocabulary rather than retyped beside it, so the
+/// next parallel definition is refused here.
 pub fn data_class_home_violations(path: &str, contents: &[u8]) -> Vec<String> {
     if !path.ends_with(".rs") || path.starts_with(CANONICAL_CRATE) {
         return Vec::new();
@@ -98,7 +98,7 @@ pub fn unclassified_field_violations(path: &str, contents: &[u8]) -> Vec<String>
             continue;
         };
         let end = (index + 1..lines.len())
-            .find(|line| lines[*line].starts_with('}'))
+            .find(|line| lines[*line].trim_start().starts_with('}'))
             .unwrap_or(lines.len());
         report_holes(
             &mut violations,
@@ -146,23 +146,29 @@ fn report_holes(
     );
 }
 
-/// A declaration is accepted trailing the field or on the line above it.
-/// Deleting a doc comment re-pads the trailing-comment column under rustfmt,
+/// A declaration is accepted trailing the field, or on a comment line above
+/// it. Deleting a doc comment re-pads the trailing-comment column under rustfmt,
 /// so an annotation legitimately moves between the two forms without anything
 /// being lost; a rule that only saw one of them would call that a deletion.
 fn annotated(body: &[&str], index: usize) -> bool {
-    [Some(index), index.checked_sub(1)]
-        .into_iter()
-        .flatten()
-        .filter_map(|index| body.get(index))
-        .any(|line| line.contains("data_class:"))
+    let declares = |line: &&&str| {
+        line.split_once("//")
+            .is_some_and(|(_, comment)| comment.contains("data_class:"))
+    };
+    body.get(index).filter(declares).is_some()
+        || index
+            .checked_sub(1)
+            .and_then(|above| body.get(above))
+            .filter(|line| line.trim_start().starts_with("//"))
+            .filter(declares)
+            .is_some()
 }
 
 fn struct_head(line: &str) -> Option<&str> {
     let head = strip_visibility(line.trim_start())
         .strip_prefix("struct ")?
         .trim();
-    let name = head.strip_suffix('{')?.trim_end();
+    let name = head.split(['<', ' ', '{']).next()?;
     is_identifier(name).then_some(name)
 }
 
