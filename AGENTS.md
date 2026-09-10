@@ -222,8 +222,11 @@ configuration asserting so are correct rather than stale.
 
 The cache substrate exists. A NativeLink CAS serves
 `grpcs://cache.oyatie.dev:50051`, verified from a GitHub-hosted runner as well
-as locally: mTLS enforced, SHA256 and BLAKE3, and Remote Execution API v2.0
-through v2.3.
+as locally: the server requests a client certificate and completes a handshake
+with one, SHA256 and BLAKE3, and Remote Execution API v2.0 through v2.3.
+Whether an anonymous RPC is REFUSED is not among those measurements --
+`cache-check` says so itself -- so "mTLS is enforced" is not a claim this
+substrate has earned.
 
 Separately, and configured rather than verified: the substrate sets the action
 cache read-only on the serving instance. No refused write has been observed,
@@ -231,15 +234,27 @@ because no client has attempted one. Read-only is deliberate -- a CAS entry is
 content-addressed and hash-verified, so a write can only insert the bytes its
 digest names, but an action-cache entry maps an action digest to an arbitrary
 result, and one unauthenticated write is arbitrary code execution in every
-consumer. Two configurations exist and only one is deployed: this repository's
-own NativeLink chart does not set `read_only`, enforcing the same split at the
-proxy by client identity instead.
+consumer.
+
+Two NativeLink configurations exist, they protect different things, and only
+the substrate's is deployed. The substrate refuses every action-cache write
+from every identity, and has no reader/writer split: that split needs two CAs
+rather than two certificates, because one CA signing both makes them
+indistinguishable to `client_ca_file`, which is hygiene rather than
+enforcement. This repository's chart is the inverse. It leaves `read_only`
+unset, and its proxy does have a reader/writer split -- one that LICENSES
+`ActionCache/UpdateActionResult` to the writer identity, a write the chart's
+own qualification suite requires to succeed. So the chart does not carry the
+deployed protection; deploying it yields a writable action cache, which the
+paragraph above describes as arbitrary code execution in every consumer.
 
 In the substrate repository, `./substrate cache-creds` mints a client
 certificate and `./substrate cache-check` reports whether the endpoint answers
 a TLS client that is not buck2. It probes with openssl, which accepts a SEC1
 key that rustls refuses, so it can report a usable endpoint for a credential
-that fails every build.
+that fails every build. The substrate emits PKCS8 at the source now, so the
+residual hazard is a key file minted before that fix, not a freshly issued
+credential.
 
 What is recorded above is authority, not present readiness. At the time of
 writing the buck2 graph does not build cleanly, a cold build measures around
