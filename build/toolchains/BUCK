@@ -1,5 +1,6 @@
 load(":rust.bzl", "hermetic_rust_toolchain", "rust_distribution")
-load("@prelude//toolchains:cxx.bzl", "system_cxx_toolchain")
+load(":cxx.bzl", "clang_distribution", "clang_tools")
+load("@prelude//toolchains:cxx.bzl", "cxx_tools_info_toolchain")
 load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
 load("@prelude//toolchains:remote_test_execution.bzl", "remote_test_execution_toolchain")
@@ -21,17 +22,30 @@ hermetic_rust_toolchain(
     visibility = ["PUBLIC"],
 )
 
-# Absolute Unix compiler paths keep the prelude build-script cc-shim independent of PATH on
-# Darwin/Linux. Windows must retain the prelude MSVC defaults; overriding them with Unix paths
-# makes every Rust target that links a C build script fail before its tests can run.
+# The C compiler, its resource headers and llvm-ar are a hash-pinned download, not paths on
+# the machine, so they are real inputs to every cxx compile, every link of a rust_test or
+# rust_binary, and every cc-rs build script. `system_cxx_toolchain` cannot express that: its
+# tool attrs are strings. `cxx_tools_info_toolchain` runs the same prelude body against a
+# CxxToolsInfo dep, so this swap changes which binaries are invoked and nothing else.
+#
+# Windows keeps the prelude MSVC tools it had before; there is no pinned clang for it.
+clang_distribution(
+    name = "clang_distribution",
+)
+
+clang_tools(
+    name = "clang_tools",
+    distribution = ":clang_distribution",
+)
+
 CXX_TOOLCHAIN_CONFIG = {
-    "compiler": None if host_info().os.is_windows else "/usr/bin/clang",
-    "compiler_type": None if host_info().os.is_windows else "clang",
-    "linker": None if host_info().os.is_windows else "/usr/bin/clang",
-    "archiver": None if host_info().os.is_windows else "/usr/bin/ar",
+    "cxx_tools_info": select({
+        "DEFAULT": ":clang_tools",
+        "prelude//os:windows": "prelude//toolchains/msvc:msvc_tools",
+    }),
 }
 
-system_cxx_toolchain(
+cxx_tools_info_toolchain(
     name = "cxx",
     visibility = ["PUBLIC"],
     **CXX_TOOLCHAIN_CONFIG
@@ -42,7 +56,7 @@ system_cxx_toolchain(
 # The config//:none branch is NEVER selected, but buck2 within-view/query validation
 # requires the target to EXIST — without it, `//...` graph traversal (deps/rdeps, hence
 # the affected-gate query) fails with "Unknown target cxx_no_default_deps". Mirror :cxx.
-system_cxx_toolchain(
+cxx_tools_info_toolchain(
     name = "cxx_no_default_deps",
     visibility = ["PUBLIC"],
     **CXX_TOOLCHAIN_CONFIG
