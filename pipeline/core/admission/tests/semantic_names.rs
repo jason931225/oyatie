@@ -143,7 +143,7 @@ fn real_reindeer_qualification_is_pinned_offline_and_fail_closed() {
         "      - uses: dtolnay/rust-toolchain@21dc36fb71dd22e3317045c0c31a3f4249868b17\n",
         "        with: { toolchain: \"nightly-2026-05-22\", components: \"clippy\" }\n",
         "      - uses: dtolnay/rust-toolchain@21dc36fb71dd22e3317045c0c31a3f4249868b17\n",
-        "        with: { toolchain: \"1.98.0\" }",
+        "        with: { toolchain: ",
     );
 
     assert_eq!(

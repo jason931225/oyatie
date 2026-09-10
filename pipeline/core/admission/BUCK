@@ -142,6 +142,18 @@ rust_test(
 )
 
 rust_test(
+    name = "pipeline-admission-execution-toolchain-single-source",
+    srcs = ["tests/execution_toolchain_single_source.rs"],
+    crate = "pipeline_admission_execution_toolchain_single_source",
+    crate_root = "tests/execution_toolchain_single_source.rs",
+    env = _CARGO_ENV,
+    visibility = ["PUBLIC"],
+    deps = [
+        ":pipeline-admission",
+    ],
+)
+
+rust_test(
     name = "pipeline-admission-frozen-markdown",
     srcs = ["tests/frozen_markdown.rs"],
     crate = "pipeline_admission_frozen_markdown",

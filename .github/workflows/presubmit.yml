@@ -193,7 +193,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ runner.temp }}/reindeer-qualification
-          key: reindeer-qualification-v1-${{ runner.os }}-rust-1.98.0-${{ github.sha }}-d4644db6bee4fce06425c6802dfc5b3c2d2a12ba93ea3d635e076700bc34d614-${{ hashFiles('Cargo.lock', 'reindeer-source/Cargo.lock') }}
+          key: reindeer-qualification-v1-${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}-d4644db6bee4fce06425c6802dfc5b3c2d2a12ba93ea3d635e076700bc34d614-${{ hashFiles('Cargo.lock', 'reindeer-source/Cargo.lock') }}
       - name: Acquire locked Cargo inputs
         env:
           CARGO_HOME: ${{ runner.temp }}/reindeer-qualification/cargo-home
