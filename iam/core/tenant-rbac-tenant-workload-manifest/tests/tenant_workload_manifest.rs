@@ -82,9 +82,8 @@ fn fd001_tenant_workload_manifest_preserves_per_workload_isolation_refs() {
             && workload.residency_region == manifest.residency_region
             && workload.tenant_claim == "tenant_id"
             && workload.otel_service_namespace == "fd001-tenant-rbac"
-            // `crates/` is the pre-ADR-0562 layout; a crate absorbed into
-            // app/<product>/<face>/ carries the face path instead. Both are
-            // legitimate while the reorg is mid-flight.
+            // Two prefixes because the reorg is mid-flight: `crates/` is the
+            // old layout and `app/` the absorbed one. Both are legitimate.
             && (workload.runtime_package_ref.starts_with("crates/")
                 || workload.runtime_package_ref.starts_with("app/"))
             && workload

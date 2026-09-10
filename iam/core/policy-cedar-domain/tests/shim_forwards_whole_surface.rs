@@ -1,12 +1,9 @@
 //! The shim must be a complete stand-in, not a convenience subset.
 //!
-//! Consumers reach this crate only through the glob re-export in `src/lib.rs`.
-//! Today they happen to name root items only, so a shim that forwarded just
-//! those would compile and look correct — and would silently deny a later
-//! consumer the module paths the crate has always exposed. That failure would
-//! surface as "the crate lost `rebac`" long after this move, so it is pinned
-//! here instead: every module and a representative of every kind of item is
-//! named through the shim path.
+//! Today's consumers happen to name root items only, so a shim narrowed to
+//! those would compile and look correct while silently withholding module paths
+//! the crate has always exposed. Naming one item of every kind here turns that
+//! into a compile error now instead of a "the crate lost `rebac`" report later.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -40,15 +37,13 @@ fn every_module_is_reachable_through_the_shim() {
     .expect("a non-empty union is valid");
     rewrite.validate().expect("the rewrite tree validates");
 
-    // `authz_engine` is the module most at risk: it was a public module path
-    // before the move, so a shim narrowed to root items would break a consumer
-    // that never named anything else.
+    // `authz_engine` is the module most at risk: it was a public path before
+    // the move, so a root-only shim would break a consumer naming nothing else.
     let _ = std::mem::size_of::<AuthzRequest>();
     let _ = std::mem::size_of::<AuthzDecision>();
     let _ = std::mem::size_of::<EvalLogFilter>();
     let _ = PrincipalType::User;
 
-    // Named so a narrowed shim fails to compile rather than fails a run.
     let _ = std::mem::size_of::<RebacObjectRef>();
     let _ = std::mem::size_of::<RebacSubjectRef>();
     let _ = std::mem::size_of::<SnapshotToken>();

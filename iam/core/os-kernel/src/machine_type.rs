@@ -4,24 +4,18 @@ use crate::error::{Error, Result};
 use alloc::string::String;
 use core::fmt;
 
-/// The role a Talos node plays in a cluster.
-///
-/// Mirrors `siderolabs/talos` `machine.Type`. `Init` is a legacy/bootstrap
-/// control-plane variant kept for compatibility.
+/// The role a node plays in a cluster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MachineType {
-    /// Bootstrap control-plane node (legacy `init` type).
+    /// Legacy bootstrap control plane, kept only for compatibility.
     Init,
-    /// A control-plane node running the Kubernetes control plane components.
     ControlPlane,
-    /// A worker node running workloads only.
     Worker,
-    /// Type could not be determined.
     Unknown,
 }
 
 impl MachineType {
-    /// Numeric wire value matching the Talos protobuf enum ordering.
+    /// Fixed by the Talos protobuf enum ordering; renumbering breaks the wire.
     pub fn as_i32(self) -> i32 {
         match self {
             MachineType::Unknown => 0,
@@ -31,7 +25,6 @@ impl MachineType {
         }
     }
 
-    /// Build a [`MachineType`] from its numeric wire value.
     pub fn from_i32(v: i32) -> Result<Self> {
         match v {
             0 => Ok(MachineType::Unknown),
@@ -42,7 +35,6 @@ impl MachineType {
         }
     }
 
-    /// Canonical lowercase string form used in machine configs.
     pub fn as_str(self) -> &'static str {
         match self {
             MachineType::Init => "init",
@@ -52,8 +44,6 @@ impl MachineType {
         }
     }
 
-    /// True if this node participates in the control plane (`init` or
-    /// `controlplane`).
     pub fn is_control_plane(self) -> bool {
         matches!(self, MachineType::Init | MachineType::ControlPlane)
     }
@@ -69,7 +59,9 @@ impl core::str::FromStr for MachineType {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        // Accept a couple of common aliases used historically in Talos configs.
+        // Where an arm carries two spellings the second is a historical Talos
+        // config alias. Blank input is not an alias but a default to `Unknown`,
+        // which `NodeIdentity::validate` then refuses.
         let normalized: String = s.trim().to_ascii_lowercase();
         match normalized.as_str() {
             "init" => Ok(MachineType::Init),
@@ -117,6 +109,12 @@ mod tests {
             MachineType::Worker
         );
         assert!(MachineType::from_str("nonsense").is_err());
+    }
+
+    #[test]
+    fn blank_input_defaults_to_unknown() {
+        assert_eq!(MachineType::from_str("").unwrap(), MachineType::Unknown);
+        assert_eq!(MachineType::from_str("   ").unwrap(), MachineType::Unknown);
     }
 
     #[test]

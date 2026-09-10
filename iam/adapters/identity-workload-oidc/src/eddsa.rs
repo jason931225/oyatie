@@ -1,12 +1,5 @@
-//! EdDSA/Ed25519 (RFC 8037) signing harness and deterministic tests.
-//!
-//! This module is **test-only** (`#[cfg(test)]`). It mirrors the ES256 signing
-//! harness in `lib.rs` but for OKP/Ed25519 keys: generates a fresh
-//! `Ed25519KeyPair` via `aws-lc-rs`, signs a compact JWS, and validates it
-//! through the full `validate_workload_token` pipeline.
-//!
-//! The harness is deterministic in the sense that each test generates its own
-//! ephemeral key pair — no shared mutable state, no ambient clock reads.
+//! EdDSA/Ed25519 (RFC 8037) signing harness. Each test mints its own ephemeral
+//! key pair, so no state is shared between them and no clock is read.
 
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
 use base64::Engine as _;
@@ -18,15 +11,19 @@ fn b64url(bytes: &[u8]) -> String {
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
-/// Mint a genuine EdDSA/Ed25519 JWS for `claims_json`.
-///
-/// Returns the compact token string and the matching [`Jwk`] to publish in
-/// the JWKS. The key pair is freshly generated for each call.
+/// The raw Edwards point an Ed25519 public key encodes to (RFC 8032 §5.1.5).
+pub(crate) const ED25519_PUBLIC_KEY_LEN: usize = 32;
+
+/// Returns the compact token plus the [`Jwk`] to publish for it, under a key
+/// pair freshly generated for this call.
 pub(crate) fn mint_ed25519_token(claims_json: &str, kid: &str) -> (String, Jwk) {
     let key_pair = Ed25519KeyPair::generate().expect("Ed25519 key generation");
-    // The public key is the raw 32-byte Edwards point.
     let pub_bytes = key_pair.public_key().as_ref();
-    assert_eq!(pub_bytes.len(), 32, "Ed25519 public key must be 32 bytes");
+    assert_eq!(
+        pub_bytes.len(),
+        ED25519_PUBLIC_KEY_LEN,
+        "Ed25519 public key must be {ED25519_PUBLIC_KEY_LEN} bytes"
+    );
 
     let header = format!(r#"{{"alg":"EdDSA","typ":"JWT","kid":"{kid}"}}"#);
     let signing_input = format!(
@@ -34,7 +31,7 @@ pub(crate) fn mint_ed25519_token(claims_json: &str, kid: &str) -> (String, Jwk) 
         b64url(header.as_bytes()),
         b64url(claims_json.as_bytes())
     );
-    // Ed25519KeyPair::sign takes no rng — deterministic signing per RFC 8032.
+    // No rng argument: Ed25519 signing is deterministic (RFC 8032).
     let sig = key_pair.sign(signing_input.as_bytes());
     let token = format!("{signing_input}.{}", b64url(sig.as_ref()));
 
@@ -81,7 +78,8 @@ fn tampered_ed25519_payload_fails_signature() {
     let (token, jwk) = mint_ed25519_token(&valid_claims(now), "kid-ed-1");
     let jwks = Jwks::new().add_key(jwk);
 
-    // Forge the payload segment (escalate scope).
+    // Forge the payload to escalate scope, leaving the signature over the
+    // original bytes.
     let mut parts: Vec<&str> = token.split('.').collect();
     let forged_payload = b64url(valid_claims(now).replace("decrypt", "ADMIN").as_bytes());
     parts[1] = &forged_payload;
@@ -99,9 +97,8 @@ fn eddsa_against_rsa_kid_is_algorithm_mismatch() {
     let now: i64 = 1_700_000_000;
     let (token, _okp_jwk) = mint_ed25519_token(&valid_claims(now), "kid-ed-1");
 
-    // RSA JWK under the same kid: family mismatch should fire.
-    // Use small (clearly synthetic) n/e values; the mismatch is caught before
-    // any signature verification.
+    // The n/e values are synthetic and need not be a real RSA key: the family
+    // mismatch is caught before any signature verification runs.
     let rsa_jwk = Jwk::rsa("kid-ed-1", "AAAA", "AQAB");
     let jwks = Jwks::new().add_key(rsa_jwk);
 
@@ -117,7 +114,6 @@ fn eddsa_against_ec_kid_is_algorithm_mismatch() {
     let now: i64 = 1_700_000_000;
     let (token, _okp_jwk) = mint_ed25519_token(&valid_claims(now), "kid-ed-1");
 
-    // EC P-256 JWK under the same kid.
     let ec_jwk = Jwk::ec_p256("kid-ed-1", "AAAA", "BBBB");
     let jwks = Jwks::new().add_key(ec_jwk);
 
@@ -128,13 +124,11 @@ fn eddsa_against_ec_kid_is_algorithm_mismatch() {
 
 #[test]
 fn rsa_token_against_okp_kid_is_algorithm_mismatch() {
-    // An RS256 header token presented against an OKP JWK must be refused.
     use aws_lc_rs::rand::SystemRandom;
     use aws_lc_rs::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair as _};
 
     let now: i64 = 1_700_000_000;
 
-    // Mint a genuine ES256 token (not RS256, but non-OKP family is the point).
     let rng = SystemRandom::new();
     let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
         .expect("generate pkcs8");
@@ -150,7 +144,6 @@ fn rsa_token_against_okp_kid_is_algorithm_mismatch() {
     let sig = ec_key.sign(&rng, signing_input.as_bytes()).expect("sign");
     let token = format!("{signing_input}.{}", b64url(sig.as_ref()));
 
-    // But present an OKP JWK for that kid.
     let key_pair = Ed25519KeyPair::generate().expect("Ed25519 generate");
     let okp_jwk = Jwk::okp_ed25519("kid-ed-1", b64url(key_pair.public_key().as_ref()));
     let jwks = Jwks::new().add_key(okp_jwk);
@@ -165,7 +158,6 @@ fn ed25519_alg_pin_mismatch_is_rejected() {
     let now: i64 = 1_700_000_000;
     let (token, jwk) = mint_ed25519_token(&valid_claims(now), "kid-ed-1");
 
-    // Pin the JWK to RS256 — the EdDSA token must be refused.
     let pinned = jwk.with_alg("RS256");
     let jwks = Jwks::new().add_key(pinned);
 
@@ -179,7 +171,6 @@ fn ed25519_alg_pin_match_is_accepted() {
     let now: i64 = 1_700_000_000;
     let (token, jwk) = mint_ed25519_token(&valid_claims(now), "kid-ed-1");
 
-    // Pinning the JWK to the exact alg that the token also uses must succeed.
     let pinned = jwk.with_alg("EdDSA");
     let jwks = Jwks::new().add_key(pinned);
 
@@ -188,12 +179,10 @@ fn ed25519_alg_pin_match_is_accepted() {
 
 #[test]
 fn malformed_okp_x_coord_is_rejected() {
-    // A JWK whose x is not 32 bytes must be refused as MalformedKey.
     let now: i64 = 1_700_000_000;
     let (token, _jwk) = mint_ed25519_token(&valid_claims(now), "kid-ed-1");
 
-    // Provide a JWK with only 16 bytes of x (invalid — must be 32).
-    let short_x = b64url(&[0u8; 16]);
+    let short_x = b64url(&[0u8; ED25519_PUBLIC_KEY_LEN / 2]);
     let bad_jwk = Jwk::okp_ed25519("kid-ed-1", short_x);
     let jwks = Jwks::new().add_key(bad_jwk);
 

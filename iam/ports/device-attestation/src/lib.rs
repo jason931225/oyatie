@@ -1,12 +1,13 @@
-//! Device/workload attestation port (ADR-0719). Feeds Cedar context.
+//! Device and workload attestation port, feeding Cedar context (ADR-0719).
 //!
-//! Not a browser. Closed adapters: passkey, MDM, Chrome Enterprise, SPIFFE
-//! workload. Verify fails closed until an adapter is wired.
+//! Every implementation must fail closed: until a real adapter is wired,
+//! [`UnwiredAttestation`] refuses rather than returning a trusted context.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-/// Closed attestation kinds. Deleting a variant without a five-field ADR is born-blocking.
+/// Closed set: removing a variant needs a recorded decision, because an adapter
+/// keyed on it stops being reachable rather than failing to compile.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AttestationKind {
     Passkey,
