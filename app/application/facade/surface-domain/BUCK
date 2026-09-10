@@ -5,7 +5,7 @@ rust_library(
     crate_root = "src/lib.rs",
     visibility = ["PUBLIC"],
     deps = [
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
     ],
 )
 
@@ -16,6 +16,6 @@ rust_test(
     crate_root = "src/lib.rs",
     visibility = ["PUBLIC"],
     deps = [
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
     ],
 )

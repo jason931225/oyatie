@@ -6,7 +6,7 @@ rust_library(
     visibility = ["PUBLIC"],
     deps = [
         "//iam/core/identity-oidc-issuer-kernel:iam-identity-oidc-issuer-kernel",
-        "//libs/shared-scim-server-kernel:shared-scim-server-kernel",
+        "//iam/core/scim-server-kernel:shared-scim-server-kernel",
         "//iam/ports/identity-workload-api:iam-identity-workload-api",
         "//iam/facade/identity-workload-app:iam-identity-workload-app",
         "//iam/adapters/identity-workload-authz-cedar:iam-identity-workload-authz-cedar",
@@ -47,7 +47,7 @@ rust_test(
     visibility = ["PUBLIC"],
     deps = [
         "//iam/core/identity-oidc-issuer-kernel:iam-identity-oidc-issuer-kernel",
-        "//libs/shared-scim-server-kernel:shared-scim-server-kernel",
+        "//iam/core/scim-server-kernel:shared-scim-server-kernel",
         "//iam/ports/identity-workload-api:iam-identity-workload-api",
         "//iam/facade/identity-workload-app:iam-identity-workload-app",
         "//iam/adapters/identity-workload-authz-cedar:iam-identity-workload-authz-cedar",

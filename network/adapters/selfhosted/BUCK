@@ -7,7 +7,7 @@ rust_library(
     deps = [
         "//network/core/domain:network-domain",
         "//network/core/residency:network-residency",
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
     ],
 )
 
@@ -20,6 +20,6 @@ rust_test(
     deps = [
         "//network/core/domain:network-domain",
         "//network/core/residency:network-residency",
-        "//libs/data-boundary-kernel:data-boundary-kernel",
+        "//data/core/data-boundary-kernel:data-boundary-kernel",
     ],
 )
