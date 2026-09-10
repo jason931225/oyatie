@@ -18,10 +18,12 @@ use seams::{
     cmd_pin, cmd_plan, cmd_ready, cmd_rulepack, cmd_toolchain,
 };
 
-/// Every command [`run`] dispatches, in usage order.
+/// Every command [`run`] dispatches, in usage order, one entry per command. `help` is also
+/// reachable as `-h` and `--help`; those are argv spellings, not commands of their own.
 ///
-/// The usage text below is prose around this list rather than a second copy of it;
-/// `usage_lists_exactly_the_dispatchable_commands` holds the two together.
+/// Neither the usage text below nor the dispatch is a second copy of this list:
+/// `usage_documents_exactly_the_listed_commands` holds the usage text against it, and
+/// `dispatch_arm_lines_agree_with_the_command_list` holds the `match` arm lines.
 pub(crate) const COMMANDS: &[&str] = &[
     "help",
     "ready",
@@ -149,12 +151,65 @@ mod tests {
             .collect()
     }
 
+    /// The tokens [`run`]'s `match` accepts, read back out of this file's own source.
+    ///
+    /// Reading the dispatch is the whole point: a list checked against another list agrees with
+    /// whatever both were written to say, and an arm added to `run` alone is what nothing else
+    /// here can see.
+    ///
+    /// The unit is a line carrying `=>` between `match cmd {` and the fallback arm. Everything
+    /// left of the `=>` and outside the quotes must be whitespace or `|`, so a `const`, a guard
+    /// or a `_` written on such a line yields that text in place of tokens and the comparison
+    /// names it.
+    ///
+    /// Known escapes, not claimed closed: a pattern wrapped onto a line of its own carries no
+    /// `=>` and is skipped, and a dispatch outside the `match`, before it or after it, never
+    /// enters the window. Both survive `cargo fmt`. Nothing here says the list is complete.
+    fn dispatched() -> Vec<&'static str> {
+        include_str!("mod.rs")
+            .lines()
+            .skip_while(|line| !line.contains("match cmd {"))
+            .take_while(|line| !line.contains("other =>"))
+            .filter(|line| line.contains("=>"))
+            .filter_map(|line| line.split("=>").next())
+            .flat_map(|arm| {
+                let literals: Vec<&str> = arm.split('"').skip(1).step_by(2).collect();
+                let outside_the_quotes_is_bare = arm
+                    .split('"')
+                    .step_by(2)
+                    .all(|gap| gap.chars().all(|c| c.is_whitespace() || c == '|'));
+                if outside_the_quotes_is_bare {
+                    literals
+                } else {
+                    vec![arm.trim()]
+                }
+            })
+            .collect()
+    }
+
     #[test]
-    fn usage_lists_exactly_the_dispatchable_commands() {
+    fn usage_documents_exactly_the_listed_commands() {
         assert_eq!(
             documented(),
             COMMANDS.to_vec(),
             "the usage text and the command list must not drift apart"
+        );
+    }
+
+    #[test]
+    fn dispatch_arm_lines_agree_with_the_command_list() {
+        let expected: Vec<&str> = COMMANDS
+            .iter()
+            .flat_map(|cmd| match *cmd {
+                "help" => vec!["help", "-h", "--help"],
+                other => vec![other],
+            })
+            .collect();
+        assert_eq!(
+            dispatched(),
+            expected,
+            "a dispatch arm line carries a command COMMANDS does not, or COMMANDS carries one no \
+             arm line does"
         );
     }
 }

@@ -249,14 +249,18 @@ mod tests {
         assert!(r.toolchain_digest.0.starts_with("sha256:"));
     }
 
-    /// Every scenario the harness builds is one [`scenario_matches`] answers for.
+    /// The scenarios the harness runs, in order, under the spellings it reports them by.
     ///
-    /// The `_ => false` arm turns an unanswered name into a silent failure rather than a loud one,
-    /// so the named constants are the only names allowed through.
+    /// The literals are the oracle: comparing the collected names against the constants they were
+    /// built from would hold for any value those constants took. `ScenarioResult::name` is public
+    /// and is what `verify-e2e` prints, so a respelled constant is an operator-visible change.
     #[test]
-    fn every_scenario_name_is_answered_for() {
+    fn scenarios_run_in_a_fixed_order_under_fixed_names() {
         let report = run_six_axis_e2e().expect("the receipt e2e must hold");
         let names: Vec<&str> = report.scenarios.iter().map(|s| s.name).collect();
-        assert_eq!(names, vec![UNCHANGED, EXPLAINED, UNEXPLAINED, INCOMPLETE]);
+        assert_eq!(
+            names,
+            vec!["unchanged", "explained", "unexplained", "incomplete"]
+        );
     }
 }

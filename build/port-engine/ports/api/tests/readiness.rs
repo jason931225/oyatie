@@ -98,6 +98,34 @@ fn a_filled_receipt_has_no_incomplete_axes() {
     assert!(filled().incomplete_axes().is_empty());
 }
 
+/// Every registered axis reports its own emptiness, and only its own.
+///
+/// [`Receipt::incomplete_axes`] walks [`RECEIPT_AXES`] arm by arm for the same reason
+/// `differing_axes` does, so it fails the same ways: an arm reading a neighbour's field, or
+/// answering a constant, leaves an unfilled axis looking answered — and `verify` would then spend
+/// absence of information as an explanation. A filled receipt cannot tell those apart; emptying one
+/// field at a time can. The `match` is exhaustive, so a seventh axis will not compile until it is
+/// covered here.
+#[test]
+fn each_registered_axis_reports_its_own_emptiness() {
+    for axis in RECEIPT_AXES {
+        let mut emptied = filled();
+        match axis {
+            ReceiptAxis::Pin => emptied.pin = String::new(),
+            ReceiptAxis::Snapshot => emptied.snapshot_digest = Digest(String::new()),
+            ReceiptAxis::Engine => emptied.engine_digest = Digest(String::new()),
+            ReceiptAxis::RulePack => emptied.rulepack_digest = Digest(String::new()),
+            ReceiptAxis::Toolchain => emptied.toolchain_digest = Digest(String::new()),
+            ReceiptAxis::Formatter => emptied.formatter_digest = Digest(String::new()),
+        }
+        assert_eq!(
+            emptied.incomplete_axes(),
+            BTreeSet::from([axis]),
+            "emptying one field must report exactly its own axis"
+        );
+    }
+}
+
 /// `is_empty` ignores `package`, which reads as an oversight and is not one.
 ///
 /// It decides the present/absent marker in the snapshot digest preimage, so the current answer is
