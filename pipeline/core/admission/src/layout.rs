@@ -10,6 +10,7 @@ mod base;
 mod build;
 mod cargo_config;
 mod change;
+mod classification;
 mod dependency;
 mod inner;
 mod manifest;
@@ -23,6 +24,7 @@ mod workspace;
 pub use base::base_admission_violations;
 pub use cargo_config::{CARGO_CONFIG_PATHS, cargo_config_violations};
 pub use change::{changed_layout_violations, owner_core_regression_violations};
+pub use classification::deleted_classification_violations;
 pub use dependency::{draft_dependency_violations, workspace_draft_dependency_violations};
 use inner::validate_owner_path;
 pub use manifest::{
