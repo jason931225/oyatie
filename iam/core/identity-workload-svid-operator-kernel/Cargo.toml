@@ -5,12 +5,11 @@ version.workspace = true
 rust-version.workspace = true
 publish = false
 license = "Apache-2.0"
-description = "Pure SVID-delivery operator reconcile kernel (G002 slice-1b-iii-c; ADR-0561): the desired/observed state shapes + the pure reconcile<C: Clock> decision (Issue / Rotate-within-window / Noop) for the in-cluster operator that produces the PDP's cloud-iam-pdp-svid Secret. No kube-rs, no k8s-openapi, no async runtime, no system clock, no crypto — issuance + Secret projection live in the transient adapter, time is always injected."
+description = "Pure SVID-delivery operator reconcile kernel (G002 slice-1b-iii-c; ADR-0561): the desired/observed state shapes + the pure reconcile<C: Clock> decision (Issue / Rotate / Noop) for the in-cluster operator that produces the PDP's cloud-iam-pdp-svid Secret. No kube-rs, no k8s-openapi, no async runtime, no system clock, no crypto — issuance + Secret projection live in the transient adapter, time is always injected."
 
 # Pure SVID-delivery operator reconcile kernel. No kube-rs, no k8s-openapi, no tokio, no crypto.
 
 [lib]
-name = "iam_identity_workload_svid_operator_kernel"
 path = "src/lib.rs"
 doctest = false
 

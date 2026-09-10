@@ -79,7 +79,7 @@ pub enum Action {
         observed_leaf_not_after_epoch_seconds: u64, // data_class: PUBLIC
         requested_at_epoch_seconds: u64,            // data_class: PUBLIC
     },
-    /// The delivered leaf is still outside its rotation window.
+    /// The delivered leaf's remaining lifetime lies inside `(window, ttl]`.
     Noop, // data_class: PUBLIC
 }
 
@@ -93,7 +93,7 @@ pub fn reconcile<C: Clock>(observed: &ObservedState, desired: &DesiredState, clo
         },
         Some(secret) => {
             let remaining = secret.leaf_not_after_epoch_seconds.saturating_sub(now);
-            if remaining <= desired.rotation_window_secs {
+            if remaining <= desired.rotation_window_secs || remaining > desired.ttl_secs {
                 Action::Rotate {
                     desired: desired.clone(),
                     observed_leaf_not_after_epoch_seconds: secret.leaf_not_after_epoch_seconds,
