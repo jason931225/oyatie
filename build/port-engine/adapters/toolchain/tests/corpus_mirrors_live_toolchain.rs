@@ -12,7 +12,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use port_engine_toolchain::{CORPUS_MIRRORS, CORPUS_PATHS};
+use port_engine_toolchain::CORPUS_MIRRORS;
 
 /// Locate the live `build/toolchains/` this crate mirrors.
 ///
@@ -69,11 +69,14 @@ fn the_bound_corpus_is_the_whole_toolchain_tree() {
     let root = live_toolchains();
     let mut on_disk = BTreeSet::new();
     live_paths(&root, &root, &mut on_disk);
-    let bound: BTreeSet<String> = CORPUS_PATHS.iter().map(|path| (*path).to_owned()).collect();
+    let bound: BTreeSet<String> = CORPUS_MIRRORS
+        .iter()
+        .map(|(path, _)| (*path).to_owned())
+        .collect();
     assert_eq!(
         bound, on_disk,
         "build/toolchains/ holds a file the toolchain receipt axis does not bind, so a change to \
-         it would move no digest. Mirror it into src/corpus/, add it to CORPUS_PATHS and \
-         CORPUS_MIRRORS, and re-pin the frozen digest in the same change."
+         it would move no digest. Mirror it into src/corpus/, add it to CORPUS_MIRRORS, and \
+         re-pin the frozen digest in the same change."
     );
 }
