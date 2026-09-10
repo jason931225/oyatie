@@ -156,6 +156,10 @@ mod tests {
     /// Reading the dispatch is the whole point: a list checked against another list agrees with
     /// whatever both were written to say, and an arm added to `run` alone is what nothing else
     /// here can see.
+    ///
+    /// An arm whose pattern is not string literals alone yields its own text in place of tokens,
+    /// so a `const`, a guard, or a `_` above `other` fails the comparison instead of passing
+    /// through it unread.
     fn dispatched() -> Vec<&'static str> {
         include_str!("mod.rs")
             .lines()
@@ -163,7 +167,18 @@ mod tests {
             .take_while(|line| !line.contains("other =>"))
             .filter(|line| line.contains("=>"))
             .filter_map(|line| line.split("=>").next())
-            .flat_map(|arm| arm.split('"').skip(1).step_by(2))
+            .flat_map(|arm| {
+                let literals: Vec<&str> = arm.split('"').skip(1).step_by(2).collect();
+                let outside_the_quotes_is_bare = arm
+                    .split('"')
+                    .step_by(2)
+                    .all(|gap| gap.chars().all(|c| c.is_whitespace() || c == '|'));
+                if outside_the_quotes_is_bare {
+                    literals
+                } else {
+                    vec![arm.trim()]
+                }
+            })
             .collect()
     }
 
