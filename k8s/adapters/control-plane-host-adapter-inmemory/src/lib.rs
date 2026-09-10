@@ -15,15 +15,15 @@ use k8s_control_plane_host_kernel::{ControlPlaneStatus, ControlPlaneTier};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Record {
-    cluster_ref: ClusterRef,    // data_class: TENANT_SCOPED
-    tier: ControlPlaneTier,     // data_class: TENANT_SCOPED
-    status: ControlPlaneStatus, // data_class: TENANT_SCOPED
-    endpoint: Option<String>,   // data_class: TENANT_SCOPED
+    cluster_ref: ClusterRef,
+    tier: ControlPlaneTier,
+    status: ControlPlaneStatus,
+    endpoint: Option<String>,
 }
 
 #[derive(Debug, Default)]
 pub struct InMemoryControlPlaneHost {
-    records: Mutex<BTreeMap<String, Record>>, // keyed by handle // data_class: TENANT_SCOPED
+    records: Mutex<BTreeMap<String, Record>>, // keyed by handle
 }
 
 impl InMemoryControlPlaneHost {

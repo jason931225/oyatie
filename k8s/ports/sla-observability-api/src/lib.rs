@@ -22,8 +22,8 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn core::future::Future<Output = T> + Send 
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ClusterRef {
-    pub tenant_id: String,    // data_class: TENANT_SCOPED
-    pub cluster_name: String, // data_class: TENANT_SCOPED
+    pub tenant_id: String,
+    pub cluster_name: String,
 }
 
 impl ClusterRef {
@@ -110,8 +110,8 @@ impl StatusWindow {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ControlPlaneSlaSnapshot {
-    pub cluster_ref: ClusterRef, // data_class: TENANT_SCOPED
-    pub control_plane_status: ObservedControlPlaneStatus, // data_class: TENANT_SCOPED
+    pub cluster_ref: ClusterRef,
+    pub control_plane_status: ObservedControlPlaneStatus,
     pub status_window: StatusWindow,
     pub provisioning_latency_millis: Option<u64>,
 }
@@ -173,8 +173,8 @@ pub fn validate_cluster_ref(cluster_ref: &ClusterRef) -> Result<(), SlaObservabi
 /// Collision-free map key for cluster observations.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ClusterKey {
-    tenant_id: String,    // data_class: TENANT_SCOPED
-    cluster_name: String, // data_class: TENANT_SCOPED
+    tenant_id: String,
+    cluster_name: String,
 }
 
 impl ClusterKey {

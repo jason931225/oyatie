@@ -4,8 +4,11 @@ use data_boundary_kernel::{Classified, DataClass};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PackVersion {
+    /// Backward-compatible additions only.
     Minor { major: u32, minor: u32, patch: u32 },
+    /// Breaking interface change — requires tenant migration window.
     Major { major: u32, minor: u32, patch: u32 },
+    /// Bug-fix / security-patch only — no interface change.
     Patch { major: u32, minor: u32, patch: u32 },
 }
 

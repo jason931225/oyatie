@@ -15,7 +15,7 @@ use k8s_sla_observability_kernel::{SlaObservation, SlaPolicy, SlaSummary, summar
 #[derive(Debug)]
 pub struct InMemorySlaObservabilityStore {
     policy: SlaPolicy,
-    observations: Mutex<BTreeMap<ClusterKey, SlaObservation>>, // data_class: TENANT_SCOPED
+    observations: Mutex<BTreeMap<ClusterKey, SlaObservation>>,
 }
 
 impl Default for InMemorySlaObservabilityStore {

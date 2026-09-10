@@ -4,7 +4,7 @@ use super::*;
 pub struct CloudIacAppConfig {
     pub bind_addr: SocketAddr,
     pub release_index_path: PathBuf,
-    pub module_registry_bearer: Option<String>, // data_class: SECRET
+    pub module_registry_bearer: Option<String>,
     pub module_registry_principal_id: Option<String>,
 }
 
