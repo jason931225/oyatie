@@ -180,23 +180,18 @@ reason to weaken or bypass the check.
 
 **buck2 is the canonical build graph, natively — not a projection of Cargo
 metadata through Reindeer.** Cargo is being withdrawn from authority. Founder
-decision, recorded in ADR-0720 "Committed to buck2 as the merge path and a
-cache-only NativeLink CAS" (Accepted 2026-09-08, `amends: [ADR-0716]`), which
-supersedes ADR-0716 D1 and D2. ADR-0716 D4 and D6 are untouched.
+decision, 2026-09-08.
 
-That record states the reasoning and is the citation to use. It lives here
-rather than in the corpus because the corpus mechanically cannot hold it:
-`is_frozen_non_root_markdown` admits only root `README.md`, `AGENTS.md` and
-`CLAUDE.md`, so amending ADR-0716 in place and filing ADR-0720 as a new record
-were BOTH refused by `repository layout` with the same message — adding a
-record is as closed as editing one (PR #2424, closed 2026-09-08). These three
-files are the only mutable authority surface, which is why the ruling is
-written here.
+This file states that ruling in full. Do not go looking for a decision record
+behind it, and do not cite one: a canonical file carries its own reasoning or
+it is not authority. Root `README.md`, `AGENTS.md` and `CLAUDE.md` are the only
+`.md` files the repository-layout gate will accept a change to, so a ruling
+lands here or nowhere.
 
-The commitment does not license an early changeover, and the record being
-honoured here says so in its own `overturn_when`: it has failed if it is cited
-to justify a dual merge proof, an incremental promotion, or a CAS standing in
-for the wave. So, carried forward intact:
+The commitment does not license an early changeover. It has failed if it is
+cited to justify a dual merge proof, an incremental promotion, or a CAS
+standing in for the wave. These four terms are part of the ruling, not
+commentary on it:
 
 - **The overturn is same-wave, not incremental.** One wave: the cloud serves
   `pipeline/` with buck2 onto `compute/`, CAS in `storage/`, and tenant #0
