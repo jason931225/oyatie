@@ -217,3 +217,9 @@ fn the_word_predicate_anchors_on_identifier_boundaries_at_both_ends() {
     assert!(!contains_word(b"", b"mod"));
     assert!(!contains_word(b"anything", b""));
 }
+
+/// Promote this to a scan when the amendment ratifies. Until then the kernel's tests must name a
+/// language only by invented slugs, because no gate rejects a real one.
+#[test]
+#[ignore = "ADR-0637's language-neutrality amendment is filed and not ratified"]
+fn language_names_are_scanned_once_the_neutrality_amendment_ratifies() {}

@@ -11,8 +11,10 @@
 //!   captured declaration. This is the shape that actually ports Go.
 //!
 //! This crate owns the TARGET side of the translation — identifier casing and the shape of an
-//! emitted item. Source vocabulary reaches it as pack data, except for the few source node kinds
-//! declared in `vocabulary`; unlike the kernel, nothing scans this crate to keep it out.
+//! emitted item. What differs between language PAIRS reaches it as pack data. What the front end
+//! and this face fixed between them — node kinds, attribute keys and their values, operator
+//! spellings — is compared against literals here, some declared in `vocabulary` and some spelled
+//! at the comparison; unlike the kernel, nothing scans this crate to keep any of it out.
 #![forbid(unsafe_code)]
 
 /// This crate's own sources, for the engine-identity axis assembled by the facade.

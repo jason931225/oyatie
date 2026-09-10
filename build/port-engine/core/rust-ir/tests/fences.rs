@@ -24,9 +24,10 @@ use std::path::Path;
 
 use port_engine_rust_ir::CRATE_SOURCES;
 
-/// The enumeration must BE the directory, not a subset somebody once curated.
+/// The enumeration must BE the directory, not a subset somebody once curated — and each entry must
+/// hold the bytes of the file it names, because a name matching proves nothing about what was read.
 #[test]
-fn scanned_sources_are_the_whole_crate() {
+fn scanned_sources_are_the_whole_crate_byte_for_byte() {
     let candidates = [
         option_env!("CARGO_MANIFEST_DIR").map(|dir| Path::new(dir).join("src")),
         Some(Path::new("src").to_path_buf()),
@@ -57,6 +58,18 @@ fn scanned_sources_are_the_whole_crate() {
         scanned, on_disk,
         "a source file exists that no architecture fence reads — regenerate src/sources.rs"
     );
+
+    for (name, embedded) in CRATE_SOURCES {
+        let path = src.join(name);
+        let bytes = std::fs::read_to_string(&path).unwrap_or_else(|err| {
+            panic!("{} must be readable to be compared: {err}", path.display())
+        });
+        assert!(
+            *embedded == bytes,
+            "src/{name} is enumerated under its own name but carries another file's bytes, so it \
+             is scanned by no fence and hashed by no axis — regenerate src/sources.rs"
+        );
+    }
 }
 
 /// A CANARY SET, not a decision procedure — no finite list can decide "corpus-specific". The

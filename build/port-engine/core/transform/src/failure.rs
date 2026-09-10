@@ -16,7 +16,7 @@
 
 use port_engine_api::{Declaration, FailureConvention, TypeRef};
 
-use crate::vocabulary::{ATTR_REF, CHILD_BIND, CHILD_RESULT, CHILD_VALUE};
+use crate::vocabulary::{ATTR_REF, CHILD_BIND, CHILD_RESULT, CHILD_VALUE, REF_ABSENT};
 
 /// Whether a type is the source's failure type.
 ///
@@ -56,7 +56,7 @@ pub(crate) fn is_absent(node: &Declaration, convention: Option<&FailureConventio
     let Some(convention) = convention else {
         return false;
     };
-    node.attr(ATTR_REF) == Some("nil") && node.name == convention.absent
+    node.attr(ATTR_REF) == Some(REF_ABSENT) && node.name == convention.absent
 }
 
 /// The propagation idiom, matched structurally over a pair of statements.

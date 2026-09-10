@@ -6,7 +6,7 @@
 //!
 //! **Every loaded rule MUST carry ≥1 positive selecting fixture**, and every fixture MUST agree
 //! with the selection derived from `applies`. Missing, empty, or false fixtures cannot manufacture
-//! coverage. Digest is SHA-256 of the embedded JSON bytes. Neutral only — no corpus vocabulary.
+//! coverage. Digest is SHA-256 of the embedded JSON bytes.
 #![forbid(unsafe_code)]
 
 /// This crate's own sources, for the engine-identity axis assembled by the facade.

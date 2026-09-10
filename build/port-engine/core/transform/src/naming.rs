@@ -1,8 +1,7 @@
 //! Target-language identifiers: sanitising, region ids, and casing.
 //!
 //! This is the one place the target language's conventions are owned. That is legitimate — this
-//! face RENDERS Rust, so Rust's casing is its business; the source language it must stay ignorant
-//! of.
+//! face RENDERS Rust, so Rust's casing is its business.
 
 use port_engine_api::{Declaration, RuleId, UnitId};
 use port_engine_rust_ir::Visibility;

@@ -66,6 +66,8 @@ pub const TYPE_NAMED_INTERFACE: &str = "named_interface";
 
 /// Attribute key classifying what an identifier resolves to.
 pub const ATTR_REF: &str = "ref";
+/// The [`ATTR_REF`] classification the source's absent-value literal arrives as.
+pub(crate) const REF_ABSENT: &str = "nil";
 /// Attribute key holding the package-qualified IDENTITY of what a call resolves to.
 pub const ATTR_CALLEE: &str = "callee";
 /// Attribute key distinguishing a call through a RECEIVER from a call to a free function.
