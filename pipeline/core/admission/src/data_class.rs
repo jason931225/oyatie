@@ -164,10 +164,19 @@ fn annotated(body: &[&str], index: usize) -> bool {
             .is_some()
 }
 
+/// A named struct's own name, generics and any wrapped `where` clause split
+/// off it. A tuple struct is not one: its fields have no names to report, and
+/// reading its head as a named struct's would attribute the NEXT struct's
+/// fields to it.
+// ponytail: `(` before the brace rejects the head, so `struct Foo<T: Fn(u8)> {`
+// is a false negative — same uncovered class as tuple structs themselves.
 fn struct_head(line: &str) -> Option<&str> {
     let head = strip_visibility(line.trim_start())
         .strip_prefix("struct ")?
         .trim();
+    if head.split('{').next()?.contains('(') {
+        return None;
+    }
     let name = head.split(['<', ' ', '{']).next()?;
     is_identifier(name).then_some(name)
 }

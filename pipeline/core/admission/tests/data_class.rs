@@ -249,3 +249,30 @@ fn a_struct_nested_in_a_module_ends_at_its_own_brace() {
     assert_eq!(refusals.len(), 1, "{refusals:?}");
     assert!(refusals[0].contains("A.email"), "{}", refusals[0]);
 }
+
+#[test]
+fn a_generic_tuple_struct_head_does_not_adopt_the_next_struct() {
+    let text = "pub struct Id<T>(pub u64);\npub struct Row {\n    \
+                pub id: Classified<String>,\n    pub email: String,\n}\n";
+    let refusals = holes(text);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(refusals[0].contains("Row.email"), "{}", refusals[0]);
+}
+
+#[test]
+fn a_struct_head_whose_brace_wrapped_past_a_where_clause_is_still_read() {
+    let text = "pub struct Row<T>\nwhere\n    T: Debug,\n{\n    \
+                pub id: Classified<String>,\n    pub email: String,\n}\n";
+    let refusals = holes(text);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(refusals[0].contains("Row.email"), "{}", refusals[0]);
+}
+
+#[test]
+fn a_paren_after_the_brace_does_not_hide_the_struct_head() {
+    let text = "pub struct Row { // (the wire shape)\n    \
+                pub id: Classified<String>,\n    pub email: String,\n}\n";
+    let refusals = holes(text);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(refusals[0].contains("Row.email"), "{}", refusals[0]);
+}
