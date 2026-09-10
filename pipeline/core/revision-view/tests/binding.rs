@@ -116,10 +116,43 @@ fn an_input_classified_twice_refuses_even_when_the_digests_agree() {
     }
 }
 
+/// A name is what the view attests to, so the same name padded differently is
+/// the same name — otherwise a caller feeding `git ls-tree` output classifies
+/// one input three times and the view stores all three answers.
+#[test]
+fn surrounding_space_does_not_hide_a_second_classification() {
+    assert_eq!(
+        identity().bind([(" same", "d1"), ("same\n", "d2")]),
+        Err(Unknown::DuplicateInput("same".to_owned()))
+    );
+}
+
+/// A blank name refuses the way a blank identity field does: a view whose
+/// central claim is which input names it covers cannot cover a nameless one.
+#[test]
+fn an_input_that_names_nothing_refuses() {
+    for blank in ["", "   ", "\n", "\t "] {
+        assert_eq!(
+            identity().bind([(blank, " digest ")]),
+            Err(Unknown::UnnamedInput("digest".to_owned())),
+            "{blank:?}"
+        );
+    }
+    let unnamed = identity()
+        .bind([("", "")])
+        .expect_err("a nameless entry is judged before its digest");
+    assert_eq!(unnamed, Unknown::UnnamedInput(String::new()));
+    assert!(
+        Unknown::UnnamedInput("d1".to_owned())
+            .reason()
+            .contains("d1")
+    );
+}
+
 #[test]
 fn a_blank_digest_and_an_empty_set_both_refuse() {
     assert_eq!(
-        identity().bind([("named", "   ")]),
+        identity().bind([(" named ", "   ")]),
         Err(Unknown::MissingDigest("named".to_owned()))
     );
     assert_eq!(
@@ -136,7 +169,22 @@ fn surrounding_space_does_not_split_one_view_into_two() {
         producer: "\trevision-view ".to_owned(),
         schema: " v1 ".to_owned(),
     };
-    assert_eq!(padded.bind([("input", "digest")]), Ok(bound()));
+    assert_eq!(padded.bind([(" input\t", "\ndigest ")]), Ok(bound()));
+    let view = bound();
+    assert_eq!(view.digest_of(" input\n"), Some("digest"));
+    assert_eq!(view.assert_revision(&format!(" {COMMIT}\n")), Ok(()));
+}
+
+/// The policy is trim, not strip: space and case inside a name are part of it,
+/// so a view that normalized them away would answer for an input it never
+/// consumed.
+#[test]
+fn space_and_case_inside_a_name_are_part_of_it() {
+    let view = identity()
+        .bind([("A b", "D e"), ("a b", "d e")])
+        .expect("distinct names");
+    assert_eq!(view.digest_of("A b"), Some("D e"));
+    assert_eq!(view.digest_of("ab"), None);
 }
 
 #[test]

@@ -7,9 +7,10 @@
 //! materialization, no digest computation.
 //!
 //! The revision is checked to be an object name. Digests are **opaque**: the
-//! caller supplies them, and this refuses a blank one but cannot tell a real
-//! digest from any other string. A view therefore proves which revision and
-//! which input NAMES it covers, and carries the caller's word for the rest.
+//! caller supplies them, and this refuses a blank one — as it refuses a blank
+//! name — but cannot tell a real digest from any other string. A view
+//! therefore proves which revision and which input NAMES it covers, and
+//! carries the caller's word for the rest.
 
 use std::collections::BTreeMap;
 
@@ -29,6 +30,9 @@ pub enum Unknown {
     MutableRevision(String),
     /// An input was named with no digest to bind it to.
     MissingDigest(String),
+    /// An input carried a digest under a blank name. The digest is the only
+    /// handle an operator has on an entry that names nothing.
+    UnnamedInput(String),
     /// One input name was classified twice. Whether the digests agree is not
     /// the question: a name classified twice means the caller's input set is
     /// itself undecided, and picking either entry would invent an answer.
@@ -47,6 +51,7 @@ impl Unknown {
                 format!("revision `{revision}` is not an immutable object name")
             }
             Self::MissingDigest(input) => format!("input `{input}` has no digest"),
+            Self::UnnamedInput(digest) => format!("input with digest `{digest}` has no name"),
             Self::DuplicateInput(input) => format!("input `{input}` is classified twice"),
             Self::RevisionMismatch { bound, presented } => {
                 format!("view is bound to revision {bound}, presented {presented}")
@@ -85,14 +90,16 @@ fn is_object_name(value: &str) -> bool {
 impl ViewIdentity {
     /// Bind this identity to the digests of every input the view consumed.
     ///
-    /// Identity fields are stored trimmed, so two callers that disagree only
-    /// about surrounding space produce the same view rather than two that
-    /// compare unequal.
+    /// Every string is stored trimmed — identity fields, input names, and
+    /// digests alike — so two callers that disagree only about surrounding
+    /// space produce the same view rather than two that compare unequal. An
+    /// input name is what a view attests to, so a blank one refuses the way a
+    /// blank identity field does.
     ///
     /// # Errors
     /// [`Unknown`] on a blank identity field, a revision that is not an
-    /// immutable object name, an empty input set, a blank digest, or an input
-    /// named more than once.
+    /// immutable object name, an empty input set, a blank input name, a blank
+    /// digest, or an input named more than once.
     pub fn bind<I, N, D>(self, inputs: I) -> Result<RevisionView, Unknown>
     where
         I: IntoIterator<Item = (N, D)>,
@@ -121,8 +128,12 @@ impl ViewIdentity {
 
         let mut bound: BTreeMap<String, String> = BTreeMap::new();
         for (name, digest) in inputs {
-            let (name, digest) = (name.into(), digest.into());
-            if digest.trim().is_empty() {
+            let (name, digest): (String, String) = (name.into(), digest.into());
+            let (name, digest) = (name.trim().to_owned(), digest.trim().to_owned());
+            if name.is_empty() {
+                return Err(Unknown::UnnamedInput(digest));
+            }
+            if digest.is_empty() {
                 return Err(Unknown::MissingDigest(name));
             }
             if bound.insert(name.clone(), digest).is_some() {
@@ -152,8 +163,10 @@ impl RevisionView {
             .map(|(name, digest)| (name.as_str(), digest.as_str()))
     }
 
+    /// Names are trimmed on the way in, so a lookup trims too rather than
+    /// missing the entry it just stored.
     pub fn digest_of(&self, input: &str) -> Option<&str> {
-        self.inputs.get(input).map(String::as_str)
+        self.inputs.get(input.trim()).map(String::as_str)
     }
 
     /// Confirm this view describes `revision`.
@@ -164,7 +177,10 @@ impl RevisionView {
     /// uppercase spelling of the SAME commit would otherwise be reported as a
     /// stale view, sending an operator to re-derive something already current.
     /// [`Unknown::RevisionMismatch`] when the view describes a different one.
+    /// `revision` is trimmed first, so the trailing newline `git rev-parse`
+    /// emits does not make a view refuse the revision it is bound to.
     pub fn assert_revision(&self, revision: &str) -> Result<(), Unknown> {
+        let revision = revision.trim();
         if !is_object_name(revision) {
             return Err(Unknown::MutableRevision(revision.to_owned()));
         }
