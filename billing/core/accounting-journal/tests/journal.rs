@@ -37,12 +37,8 @@ fn fingerprint_is_length_prefixed_against_field_boundary_collisions() {
 
 #[test]
 fn scoped_key_places_tenant_first() {
-    // The LOGICAL key encodes (tenant, scope, primary_ref) only; the body
-    // fingerprint is carried separately so the store can detect a changed body
-    // under a reused logical key (ADR-0592).
     let key = scoped_idempotency_key("ten_acme", "journal-posted", "jrn_1");
     assert_eq!(key, "idem-v2:ten_acme:journal-posted:jrn_1");
-    // Two tenants with the same primary_ref never collide.
     let other = scoped_idempotency_key("ten_beta", "journal-posted", "jrn_1");
     assert_ne!(key, other);
 }
