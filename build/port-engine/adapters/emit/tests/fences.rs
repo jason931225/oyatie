@@ -1,5 +1,6 @@
-//! ADR-0637 D1: a corpus-specific branch in neutral code is a defect, so emit must refuse the
-//! corpus destination root.
+//! ADR-0638 (archived; live via apex ADR-0704) D1 puts generated Kubernetes output under `k8s/`,
+//! and ADR-0637 (archived; live via apex ADR-0704) D4 places corpus expansion expressly outside
+//! the W0 authorization. So emit refuses that destination root rather than writing into it.
 //!
 //! Scanned over the WHOLE crate: the set is enumerated and then PROVEN to be the whole of `src/`.
 
