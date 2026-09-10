@@ -71,17 +71,30 @@ fn observed_single_active(desired: &DesiredState) -> ObservedState {
     }
 }
 
-fn rotates_at(now: u64) -> bool {
+fn rotation_reason_at(now: u64) -> Option<String> {
     let desired = desired_state();
     let observed = observed_single_active(&desired);
     reconcile(&observed, &desired, &FixedClock { now })
-        .iter()
-        .any(|action| matches!(action, Action::RotateKeyVersion { .. }))
+        .into_iter()
+        .find_map(|action| match action {
+            Action::RotateKeyVersion { reason, .. } => Some(reason),
+            _ => None,
+        })
+}
+
+fn rotates_at(now: u64) -> bool {
+    rotation_reason_at(now).is_some()
 }
 
 #[test]
 fn a_clock_reading_before_activation_rotates_the_active_key_version() {
-    assert!(rotates_at(0));
+    assert_eq!(
+        rotation_reason_at(0),
+        Some(format!(
+            "active key version age {}s exceeds policy {ROTATE_AFTER}s",
+            u64::MAX
+        ))
+    );
 }
 
 #[test]
