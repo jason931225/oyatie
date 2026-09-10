@@ -167,3 +167,32 @@ fn no_clock_reading_below_the_leafs_issuance_yields_noop() {
         "clock readings that suppressed rotation: {suppressed:?}"
     );
 }
+
+/// A shortened `ttl_secs` leaves a longer-lived leaf in place, so the
+/// `remaining > ttl_secs` disjunct also fires on a HEALTHY clock. Deriving the
+/// issuance instant from the leaf instead of the clock dates the replacement
+/// into the future there, and a not-yet-valid leaf is refused by every peer
+/// the moment it is applied.
+#[test]
+fn a_shortened_ttl_never_dates_the_replacement_after_the_clock() {
+    let want = desired();
+    let issuance = match reconcile(
+        &ObservedState::present(ISSUED_AT + 20 * TTL_SECS),
+        &want,
+        &FixedClock { now: ISSUED_AT },
+    ) {
+        Action::Issue {
+            requested_at_epoch_seconds,
+            ..
+        }
+        | Action::Rotate {
+            requested_at_epoch_seconds,
+            ..
+        } => Some(requested_at_epoch_seconds),
+        Action::Noop => None,
+    };
+    assert!(
+        issuance.is_some_and(|at| at <= ISSUED_AT),
+        "expected a mint instant at or before the clock reading {ISSUED_AT}, got {issuance:?}"
+    );
+}
