@@ -227,6 +227,7 @@ mod tests {
     fn score_is_bounded_by_recency_weight_plus_engagement_cap() {
         let now = 1_000_000u64;
         let max = RECENCY_WEIGHT + ENGAGEMENT_CAP;
+        assert_eq!(max, 96_400);
         for created_at in [0, now - 200_000, now - 86_400, now - 1, now, now + 5_000] {
             for engagement in [0, 1, ENGAGEMENT_CAP, ENGAGEMENT_CAP + 1, u64::MAX] {
                 let observed = score(&make_post("p", created_at, engagement), now);

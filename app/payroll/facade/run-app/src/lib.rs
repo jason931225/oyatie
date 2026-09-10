@@ -69,7 +69,7 @@ pub struct PayrollAccountingDispatchEnvelope {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrialCloseOutcome {
-    pub run: PayrollRun, // data_class: PII_IDENTIFYING
+    pub run: PayrollRun, // data_class: PII_IDENTIFYING + FINANCIAL
     pub audit_envelope: PayrollAuditEnvelope,
 }
 
