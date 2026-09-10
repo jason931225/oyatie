@@ -1,8 +1,41 @@
 #!/bin/sh
-# D-10: rustfmt --check the staged *.rs list. File list in, those files out.
+# D-10: rustfmt --check the STAGED bytes of changed *.rs.
+#
+# Staged bytes, not the worktree copy: `rustfmt --check <path>` reads from disk, so partial staging
+# (git add -p, or editing after add) let unformatted content commit while the hook reported clean.
+# Missing rustfmt warns and passes rather than blocking every commit in every worktree; presubmit
+# still gates fmt, so a local outage buys nothing. A failure prints the command that fixes it,
+# because a hook that only says "no" makes an agent retry the same commit forever.
 set -eu
-if ! git diff --cached --name-only --diff-filter=ACMR -- '*.rs' | grep -q .; then
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs')
+[ -n "$staged" ] || exit 0
+
+if ! command -v rustfmt >/dev/null 2>&1; then
+  echo "pre-commit: rustfmt not on PATH; skipping fmt check (presubmit still gates it)" >&2
   exit 0
 fi
-git diff --cached --name-only -z --diff-filter=ACMR -- '*.rs' \
-  | xargs -0 rustfmt --check --config-path rustfmt.toml --
+
+top=$(git rev-parse --show-toplevel)
+tmp=$(mktemp -d) || { echo "pre-commit: mktemp failed; skipping fmt check" >&2; exit 0; }
+trap 'rm -rf "$tmp"' EXIT INT TERM
+
+IFS='
+'
+for f in $staged; do
+  mkdir -p "$tmp/$(dirname "$f")"
+  # A missing blob is a broken index, not a formatting verdict: report it, do not pass silently.
+  git show ":$f" > "$tmp/$f" || { echo "pre-commit: cannot read staged $f" >&2; exit 1; }
+done
+unset IFS
+
+# One invocation over real paths: rustfmt exits non-zero for a file, but exits 0 for stdin even
+# when it prints a diff, so a stdin pipeline would look strict and gate nothing.
+if (cd "$tmp" && find . -name '*.rs' -exec rustfmt --check --config-path "$top/rustfmt.toml" -- {} +); then
+  exit 0
+fi
+echo "" >&2
+echo "pre-commit: staged Rust is not rustfmt-clean. Fix, re-stage, and commit again:" >&2
+echo "    cargo fmt --all && git add -u" >&2
+echo "(paths above are the extracted staged copies; edit the same files in the worktree)" >&2
+exit 1

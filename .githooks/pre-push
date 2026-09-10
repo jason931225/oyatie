@@ -1,16 +1,48 @@
 #!/bin/sh
-# D-10 / D-43: rustfmt --check the *.rs list vs the push base. Fail closed if no base.
+# D-10 / D-43: rustfmt --check the *.rs committed between the push base and HEAD.
+#
+# Blobs at HEAD, not the worktree copy: the worktree can hold edits that are not in the commits
+# being pushed, so checking files on disk judges bytes the remote will never see. Missing rustfmt
+# warns and passes rather than blocking every push in every worktree; presubmit still gates fmt.
+# No base still refuses (D-43), but says how to get one instead of leaving the push wedged.
 set -eu
+
 if base=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) && [ -n "$base" ]; then
   :
 elif git rev-parse --verify --quiet origin/dev >/dev/null; then
   base=origin/dev
 else
   echo "pre-push: no upstream or origin/dev; refuse to skip fmt" >&2
+  echo "    git fetch origin dev    # then push again" >&2
   exit 1
 fi
-if ! git diff --name-only --diff-filter=ACMR "$base"...HEAD -- '*.rs' | grep -q .; then
+
+changed=$(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- '*.rs')
+[ -n "$changed" ] || exit 0
+
+if ! command -v rustfmt >/dev/null 2>&1; then
+  echo "pre-push: rustfmt not on PATH; skipping fmt check (presubmit still gates it)" >&2
   exit 0
 fi
-git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- '*.rs' \
-  | xargs -0 rustfmt --check --config-path rustfmt.toml --
+
+top=$(git rev-parse --show-toplevel)
+tmp=$(mktemp -d) || { echo "pre-push: mktemp failed; skipping fmt check" >&2; exit 0; }
+trap 'rm -rf "$tmp"' EXIT INT TERM
+
+IFS='
+'
+for f in $changed; do
+  mkdir -p "$tmp/$(dirname "$f")"
+  # A path can be deleted at HEAD while still appearing for an earlier revision in the range.
+  git show "HEAD:$f" > "$tmp/$f" 2>/dev/null || rm -f "$tmp/$f"
+done
+unset IFS
+
+# rustfmt exits 0 for stdin even when it prints a diff, so this must run over real paths.
+if (cd "$tmp" && find . -name '*.rs' -exec rustfmt --check --config-path "$top/rustfmt.toml" -- {} +); then
+  exit 0
+fi
+echo "" >&2
+echo "pre-push: committed Rust is not rustfmt-clean. Fix it and amend or add a commit:" >&2
+echo "    cargo fmt --all && git add -u && git commit --amend --no-edit" >&2
+exit 1
