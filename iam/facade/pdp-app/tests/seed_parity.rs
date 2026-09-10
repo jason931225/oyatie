@@ -1,17 +1,15 @@
-//! Seed-parity guard: the crate-local Cedar seeds must stay byte-identical
-//! to the canonical FD-001 seeds in
-//! `iam/core/platform-contracts-kernel/cedar/` (the
-//! iam-pdp-cedar conformance-suite pattern). Crate-local
-//! copies exist because buck2 targets sandbox their srcs; this test makes
-//! the duplication drift-impossible on the cargo lane.
+//! The crate-local Cedar seeds must stay byte-identical to the canonical ones
+//! in `iam/core/platform-contracts-kernel/cedar/`. The copies exist only
+//! because buck2 targets sandbox their srcs; this guard makes the duplication
+//! drift-impossible on the cargo lane.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::path::{Path, PathBuf};
 
-// option_env!, not env!: CARGO_MANIFEST_DIR is undefined at buck2 compile
-// time (hermetic sandbox), and the buck2 lane must still COMPILE this target
-// (FRIC-019). The cargo lane enforces parity; buck2 skips with a notice.
+// option_env!, not env!: CARGO_MANIFEST_DIR is undefined in buck2's hermetic
+// sandbox, and this target must still compile there. Cargo enforces the parity;
+// buck2 skips with a notice.
 fn manifest_dir() -> Option<&'static Path> {
     option_env!("CARGO_MANIFEST_DIR").map(Path::new)
 }

@@ -1,22 +1,6 @@
-//! SVID-delivery operator composition root (G002 slice-1b-iii-c; ADR-0561).
-//!
-//! This crate owns runtime wiring only: env-driven desired-state config with
-//! fail-closed validation, the injected issuance backend, the injected clock, and
-//! the reconcile loop. The reconcile DECISION stays in the pure kernel; the
-//! kube-rs Secret projection + real X.509 issuance stay in the transient adapter.
-//!
-//! ## Config (env, fail-closed)
-//!
-//! The operator derives its single desired SVID-delivery spec from the
-//! environment; an invalid/empty value is a HARD startup error (the binary exits
-//! non-zero, mirroring the kms-operator-app precedent — never boots with a
-//! degraded config):
-//! - `OYATIE_SVID_OPERATOR_CELL_ID`        — the cell id (forms the SPIFFE authority).
-//! - `OYATIE_SVID_OPERATOR_NAMESPACE`      — the Secret namespace (default `cloud-iam`).
-//! - `OYATIE_SVID_OPERATOR_TTL_SECS`       — leaf lifetime seconds (default 3600).
-//! - `OYATIE_SVID_OPERATOR_ROTATION_WINDOW_SECS` — pre-expiry rotation window (default 600).
-//!
-//! The Secret name is FIXED to `cloud-iam-pdp-svid` (the consumer contract).
+//! Composition root for the SVID-delivery operator: env-driven config, the
+//! injected issuance backend and clock, and the reconcile loop. The decision
+//! itself belongs to the kernel and the Secret projection to the adapter.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
@@ -27,46 +11,33 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use iam_identity_workload_svid_operator_k8s::ExponentialBackoff;
 use iam_identity_workload_svid_operator_kernel::{Clock, DesiredState};
 
-/// The fixed Secret name the consumer (`MtlsContext::from_path`) mounts.
+/// The Secret name the consumer (`MtlsContext::from_path`) mounts.
 pub const PDP_SVID_SECRET_NAME: &str = "cloud-iam-pdp-svid";
-/// The default Secret namespace (the iam namespace).
 pub const DEFAULT_NAMESPACE: &str = "cloud-iam";
-/// The default leaf lifetime in seconds (1 hour).
 pub const DEFAULT_TTL_SECS: u64 = 3_600;
-/// The default pre-expiry rotation window in seconds (10 minutes).
 pub const DEFAULT_ROTATION_WINDOW_SECS: u64 = 600;
 
-/// Env var: the cell id (forms `spiffe://oyatie.cell-<id>/platform/cloud-iam-pdp`).
+/// Forms `spiffe://oyatie.cell-<id>/platform/cloud-iam-pdp`.
 pub const ENV_CELL_ID: &str = "OYATIE_SVID_OPERATOR_CELL_ID";
-/// Env var: the Secret namespace.
 pub const ENV_NAMESPACE: &str = "OYATIE_SVID_OPERATOR_NAMESPACE";
-/// Env var: the leaf lifetime in seconds.
 pub const ENV_TTL_SECS: &str = "OYATIE_SVID_OPERATOR_TTL_SECS";
-/// Env var: the pre-expiry rotation window in seconds.
 pub const ENV_ROTATION_WINDOW_SECS: &str = "OYATIE_SVID_OPERATOR_ROTATION_WINDOW_SECS";
 
-/// Why the operator refused to start. Every variant is fail-closed: an invalid
-/// config exits the process non-zero rather than booting degraded.
+/// Why the operator refused to start. Each variant exits the process non-zero;
+/// none of them lets it boot degraded. The `Display` arms carry the operator
+/// message.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OperatorStartupConfigError {
-    /// `OYATIE_SVID_OPERATOR_CELL_ID` was missing or empty (no SPIFFE authority).
     MissingCellId,
-    /// The cell id carried whitespace/control/`/` (cannot form a cell authority).
     MalformedCellId(String),
-    /// A numeric env var was present but not a valid positive integer.
     InvalidNumber {
-        /// The env var name.
         var: String,
-        /// The offending raw value.
         value: String,
     },
-    /// `OYATIE_SVID_OPERATOR_TTL_SECS` resolved to zero (a leaf must outlive issuance).
     ZeroTtl,
-    /// The rotation window was >= the TTL (a leaf would be born already-rotating).
+    /// A leaf would otherwise be born already inside its rotation window.
     RotationWindowNotBelowTtl {
-        /// The configured TTL seconds.
         ttl_secs: u64,
-        /// The configured rotation-window seconds.
         rotation_window_secs: u64,
     },
 }
@@ -96,29 +67,24 @@ impl fmt::Display for OperatorStartupConfigError {
 
 impl std::error::Error for OperatorStartupConfigError {}
 
-/// The validated operator config: the desired SVID-delivery spec + requeue backoff.
+/// The validated operator config.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OperatorConfig {
-    /// The single desired SVID-delivery spec the operator converges.
     pub desired: DesiredState,
-    /// The reconcile requeue backoff.
     pub backoff: ExponentialBackoff,
 }
 
 impl OperatorConfig {
-    /// Build the config from the process environment, fail-closed.
-    ///
     /// # Errors
-    /// [`OperatorStartupConfigError`] on any missing/malformed/invalid value.
+    /// [`OperatorStartupConfigError`] on any missing, malformed, or invalid value.
     pub fn from_env() -> Result<Self, OperatorStartupConfigError> {
         Self::from_env_pairs(std::env::vars())
     }
 
-    /// Build the config from explicit env pairs (the testable core of
-    /// [`OperatorConfig::from_env`]).
+    /// The testable core of [`OperatorConfig::from_env`].
     ///
     /// # Errors
-    /// [`OperatorStartupConfigError`] on any missing/malformed/invalid value.
+    /// [`OperatorStartupConfigError`] on any missing, malformed, or invalid value.
     pub fn from_env_pairs<K, V, I>(pairs: I) -> Result<Self, OperatorStartupConfigError>
     where
         K: AsRef<str>,
@@ -189,7 +155,6 @@ fn parse_u64(var: &str, value: &str) -> Result<u64, OperatorStartupConfigError> 
         })
 }
 
-/// The default reconcile requeue backoff (base 30s, capped at 600s).
 #[must_use]
 pub fn default_operator_backoff() -> ExponentialBackoff {
     ExponentialBackoff {
@@ -198,7 +163,6 @@ pub fn default_operator_backoff() -> ExponentialBackoff {
     }
 }
 
-/// The production wall-clock (epoch seconds).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SystemClock;
 

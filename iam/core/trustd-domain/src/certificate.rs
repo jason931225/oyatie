@@ -4,15 +4,14 @@ use crate::error::{Result, TrustError};
 use crate::x509::{DistinguishedName, PEMEncoded, PEMLabel, SubjectAltNames, Validity};
 use os_kernel::role::RoleSet;
 
-/// The intended usage of a certificate, gating what kinds of certs the CA will
-/// issue (mirrors Talos KeyUsage/ExtKeyUsage handling).
+/// What the CA is willing to issue, and what the holder may then do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CertUsage {
-    /// A certificate authority (can sign other certs).
+    /// The only usage that may sign other certificates.
     CertificateAuthority,
-    /// A TLS server certificate (apid, machined endpoints).
+    /// A TLS server certificate.
     ServerAuth,
-    /// A TLS client certificate (talosctl, node-to-node).
+    /// A TLS client certificate, which is what a workload SVID is.
     ClientAuth,
 }
 
@@ -23,25 +22,25 @@ impl CertUsage {
     }
 }
 
-/// An issued certificate. Equivalent to the parsed contents of an
-/// `x509.Certificate` in Talos, plus the signature linking it to its issuer.
+/// An issued certificate: the parsed shape, plus the signature that links it to
+/// its issuer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Certificate {
-    /// Monotonic serial number assigned by the issuing CA.
+    /// Monotonic per issuing CA.
     pub serial: u64,
-    /// Subject distinguished name.
+    /// The subject distinguished name.
     pub subject: DistinguishedName,
-    /// Issuer distinguished name (equals subject for a self-signed CA).
+    /// Equal to `subject` for a self-signed CA.
     pub issuer: DistinguishedName,
-    /// Validity window.
+    /// The validity window.
     pub validity: Validity,
-    /// Intended usage.
+    /// The intended usage.
     pub usage: CertUsage,
-    /// Subject alternative names.
+    /// The subject alternative names.
     pub sans: SubjectAltNames,
-    /// The DER bytes of the subject's public key.
+    /// DER bytes of the subject's public key.
     pub public_key_der: Vec<u8>,
-    /// The signature produced by the issuer over this certificate's TBS bytes.
+    /// The issuer's signature over [`Certificate::tbs_bytes`].
     pub signature: Vec<u8>,
 }
 
@@ -61,9 +60,9 @@ impl Certificate {
         self.validity.contains(now)
     }
 
-    /// Deterministic "to-be-signed" bytes used as the signing input. In a real
-    /// implementation this is the DER `TBSCertificate`; here it is a stable
-    /// serialization of the load-bearing fields.
+    /// The signing input: a deterministic serialization standing in for the DER
+    /// `TBSCertificate`. Every field a verifier trusts must appear here, or it
+    /// could be altered without breaking the signature.
     pub fn tbs_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         buf.extend_from_slice(&self.serial.to_be_bytes());
@@ -82,11 +81,8 @@ impl Certificate {
             buf.extend_from_slice(ip.as_bytes());
             buf.push(b',');
         }
-        // URI SANs are signed too: a SPIFFE SVID's identity is the URI SAN, so
-        // it MUST be inside the to-be-signed bytes or an attacker could append
-        // a forged identity to a validly-signed cert without breaking the
-        // signature. The `|` separator keeps the URI section unambiguous from
-        // the DNS/IP sections above.
+        // Separator: without it a DNS SAN could be shifted into the URI section
+        // and change the SPIFFE identity without changing these bytes.
         buf.push(b'|');
         for uri in &self.sans.uris {
             buf.extend_from_slice(uri.as_bytes());
@@ -96,16 +92,15 @@ impl Certificate {
         buf
     }
 
-    /// PEM envelope of the certificate. The body is the TBS bytes followed by
-    /// the signature, so a verifier can reconstruct both.
+    /// PEM envelope: the TBS bytes then the signature, so a verifier can split
+    /// them back apart.
     pub fn to_pem(&self) -> PEMEncoded {
         let mut der = self.tbs_bytes();
         der.extend_from_slice(&self.signature);
         PEMEncoded::new(PEMLabel::Certificate, der)
     }
 
-    /// Validate basic structural invariants Talos enforces before trusting a
-    /// certificate (non-empty CN, signature present, sane validity).
+    /// The structural invariants checked before a certificate is trusted at all.
     pub fn validate(&self) -> Result<()> {
         if self.subject.common_name.is_empty() {
             return Err(TrustError::invalid("certificate has empty common name"));
@@ -119,33 +114,32 @@ impl Certificate {
         Ok(())
     }
 
-    /// Common name accessor.
+    /// The subject CN, which carries the node or workload name.
     pub fn common_name(&self) -> &str {
         &self.subject.common_name
     }
 }
 
-/// A signed leaf certificate plus CA chain PEMs returned to a CSR requester.
-/// The requester already holds its private key; `key_pem` is intentionally empty.
+/// What a CSR requester gets back: its signed leaf plus the chain to anchor it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssuedIdentity {
     /// The signed certificate.
     pub certificate: Certificate,
-    /// PEM-encoded certificate.
+    /// PEM form of [`IssuedIdentity::certificate`].
     pub cert_pem: PEMEncoded,
-    /// PEM-encoded private key.
+    /// Always empty: the requester generated and kept its own private key.
     pub key_pem: PEMEncoded,
-    /// PEM-encoded issuing CA certificate, for chain building.
+    /// The issuing CA, for chain building.
     pub ca_pem: PEMEncoded,
 }
 
 impl IssuedIdentity {
-    /// The hostname / common name of the issued identity.
+    /// The common name of the issued identity.
     pub fn name(&self) -> &str {
         self.certificate.common_name()
     }
 
-    /// Convenience: the issued certificate's textual PEM.
+    /// The issued certificate's textual PEM.
     pub fn cert_pem_text(&self) -> String {
         self.cert_pem.encode()
     }

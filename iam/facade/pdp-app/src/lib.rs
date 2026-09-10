@@ -1,35 +1,8 @@
-//! # iam-pdp-app
-//!
-//! The runnable iam policy-decision-point service (ADR-0559, G004
-//! slice 1).
-//!
-//! ## Posture
-//! iam IS the IdP substrate, and the Cedar PDP + policy-bundle
-//! distribution live here (three-plane identity doctrine; ADR-0536 D-2).
-//! This app is the composition root: it loads ONE declarative policy bundle
-//! through the [`iam_pdp_kernel::PolicyBundleStore`] port
-//! (file/ConfigMap transport in slice 1), compiles it into the shared
-//! embedded Cedar engine (`iam/adapters/pdp-cedar` — the single
-//! decision algorithm, ADR-0243), and serves authorization decisions over
-//! gRPC + REST with health/readiness and one attributable audit record per
-//! decision.
-//!
-//! ## Doctrine bindings
-//! - **Default-deny everywhere**: Cedar denies absent a permit; unknown
-//!   routes 404; refusals are NEVER allows. RBAC + ABAC + PBAC are all
-//!   expressible (Cedar natively; the API carries PARC + entity slice +
-//!   context, never an RBAC-only shape).
-//! - **Fail-closed boot**: a policy bundle that cannot load REFUSES the boot
-//!   (the identity precedent). A serving process is a
-//!   correctly-configured process.
-//! - **PDP, not PEP**: decisions are deterministic + side-effect-free per
-//!   request — same request + same bundle ⇒ same decision content. The only
-//!   emission is the audit record, which never affects the decision.
-//! - **API-only service** (cli_surface_policy): no CLI surface; declarative
-//!   policy bundles are the management surface (ConfigMap in slice 1, the
-//!   policy-bundle CRD + operator distribution as destination).
-//!
-//! ADR-0083 Tier-3: production code carries no unwrap/expect/panic.
+//! Composition root for the runnable policy-decision-point service: it loads one
+//! declarative policy bundle through [`iam_pdp_kernel::PolicyBundleStore`],
+//! compiles it into the embedded Cedar engine, and serves decisions over gRPC and
+//! REST. Authorization posture is recorded in ADR-0702.
+
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -56,53 +29,43 @@ pub use iam_pdp_kernel::{
     ENV_BUNDLE_PATH, ENV_DECISION_CACHE_CAPACITY, ENV_GRPC_ADDR, ENV_REST_ADDR, PdpConfig,
 };
 
-/// Shared service state: the embedded Cedar PDP plus the audit-emission
-/// port. BOTH delivery surfaces (REST + gRPC) decide through [`PdpState::decide`],
-/// so the two protocols can never drift and the audit-per-decision invariant
-/// holds at exactly one place.
+/// REST and gRPC both decide through [`PdpState::decide`], so the protocols
+/// cannot drift and audit-per-decision holds at exactly one place.
 pub struct PdpState {
     pdp: CedarPdp,
     audit: Arc<dyn DecisionAuditSink>,
 }
 
 impl PdpState {
-    /// Assemble the state from a loaded PDP and an audit sink.
     #[must_use]
     pub fn new(pdp: CedarPdp, audit: Arc<dyn DecisionAuditSink>) -> Self {
         Self { pdp, audit }
     }
 
-    /// The policy-store version token of the currently serving bundle
-    /// (readiness surface + zookie echo).
     #[must_use]
     pub fn loaded_policy_version(&self) -> PolicyVersion {
         self.pdp.loaded_policy_version()
     }
 
-    /// Decide one PARC request against the supplied entity slice and emit
-    /// the audit record. Every [`PdpError`] is a REFUSAL, not a decision —
-    /// callers map it to a non-success protocol status and PEPs MUST treat
-    /// it as deny (fail-closed).
+    /// An `Err` here is a REFUSAL, not a deny decision: the PDP declined to
+    /// decide at all, and a PEP must still fail closed on it.
     ///
     /// # Errors
-    /// [`PdpError`] when the PDP refuses to decide (invalid request, stale
-    /// zookie pin, unknown action, evaluation failure).
+    /// [`PdpError`] when the PDP refuses to decide.
     pub fn decide(
         &self,
         request: &AuthorizationRequest,
         entities: &EntitySlice,
     ) -> Result<AuthorizationResponse, PdpError> {
         let outcome = self.pdp.authorize(request, entities)?;
-        // Audit emission is best-effort by PORT CONTRACT (a sink failure
-        // never surfaces as an allow or a refusal); the sink itself owns
-        // swallowing its errors.
+        // Infallible by port contract: a sink failure must never become an
+        // allow or a refusal, so the sink swallows its own errors.
         self.audit.record(&outcome.audit);
         Ok(outcome.response)
     }
 
-    /// Structured refusal log line (one per refused request, so unauthorized
-    /// probing is visible even though no decision record exists — refusals
-    /// are not decisions and never enter the decision-audit chain).
+    /// Refusals never enter the decision-audit chain, so this log line is the
+    /// only trace a probing caller leaves.
     pub(crate) fn log_refusal(request_id: &str, error: &PdpError) {
         tracing::warn!(
             target: "cloud_iam_pdp::refusal",

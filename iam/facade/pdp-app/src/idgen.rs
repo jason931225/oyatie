@@ -1,20 +1,14 @@
 //! Production ULID minting for decision ids.
 //!
-//! The shared Cedar PDP mints one fresh decision id per decision (cached
-//! replays included) through the [`IdGenerator`] port. This is the first
-//! PRODUCTION implementation in the workspace (the kernel ships only the
-//! deterministic `SeededIdGenerator` for tests): 48-bit millisecond
-//! timestamp + 80 bits of entropy from the ADR-0506 blessed crypto stack
-//! (aws-lc-rs `SystemRandom`), Crockford-base32 per the ULID spec.
-//!
-//! Failure posture: an entropy or clock failure yields an error — never a
-//! degraded id — and the PDP maps it to `DecisionIdUnavailable`, refusing to
-//! emit a decision that would be unattributable in the audit chain.
+//! An entropy or clock failure yields an error rather than a degraded id: the
+//! PDP maps it to `DecisionIdUnavailable` and emits no decision at all, because
+//! a decision without an id would be unattributable in the audit chain.
 
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use shared_ulid_id_kernel::{IdGenerator, IdGeneratorError, Ulid};
 
-/// Crockford-base32 alphabet (ULID spec: no I, L, O, U).
+/// Crockford base32: the alphabet omits I, L, O and U so a decision id read
+/// back by a human cannot be mistranscribed.
 const CROCKFORD: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /// Wall-clock + CSPRNG [`IdGenerator`].
@@ -24,7 +18,6 @@ pub struct SystemUlidIdGenerator {
 }
 
 impl SystemUlidIdGenerator {
-    /// Build a generator over the process-global CSPRNG.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -33,9 +26,8 @@ impl SystemUlidIdGenerator {
     }
 }
 
-/// Encode the 128-bit ULID value as 26 Crockford-base32 characters
-/// (MSB-first; the leading character carries only 3 significant bits, so a
-/// 48-bit-masked timestamp always satisfies the spec's `0..=7` constraint).
+/// MSB-first, so the leading character carries only 3 significant bits and a
+/// 48-bit-masked timestamp always lands inside the ULID spec's `0..=7`.
 fn encode(value: u128) -> String {
     let mut out = String::with_capacity(26);
     for i in 0..26 {
@@ -56,9 +48,8 @@ impl IdGenerator for SystemUlidIdGenerator {
         let timestamp = millis & ((1u128 << 48) - 1);
         let mut entropy = [0u8; 10];
         self.rng.fill(&mut entropy).map_err(|_| {
-            // The kernel error enum has no entropy variant; the detail string
-            // names the real failure and the PDP surfaces it as
-            // DecisionIdUnavailable (fail-closed, no decision emitted).
+            // Reusing MalformedUlid because the kernel enum has no entropy
+            // variant; the detail string is what names the real failure.
             IdGeneratorError::MalformedUlid("entropy-unavailable".to_owned())
         })?;
         let mut random: u128 = 0;
@@ -99,7 +90,6 @@ mod tests {
 
     #[test]
     fn encode_is_msb_first_crockford() {
-        // 1 in the lowest 5 bits encodes as ...0001 over 26 chars.
         assert_eq!(encode(1), "00000000000000000000000001");
         assert_eq!(encode(31), "0000000000000000000000000Z");
     }

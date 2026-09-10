@@ -1,44 +1,18 @@
-//! Stable OTel event/attribute taxonomy for `identity.token.issue`.
-//!
-//! This module is pure data mapping over the existing error and status types;
-//! issuance logic is unchanged. No runtime dependencies (no `tracing` or
-//! `opentelemetry` crates) are introduced — a runtime adapter at the binary
-//! boundary is responsible for projecting these value objects into concrete
-//! telemetry exporters.
-//!
-//! # Attribute taxonomy
-//!
-//! | Attribute        | Value shape          | Notes                              |
-//! |------------------|----------------------|------------------------------------|
-//! | `surface`        | `&'static str`       | Always `"identity.token.issue"`    |
-//! | `outcome`        | [`OutcomeLabel`]     | `"success"` or `"failure"`         |
-//! | `error_code`     | `Option<&'static str>`| `None` on success                  |
-//! | `purpose`        | `Option<&'static str>`| PascalCase; `None` when unavailable|
-//! | `tenant_id_hash` | `u64`                | FNV-1a hash — never raw value      |
-//! | `data_class`     | `&'static str`       | Always `"AUDIT"`                   |
-//!
-//! The `data_class` field is always `"AUDIT"` per `OperationalDataClass::Audit`
-//! in `data-boundary-kernel`, marking every event as operational audit data.
-//!
-//! The `tenant_id_hash` is a low-cardinality FNV-1a 64-bit hash of the raw
-//! tenant identifier. The raw value is never stored in the event.
+//! Telemetry value objects for the `identity.token.issue` surface. A runtime
+//! adapter at the binary boundary projects them into concrete exporters; this
+//! module deliberately pulls in no telemetry crate of its own.
 
-use data_boundary_kernel::parse_purpose_pascal_label;
+use data_boundary_kernel::{DataClassification, OperationalDataClass, parse_purpose_pascal_label};
 
 use crate::{
     IdentityTokenIssueApiError, IdentityTokenIssueApiRequest, IdentityTokenRotationRequest,
 };
 
-/// Stable telemetry surface name for identity token issuance.
-///
-/// Mirrors [`crate::IDENTITY_TOKEN_ISSUE_SURFACE`] so observability consumers
-/// can import from a single module without touching the app-boundary public API.
-pub const SURFACE: &str = "identity.token.issue";
+/// Telemetry surface name, re-exported here so observability consumers need not
+/// reach into the app-boundary API.
+pub const SURFACE: &str = crate::IDENTITY_TOKEN_ISSUE_SURFACE;
 
-/// Low-cardinality outcome label for `identity.token.issue` events.
-///
-/// Designed for use as a Prometheus label or OTel attribute value; the two
-/// variants cover every terminal outcome of an issue or rotate call.
+/// Outcome label for `identity.token.issue` events.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OutcomeLabel {
     /// The issuance or rotation completed successfully.
@@ -48,7 +22,7 @@ pub enum OutcomeLabel {
 }
 
 impl OutcomeLabel {
-    /// Stable, low-cardinality string form for telemetry label values.
+    /// Stable string form for telemetry label values.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Success => "success",
@@ -57,36 +31,22 @@ impl OutcomeLabel {
     }
 }
 
-/// Stable OTel event describing a single `identity.token.issue` call outcome.
-///
-/// Every field is intentionally low-cardinality:
-/// - `surface` and `data_class` are compile-time constants.
-/// - `outcome` and `error_code` are `&'static str` labels from the error taxonomy.
-/// - `purpose` is an optional `&'static str` label extracted from the request.
-/// - `tenant_id_hash` is a FNV-1a hash — the raw tenant identifier is never stored.
-///
-/// A runtime adapter (e.g. an axum middleware or a tracing subscriber) projects
-/// this value object into concrete spans, counters, or log events.
+/// One `identity.token.issue` call outcome. Every field is a bounded label so
+/// the event can carry no unbounded user input into a metrics dimension.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IdentityTokenIssueEvent {
-    /// Telemetry surface name; always `"identity.token.issue"`.
     pub surface: &'static str, // data_class: INTERNAL_ONLY
-    /// Outcome of the issuance call.
     pub outcome: OutcomeLabel, // data_class: INTERNAL_ONLY
-    /// Stable error code; `None` on success.
+    /// `None` on success.
     pub error_code: Option<&'static str>, // data_class: INTERNAL_ONLY
-    /// PascalCase purpose label from the request body; `None` when the request
-    /// fails validation before a valid purpose can be extracted.
+    /// `None` when the request failed validation before a purpose could be
+    /// extracted.
     pub purpose: Option<&'static str>, // data_class: INTERNAL_ONLY
-    /// FNV-1a 64-bit hash of the tenant identifier; never the raw value.
+    /// Hashed, never the raw tenant identifier.
     pub tenant_id_hash: u64, // data_class: INTERNAL_ONLY
-    /// Operational data class label; always `"AUDIT"`.
     pub data_class: &'static str, // data_class: AUDIT
 }
 
-// ── Public constructors ─────────────────────────────────────────────────────
-
-/// Build a success event for `issue_identity_token_from_app`.
 pub fn identity_token_issue_event_for_success(
     request: &IdentityTokenIssueApiRequest,
 ) -> IdentityTokenIssueEvent {
@@ -100,7 +60,6 @@ pub fn identity_token_issue_event_for_success(
     }
 }
 
-/// Build a failure event for `issue_identity_token_from_app`.
 pub fn identity_token_issue_event_for_error(
     request: &IdentityTokenIssueApiRequest,
     error: &IdentityTokenIssueApiError,
@@ -115,14 +74,12 @@ pub fn identity_token_issue_event_for_error(
     }
 }
 
-/// Build a success event for `rotate_identity_token_from_app`.
 pub fn identity_token_rotate_event_for_success(
     request: &IdentityTokenRotationRequest,
 ) -> IdentityTokenIssueEvent {
     identity_token_issue_event_for_success(&request.replacement)
 }
 
-/// Build a failure event for `rotate_identity_token_from_app`.
 pub fn identity_token_rotate_event_for_error(
     request: &IdentityTokenRotationRequest,
     error: &IdentityTokenIssueApiError,
@@ -130,28 +87,14 @@ pub fn identity_token_rotate_event_for_error(
     identity_token_issue_event_for_error(&request.replacement, error)
 }
 
-// ── Private helpers ─────────────────────────────────────────────────────────
+const AUDIT_LABEL: &str = DataClassification::Operational(OperationalDataClass::Audit).label();
 
-/// Stable label for the operational audit data class.
-///
-/// Matches `OperationalDataClass::Audit.label()` from `data-boundary-kernel`
-/// without importing the crate at the observability module level.
-const AUDIT_LABEL: &str = "AUDIT";
-
-/// Extract a stable PascalCase purpose label from a raw purpose string.
-///
-/// Returns `None` when the label does not match a supported purpose — this
-/// preserves the invariant that `purpose` in the event is always a validated
+/// `None` for an unrecognised label, which is what keeps `purpose` a validated
 /// static string rather than arbitrary user input.
 fn purpose_label_from_body(purpose: &str) -> Option<&'static str> {
     parse_purpose_pascal_label(purpose).map(|p| p.pascal_label())
 }
 
-/// FNV-1a 64-bit hash of an arbitrary string.
-///
-/// Used to produce a low-cardinality `tenant_id_hash` attribute that can be
-/// used for bucketing in metrics without storing the raw tenant identifier in
-/// the telemetry event.
 fn fnv1a_hash(value: &str) -> u64 {
     let mut state: u64 = 0xcbf29ce484222325;
     for byte in value.bytes() {

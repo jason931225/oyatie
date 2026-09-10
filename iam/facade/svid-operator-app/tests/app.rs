@@ -48,7 +48,6 @@ fn missing_cell_id_is_a_startup_refusal() {
         cfg(&[(ENV_NAMESPACE, "cloud-iam")]),
         Err(OperatorStartupConfigError::MissingCellId)
     );
-    // Empty value is also missing.
     assert_eq!(
         cfg(&[(ENV_CELL_ID, "   ")]),
         Err(OperatorStartupConfigError::MissingCellId)

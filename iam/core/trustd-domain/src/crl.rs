@@ -1,12 +1,6 @@
-//! Certificate revocation tracking.
-//!
-//! Real Talos rotates the cluster CA and short-lived node certificates rather
-//! than maintaining classic CRLs, but trustd still needs to *refuse* a
-//! certificate that has been administratively revoked (e.g. a decommissioned
-//! node, a compromised key, or a rotated CA generation). This module models a
-//! small in-memory revocation list keyed by certificate serial, with reason
-//! codes mirroring RFC 5280, and the bookkeeping trustd would apply when
-//! deciding whether an otherwise-valid certificate may still be trusted.
+//! Refusing an otherwise-valid certificate that was administratively revoked:
+//! an in-memory list keyed by serial, with RFC 5280 reason codes. Rotation, not
+//! revocation, is the primary mechanism; this covers what rotation cannot.
 
 use crate::certificate::Certificate;
 use crate::error::{Result, TrustError};
@@ -117,7 +111,8 @@ impl RevocationList {
     pub fn revoke(&mut self, serial: u64, reason: RevocationReason, now: u64) -> u64 {
         let upgrade = match self.entries.get(&serial) {
             None => true,
-            // a held cert can be hardened into a permanent revocation
+            // A hold can be hardened into a permanent revocation, never the
+            // reverse.
             Some(existing) => !existing.reason.is_permanent() && reason.is_permanent(),
         };
         if upgrade {
@@ -245,17 +240,14 @@ mod tests {
         let mut crl = RevocationList::new();
         crl.revoke(5, RevocationReason::CertificateHold, 10);
         assert!(crl.is_revoked(5));
-        // release the hold
         crl.release_hold(5).unwrap();
         assert!(!crl.is_revoked(5));
-        // hold again, then harden into permanent
         crl.revoke(5, RevocationReason::CertificateHold, 20);
         crl.revoke(5, RevocationReason::KeyCompromise, 30);
         assert_eq!(
             crl.entry(5).unwrap().reason,
             RevocationReason::KeyCompromise
         );
-        // now release must fail
         assert_eq!(crl.release_hold(5).unwrap_err().kind(), "invalid");
     }
 

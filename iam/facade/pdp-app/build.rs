@@ -4,11 +4,9 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn Error>> {
     let manifest_dir =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string()));
-    // The proto contract is crate-local (proto/iam-pdp.proto): the
-    // buck2 buildscript genrule copies it into the generated manifest dir at
-    // the same relative path, so one resolution serves both build systems.
-    // Promotion to cloud/iam/contracts/proto happens with the first
-    // external consumer slice (ADR-0559 adoption path).
+    // Crate-local because buck2's genrule copies the proto to the same relative
+    // path inside the generated manifest dir, so one resolution serves cargo and
+    // buck2 alike.
     let proto_root = manifest_dir.join("proto");
     let proto_file = proto_root.join("iam-pdp.proto");
     if !proto_file.exists() {
@@ -27,9 +25,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::env::set_var("PROTOC", protoc);
     }
 
-    // Clients are generated alongside servers: the in-repo E2E suite and the
-    // later PEP-pointing slices drive the same contract through generated
-    // stubs instead of hand-rolling tonic calls.
+    // Clients too, so the E2E suite drives the same generated contract the
+    // server implements rather than a hand-rolled tonic call.
     tonic_prost_build::configure()
         .build_client(true)
         .build_server(true)

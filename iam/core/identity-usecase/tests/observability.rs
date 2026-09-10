@@ -1,5 +1,3 @@
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` /
-// `.expect_err()` / `.unwrap_err()` to assert invariants — Tier 3 exemption.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use iam_identity_domain::IdentityError;
@@ -14,8 +12,6 @@ use iam_identity_usecase::{
         identity_token_rotate_event_for_success,
     },
 };
-
-// ── helpers ────────────────────────────────────────────────────────────────
 
 fn valid_request(request_id: &str, idempotency_key: &str) -> IdentityTokenIssueApiRequest {
     IdentityTokenIssueApiRequest {
@@ -52,23 +48,17 @@ fn valid_request(request_id: &str, idempotency_key: &str) -> IdentityTokenIssueA
     }
 }
 
-// ── SURFACE constant ────────────────────────────────────────────────────────
-
 #[test]
 fn observability_surface_constant_matches_app_surface() {
     assert_eq!(SURFACE, IDENTITY_TOKEN_ISSUE_SURFACE);
     assert_eq!(SURFACE, "identity.token.issue");
 }
 
-// ── OutcomeLabel ────────────────────────────────────────────────────────────
-
 #[test]
 fn outcome_label_strings_are_stable_low_cardinality() {
     assert_eq!(OutcomeLabel::Success.as_str(), "success");
     assert_eq!(OutcomeLabel::Failure.as_str(), "failure");
 }
-
-// ── Success event ───────────────────────────────────────────────────────────
 
 #[test]
 fn success_event_has_no_error_code_and_success_outcome() {
@@ -80,11 +70,8 @@ fn success_event_has_no_error_code_and_success_outcome() {
     assert_eq!(event.error_code, None);
     assert_eq!(event.purpose, Some("CapabilityInvocation"));
     assert_eq!(event.data_class, "AUDIT");
-    // tenant_id_hash is a u64 — not the raw tenant_id string
     assert!(event.tenant_id_hash > 0);
 }
-
-// ── tenant_id_hash stability ────────────────────────────────────────────────
 
 #[test]
 fn tenant_id_hash_is_deterministic_and_not_raw_value() {
@@ -94,17 +81,13 @@ fn tenant_id_hash_is_deterministic_and_not_raw_value() {
     let event_a = identity_token_issue_event_for_success(&request);
     let event_b = identity_token_issue_event_for_success(&request_b);
 
-    // Same tenant_id → same hash
     assert_eq!(event_a.tenant_id_hash, event_b.tenant_id_hash);
 
-    // Different tenant_id → different hash
     let mut other_tenant = valid_request("req_obs_hash_c", "idem_obs_hash_c");
     other_tenant.boundary.tenant_id = "ten_beta".to_string();
     let event_c = identity_token_issue_event_for_success(&other_tenant);
     assert_ne!(event_a.tenant_id_hash, event_c.tenant_id_hash);
 }
-
-// ── Error code coverage: all IdentityTokenIssueApiError variants ────────────
 
 #[test]
 fn every_api_error_variant_maps_to_stable_non_empty_error_code() {
@@ -199,15 +182,11 @@ fn every_api_error_variant_maps_to_stable_non_empty_error_code() {
     }
 }
 
-// ── Purpose extraction from request body ────────────────────────────────────
-
 #[test]
 fn error_event_with_valid_purpose_in_request_extracts_purpose() {
     let request = valid_request("req_obs_purpose_valid", "idem_obs_purpose_valid");
-    // EmptyCredentialKind fails after purpose can be extracted from body
     let error = IdentityTokenIssueApiError::EmptyCredentialKind;
     let event = identity_token_issue_event_for_error(&request, &error);
-    // purpose field comes from the request body when it's a valid pascal label
     assert_eq!(event.purpose, Some("CapabilityInvocation"));
 }
 
@@ -221,8 +200,6 @@ fn error_event_with_invalid_purpose_in_request_has_none_purpose() {
     let event = identity_token_issue_event_for_error(&request, &error);
     assert_eq!(event.purpose, None);
 }
-
-// ── Rotate events ───────────────────────────────────────────────────────────
 
 #[test]
 fn rotate_success_event_uses_same_surface_and_has_no_error_code() {
