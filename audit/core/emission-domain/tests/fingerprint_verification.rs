@@ -2,9 +2,12 @@
 //! itself, but it must genuinely verify a caller-supplied fingerprint
 //! against the canonical preimage, and `FingerprintMismatch` must be
 //! reachable whenever the two disagree.
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` to assert
-// invariants — Tier 3 exemption.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+)]
 
 use audit_emission_domain::{CanonicalEnvelope, EmissionDomainError, Fingerprinter};
 use audit_emission_kernel::ChainCoordinate;
@@ -111,14 +114,6 @@ fn verify_accepts_an_untampered_envelope() {
 
 #[test]
 fn verify_rejects_when_recomputed_with_a_disagreeing_fingerprinter() {
-    // `CanonicalEnvelope`'s fields are private and `build` is the only
-    // public constructor, so a built envelope's fields cannot be mutated
-    // out from under its fingerprint through this crate's public API — the
-    // in-memory tampering scenario `verify` might otherwise need to catch
-    // simply cannot be constructed. What `verify` genuinely detects is
-    // fingerprinter drift: re-deriving the fingerprint with a *different*
-    // `Fingerprinter` than the one used at construction (e.g. after a hash
-    // algorithm or key rotation on the adapter side) must disagree.
     struct AlwaysReturns(&'static str);
     impl Fingerprinter for AlwaysReturns {
         fn fingerprint(&self, _preimage: &[u8]) -> String {

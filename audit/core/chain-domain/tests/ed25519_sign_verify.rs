@@ -1,6 +1,9 @@
-// ADR-0083 Tier 3: integration tests use `.unwrap()` / `.expect()` /
-// `.expect_err()` / `.unwrap_err()` to assert invariants — Tier 3 exemption.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+)]
 
 use audit_chain_domain::{
     AuditAppendInput, AuditChain, AuditChainError, Ed25519Signature, Ed25519SigningKey,

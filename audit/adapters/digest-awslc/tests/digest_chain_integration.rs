@@ -1,4 +1,4 @@
-//! Integration rung (AMENDMENT 7 ladder): seal and verify a real audit
+//! Integration rung: seal and verify a real audit
 //! digest chain end-to-end — SHA-256 + Ed25519 via aws-lc-rs, audit
 //! events serialized through the canonical CloudEvents envelope. GREEN
 //! path plus RED tamper fixtures (forged batch, truncation, cross-key
@@ -40,7 +40,6 @@ fn admin_event(sequence: u64) -> AuditCloudEvent {
     .expect("well-formed admin event")
 }
 
-/// Canonical batch framing: newline-delimited canonical event JSON.
 fn batch_bytes(events: &[AuditCloudEvent]) -> Vec<u8> {
     let mut out = Vec::new();
     for event in events {

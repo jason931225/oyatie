@@ -1,13 +1,3 @@
-//! Caller-supplied inputs for [`crate::verify`].
-//!
-//! Mirrors the shape `audit_sealing_domain::seal_record::SealRecordInput`
-//! uses: plain public fields, no constructor, and no invariant claimed by
-//! this module (L1) — every check [`crate::verify`] performs runs inside
-//! `verify` itself and is reported through [`VerificationVerdict`], never
-//! silently skipped by a constructor that never got called.
-//!
-//! [`VerificationVerdict`]: audit_verification_api::VerificationVerdict
-
 use audit_chain_domain::{Ed25519Signature, Sha256Hash};
 
 /// A bundle of the three RFC 6962 §2.1 values
@@ -26,28 +16,12 @@ pub struct MerkleInclusionProof {
     pub leaf_count: u64, // data_class: PUBLIC
 }
 
-/// What the record under verification claims about the period immediately
-/// before it, for the same `(pack, tenant_partition)`.
-///
-/// Mirrors `audit_sealing_domain::seal_record::PriorPeriod` exactly
-/// (`First` / `Preceding { root }`) — see that type's doc for why a bare
-/// `First` claim is never trusted on its own: [`crate::verify`] always
-/// checks it against [`crate::ports::RootRegistry::is_first_period`] (L8)
-/// rather than accepting the variant as proof of anything.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PriorRootClaim {
-    /// This is claimed to be the first period ever sealed for
-    /// `(pack, tenant_partition)`. Verified via
-    /// [`crate::ports::RootRegistry::is_first_period`], never taken as-is.
     First,
-    /// The immediately preceding sealed period's published root, for
-    /// chaining. Verified against
-    /// [`crate::ports::RootRegistry::resolve_root`], never taken as-is.
     Preceding { root: Sha256Hash },
 }
 
-/// Caller-supplied inputs to [`crate::verify`].
-///
 /// Two identity triples travel together here, and [`crate::verify`]
 /// deliberately keeps them distinct instead of collapsing them into one:
 ///
@@ -66,8 +40,7 @@ pub enum PriorRootClaim {
 ///   submitted under a pack A or pack B verification request) — so
 ///   [`crate::verify`] checks the two triples against each other
 ///   explicitly and reports any leg's mismatch as
-///   `VerificationFailureReason::PackMismatch` (L7: every leg of the tuple
-///   participates, not just `pack`).
+///   `VerificationFailureReason::PackMismatch`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VerificationRequest {
     pub context_pack: String,             // data_class: PUBLIC
@@ -88,23 +61,5 @@ pub struct VerificationRequest {
     pub prior_root: PriorRootClaim,  // data_class: INTERNAL_ONLY
     pub signature: Ed25519Signature, // data_class: INTERNAL_ONLY
 
-    /// The caller's claim that the leaf under verification belongs to an
-    /// event a retention-cascade redaction has already erased the payload
-    /// of. `audit/policy/retention-matrix.yaml` sets `preserve_merkle_proof:
-    /// true` for every class it defines, so a redacted event's leaf hash is
-    /// never removed from the tree — [`crate::verify`] still runs the full
-    /// signature and Merkle-inclusion check against it (it must still PROVE
-    /// inclusion).
-    ///
-    /// This field alone is NOT the enforcement: a plain `bool` is exactly
-    /// as free to construct as [`PriorRootClaim::First`] is (L8), so
-    /// [`crate::verify`] never takes it at face value either. It confirms
-    /// the true redaction status via
-    /// [`crate::ports::RedactionRegistry::is_redacted`] — see that port's
-    /// doc for why — and only turns a would-be `Verified` into
-    /// `VerificationFailureReason::RedactedEvent` once genuine inclusion
-    /// has been proven, so a redacted leaf is reported honestly rather than
-    /// silently verified, and setting this field to `false` cannot by
-    /// itself launder a genuinely redacted leaf through as `Verified`.
     pub redacted: bool, // data_class: PUBLIC
 }

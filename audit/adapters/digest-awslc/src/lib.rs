@@ -1,14 +1,14 @@
-//! aws-lc-rs adapter for the audit digest-chain ports — ADR-0506
-//! canonical crypto backend, transitional custody per ADR-0510.
-//!
-//! Implements [`Digester`] with SHA-256 (CloudTrail digest-file algorithm)
-//! and [`ChainSigner`]/[`ChainVerifier`] with Ed25519 (RFC 8032,
-//! deterministic signing — no ambient RNG at sign time). Key custody here
-//! is in-process and transitional; the W5 destination moves signing behind
-//! the owned KMS interface (ADR-0536 D-5) without changing the ports.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+//! Key custody here is in-process and transitional: signing keys are held
+//! in this adapter, not behind a KMS interface.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        reason = "assertion failure IS the test signal; ADR-0083 Tier 3 cfg(test) exemption"
+    )
+)]
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeMap;
@@ -19,10 +19,8 @@ use shared_audit_event_kernel::{
     ChainSigner, ChainVerifier, DigestChainError, Digester, decode_hex, encode_hex,
 };
 
-/// Self-describing digest prefix (house convention `sha256:<hex>`).
 pub const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
-/// SHA-256 [`Digester`] backed by aws-lc-rs.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Sha256Digester;
 
@@ -37,30 +35,35 @@ impl Digester for Sha256Digester {
     }
 }
 
-/// Ed25519 [`ChainSigner`] holding an in-process key pair (transitional
-/// custody — see crate docs).
+/// Wrapper whose `Debug` never renders what it holds, so key material
+/// cannot reach a log through a derived or interpolated format.
+struct Secret<T>(T);
+
+impl<T> std::fmt::Debug for Secret<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Secret(<redacted>)")
+    }
+}
+
 pub struct Ed25519ChainSigner {
-    key_pair: Ed25519KeyPair, // data_class: SECRET
-    key_id: String,           // data_class: INTERNAL_ONLY
+    signing_key: Secret<Ed25519KeyPair>, // data_class: SECRET
+    key_id: String,                      // data_class: INTERNAL_ONLY
 }
 
 impl Ed25519ChainSigner {
-    /// Generate a fresh signing key under `key_id`.
-    ///
     /// # Errors
     /// [`DigestChainError::SigningFailed`] when key generation fails.
     pub fn generate(key_id: impl Into<String>) -> Result<Self, DigestChainError> {
         let key_pair = Ed25519KeyPair::generate()
             .map_err(|e| DigestChainError::SigningFailed(format!("ed25519 keygen: {e}")))?;
         Ok(Self {
-            key_pair,
+            signing_key: Secret(key_pair),
             key_id: key_id.into(),
         })
     }
 
-    /// Raw 32-byte Edwards public key for registration with a verifier.
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key_pair.public_key().as_ref().to_vec()
+        self.signing_key.0.public_key().as_ref().to_vec()
     }
 }
 
@@ -71,14 +74,13 @@ impl ChainSigner for Ed25519ChainSigner {
 
     fn sign_hex(&self, message: &[u8]) -> Result<String, DigestChainError> {
         // Ed25519 signing is deterministic per RFC 8032 — no RNG input.
-        Ok(encode_hex(self.key_pair.sign(message).as_ref()))
+        Ok(encode_hex(self.signing_key.0.sign(message).as_ref()))
     }
 }
 
-/// Ed25519 [`ChainVerifier`] over a key_id → public-key registry.
 #[derive(Clone, Debug, Default)]
 pub struct Ed25519ChainVerifier {
-    keys: BTreeMap<String, Vec<u8>>, // data_class: PUBLIC
+    public_keys: BTreeMap<String, Vec<u8>>,
 }
 
 impl Ed25519ChainVerifier {
@@ -89,7 +91,7 @@ impl Ed25519ChainVerifier {
     /// Register `public_key` (raw 32-byte Edwards point) under `key_id`.
     #[must_use]
     pub fn with_key(mut self, key_id: impl Into<String>, public_key: Vec<u8>) -> Self {
-        self.keys.insert(key_id.into(), public_key);
+        self.public_keys.insert(key_id.into(), public_key);
         self
     }
 }
@@ -102,7 +104,7 @@ impl ChainVerifier for Ed25519ChainVerifier {
         signature_hex: &str,
     ) -> Result<(), DigestChainError> {
         let public_key = self
-            .keys
+            .public_keys
             .get(key_id)
             .ok_or_else(|| DigestChainError::UnknownKeyId(key_id.to_owned()))?;
         let signature = decode_hex(signature_hex)?;
@@ -143,6 +145,12 @@ mod tests {
             verifier.verify("key-1", b"forged", &sig),
             Err(DigestChainError::SignatureInvalid { .. })
         ));
+    }
+
+    #[test]
+    fn secret_debug_rendering_never_exposes_what_it_holds() {
+        let held = "ed25519-private-key-material";
+        assert_eq!(format!("{:?}", Secret(held)), "Secret(<redacted>)");
     }
 
     #[test]

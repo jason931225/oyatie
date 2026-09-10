@@ -1,10 +1,3 @@
-//! Black-box tests for (d): auditor-engagement validity.
-//!
-//! `authorize_auditor_engagement` takes `now_epoch_seconds` as a
-//! caller-supplied parameter (no clock in this crate — see the module docs,
-//! section (d), and L8). These tests compute the comparison instants
-//! themselves so nothing here depends on the wall clock either.
-
 use audit_query_domain::{AuditorEngagement, QueryDomainError, authorize_auditor_engagement};
 
 // 2026-06-01T00:00:00Z, computed independently of the crate's own date math
@@ -115,8 +108,6 @@ fn rejects_expires_at_with_non_utc_offset() {
     ));
 }
 
-// ── L7: both tenant legs are validated, not just compared (finding C/#8) ──
-
 #[test]
 fn rejects_blank_tenant_on_both_sides_rather_than_authorizing_a_blank_match() {
     let mut bad = engagement();
@@ -135,7 +126,7 @@ fn rejects_whitespace_only_tenant_on_both_sides() {
 
 #[test]
 fn rejects_invisible_only_tenant_on_both_sides() {
-    // L3: ZWSP/BOM survive `.trim()`, so a bare equality check on two
+    // ZWSP/BOM survive `.trim()`, so a bare equality check on two
     // unvalidated invisible-only strings would compare equal.
     let mut bad = engagement();
     bad.tenant_id = "\u{200B}\u{FEFF}".to_string();
