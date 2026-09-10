@@ -222,9 +222,9 @@ configuration asserting so are correct rather than stale.
 
 The cache substrate exists. A NativeLink CAS serves
 `grpcs://cache.oyatie.dev:50051`, and has been called from a GitHub-hosted
-runner as well as locally. **mTLS is enforced**: `client_ca_file` is set on the
-listener,
-which is what makes the port an authorisation boundary rather than merely an
+runner as well as locally. **mTLS is enforced**: `client_ca_file` is set on
+the listener, which is what makes the port an authorisation boundary rather
+than merely an
 encrypted one, and an anonymous RPC was measured being refused at the time a
 check existed that made one. That check was retired because it rested on an
 ad-hoc `grpcurl` install, not because its finding was wrong -- so the property
@@ -245,10 +245,14 @@ UNAUTHENTICATED write is arbitrary code execution in every consumer.
 
 Two NativeLink configurations exist, they protect different things, and only
 the substrate's is deployed. The substrate refuses every action-cache write
-from every identity, and has no reader/writer split: that split needs two CAs
-rather than two certificates, because one CA signing both makes them
-indistinguishable to `client_ca_file`, which is hygiene rather than
-enforcement. This repository's chart is the inverse. It leaves `read_only`
+from every identity, and has no reader/writer split. Against `client_ca_file`
+alone such a split would need two CAs, because that check proves only that a
+client's chain terminates in the given CA: one CA signing both a reader and a
+writer leaves them indistinguishable to it, and possession of either
+authenticates as both. That is a limit of `client_ca_file`, not of split
+enforcement in general -- the chart splits one CA's certificates by SAN at the
+proxy, which is precisely what `client_ca_file` cannot do. This repository's
+chart is the inverse. It leaves `read_only`
 unset, and its proxy does have a reader/writer split -- one that LICENSES
 `ActionCache/UpdateActionResult` to the writer identity, a write the chart's
 own qualification suite requires to succeed.
@@ -269,13 +273,18 @@ that fails every build. The substrate emits PKCS8 at the source now, so a
 freshly minted credential is sound, and any key issued before that fix is SEC1
 by construction.
 
-Whether a given HELD key is stale cannot be read back. The `CACHE_CLIENT_KEY`
-Actions secret is fed from the same output and `cache-creds` does not refresh
-it, but GitHub does not return a secret's value and the provider does not keep
-the plaintext in state -- so its format is not observable from either side.
-Re-applying the repository stack rewrites it from the current output, which
-settles the question instead of inferring it from when the secret was last
-written.
+The published `CACHE_CLIENT_KEY` Actions secret is current PKCS8, and that is
+checkable without writing anything. GitHub never returns a secret's value, but
+the provider keeps `plaintext_value` in state, so a `tofu plan` on the
+`repository` stack diffs the published secret against the live `platform`
+output. That plan reports no change to any cache secret, which is what makes
+the published key the PKCS8 one rather than the SEC1 one it would hold if it
+predated the fix.
+
+`tofu state show` REDACTS sensitive attributes, so inspecting that row shows
+neither PEM header and reads as absence. That is the instrument hiding the
+value, not the value being absent -- a plan compares it, a state row does not
+reveal it.
 
 What is recorded above is authority, not present readiness. At the time of
 writing the buck2 graph does not build cleanly, a cold build measures around
