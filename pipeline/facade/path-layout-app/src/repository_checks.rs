@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use pipeline_admission::layout::live_apex_adr;
 use pipeline_admission::{
     ALLOWED_ROOT_DIRS, APP_PRODUCT_DIRS, BUILD_ROOT_DIRS, CARGO_CONFIG_PATHS,
     cargo_config_violations, comment_run_violations, file_budget_violations, is_capability_root,
@@ -129,6 +130,29 @@ pub(super) fn live_candidate_violations(
         }
     }
     Ok(violations)
+}
+
+/// Decision id to live path for every decision record the corpus still serves
+/// as current law, and can therefore amend in place.
+pub(super) fn amendable_decision_paths(
+    repository: &impl RepositoryRead,
+    commit: &str,
+) -> Result<BTreeMap<String, String>, String> {
+    const DECISIONS: &str = "docs/decisions";
+    if !repository.directory_exists(commit, DECISIONS)? {
+        return Ok(BTreeMap::new());
+    }
+    Ok(repository
+        .files_under(commit, DECISIONS)?
+        .into_iter()
+        .filter(|path| live_apex_adr(path))
+        .filter_map(|path| Some((decision_id(&path)?, path)))
+        .collect())
+}
+
+fn decision_id(path: &str) -> Option<String> {
+    let (_, name) = path.rsplit_once('/')?;
+    name.get(..8).map(str::to_owned)
 }
 
 pub(super) fn regular_blob(kind: Option<RepositoryEntryKind>) -> bool {

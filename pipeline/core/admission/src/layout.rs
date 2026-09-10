@@ -10,6 +10,7 @@ mod base;
 mod build;
 mod cargo_config;
 mod change;
+mod decision_record;
 mod dependency;
 mod inner;
 mod manifest;
@@ -22,6 +23,7 @@ mod workspace;
 pub use base::base_admission_violations;
 pub use cargo_config::{CARGO_CONFIG_PATHS, cargo_config_violations};
 pub use change::{changed_layout_violations, owner_core_regression_violations};
+pub use decision_record::new_decision_record_violations;
 pub use dependency::{draft_dependency_violations, workspace_draft_dependency_violations};
 use inner::validate_owner_path;
 pub use manifest::{
@@ -241,6 +243,26 @@ pub(crate) fn is_frozen_non_root_markdown(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
     (lower.ends_with(".md") || lower.ends_with(".markdown"))
         && !matches!(path, "README.md" | "AGENTS.md" | "CLAUDE.md")
+        && !live_apex_adr(path)
+}
+
+/// A decision record the corpus still serves as current law, and therefore the
+/// one Markdown file the repository may edit to change its own mind.
+pub fn live_apex_adr(path: &str) -> bool {
+    path.strip_prefix("docs/decisions/")
+        .is_some_and(live_apex_adr_name)
+}
+
+// ponytail: `ADR-07` is the corpus's own spelling of the live apex, inherited
+// from the file budget; ADR-0800 is frozen again until someone widens it.
+pub(crate) fn live_apex_adr_name(name: &str) -> bool {
+    name.strip_prefix("ADR-07")
+        .and_then(|rest| rest.strip_suffix(".md"))
+        .is_some_and(|rest| {
+            rest.len() > 3
+                && rest.as_bytes()[..2].iter().all(u8::is_ascii_digit)
+                && rest.as_bytes()[2] == b'-'
+        })
 }
 
 pub(crate) fn frozen_non_root_markdown_message(path: &str) -> String {

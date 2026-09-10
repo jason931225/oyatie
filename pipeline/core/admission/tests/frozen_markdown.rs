@@ -56,7 +56,8 @@ fn only_three_exact_root_markdown_paths_remain_mutable() {
     for path in [
         "README.MD",
         "policy/README.md",
-        "docs/decisions/ADR-0720-example.md",
+        "docs/decisions/INDEX.md",
+        "docs/decisions/ADR-0654-consolidated.md",
         ".github/SECURITY.md",
         "app/README.md",
         "policy/notes.markdown",
@@ -73,13 +74,13 @@ fn only_three_exact_root_markdown_paths_remain_mutable() {
 
 #[test]
 fn historical_path_provenance_does_not_leak_into_the_diagnostic() {
-    let violation = layout_violations(&["docs/decisions/ADR-0720-example.md".to_owned()])
+    let violation = layout_violations(&["docs/decisions/ADR-0654-consolidated.md".to_owned()])
         .into_iter()
         .next()
         .expect("frozen historical path violation");
     assert_eq!(
         violation,
-        "docs/decisions/ADR-0720-example.md: frozen non-root Markdown cannot be changed or used as a copy source"
+        "docs/decisions/ADR-0654-consolidated.md: frozen non-root Markdown cannot be changed or used as a copy source"
     );
 }
 
@@ -103,4 +104,54 @@ fn frozen_change(changes: &pipeline_admission::GitChangePaths) -> Vec<String> {
         .into_iter()
         .filter(|violation| violation.contains("frozen non-root Markdown"))
         .collect()
+}
+
+const APEX: &str = "docs/decisions/ADR-0716-cargo-merge-path.md";
+
+#[test]
+fn a_live_apex_decision_record_is_amendable_in_place() {
+    for change in [
+        format!("M\0{APEX}\0"),
+        format!("A\0{APEX}\0"),
+        format!("T\0{APEX}\0"),
+    ] {
+        let violations = frozen(change.as_bytes());
+        assert!(violations.is_empty(), "{change:?}: {violations:#?}");
+    }
+    assert!(layout_violations(&[APEX.to_owned()]).is_empty());
+}
+
+#[test]
+fn a_live_apex_decision_record_cannot_be_retired_by_erasure() {
+    for change in [
+        format!("D\0{APEX}\0"),
+        format!("R100\0{APEX}\0docs/decisions/ADR-0717-renamed.md\0"),
+        format!("C100\0{APEX}\0docs/decisions/ADR-0717-copied.md\0"),
+    ] {
+        let violations = frozen(change.as_bytes());
+        assert!(
+            violations.iter().any(|item| item.starts_with(APEX)),
+            "{change:?}: {violations:#?}"
+        );
+    }
+}
+
+#[test]
+fn the_exemption_is_spelled_exactly_like_the_live_apex_corpus() {
+    for path in [
+        "docs/decisions/ADR-0654-consolidated.md",
+        "docs/decisions/ADR-0800-future.md",
+        "docs/decisions/ADR-07evil.md",
+        "docs/decisions/INDEX.md",
+        "docs/adr-archive/ADR-0716-cargo-merge-path.md",
+        "docs/decisions/nested/ADR-0716-cargo-merge-path.md",
+    ] {
+        let violations = layout_violations(&[path.to_owned()]);
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains("frozen non-root Markdown")),
+            "{path}: {violations:#?}"
+        );
+    }
 }

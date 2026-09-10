@@ -113,15 +113,7 @@ pub(super) fn validate_templates_path(file: &str, parts: &[&str], violations: &m
 }
 
 fn decision_file(name: &str) -> bool {
-    matches!(name, "OWNERS" | "README.md" | "INDEX.md" | "BUCK")
-        || name
-            .strip_prefix("ADR-07")
-            .and_then(|rest| rest.strip_suffix(".md"))
-            .is_some_and(|rest| {
-                rest.len() > 3
-                    && rest.as_bytes()[..2].iter().all(u8::is_ascii_digit)
-                    && rest.as_bytes()[2] == b'-'
-            })
+    matches!(name, "OWNERS" | "README.md" | "INDEX.md" | "BUCK") || super::live_apex_adr_name(name)
 }
 
 fn markdown_or_metadata(name: &str) -> bool {

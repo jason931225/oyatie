@@ -17,8 +17,9 @@ use pipeline_repository_git_draft::GitRepository;
 
 mod repository_checks;
 
+use pipeline_admission::layout::{live_apex_adr, new_decision_record_violations};
 use repository_checks::{
-    live_candidate_violations, owner_tree_state, regular_blob,
+    amendable_decision_paths, live_candidate_violations, owner_tree_state, regular_blob,
     reject_indirect_dependency_components, repository_cargo_config_violations,
 };
 
@@ -183,6 +184,18 @@ fn run() -> Result<(), String> {
         {
             added_base_manifests.push(manifest);
         }
+    }
+    let amendable = amendable_decision_paths(&repository, &head)?;
+    for path in changes
+        .layout_candidates
+        .iter()
+        .filter(|path| live_apex_adr(path))
+    {
+        if repository.path_exists(&merge_base, path)? {
+            continue;
+        }
+        let contents = repository.blob_text(&head, path)?;
+        violations.extend(new_decision_record_violations(path, &contents, &amendable));
     }
     for path in changes
         .layout_candidates

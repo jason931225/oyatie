@@ -32,14 +32,20 @@ fn layout_engine_rejects_dump_and_frozen_markdown_but_accepts_native_faces() {
         "storage/core/journal/src/lib.rs".into(),
         "app/foundry/ports/blob/src/lib.rs".into(),
         "docs/decisions/ADR-0720-example.md".into(),
+        "docs/decisions/INDEX.md".into(),
     ]);
     assert!(violations.iter().any(|item| item.contains("plan")));
     assert!(violations.iter().any(|item| item.contains("libs")));
     assert!(violations.iter().any(|item| item.contains("storage/src")));
     assert!(!violations.iter().any(|item| item.contains("storage/core")));
     assert!(!violations.iter().any(|item| item.contains("foundry/ports")));
+    assert!(
+        !violations
+            .iter()
+            .any(|item| item.contains("ADR-0720-example"))
+    );
     assert!(violations.iter().any(|item| {
-        item.contains("ADR-0720-example") && item.contains("frozen non-root Markdown")
+        item.contains("docs/decisions/INDEX.md") && item.contains("frozen non-root Markdown")
     }));
 }
 

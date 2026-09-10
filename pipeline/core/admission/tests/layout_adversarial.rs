@@ -254,7 +254,7 @@ fn root_docs_cargo_config_and_pack_payloads_are_closed() {
         "templates/notes/new.md",
         "packs/eu/plan/todo.md",
         "packs/eu/new-overlay.yaml",
-        "docs/decisions/ADR-0720-example.md",
+        "docs/decisions/INDEX.md",
         "docs/standards/code-style.md",
     ] {
         assert!(rejected(path), "expected rejection: {path}");

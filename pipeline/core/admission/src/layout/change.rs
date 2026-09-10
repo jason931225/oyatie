@@ -6,7 +6,7 @@ use crate::GitChangePaths;
 
 use super::{
     ALLOWED_ROOT_DIRS, APP_PRODUCT_DIRS, BUILD_ROOT_DIRS, frozen_non_root_markdown_message,
-    is_capability_root, is_frozen_non_root_markdown, layout_violations,
+    is_capability_root, is_frozen_non_root_markdown, layout_violations, live_apex_adr,
 };
 
 /// Apply repository-layout rules only to changed paths that remain after the Git diff. A new owner
@@ -23,11 +23,18 @@ pub fn changed_layout_violations(
             .cloned()
             .collect::<Vec<_>>(),
     );
+    // A live apex decision record is exempt from the Markdown freeze so the
+    // repository can change its own mind in place. Amendment leaves the file
+    // where it is: an endpoint that is occupied but does not survive the diff
+    // is a delete or a copy/rename source, which erases the record instead.
     violations.extend(
         changes
             .occupied
             .iter()
-            .filter(|path| is_frozen_non_root_markdown(path))
+            .filter(|path| {
+                is_frozen_non_root_markdown(path)
+                    || (live_apex_adr(path) && !changes.layout_candidates.contains(*path))
+            })
             .map(|path| frozen_non_root_markdown_message(path)),
     );
     if owner_is_new_and_touched("base", changes, existing_owner_dirs) {

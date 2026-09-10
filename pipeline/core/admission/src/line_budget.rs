@@ -1,6 +1,6 @@
 //! Touched-file budget. Provenance: ADR-0719 file-budget decision (D-35).
 
-use crate::layout::{APP_PRODUCT_DIRS, is_capability_root};
+use crate::layout::{APP_PRODUCT_DIRS, is_capability_root, live_apex_adr};
 
 const MAX_LINES: usize = 300;
 const MAX_COMMENT_RUN: usize = 20;
@@ -171,16 +171,6 @@ fn lowercase_versioned_name(name: &str) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
         && version.is_some_and(|version| {
             !version.is_empty() && version.bytes().all(|byte| byte.is_ascii_digit())
-        })
-}
-
-fn live_apex_adr(path: &str) -> bool {
-    path.strip_prefix("docs/decisions/ADR-07")
-        .and_then(|rest| rest.strip_suffix(".md"))
-        .is_some_and(|rest| {
-            rest.len() > 3
-                && rest.as_bytes()[..2].iter().all(u8::is_ascii_digit)
-                && rest.as_bytes()[2] == b'-'
         })
 }
 
