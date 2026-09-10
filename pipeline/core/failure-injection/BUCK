@@ -1,0 +1,36 @@
+rust_library(
+    name = "pipeline-failure-injection",
+    srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
+    crate = "pipeline_failure_injection",
+    crate_root = "src/lib.rs",
+    visibility = ["PUBLIC"],
+    deps = [
+        "//pipeline/core/retained-reference:pipeline-retained-reference",
+        "//pipeline/core/revision-view:pipeline-revision-view",
+    ],
+)
+
+rust_test(
+    name = "pipeline-failure-injection-unittest",
+    srcs = glob(["src/**/*.rs", "migrations/**/*.sql", "**/*.cedar", "**/*.sql", "**/*.json", "**/*.toml", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.html", "**/*.css", "**/*.txt"]),
+    crate = "pipeline_failure_injection",
+    crate_root = "src/lib.rs",
+    visibility = ["PUBLIC"],
+    deps = [
+        "//pipeline/core/retained-reference:pipeline-retained-reference",
+        "//pipeline/core/revision-view:pipeline-revision-view",
+    ],
+)
+
+rust_test(
+    name = "pipeline-failure-injection-refusal-under-fault",
+    srcs = ["tests/refusal_under_fault.rs"],
+    crate = "pipeline_failure_injection_refusal_under_fault",
+    crate_root = "tests/refusal_under_fault.rs",
+    visibility = ["PUBLIC"],
+    deps = [
+        ":pipeline-failure-injection",
+        "//pipeline/core/retained-reference:pipeline-retained-reference",
+        "//pipeline/core/revision-view:pipeline-revision-view",
+    ],
+)

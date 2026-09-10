@@ -6492,6 +6492,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pipeline-failure-injection"
+version = "0.1.0"
+dependencies = [
+ "pipeline-retained-reference",
+ "pipeline-revision-view",
+]
+
+[[package]]
 name = "pipeline-path-layout-app"
 version = "0.1.0"
 dependencies = [
