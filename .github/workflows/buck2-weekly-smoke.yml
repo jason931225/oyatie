@@ -1,19 +1,22 @@
 # Weekly non-blocking honesty check for the buck2 graph, and the only lane that
-# reads or writes the shared NativeLink cache.
+# reads the shared NativeLink cache. It never writes.
 #
 # Not part of the merge path. Red means BUCK/reindeer wiring rotted, or the
 # cache lane below reported something worth reading -- never that a change is
-# refused. ADR-0720 is explicit that measurement manages the rollout and does
-# not gate the merge, and that CAS alone does not overturn ADR-0716.
+# refused. AGENTS.md:208 is explicit that a live CAS alone does not overturn
+# ADR-0716.
 #
-# This lane is the single writer on purpose. Every runner here is an ephemeral
-# GitHub image, so two runs of one commit see near-identical undeclared inputs;
-# that uniformity is what stands in for the sandbox a remote executor would
-# give, and it only holds while writes come from CI and never from a laptop.
+# This lane reads and never writes. An earlier draft argued it should be the
+# single writer, because ephemeral identical runners stand in for the sandbox a
+# remote executor gives. That is a claim about the uniformity of the
+# ENVIRONMENT; an action-cache write is a claim about the integrity of the
+# MAPPING -- the right to decide what every later build receives instead of
+# compiling -- and no amount of the first buys the second.
 #
 # Authority: docs/decisions/ADR-0716-cargo-merge-path-buck2-local-hermeticity.md
-#            ADR-0720 (buck2 merge path, cache-only NativeLink)
-
+#            AGENTS.md:181-191. The buck2/NativeLink record it describes is not
+#            in docs/decisions/: the repository layout gate refused it
+#            (PR #2424), so AGENTS.md carries it.
 name: buck2-weekly-smoke
 
 on:
@@ -123,6 +126,20 @@ jobs:
             echo "wired=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Does the SERVER accept this client cert? The TCP probe below proves
+          # the port answers; it says nothing about mTLS. An expired, revoked or
+          # wrong-CA cert passes every other guard and then kills the build at
+          # handshake -- the likeliest real failure, and the one the guards
+          # missed. This is a different question from the PKCS8 check above:
+          # that one asks whether rustls can PARSE the key, this asks whether
+          # the far end ACCEPTS the identity.
+          if ! echo | timeout 20 openssl s_client -connect "${CACHE_ENDPOINT}" \
+                 -cert "${RUNNER_TEMP}/cache-creds/client.pem" \
+                 -CAfile "${RUNNER_TEMP}/cache-creds/ca.crt" >/dev/null 2>&1; then
+            echo "the cache did not accept this client certificate; building without the cache"
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Reachability is checked before buck2 is told the endpoint exists, so
           # an unreachable cache is a skipped feature rather than a failed build.
           #
@@ -184,6 +201,17 @@ jobs:
           # construction -- `opts.engine_address.as_ref().context("No engine
           # address")?` runs before CAS setup -- and is never called, because
           # the cache platform keeps `remote_enabled = False`.
+          # Only after the file exists and parses. `set -uo pipefail` has no
+          # `-e` -- deliberately, because every guard above exits 0 on purpose
+          # -- so a heredoc that failed part way (ENOSPC) would otherwise leave
+          # a truncated config, redden the build, and still report wired=yes.
+          # A hollow success line is the defect this lane is about.
+          if ! grep -q '^\s*instance_name' .buckconfig.local 2>/dev/null; then
+            echo "the cache config was not written completely; building without the cache"
+            rm -f .buckconfig.local
+            echo "wired=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "wired=yes" >> "$GITHUB_OUTPUT"
           echo "runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
 
@@ -203,11 +231,15 @@ jobs:
           set -uo pipefail
           echo "cache wired: ${{ steps.cache-config.outputs.wired }}"
           echo "runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
-          buck2 log summary 2>/dev/null | grep -iE "cache|remote|network" || \
-            echo "(no cache accounting in this run's summary)"
+          if ! summary=$(buck2 log summary 2>&1); then
+            echo "buck2 log summary failed, so this run reported no cache accounting:"
+            echo "$summary" | tail -3
+          elif ! printf '%s' "$summary" | grep -iE "cache|remote|network"; then
+            echo "(the summary carried no cache, remote or network line)"
+          fi
 
       # Credentials outlive the build otherwise: this runner is ephemeral, but
       # a self-hosted one would not be, and the habit should not depend on that.
       - name: Remove the credentials
         if: ${{ always() }}
-        run: rm -rf "${RUNNER_TEMP}/cache-creds" .buckconfig.local
+        run: rm -rf "${RUNNER_TEMP:?}/cache-creds" .buckconfig.local
