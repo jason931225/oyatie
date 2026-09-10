@@ -1,5 +1,3 @@
-use super::*;
-
 pub(super) fn query_operation_document() -> String {
     r#"openapi: 3.2.0
 info:

@@ -1,6 +1,6 @@
 use crate::NETWORK_SCHEMA_VERSION;
 use crate::error::CloudNetworkError;
-use crate::load_balancer::{LbKind, LoadBalancer, LoadBalancerCreate, listeners, target_groups};
+use crate::load_balancer::{LbKind, LoadBalancer, LoadBalancerCreate};
 use crate::provider::{
     NetworkProviderKind, NetworkProviderLoadBalancerOperation,
     validate_network_provider_load_balancer_ref,

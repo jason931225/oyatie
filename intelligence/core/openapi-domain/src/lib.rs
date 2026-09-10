@@ -10,10 +10,6 @@
 // `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-use std::collections::{BTreeMap, BTreeSet};
-
-use data_boundary_kernel::parse_data_class_label;
-
 mod contract_mirror;
 mod data_class;
 mod document;
