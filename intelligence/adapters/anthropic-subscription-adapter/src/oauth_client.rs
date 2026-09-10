@@ -37,6 +37,11 @@ pub enum OAuthClientError {
         kind: RefreshFailureKind,
     },
     ParseError(String),
+    /// Refused pre-flight: empty PKCE verifier, i.e. no proof of possession.
+    MissingPkceVerifier,
+    /// A 200 carried no `refresh_token` and none was held to carry forward.
+    /// Refusing keeps the stored credential intact.
+    MissingRefreshToken,
 }
 
 impl OAuthClientError {
@@ -108,6 +113,12 @@ impl OAuthTokenClient {
         redirect_uri: &str,
         now_secs: u64,
     ) -> Result<SeatTokenState, OAuthClientError> {
+        // PKCE binds the code to the client that requested it. An empty
+        // verifier is PKCE silently disabled — refuse before the code ships.
+        if pkce_verifier.is_empty() {
+            warn!("refusing authorization-code exchange with an empty PKCE verifier");
+            return Err(OAuthClientError::MissingPkceVerifier);
+        }
         let body = format!(
             "grant_type=authorization_code&code={}&code_verifier={}&redirect_uri={}&client_id={}",
             url_encode(code),
@@ -116,7 +127,9 @@ impl OAuthTokenClient {
             url_encode(&self.client_id),
         );
         debug!(endpoint = %self.token_endpoint, "exchanging authorization code for tokens");
-        self.post_token_request(body.into_bytes(), now_secs).await
+        // Initial exchange holds no previous token to fall back on.
+        self.post_token_request(body.into_bytes(), now_secs, None)
+            .await
     }
 
     /// The provider may rotate the refresh token in its response.
@@ -131,13 +144,19 @@ impl OAuthTokenClient {
             url_encode(&self.client_id),
         );
         debug!(endpoint = %self.token_endpoint, "refreshing OAuth token");
-        self.post_token_request(body.into_bytes(), now_secs).await
+        self.post_token_request(
+            body.into_bytes(),
+            now_secs,
+            Some(current_state.refresh_token.as_str()),
+        )
+        .await
     }
 
     async fn post_token_request(
         &self,
         body: Vec<u8>,
         now_secs: u64,
+        previous_refresh_token: Option<&str>,
     ) -> Result<SeatTokenState, OAuthClientError> {
         let req = Request::builder()
             .method("POST")
@@ -168,9 +187,18 @@ impl OAuthTokenClient {
 
             let expires_in = tr.expires_in.unwrap_or(3600);
             let expires_at = now_secs.saturating_add(expires_in);
-            // A response that omits refresh_token leaves this empty; the
-            // previous one is not carried forward.
-            let refresh_token = tr.refresh_token.unwrap_or_default();
+            // A provider that does not rotate omits `refresh_token` from a 200.
+            // Carry the previous one forward; defaulting to "" here would store
+            // an empty credential and leave the next refresh with nothing to
+            // present. If neither exists, refuse rather than persist a blank.
+            let rotated = tr.refresh_token.filter(|t| !t.is_empty());
+            let carried = previous_refresh_token
+                .filter(|t| !t.is_empty())
+                .map(str::to_owned);
+            let Some(refresh_token) = rotated.or(carried) else {
+                warn!("token response carried no refresh_token and none was held");
+                return Err(OAuthClientError::MissingRefreshToken);
+            };
 
             Ok(SeatTokenState::new(
                 tr.access_token,

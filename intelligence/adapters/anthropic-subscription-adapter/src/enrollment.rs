@@ -6,7 +6,7 @@
 
 use intelligence_account_domain::ProviderFamily;
 use intelligence_oauth_subscription_kernel::{
-    FlowKind, OAuthLoopbackServer, PkceChallenge, PkceVerifier, SubscriptionOAuthFlow,
+    FlowKind, OAuthLoopbackServer, PkceVerifier, SubscriptionOAuthFlow,
     SubscriptionTokenCaptureRequest, build_authorization_url, capture_subscription_token,
 };
 
@@ -74,17 +74,20 @@ pub fn parse_callback(url_or_query: &str) -> Result<CallbackParams, EnrollmentEr
     Ok(CallbackParams { code, state })
 }
 
-/// The verifier is consumed here and appears on neither return value, and
-/// [`complete_enrollment`] has no parameter to receive one.
+/// Build the enrollment flow from a pre-generated PKCE verifier and state nonce.
+/// Returns the `(flow, authorization_url)` pair for the caller to present to the browser.
+///
+/// Borrows the verifier rather than consuming it: the flow carries only the
+/// challenge, and `complete_enrollment` needs the verifier again in step 2.
 pub fn build_enrollment_flow(
-    verifier: PkceVerifier,
+    verifier: &PkceVerifier,
     state_nonce: String,
     loopback: OAuthLoopbackServer,
 ) -> Result<(SubscriptionOAuthFlow, String), EnrollmentError> {
     let req = SubscriptionTokenCaptureRequest {
         flow_kind: FlowKind::AnthropicSubscriptionOAuth,
         provider: ProviderFamily::Claude,
-        verifier,
+        verifier: verifier.clone(),
         state_nonce,
         loopback,
     };
@@ -93,9 +96,16 @@ pub fn build_enrollment_flow(
     Ok((flow, url))
 }
 
+/// Complete enrollment: exchange the authorization code for tokens, persist them.
+/// Returns the `SeatTokenState` on success.
+///
+/// `verifier` MUST be the same `PkceVerifier` whose challenge is carried by
+/// `flow`. It is not derivable from the challenge — SHA-256 is one-way — so
+/// the caller that generated it in step 1 has to hand it back here.
 pub async fn complete_enrollment(
     seat_id: &SeatId,
     flow: &SubscriptionOAuthFlow,
+    verifier: &PkceVerifier,
     callback_url_or_query: &str,
     client: &OAuthTokenClient,
     store: &dyn CredentialStorePort,
@@ -111,11 +121,10 @@ pub async fn complete_enrollment(
         });
     }
 
-    let verifier_str = pkce_verifier_str_from_challenge(&flow.challenge);
     let state = client
         .exchange(
             &params.code,
-            &verifier_str,
+            verifier.expose_secret(),
             &flow.loopback.redirect_uri(),
             now_secs,
         )
@@ -133,15 +142,7 @@ pub async fn complete_enrollment(
     Ok(state)
 }
 
-/// Always empty: a verifier cannot be recovered from its challenge. Every
-/// [`complete_enrollment`] therefore exchanges with no PKCE proof, which an
-/// authorization server that enforces PKCE will reject.
-fn pkce_verifier_str_from_challenge(_challenge: &PkceChallenge) -> String {
-    String::new()
-}
-
-/// Each escaped byte becomes the `char` of that code point, so percent-encoded
-/// multi-byte UTF-8 comes back as Latin-1 mojibake rather than the character.
+/// Minimal percent-decode for callback query values.
 fn percent_decode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let bytes = s.as_bytes();
@@ -214,7 +215,7 @@ mod tests {
         let verifier =
             PkceVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_owned()).unwrap();
         let loopback = OAuthLoopbackServer::default_claude();
-        let (flow, url) = build_enrollment_flow(verifier, "nonce42".into(), loopback).unwrap();
+        let (flow, url) = build_enrollment_flow(&verifier, "nonce42".into(), loopback).unwrap();
         assert!(!url.is_empty());
         assert!(url.contains("code_challenge"));
         assert!(url.contains("nonce42"));
@@ -226,7 +227,8 @@ mod tests {
         let verifier =
             PkceVerifier::new("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk".to_owned()).unwrap();
         let loopback = OAuthLoopbackServer::default_claude();
-        let (flow, _) = build_enrollment_flow(verifier, "correct-nonce".into(), loopback).unwrap();
+        let (flow, _) = build_enrollment_flow(&verifier, "correct-nonce".into(), loopback).unwrap();
+        // Simulate wrong state in callback.
         let params = parse_callback("code=c&state=wrong-nonce").unwrap();
         assert_ne!(params.state, flow.state_nonce);
     }

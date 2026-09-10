@@ -111,3 +111,64 @@ fn agent_id_does_not_affect_decision_when_tenants_match() {
         );
     }
 }
+
+#[test]
+fn same_tenant_admin_actions_still_allowed_after_cross_tenant_widening() {
+    // The cross-tenant forbid covers every action, not just the two inference
+    // ones. A forbid that is too broad is its own outage, so pin the legitimate
+    // side: an admin acting on its OWN tenant must still pass.
+    let g = gate();
+    let t = TenantId::new("acme").unwrap();
+    let a = AgentId::new("admin:acme").unwrap();
+    let mut denied: Vec<&str> = Vec::new();
+    for (label, action) in [
+        ("RefreshToken", AuthzAction::RefreshToken),
+        ("InvalidateSeat", AuthzAction::InvalidateSeat),
+        ("SelectSeat", AuthzAction::SelectSeat),
+    ] {
+        let r = AuthzRequest {
+            principal_tenant: &t,
+            principal_agent: &a,
+            action,
+            resource_tenant: &t,
+            resource_provider: Provider::Anthropic,
+        };
+        if g.decide(&r) != AuthzDecision::Allow {
+            denied.push(label);
+        }
+    }
+    assert!(
+        denied.is_empty(),
+        "same-tenant actions wrongly denied by the widened forbid: {denied:?}",
+    );
+}
+
+#[test]
+fn cross_tenant_is_forbidden_for_every_action() {
+    // The complement of the test above: no action escapes the tenant boundary.
+    let g = gate();
+    let pt = TenantId::new("acme").unwrap();
+    let rt = TenantId::new("evil-corp").unwrap();
+    let a = AgentId::new("admin:acme").unwrap();
+    let mut leaked: Vec<&str> = Vec::new();
+    for (label, action) in [
+        ("RefreshToken", AuthzAction::RefreshToken),
+        ("InvalidateSeat", AuthzAction::InvalidateSeat),
+        ("SelectSeat", AuthzAction::SelectSeat),
+    ] {
+        let r = AuthzRequest {
+            principal_tenant: &pt,
+            principal_agent: &a,
+            action,
+            resource_tenant: &rt,
+            resource_provider: Provider::Anthropic,
+        };
+        if g.decide(&r) != AuthzDecision::Forbid {
+            leaked.push(label);
+        }
+    }
+    assert!(
+        leaked.is_empty(),
+        "these actions crossed the tenant boundary: {leaked:?}",
+    );
+}
