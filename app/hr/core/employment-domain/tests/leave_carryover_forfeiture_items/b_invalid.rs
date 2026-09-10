@@ -10,10 +10,6 @@ fn cap_below_floor_returns_error() {
     assert_eq!(err, HrDomainError::CarryOverCapBelowFloor);
 }
 
-// ---------------------------------------------------------------------------
-// (e) negative / NaN inputs rejected
-// ---------------------------------------------------------------------------
-
 #[test]
 fn negative_closing_balance_rejected() {
     let err = evaluate_leave_carryover_forfeiture(LeaveCarryoverForfeitureInput {
@@ -79,10 +75,6 @@ fn infinite_cap_rejected() {
 
     assert_eq!(err, HrDomainError::InvalidAccrualUnits);
 }
-
-// ---------------------------------------------------------------------------
-// Classification: every FINANCIAL unit field must carry DataClass::Financial
-// ---------------------------------------------------------------------------
 
 #[test]
 fn invalid_tenant_id_rejected() {

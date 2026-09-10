@@ -46,10 +46,6 @@ fn all_cleared_input() -> OnboardingReadinessInput {
     }
 }
 
-// ---------------------------------------------------------------------------
-// [st3] Test: all mandatory items cleared → READY decision
-// ---------------------------------------------------------------------------
-
 #[test]
 fn all_mandatory_items_cleared_returns_ready_decision() {
     let result = evaluate_onboarding_readiness(all_cleared_input())
@@ -61,10 +57,6 @@ fn all_mandatory_items_cleared_returns_ready_decision() {
         "READY decision must have no outstanding items"
     );
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: missing mandatory item → NOT_READY with blocker list
-// ---------------------------------------------------------------------------
 
 #[test]
 fn missing_mandatory_item_returns_not_ready_with_blocker_list() {
@@ -86,10 +78,6 @@ fn missing_mandatory_item_returns_not_ready_with_blocker_list() {
         "BackgroundCheck must appear in the blocker list"
     );
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: uncleared mandatory item → NOT_READY
-// ---------------------------------------------------------------------------
 
 #[test]
 fn uncleared_mandatory_item_returns_not_ready() {
@@ -114,10 +102,6 @@ fn uncleared_mandatory_item_returns_not_ready() {
         "RightToWorkI9 must be listed as an outstanding item"
     );
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: cleared mandatory item with no evidence → OnboardingItemNotCleared
-// ---------------------------------------------------------------------------
 
 #[test]
 fn only_optional_items_all_cleared_returns_ready() {
@@ -152,10 +136,6 @@ fn only_optional_items_all_cleared_returns_ready() {
     );
     assert!(result.outstanding_items.value.is_empty());
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: invalid evidence ref on cleared mandatory item → error
-// ---------------------------------------------------------------------------
 
 #[test]
 fn multiple_uncleared_mandatory_items_lists_all_blockers() {
@@ -195,7 +175,3 @@ fn multiple_uncleared_mandatory_items_lists_all_blockers() {
         "exactly two blockers"
     );
 }
-
-// ---------------------------------------------------------------------------
-// [st3] Test: zero evaluated_at_epoch_seconds → InvalidEvaluatedAt error
-// ---------------------------------------------------------------------------

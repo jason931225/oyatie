@@ -2,29 +2,29 @@ const HR_LIFECYCLE_TOPIC: &str = "audit.hr.employment.lifecycle";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrAuditEnvelope {
-    pub topic: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub tenant_id: data_boundary_kernel::Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: data_boundary_kernel::Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub aggregate_ref: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub payload_kind: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: data_boundary_kernel::Classified<data_boundary_kernel::DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: data_boundary_kernel::Classified<u32>, // data_class: PUBLIC
+    pub topic: data_boundary_kernel::Classified<String>,
+    pub tenant_id: data_boundary_kernel::Classified<TenantId>,
+    pub legal_entity_id: data_boundary_kernel::Classified<LegalEntityId>,
+    pub aggregate_ref: data_boundary_kernel::Classified<String>,
+    pub evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>,
+    pub payload_kind: data_boundary_kernel::Classified<String>,
+    pub idempotency_key: data_boundary_kernel::Classified<String>,
+    pub payload_data_class: data_boundary_kernel::Classified<data_boundary_kernel::DataClass>,
+    pub schema_version: data_boundary_kernel::Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardEmployeeCommand {
-    pub employee: EmployeeCreate,        // data_class: PII_IDENTIFYING
-    pub event_id: String,                // data_class: INTERNAL_ONLY
-    pub lifecycle_kind: HrLifecycleKind, // data_class: INTERNAL_ONLY
+    pub employee: EmployeeCreate, // data_class: PII_IDENTIFYING
+    pub event_id: String,
+    pub lifecycle_kind: HrLifecycleKind,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OnboardEmployeeOutcome {
-    pub employee: Employee,                      // data_class: PII_IDENTIFYING
-    pub lifecycle_event: EmployeeLifecycleEvent, // data_class: INTERNAL_ONLY
-    pub audit_envelope: HrAuditEnvelope,         // data_class: INTERNAL_ONLY
+    pub employee: Employee, // data_class: PII_IDENTIFYING
+    pub lifecycle_event: EmployeeLifecycleEvent,
+    pub audit_envelope: HrAuditEnvelope,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

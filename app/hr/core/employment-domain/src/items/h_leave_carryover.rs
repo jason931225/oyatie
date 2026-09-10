@@ -4,37 +4,37 @@
 /// balance instead of hard-erroring when the cap is exceeded.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeaveCarryoverForfeitureInput {
-    pub tenant_id: String,               // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,         // data_class: INTERNAL_ONLY
-    pub employee_id: String,             // data_class: INTERNAL_ONLY
-    pub period_boundary_date: String,    // data_class: INTERNAL_ONLY (ISO-8601 YYYY-MM-DD)
-    pub closing_balance_units: f64,      // data_class: FINANCIAL
-    pub statutory_min_floor_units: f64,  // data_class: FINANCIAL
-    pub carry_over_cap_units: f64,       // data_class: FINANCIAL
-    pub rulepack_ref: String,            // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: String, // data_class: INTERNAL_ONLY
-    pub evidence_ref: String,            // data_class: INTERNAL_ONLY
-    pub evaluated_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub employee_id: String,
+    pub period_boundary_date: String,
+    pub closing_balance_units: f64,     // data_class: FINANCIAL
+    pub statutory_min_floor_units: f64, // data_class: FINANCIAL
+    pub carry_over_cap_units: f64,      // data_class: FINANCIAL
+    pub rulepack_ref: String,
+    pub rulepack_effective_date: String,
+    pub evidence_ref: String,
+    pub evaluated_at_epoch_seconds: u64,
 }
 
 /// Projection produced by `evaluate_leave_carryover_forfeiture`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LeaveCarryoverForfeitureProjection {
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub period_boundary_date: Classified<String>, // data_class: INTERNAL_ONLY
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub employee_id: Classified<EmployeeId>,
+    pub period_boundary_date: Classified<String>,
     pub closing_balance_units: Classified<f64>, // data_class: FINANCIAL
     pub statutory_min_floor_units: Classified<f64>, // data_class: FINANCIAL
-    pub carry_over_cap_units: Classified<f64>, // data_class: FINANCIAL
-    pub carried_over_units: Classified<f64>, // data_class: FINANCIAL
-    pub forfeited_units: Classified<f64>, // data_class: FINANCIAL
-    pub rulepack_ref: Classified<RulepackRef>, // data_class: INTERNAL_ONLY
-    pub rulepack_effective_date: Classified<RulepackEffectiveDate>, // data_class: INTERNAL_ONLY
-    pub evidence_ref: Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub evaluated_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub carry_over_cap_units: Classified<f64>,  // data_class: FINANCIAL
+    pub carried_over_units: Classified<f64>,    // data_class: FINANCIAL
+    pub forfeited_units: Classified<f64>,       // data_class: FINANCIAL
+    pub rulepack_ref: Classified<RulepackRef>,
+    pub rulepack_effective_date: Classified<RulepackEffectiveDate>,
+    pub evidence_ref: Classified<AuditEvidenceRef>,
+    pub idempotency_key: Classified<String>,
+    pub evaluated_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 /// Pure period-boundary evaluator that splits a closing leave balance into

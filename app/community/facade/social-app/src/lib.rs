@@ -1,4 +1,3 @@
-//! App-layer write orchestration for social post composition.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use community_social_post_composition_api::{
@@ -24,9 +23,8 @@ use shared_transactional_outbox_kernel::{
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SocialAppError {
     ScopeMismatch {
-        // data_class: INTERNAL_ONLY
-        context_scope_ref: String, // data_class: INTERNAL_ONLY
-        tenant_id: String,         // data_class: INTERNAL_ONLY
+        context_scope_ref: String,
+        tenant_id: String,
     },
     Usecase(SocialUsecaseError),
     Sql(SqlCommandError),
@@ -37,12 +35,12 @@ pub enum SocialAppError {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SocialPublishPlan {
-    pub receipt: SocialPostReceipt,            // data_class: INTERNAL_ONLY
-    pub persistence: SqlWriteBatch,            // data_class: INTERNAL_ONLY
-    pub sql_execution: SqlExecutionPlan,       // data_class: INTERNAL_ONLY
-    pub protocol_event: ProtocolEventEnvelope, // data_class: INTERNAL_ONLY
-    pub transport: ProtocolTransportBundle,    // data_class: INTERNAL_ONLY
-    pub story_purge_targets: Vec<String>,      // data_class: INTERNAL_ONLY
+    pub receipt: SocialPostReceipt,
+    pub persistence: SqlWriteBatch,
+    pub sql_execution: SqlExecutionPlan,
+    pub protocol_event: ProtocolEventEnvelope,
+    pub transport: ProtocolTransportBundle,
+    pub story_purge_targets: Vec<String>,
 }
 
 pub fn plan_publish_post(

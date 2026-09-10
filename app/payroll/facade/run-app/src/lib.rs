@@ -4,8 +4,6 @@
 //! and accounting integration envelopes for later cloud/runtime adapters. It
 //! does not persist data, call accounting, file with regulators, disburse funds,
 //! or perform network I/O.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -23,62 +21,62 @@ const PAYROLL_HR_LEAVE_IMPACT_TOPIC: &str = "integration.payroll.hr.leave-impact
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PayrollAuditEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub run_id: Classified<PayrollRunId>, // data_class: INTERNAL_ONLY
-    pub evidence_ref: Classified<EvidenceRef>, // data_class: INTERNAL_ONLY
-    pub evidence_digest: Classified<EvidenceDigest>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub run_id: Classified<PayrollRunId>,
+    pub evidence_ref: Classified<EvidenceRef>,
+    pub evidence_digest: Classified<EvidenceDigest>,
+    pub idempotency_key: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PayrollHrLeaveImpactEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub run_id: Classified<PayrollRunId>, // data_class: INTERNAL_ONLY
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub run_id: Classified<PayrollRunId>,
     pub payroll_period: Classified<String>, // data_class: FINANCIAL
-    pub payee_id: Classified<PayeeId>,   // data_class: INTERNAL_ONLY
-    pub employee_id: Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub leave_request_id: Classified<LeaveRequestId>, // data_class: INTERNAL_ONLY
+    pub payee_id: Classified<PayeeId>,
+    pub employee_id: Classified<EmployeeId>,
+    pub leave_request_id: Classified<LeaveRequestId>,
     pub impact_kind: Classified<HrLeaveImpactKind>, // data_class: FINANCIAL
-    pub source_topic: Classified<String>, // data_class: INTERNAL_ONLY
-    pub source_hr_idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
+    pub source_topic: Classified<String>,
+    pub source_hr_idempotency_key: Classified<String>,
     pub payroll_impact_evidence_ref: Classified<EvidenceRef>, // data_class: FINANCIAL
-    pub payroll_intake_evidence_ref: Classified<EvidenceRef>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub payroll_intake_evidence_ref: Classified<EvidenceRef>,
+    pub idempotency_key: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PayrollAccountingDispatchEnvelope {
-    pub topic: Classified<String>,       // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub run_id: Classified<PayrollRunId>, // data_class: INTERNAL_ONLY
-    pub journal_id: Classified<JournalId>, // data_class: INTERNAL_ONLY
+    pub topic: Classified<String>,
+    pub tenant_id: Classified<TenantId>,
+    pub legal_entity_id: Classified<LegalEntityId>,
+    pub run_id: Classified<PayrollRunId>,
+    pub journal_id: Classified<JournalId>,
     pub source_payroll_digest: Classified<EvidenceDigest>, // data_class: FINANCIAL
-    pub approval_evidence_ref: Classified<EvidenceRef>, // data_class: INTERNAL_ONLY
-    pub reversal_required_ref: Classified<EvidenceRef>, // data_class: INTERNAL_ONLY
-    pub idempotency_key: Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: Classified<DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub approval_evidence_ref: Classified<EvidenceRef>,
+    pub reversal_required_ref: Classified<EvidenceRef>,
+    pub idempotency_key: Classified<String>,
+    pub payload_data_class: Classified<DataClass>,
+    pub schema_version: Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrialCloseOutcome {
     pub run: PayrollRun, // data_class: PII_IDENTIFYING + FINANCIAL
-    pub audit_envelope: PayrollAuditEnvelope, // data_class: INTERNAL_ONLY
+    pub audit_envelope: PayrollAuditEnvelope,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountingBridgeOutcome {
     pub journal: PayrollJournalDraft, // data_class: FINANCIAL
-    pub dispatch_envelope: PayrollAccountingDispatchEnvelope, // data_class: INTERNAL_ONLY
+    pub dispatch_envelope: PayrollAccountingDispatchEnvelope,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

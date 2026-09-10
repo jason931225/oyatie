@@ -45,10 +45,6 @@ fn test_happy_path_balance_projection() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Carry-over cap boundary
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_exact_carry_over_cap_accepted() {
     // after_deduction == carry_over_cap_units → Ok
@@ -83,10 +79,6 @@ fn valid_input() -> LeaveBalanceAccrualInput {
         decided_at_epoch_seconds: 1_779_532_800,
     }
 }
-
-// ---------------------------------------------------------------------------
-// [RED] id / timestamp validation for evaluate_leave_balance_accrual
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_all_financial_output_fields_carry_financial_data_class() {
@@ -135,10 +127,6 @@ fn test_all_financial_output_fields_carry_financial_data_class() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// [RED] happy-path: decided_at_epoch_seconds and rulepack_effective_date roundtrip
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_decided_at_and_rulepack_date_round_trip_in_projection() {
     let proj = evaluate_leave_balance_accrual(valid_input()).expect("projection");
@@ -154,10 +142,6 @@ fn test_decided_at_and_rulepack_date_round_trip_in_projection() {
         "audit/hr/leave-balance/emp_001/deduction"
     );
 }
-
-// ---------------------------------------------------------------------------
-// [RED] happy-path: zero-balance edge (no prior, no accrual, no deduction)
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_zero_balance_with_zero_accrual_and_deduction_is_valid() {

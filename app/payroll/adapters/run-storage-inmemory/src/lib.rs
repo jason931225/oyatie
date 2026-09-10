@@ -7,8 +7,6 @@
 //! adapters have a tested contract. It does not persist to durable storage,
 //! calculate payroll, submit statutory filings, disburse funds, call HR or
 //! Accounting, execute Workflow, emit audit-chain events, or deploy cloud I/O.
-//! ADR-0083 Tier 3: tests legitimately use assertion helpers under the
-//! `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -29,32 +27,32 @@ pub enum PayrollStoredRecordKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PayrollStoredRecord {
-    pub kind: PayrollStoredRecordKind, // data_class: INTERNAL_ONLY
-    pub topic: String,                 // data_class: INTERNAL_ONLY
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub legal_entity_id: String,       // data_class: INTERNAL_ONLY
-    pub run_id: String,                // data_class: INTERNAL_ONLY
-    pub primary_ref: String,           // data_class: INTERNAL_ONLY
-    pub idempotency_key: String,       // data_class: INTERNAL_ONLY
-    pub payload_data_class: String,    // data_class: INTERNAL_ONLY
-    pub evidence_ref_count: usize,     // data_class: INTERNAL_ONLY
-    pub storage_backend: String,       // data_class: PUBLIC
-    pub schema_version: u32,           // data_class: PUBLIC
+    pub kind: PayrollStoredRecordKind,
+    pub topic: String,
+    pub tenant_id: String,
+    pub legal_entity_id: String,
+    pub run_id: String,
+    pub primary_ref: String,
+    pub idempotency_key: String,
+    pub payload_data_class: String,
+    pub evidence_ref_count: usize,
+    pub storage_backend: String,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PayrollStorageCapabilities {
-    pub adapter: String,                        // data_class: PUBLIC
-    pub durable_backend_attached: bool,         // data_class: PUBLIC
-    pub postgres_rls_attached: bool,            // data_class: PUBLIC
-    pub payroll_calculation_attached: bool,     // data_class: PUBLIC
-    pub statutory_filing_rails_attached: bool,  // data_class: PUBLIC
-    pub disbursement_rails_attached: bool,      // data_class: PUBLIC
-    pub workflow_dispatch_attached: bool,       // data_class: PUBLIC
-    pub hr_network_call_attached: bool,         // data_class: PUBLIC
-    pub accounting_network_call_attached: bool, // data_class: PUBLIC
-    pub audit_chain_emission_attached: bool,    // data_class: PUBLIC
-    pub schema_version: u32,                    // data_class: PUBLIC
+    pub adapter: String,
+    pub durable_backend_attached: bool,
+    pub postgres_rls_attached: bool,
+    pub payroll_calculation_attached: bool,
+    pub statutory_filing_rails_attached: bool,
+    pub disbursement_rails_attached: bool,
+    pub workflow_dispatch_attached: bool,
+    pub hr_network_call_attached: bool,
+    pub accounting_network_call_attached: bool,
+    pub audit_chain_emission_attached: bool,
+    pub schema_version: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

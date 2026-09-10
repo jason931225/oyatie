@@ -2,23 +2,23 @@ const HR_LEAVE_PAYROLL_IMPACT_TOPIC: &str = "integration.hr.payroll.leave-impact
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HrLeavePayrollImpactEnvelope {
-    pub topic: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub tenant_id: data_boundary_kernel::Classified<TenantId>, // data_class: INTERNAL_ONLY
-    pub legal_entity_id: data_boundary_kernel::Classified<LegalEntityId>, // data_class: INTERNAL_ONLY
-    pub employee_id: data_boundary_kernel::Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub leave_request_id: data_boundary_kernel::Classified<LeaveRequestId>, // data_class: INTERNAL_ONLY
-    pub approver_id: data_boundary_kernel::Classified<EmployeeId>, // data_class: INTERNAL_ONLY
-    pub decision: data_boundary_kernel::Classified<LeaveDecision>, // data_class: INTERNAL_ONLY
-    pub routing_mode: data_boundary_kernel::Classified<LeaveRoutingMode>, // data_class: INTERNAL_ONLY
-    pub workflow_ref: data_boundary_kernel::Classified<WorkflowRef>, // data_class: INTERNAL_ONLY
-    pub payroll_period: data_boundary_kernel::Classified<String>,    // data_class: FINANCIAL
+    pub topic: data_boundary_kernel::Classified<String>,
+    pub tenant_id: data_boundary_kernel::Classified<TenantId>,
+    pub legal_entity_id: data_boundary_kernel::Classified<LegalEntityId>,
+    pub employee_id: data_boundary_kernel::Classified<EmployeeId>,
+    pub leave_request_id: data_boundary_kernel::Classified<LeaveRequestId>,
+    pub approver_id: data_boundary_kernel::Classified<EmployeeId>,
+    pub decision: data_boundary_kernel::Classified<LeaveDecision>,
+    pub routing_mode: data_boundary_kernel::Classified<LeaveRoutingMode>,
+    pub workflow_ref: data_boundary_kernel::Classified<WorkflowRef>,
+    pub payroll_period: data_boundary_kernel::Classified<String>, // data_class: FINANCIAL
     pub payroll_impact_kind: data_boundary_kernel::Classified<PayrollImpactKind>, // data_class: FINANCIAL
-    pub decision_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
-    pub routing_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>, // data_class: INTERNAL_ONLY
+    pub decision_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>,
+    pub routing_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>,
     pub payroll_impact_evidence_ref: data_boundary_kernel::Classified<AuditEvidenceRef>, // data_class: FINANCIAL
-    pub idempotency_key: data_boundary_kernel::Classified<String>, // data_class: INTERNAL_ONLY
-    pub payload_data_class: data_boundary_kernel::Classified<data_boundary_kernel::DataClass>, // data_class: INTERNAL_ONLY
-    pub schema_version: data_boundary_kernel::Classified<u32>, // data_class: PUBLIC
+    pub idempotency_key: data_boundary_kernel::Classified<String>,
+    pub payload_data_class: data_boundary_kernel::Classified<data_boundary_kernel::DataClass>,
+    pub schema_version: data_boundary_kernel::Classified<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
