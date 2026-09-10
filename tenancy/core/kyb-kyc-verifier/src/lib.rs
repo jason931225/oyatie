@@ -1,8 +1,3 @@
-//! KYB / KYC verifier domain — pure logic for verification case, document
-//! requirements, screening result aggregation, decision state, expiry, and
-//! escalation. Provider calls are out of scope here.
-//!
-//! Wave 15-IMPL-truth-up scaffold; full implementation lands in IP-018 execution.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![allow(dead_code)]
 
@@ -49,7 +44,6 @@ pub struct VerificationCase {
     pub screenings: Vec<ScreeningResult>,
 }
 
-/// Decide whether activation may proceed. Stub returns Pending until IP-018 lands.
 pub fn decide(case: &VerificationCase) -> VerificationDecision {
     case.decision
 }

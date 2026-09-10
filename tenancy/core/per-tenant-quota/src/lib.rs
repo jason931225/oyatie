@@ -1,8 +1,3 @@
-//! Per-tenant quota usecase — reads tenant class, pack, lifecycle status,
-//! resolves quota defaults, applies overrides, exposes quota decisions to Cedar
-//! and REST. Enforcement stays local to each service; tenancy is source of truth.
-//!
-//! Wave 15-IMPL-truth-up scaffold; full implementation lands in IP-022 execution.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![allow(dead_code)]
 

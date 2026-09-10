@@ -1,11 +1,7 @@
 use super::*;
 
-/// Wrap a typed `Handler` (with associated `Error`) into the closure-shaped
-/// `SyncHandler` the router holds. Renders errors via the handler's
-/// `From<Error> for HttpResponse` impl at call time.
-///
-/// This is the canonical bridge between the kernel `Handler` trait and the
-/// router's handler-type-erasure. ADR-0094.
+/// Errors are rendered through the handler's `From<Error> for HttpResponse`
+/// impl at call time (ADR-0094).
 pub fn handler_to_sync<H>(handler: H) -> SyncHandler
 where
     H: Handler + 'static,
@@ -14,10 +10,8 @@ where
     Arc::new(move |req: HttpRequest| call_into_response(handler.as_ref(), req))
 }
 
-/// Default per-request body cap (1 MiB) when `ServerConfig` is constructed
-/// via `default()`. Per ADR-0092 + S3 security finding: NEVER read an
-/// unbounded request body. Routes that legitimately need larger bodies
-/// MUST override via `ServerConfig::with_max_body_bytes`.
+/// NEVER read an unbounded request body. Routes that legitimately need
+/// larger bodies MUST override via `ServerConfig::with_max_body_bytes`.
 pub const DEFAULT_MAX_BODY_BYTES: usize = 1024 * 1024;
 
 /// Default header-read timeout. Hyper's `http1.header_read_timeout` budget;
@@ -28,9 +22,6 @@ pub const DEFAULT_HEADER_READ_TIMEOUT: Duration = Duration::from_secs(15);
 /// dropped to bound concurrent-connection count under load.
 pub const DEFAULT_KEEPALIVE_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Server-level configuration: body cap + connection timeouts. Per ADR-0092
-/// Phase 8 (S3 + S4): both fields are mandatory at the seam; defaults are
-/// safe but conservative.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServerConfig {
     pub max_body_bytes: usize,
@@ -65,13 +56,6 @@ impl ServerConfig {
     }
 }
 
-/// Build an `HttpRequest` from a `hyper::Request<Incoming>` by collecting
-/// the body fully, bounded by `max_body_bytes`. Bodies exceeding the cap
-/// fail with `HyperRuntimeError::BodyTooLarge`; the caller renders 413.
-/// This closes the S3 security finding (unbounded body → OOM DoS).
-///
-/// Boundary conversion: hyper `Bytes` body → kernel `Vec<u8>`. Allocates
-/// once, bounded by max_body_bytes.
 pub async fn collect_hyper_request(
     req: Request<Incoming>,
     max_body_bytes: usize,
@@ -81,12 +65,6 @@ pub async fn collect_hyper_request(
         .ok_or_else(|| HyperRuntimeError::UnsupportedMethod(method_str.clone()))?;
     let path = req.uri().path().to_string();
     let mut headers = BTreeMap::new();
-    // ADR-0092 Phase 10:
-    //   * S1: hyper normalizes header names to lowercase already; we
-    //     additionally `.to_ascii_lowercase()` defensively so direct-
-    //     constructor tests cannot create case-divergent maps.
-    //   * S2: non-UTF8 header value is REJECTED with 400 BadHeader, not
-    //     silently dropped. Silent drops mask attack signal.
     for (name, value) in req.headers().iter() {
         let name_lower = name.as_str().to_ascii_lowercase();
         match value.to_str() {
@@ -111,8 +89,6 @@ pub async fn collect_hyper_request(
     })
 }
 
-/// Collect a hyper body to `Vec<u8>` with a hard byte cap. Used by
-/// `collect_hyper_request`; exposed for tests + future per-route overrides.
 pub async fn collect_body_with_limit<B>(
     body: B,
     max_bytes: usize,
@@ -137,16 +113,10 @@ where
     Ok(collected.to_bytes().to_vec())
 }
 
-/// Convert an `HttpResponse` into a hyper `Response<Full<Bytes>>`.
-///
-/// Boundary conversion: kernel `Vec<u8>` body → hyper `Bytes`. Zero-copy via
-/// `Bytes::from(Vec<u8>)` (Bytes takes ownership of the buffer).
 pub fn to_hyper_response(resp: HttpResponse) -> Response<Full<Bytes>> {
     response::convert(resp, None)
 }
 
-/// Dispatch a request through router → middleware chain → handler.
-///
 /// Lookups are sync (router) + sync (middleware chain) + sync (handler).
 /// The hyper Service wrapper drives this from an async context.
 pub fn dispatch(
@@ -182,8 +152,6 @@ pub enum HyperRuntimeError {
 }
 
 impl HyperRuntimeError {
-    /// Status code the runtime should emit when converting this error to a
-    /// client-facing response.
     pub fn status_code(&self) -> u16 {
         match self {
             HyperRuntimeError::Bind(_) => 500,

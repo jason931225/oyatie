@@ -1,4 +1,3 @@
-//! Tenant-to-Cell binding contracts and legacy assignment compatibility.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]
 
@@ -115,7 +114,7 @@ pub use write_authority_token_issuer::*;
 pub use write_fence::*;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct CellId(pub String); // data_class: INTERNAL_ONLY
+pub struct CellId(pub String);
 
 pub type LegacyCellId = CellId;
 
@@ -139,7 +138,7 @@ pub fn legacy_cell_id_from_canonical(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ShardKey(pub u64); // data_class: INTERNAL_ONLY
+pub struct ShardKey(pub u64);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CellHealth {
@@ -150,10 +149,10 @@ pub enum CellHealth {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RebalanceTask {
-    pub tenant: String,    // data_class: INTERNAL_ONLY
-    pub from_cell: CellId, // data_class: INTERNAL_ONLY
-    pub to_cell: CellId,   // data_class: INTERNAL_ONLY
-    pub reason: String,    // data_class: INTERNAL_ONLY
+    pub tenant: String,
+    pub from_cell: CellId,
+    pub to_cell: CellId,
+    pub reason: String,
 }
 
 pub trait CellAssignmentRepository {

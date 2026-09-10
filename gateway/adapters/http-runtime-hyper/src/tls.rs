@@ -1,13 +1,9 @@
 use super::*;
 
-/// Canonical outbound HTTPS connector type for hyper clients.
 pub type HyperHttpsConnector = hyper_rustls::HttpsConnector<HttpConnector>;
 
-/// Canonical outbound HTTPS client type used by app-layer transports.
 pub type HyperHttpsClient = Client<HyperHttpsConnector, Full<Bytes>>;
 
-/// Build the aws-lc-rs provider used by the workspace TLS policy.
-///
 /// X25519MLKEM768 is explicitly first so Buck2 and Cargo cannot diverge on
 /// feature unification; X25519 remains present as the classical fallback.
 #[must_use]
@@ -22,7 +18,6 @@ pub fn pqc_hybrid_aws_lc_provider() -> rustls::crypto::CryptoProvider {
     provider
 }
 
-/// Return the aws-lc-rs key-exchange group order used by this workspace TLS policy.
 #[must_use]
 pub fn pqc_hybrid_kx_group_names() -> Vec<rustls::NamedGroup> {
     pqc_hybrid_aws_lc_provider()
@@ -32,7 +27,6 @@ pub fn pqc_hybrid_kx_group_names() -> Vec<rustls::NamedGroup> {
         .collect()
 }
 
-/// TLS 1.3-only client config builder using the workspace aws-lc-rs provider.
 #[must_use]
 pub fn pqc_hybrid_tls13_client_config_builder()
 -> rustls::ConfigBuilder<rustls::ClientConfig, rustls::WantsVerifier> {
@@ -41,7 +35,6 @@ pub fn pqc_hybrid_tls13_client_config_builder()
         .expect("static aws-lc-rs TLS 1.3 PQC-hybrid client provider must be valid")
 }
 
-/// TLS 1.3-only server config builder using the workspace aws-lc-rs provider.
 #[must_use]
 pub fn pqc_hybrid_tls13_server_config_builder()
 -> rustls::ConfigBuilder<rustls::ServerConfig, rustls::WantsVerifier> {
@@ -50,7 +43,6 @@ pub fn pqc_hybrid_tls13_server_config_builder()
         .expect("static aws-lc-rs TLS 1.3 PQC-hybrid server provider must be valid")
 }
 
-/// Build a webpki-rooted client TLS config for external HTTPS calls.
 #[must_use]
 pub fn pqc_hybrid_tls13_client_config() -> rustls::ClientConfig {
     pqc_hybrid_tls13_client_config_builder()
@@ -58,7 +50,6 @@ pub fn pqc_hybrid_tls13_client_config() -> rustls::ClientConfig {
         .with_no_client_auth()
 }
 
-/// Build the canonical HTTPS-only connector: TLS 1.3, X25519MLKEM768 first, X25519 fallback.
 #[must_use]
 pub fn build_pqc_hybrid_https_connector() -> HyperHttpsConnector {
     hyper_rustls::HttpsConnectorBuilder::new()
@@ -69,15 +60,13 @@ pub fn build_pqc_hybrid_https_connector() -> HyperHttpsConnector {
         .build()
 }
 
-/// Build the canonical pooled hyper HTTPS client.
 #[must_use]
 pub fn build_pqc_hybrid_https_client() -> HyperHttpsClient {
     Client::builder(TokioExecutor::new()).build(build_pqc_hybrid_https_connector())
 }
 
-/// Build a deliberately named loopback-test connector that can speak plaintext
-/// HTTP to in-process mock servers. HTTP traffic through this connector is not
-/// PQC protected and must never be used as production external-endpoint evidence.
+/// HTTP traffic through this connector is not PQC protected and must never be
+/// used as production external-endpoint evidence.
 #[doc(hidden)]
 #[must_use]
 pub fn build_loopback_http_or_pqc_hybrid_https_connector_for_tests() -> HyperHttpsConnector {
@@ -89,7 +78,6 @@ pub fn build_loopback_http_or_pqc_hybrid_https_connector_for_tests() -> HyperHtt
         .build()
 }
 
-/// Build a pooled client for loopback plaintext test servers plus normal PQC HTTPS.
 #[doc(hidden)]
 #[must_use]
 pub fn build_loopback_http_or_pqc_hybrid_https_client_for_tests() -> HyperHttpsClient {

@@ -1,9 +1,3 @@
-//! DR pairing usecase — assigns same-jurisdiction home/DR cell pair, evaluates
-//! promotion eligibility, emits auditable promotion/restoration events.
-//!
-//! Wave 15-IMPL-truth-up scaffold; full implementation lands in IP-019 execution.
-//! Cell composition draws from `cell-assignment` data; residency from
-//! `policy/data-residency.cedar`; SLO signals from tenancy dashboards.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![allow(dead_code)]
 

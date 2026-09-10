@@ -1,6 +1,3 @@
-//! Tenant kernel: tenant identity, residency, and regional-pack binding.
-// ADR-0083 Tier 3: tests legitimately use `.unwrap()` / `.expect()` /
-// `panic!()` to assert invariants under the `cfg(test)` exemption.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod design_partner_status;
@@ -11,7 +8,7 @@ use network_residency::{ResidencyClass, residency_class_allows_home_region_label
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Tenant {
-    pub id: String, // data_class: INTERNAL_ONLY
+    pub id: String,
     pub legal_name: Classified<String>,
     pub home_region: Classified<String>,
     pub residency_class: Classified<ResidencyClass>,

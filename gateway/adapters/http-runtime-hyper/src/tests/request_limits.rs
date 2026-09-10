@@ -1,24 +1,12 @@
 use super::*;
 
-// F3 adversarial: handler_to_sync wraps a typed Handler so the router
-// can hold it as a SyncHandler, and the rendered error path goes through
-// From<Error> for HttpResponse — proves the Phase 6 contract end-to-end.
-// F3 adversarial Phase 10 (S2 non-UTF8 + S1 header case):
-// building a hyper::Request<Full<Bytes>> and round-tripping through a
-// helper that exercises the same header-iteration path collect_hyper_request
-// uses. Direct Request<Incoming> isn't constructible in tests.
 #[test]
-fn header_name_lowercased_when_inserted_via_with_header() {
-    // Surrogate for the adapter path: middleware-kernel with_header
-    // already lowercases. Adapter inherits since adapter writes through
-    // BTreeMap with insertion done via the same `.to_ascii_lowercase()`
-    // in collect_hyper_request. Smoke this for S1 explicitly.
+fn middleware_kernel_with_header_lowercases_header_name() {
     let resp = HttpResponse::new(200).with_header("X-Tenant-Id", "acme");
     assert!(resp.headers.contains_key("x-tenant-id"));
     assert!(!resp.headers.contains_key("X-Tenant-Id"));
 }
 
-// F3 adversarial: NonUtf8HeaderValue error maps to 400.
 #[test]
 fn non_utf8_header_value_renders_400() {
     let err = HyperRuntimeError::NonUtf8HeaderValue {
@@ -42,7 +30,6 @@ fn non_utf8_header_value_status_code() {
     );
 }
 
-// F3 adversarial: collect_body_with_limit accepts bodies <= max.
 #[tokio::test]
 async fn collect_body_with_limit_accepts_under_cap() {
     let body = Full::new(Bytes::from_static(b"hello"));
@@ -50,7 +37,6 @@ async fn collect_body_with_limit_accepts_under_cap() {
     assert_eq!(result, b"hello".to_vec());
 }
 
-// F3 adversarial: collect_body_with_limit accepts bodies exactly at max.
 #[tokio::test]
 async fn collect_body_with_limit_accepts_exact_cap() {
     let payload = vec![0xAB; 100];
@@ -59,8 +45,6 @@ async fn collect_body_with_limit_accepts_exact_cap() {
     assert_eq!(result, payload);
 }
 
-// F3 adversarial: collect_body_with_limit rejects bodies > max with the
-// specific BodyTooLarge variant. This closes the S3 unbounded-body DoS.
 #[tokio::test]
 async fn collect_body_with_limit_rejects_over_cap_with_body_too_large() {
     let body = Full::new(Bytes::from(vec![0u8; 1025]));
@@ -73,8 +57,6 @@ async fn collect_body_with_limit_rejects_over_cap_with_body_too_large() {
     }
 }
 
-// F3 adversarial: BodyTooLarge maps to 413 Payload Too Large at the
-// From<HyperRuntimeError> for HttpResponse boundary.
 #[test]
 fn body_too_large_renders_413() {
     let err = HyperRuntimeError::BodyTooLarge { max_bytes: 1024 };
@@ -85,8 +67,6 @@ fn body_too_large_renders_413() {
     assert!(body.contains("body"));
 }
 
-// F3 adversarial: each error variant maps to the correct status — proves
-// the From impl handles every variant, not just the obvious ones.
 #[test]
 fn hyper_runtime_error_status_code_mapping() {
     assert_eq!(HyperRuntimeError::Bind("x".into()).status_code(), 500);
@@ -104,7 +84,6 @@ fn hyper_runtime_error_status_code_mapping() {
     );
 }
 
-// F4 ergonomic: ServerConfig builder methods are chainable.
 #[test]
 fn server_config_builder_chains_with_methods() {
     let cfg = ServerConfig::default()
@@ -116,8 +95,6 @@ fn server_config_builder_chains_with_methods() {
     assert_eq!(cfg.keepalive_timeout, Duration::from_secs(30));
 }
 
-// F1 linus: ServerConfig::default uses safe defaults (sealed contract
-// for fresh cell binaries).
 #[test]
 fn server_config_defaults_are_safe() {
     let cfg = ServerConfig::default();
@@ -174,7 +151,6 @@ fn handler_to_sync_routes_ok_and_err_paths() {
     assert_eq!(ok.body, b"svc-ok".to_vec());
 
     let err = dispatch(mock_request(HttpMethod::Get, "/err"), &router, &chain);
-    // The handler returned Err(SvcErr::Missing); rendered via From impl.
     assert_eq!(err.status, 404);
     assert_eq!(err.body, b"missing-from-svc".to_vec());
 }
