@@ -1,14 +1,3 @@
-//! The Prometheus exposition surface, hand-rendered against the platform's
-//! own precedent so the process carries no metrics dependency.
-//!
-//! **One table, three consumers.** `samples` is the single place a metric
-//! exists: `prometheus_text` renders EVERY sample from it, while
-//! `objective_eligible_metrics` and `objective_ineligible_metrics` partition
-//! it, so deleting a metric removes it from all three and any objective
-//! naming it fails. An earlier revision kept those as separate
-//! hand-maintained lists, and they had already diverged inside one diff —
-//! the list omitted the very gauge an objective's denominator needed.
-//!
 //! Counters are process-lifetime and unlabelled by tenant: this surface is
 //! unauthenticated by design, so it must not become a tenancy oracle. That
 //! choice constrains what an objective can express, and the objectives are
@@ -49,7 +38,6 @@ impl Metrics {
     }
 }
 
-/// One exported series.
 pub struct Sample {
     pub name: &'static str, // data_class: INTERNAL_ONLY
     pub kind: &'static str, // data_class: INTERNAL_ONLY
@@ -62,14 +50,10 @@ pub struct Sample {
     /// that cannot move. A sample that is not eligible carries the reason on
     /// its `ineligible_because` line.
     pub objective_eligible: bool, // data_class: INTERNAL_ONLY
-    /// Why this series may not back an objective, or empty when it may.
-    /// Read into the failure message, so the refusal explains itself.
+    /// Empty exactly when `objective_eligible`; read into the refusal.
     pub ineligible_because: &'static str, // data_class: INTERNAL_ONLY
 }
 
-/// Everything this process exports, evaluated against current state. The
-/// single source: add a metric here and both the exposition and the
-/// objective-validation see it; delete one and both stop seeing it.
 pub fn samples(state: &AppState) -> Vec<Sample> {
     let metrics = &state.metrics;
     // ONE observation for every gauge below, so the three cannot disagree.
@@ -185,12 +169,6 @@ pub fn samples(state: &AppState) -> Vec<Sample> {
     ]
 }
 
-/// The metric names an objective MAY be written over. This is a strict
-/// subset of what the exposition renders: a series can be worth showing an
-/// operator and still be unusable as an indicator, and the earlier name for
-/// this function promised the full export set while returning the filtered
-/// one. The SLO suite asserts every declared indicator names one of these,
-/// so an objective cannot outlive its signal.
 pub fn objective_eligible_metrics(state: &AppState) -> BTreeSet<&'static str> {
     samples(state)
         .into_iter()
@@ -199,10 +177,6 @@ pub fn objective_eligible_metrics(state: &AppState) -> BTreeSet<&'static str> {
         .collect()
 }
 
-/// Series this process exports that an objective may NOT be written over,
-/// each with its reason. The refusal is only useful if it says why, and the
-/// reason has to travel with the table rather than living in a comment
-/// beside the objectives — a rule nothing reconciles is not a rule.
 pub fn objective_ineligible_metrics(state: &AppState) -> Vec<(&'static str, &'static str)> {
     samples(state)
         .into_iter()
@@ -211,7 +185,6 @@ pub fn objective_ineligible_metrics(state: &AppState) -> Vec<(&'static str, &'st
         .collect()
 }
 
-/// Render the current values in Prometheus text format.
 pub fn prometheus_text(state: &AppState) -> String {
     let mut out = String::new();
     for sample in samples(state) {

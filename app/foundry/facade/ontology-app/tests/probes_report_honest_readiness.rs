@@ -1,18 +1,3 @@
-//! The probes tell the truth about two different questions. `/healthz` asks
-//! whether the listener is bound; `/readyz` asks whether this process can
-//! serve correct answers — boot complete and every tenant's fold caught up
-//! to its log head. **A poisoned entry never un-readies the process**: a
-//! poison advances the fold and touches nothing else, so treating it as
-//! un-ready would red the instrument exactly when the system is making
-//! progress. `/statusz` is deny-by-default and now answers: the authorizer
-//! is composed, so it authorizes like the other tenant-wide views instead of
-//! refusing everything.
-//!
-//! Operator procedure: `/readyz` 503 means lag — the fold is behind the log;
-//! read `/statusz` as an operator, or the process logs, for the lag figure.
-//! Poison is NOT a readiness fault; `first_poisoned_ordinal` is where triage
-//! starts, and poisons un-poison on refold once the missing law lands.
-
 use std::path::PathBuf;
 
 use axum::body::Body;
@@ -54,8 +39,6 @@ impl Fixture {
             action_log: self.action.clone(),
             denial_log: self.denial.clone(),
             tenants: vec!["ten_test".into()],
-            // No operators: deny-all serving is the honest posture for a
-            // process whose surfaces this suite never authenticates to.
             operators: Vec::new(),
         }
     }
@@ -159,11 +142,6 @@ async fn a_poisoned_entry_never_un_readies_the_process() {
 async fn statusz_refuses_an_unauthenticated_caller() {
     let fixture = Fixture::new("statusz");
     let (status, _) = get(&fixture, "/statusz").await;
-    // 401, not the 403 this asserted while the surface was a blanket stub.
-    // The property is unchanged — no credential, no operator status — but
-    // the code is now the precise one: nothing was presented, so nothing was
-    // refused on its merits. The authenticated-but-unauthorized case is 403
-    // and is covered in `statusz_serves_the_operator`.
     assert_eq!(
         status,
         StatusCode::UNAUTHORIZED,
@@ -204,7 +182,6 @@ async fn an_unknown_route_is_not_found_and_never_a_silent_ok() {
 #[tokio::test]
 async fn the_write_surface_refuses_a_read_verb_and_an_absent_credential() {
     let fixture = Fixture::new("write-surface-guarded");
-    // GET is not the write verb: the router must not answer it at all.
     let (method, _) = get(&fixture, "/v1/actions").await;
     assert_eq!(method, StatusCode::METHOD_NOT_ALLOWED);
 }

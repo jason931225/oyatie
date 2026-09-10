@@ -1,14 +1,3 @@
-//! `POST /v1/migrations/attest` — what a plan still owes, on the caller's own
-//! tenant and no other.
-//!
-//! `MigrationPlan` carries its own `tenant_id`, so the plan a caller submits
-//! names a tenant. The write path already settled this question — "the tenant
-//! is the CREDENTIAL's; nothing in the body can move it" — and the same rule
-//! has to hold here.
-//!
-//! It is a READ dressed as a POST — the plan does not fit in a query string
-//! — so it is gated on `Use`, not `Invoke`, and it mutates nothing.
-
 mod facade_support;
 mod migration_support;
 mod out_of_band;
@@ -103,8 +92,6 @@ async fn a_roleless_caller_may_not_attest() {
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
 }
 
-/// A plan the registry refuses is a typed refusal, not a 500 and not a
-/// fixpoint claim over a plan nothing validated.
 #[tokio::test]
 async fn an_invalid_plan_is_refused_with_its_reason() {
     let fixture = Fixture::new("attest-invalid");
@@ -219,17 +206,6 @@ async fn a_poisoned_ordinal_is_reported_not_hidden() {
     );
 }
 
-/// The plan is validated against the registry the RUNNER admits from.
-///
-/// `registry_input` is the untouched fold input the runner's own gate reads
-/// and the writer stamps revisions from; `engine` is that seed plus
-/// accumulated link instances. They agree on definitions today, so a surface
-/// reading the wrong one looks correct — and a fixture evolving both cannot
-/// tell them apart at all. This installs the divergence directly: only
-/// `engine` is evolved, which is exactly the state where a surface reading
-/// `engine` would call the plan executable. The runner would refuse it, so an
-/// attestation that claimed a fixpoint here would be claiming one over a plan
-/// that cannot run.
 #[tokio::test]
 async fn a_plan_is_validated_against_the_registry_the_runner_admits_from() {
     let fixture = Fixture::new("attest-registry-input");
@@ -249,13 +225,6 @@ async fn a_plan_is_validated_against_the_registry_the_runner_admits_from() {
     );
 }
 
-/// Attest refuses a plan naming an unregistered action, rather than
-/// answering it with pending objects.
-///
-/// This module promises an attestation "can never claim a fixpoint over a
-/// plan the runner would refuse to execute". Until `validate` required the
-/// action to EXIST, it did exactly that: the plan passed, and this surface
-/// reported what it owed as though the migration were runnable.
 #[tokio::test]
 async fn a_plan_naming_an_unregistered_action_is_not_attested() {
     let fixture = Fixture::new("attest-unregistered-action");

@@ -1,19 +1,7 @@
-//! The checked-in SLO payloads are RENDERED, not written.
-//!
-//! Each `.generated.openslo.yaml` under `app/foundry/observability/slos/` must
-//! be byte-identical to what the in-crate renderer produces from its typed
-//! IR. A hand-edited payload therefore fails here rather than drifting
-//! silently from the objective the code believes it is serving — which is the
-//! failure mode that makes a declared SLO worse than none.
-//!
 //! Regenerate with `OYATIE_FOUNDRY_RENDER_SLOS=1 cargo nextest run -p
 //! foundry-ontology-app`. That is the only writer: `src/bin/` and an explicit
 //! `[[bin]]` are both refused by the layout gate, so a generator binary
 //! cannot exist in this crate.
-//!
-//! Operator procedure: a failure here means the payload and the IR disagree.
-//! Fix the IR and regenerate; never hand-edit the payload to match.
-
 #[path = "facade_support/mod.rs"]
 mod support;
 
@@ -21,9 +9,6 @@ use foundry_ontology_app::slo::{SLOS, SloSpec, render_openslo};
 use std::collections::BTreeSet;
 use support::Fixture;
 
-/// Every declared SLI must name a metric this process actually exports.
-/// An objective over a metric with no samples is a declared objective with
-/// no signal, which reads as coverage while providing none.
 #[tokio::test]
 async fn every_indicator_names_an_exported_metric() {
     // Both sides are derived: the names come from the same table the
@@ -34,23 +19,12 @@ async fn every_indicator_names_an_exported_metric() {
     let state = fixture.state();
     let exported = foundry_ontology_app::metrics::objective_eligible_metrics(&state);
     let ineligible = foundry_ontology_app::metrics::objective_ineligible_metrics(&state);
-    // A table with no objectives satisfies every check below vacuously.
-    // Deleting an objective is now an exercised move, so the floor has to be
-    // executable rather than assumed.
-    assert!(
-        !SLOS.is_empty(),
-        "no objectives are declared, so every check in this file passes over nothing"
-    );
+    assert_not_vacuous(SLOS.len(), "the declared objective set");
     for spec in SLOS {
         let referenced = spec.referenced_metrics();
-        // A scanner that finds nothing satisfies the loop below vacuously,
-        // so an objective querying series this process never exports would
-        // pass by naming none of them recognisably.
-        assert!(
-            !referenced.is_empty(),
-            "{}: no metric was recovered from this objective's queries, so the \
-             check below proves nothing about it",
-            spec.name
+        assert_not_vacuous(
+            referenced.len(),
+            &format!("the metrics recovered from {}'s queries", spec.name),
         );
         for metric in referenced {
             if let Some((_, reason)) = ineligible.iter().find(|(name, _)| *name == metric) {
@@ -133,19 +107,16 @@ fn the_scanner_reads_whole_metric_names_only() {
         counter: false,
     };
 
-    // A bare name is recovered.
     assert_eq!(
         spec("sum(foundry_read_served_total)", "vector(1)").referenced_metrics(),
         BTreeSet::from(["foundry_read_served_total".to_owned()]),
     );
-    // A recording rule that merely CONTAINS one is not that metric.
     assert!(
         spec("job:foundry_read_served_total:rate5m", "vector(1)")
             .referenced_metrics()
             .is_empty(),
         "a recording-rule name must not be reported as the metric it derives from"
     );
-    // Nor is a longer name that starts with one.
     assert!(
         spec("foundry_read_served_total_bucket", "vector(1)")
             .referenced_metrics()
@@ -160,18 +131,12 @@ fn the_scanner_reads_whole_metric_names_only() {
     );
 }
 
-/// The ineligible set is FROZEN, and it is currently EMPTY.
+/// The ineligible set is FROZEN, and it is currently EMPTY. Emptiness is the
+/// claim, not the absence of one.
 ///
-/// `objective_eligible` partitions the metric table and nothing else
-/// reconciles it, so the verdict has to be asserted rather than merely
-/// consumed. `foundry_projection_lag` was the sole member until its head
-/// became durable: a gauge that could not move became one that can, so an
-/// objective over it can breach and it is no longer barred.
-///
-/// Emptiness is the claim, not the absence of one. Marking any series
-/// ineligible fails here, which is the point — barring a series from backing
-/// an objective is a judgement a human should confirm, and the reason it
-/// carries is the thing an operator reads when their objective is refused.
+/// Barring a series from backing an objective is a judgement a human should
+/// confirm, and the reason it carries is what an operator reads when their
+/// objective is refused.
 #[tokio::test]
 async fn no_series_is_currently_barred_from_backing_an_objective() {
     let fixture = Fixture::new("slo-eligibility");
@@ -239,4 +204,11 @@ fn no_objective_measures_itself() {
             spec.name
         );
     }
+}
+
+fn assert_not_vacuous(count: usize, what: &str) {
+    assert!(
+        count > 0,
+        "{what} is empty, so every check over it passes vacuously"
+    );
 }

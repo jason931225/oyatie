@@ -1,11 +1,8 @@
-//! The registry seed: the per-tenant `OntologyEngine` the fold and the
-//! writer both read as the law in force.
-//!
 //! The seed is CODE, not configuration, and that is forced rather than
-//! chosen: a handwritten yaml or json is inadmissible at a capability root,
-//! and `OntologyEngine` carries no serialization. The durable, operator-
-//! authored registry is the Ontology Manager vertical's charter; this module
-//! is the seam it will replace and must not quietly grow into it.
+//! chosen: a handwritten yaml or json is inadmissible at a capability root
+//! (ADR-0719), and `OntologyEngine` carries no serialization. The durable,
+//! operator-authored registry is the Ontology Manager vertical's charter;
+//! this module is the seam it will replace and must not quietly grow into it.
 
 use data_boundary_kernel::{DataClass, PrivacyDataClass};
 use data_ontology_kernel::{
@@ -13,11 +10,8 @@ use data_ontology_kernel::{
     EntityTypePropertyDefinition, OntologyEngine, OntologyEngineError, PropertyTier,
 };
 
-/// Why a tenant could not be seeded.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SeedError {
-    /// The tenant id is not the kernel's `ten_` vocabulary, or a definition
-    /// the seed declares was refused by the kernel.
     Refused(OntologyEngineError),
     /// The label this seed classifies its properties with is not a privacy
     /// class. Unreachable while the seed names `InternalOnly`, and typed
@@ -46,16 +40,15 @@ fn internal() -> Result<PrivacyDataClass, SeedError> {
     PrivacyDataClass::try_from(DataClass::InternalOnly).map_err(|_| SeedError::DataClassRefused)
 }
 
-/// The registry for one tenant. Every definition here is law the writer
-/// stamps against and the fold re-checks, so the seed is deliberately the
-/// smallest coherent ontology rather than a demonstration.
 pub fn registry_for(tenant_id: &str) -> Result<OntologyEngine, SeedError> {
     build(tenant_id)
 }
 
+const SEEDED_ENTITY_TYPE: &str = "ety_record";
+
 fn build(tenant_id: &str) -> Result<OntologyEngine, SeedError> {
     let mut engine = OntologyEngine::default();
-    let record = EntityTypeId::new("ety_record")?;
+    let record = EntityTypeId::new(SEEDED_ENTITY_TYPE)?;
     engine.register_entity_type(
         EntityTypeDefinition::new(
             tenant_id,
@@ -85,14 +78,11 @@ fn build(tenant_id: &str) -> Result<OntologyEngine, SeedError> {
     Ok(engine)
 }
 
-/// Every entity type this tenant's registry declares, for the read
-/// surface's type view. The Ontology Manager vertical replaces the seed
-/// with a durable registry; this accessor is the seam it will serve.
 pub fn declared_entity_types<'a>(
     engine: &'a OntologyEngine,
     tenant_id: &str,
 ) -> Vec<&'a EntityTypeDefinition> {
-    [EntityTypeId::new("ety_record")]
+    [EntityTypeId::new(SEEDED_ENTITY_TYPE)]
         .into_iter()
         .flatten()
         .filter_map(|id| engine.entity_type(tenant_id, &id))

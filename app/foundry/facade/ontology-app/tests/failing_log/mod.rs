@@ -1,17 +1,3 @@
-//! A durable log that answers every call with a STORAGE fault.
-//!
-//! Shared because four suites need the same fault on three paths — `append`
-//! on the write side, `replay` on the read side, and `head` for the lag
-//! observation — and two copies of a fault-injection double is the
-//! arrangement where one gets fixed and the other silently stops injecting
-//! the fault it names.
-//!
-//! `Storage` is the adapter-level I/O and corruption variant, not the
-//! caller's idempotency conflict. Installable only because the tenant holds
-//! its log behind the port; producing it from a real SQLite handle would mean
-//! vandalising the database from a second connection and a `rusqlite`
-//! dependency in this crate.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use foundry_ontology_app::{AppState, compose};
@@ -58,7 +44,6 @@ pub fn state_with_a_failing_log(
     state_with_a_failing_log_from(config.clone(), detail)
 }
 
-/// The same, taking the config by value so a caller can vary the roster.
 pub fn state_with_a_failing_log_from(
     config: foundry_ontology_app::Config,
     detail: &'static str,
@@ -118,7 +103,6 @@ impl RecordsLog for HeadFailsOnceLog {
     }
 }
 
-/// Boot normally, then install a log whose head fails only on its first read.
 pub fn state_with_a_transiently_failing_head(
     config: &foundry_ontology_app::Config,
     head_ordinal: u64,

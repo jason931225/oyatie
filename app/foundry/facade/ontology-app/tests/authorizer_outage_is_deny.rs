@@ -1,18 +1,3 @@
-//! When the authorizer cannot answer, the surface refuses — and says so
-//! durably.
-//!
-//! This is the failure the whole deny-by-default posture exists for. A PDP
-//! that errors, or a policy version the process cannot serve, must produce
-//! a refusal and a durable denial record, never a write. The denial trail
-//! is a SEPARATE store from the action log precisely so that recording a
-//! refusal can never be mistaken for performing the action.
-//!
-//! Operator procedure: a boot refusal here means the seed did not compile —
-//! the process never serves a policy set it could not strict-validate, so
-//! there is no degraded mode to diagnose. At runtime, a 403 whose cause
-//! names the authorization gate means the PDP said no or could not answer;
-//! both are the same answer to the caller by design.
-
 #[path = "facade_support/mod.rs"]
 mod support;
 

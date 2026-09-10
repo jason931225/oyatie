@@ -1,12 +1,3 @@
-//! What the attest surface does with a plan it cannot execute, and what it
-//! counts while doing it.
-//!
-//! Split from the tenancy suite because that file reached the 300-line budget
-//! with these unwritten — and they are the half an independent review found
-//! missing, not a rounding-out. A surface whose whole job is to answer "is
-//! this migration owed?" must never answer "no" because it failed to read
-//! the question.
-
 mod facade_support;
 mod migration_support;
 
@@ -64,29 +55,23 @@ async fn the_same_plan_spelled_correctly_is_answered() {
     assert_eq!(status, StatusCode::OK, "{body}");
 }
 
-/// EVERY refusal this surface makes is counted, not one of four.
-///
-/// The metric was asserted only at the tenancy check, so the parse, the
-/// transform-vocabulary and the validate refusals could each stop counting
-/// without any test noticing. A refusal no counter saw is a refusal no
-/// operator sees.
 #[tokio::test]
 async fn every_refusal_site_increments_the_refusal_counter() {
     let fixture = Fixture::new("attest-refusal-accounting");
     let session = Session::from_state(state_with_two_revisions(&fixture.config()));
     let token = Some(fixture.operator_token());
 
-    // 1: unreadable body.
-    let (parse, _) = attest(&session, token, "{not a plan").await;
-    // 2: a conversion this process does not perform.
-    let unknown_conversion = plan_for("ten_acme").replace(
+    let an_unreadable_body = "{not a plan";
+    let a_conversion_this_process_does_not_perform = plan_for("ten_acme").replace(
         r#"{"kind":"copy_as","from":"note","to":"nickname"}"#,
         r#"{"kind":"convert_as","from":"note","to":"nickname","conversion":"nope"}"#,
     );
-    let (conversion, _) = attest(&session, token, &unknown_conversion).await;
-    // 3: a plan the registry refuses.
-    let absent = plan_for("ten_acme").replace("ety_record", "ety_absent");
-    let (validate, _) = attest(&session, token, &absent).await;
+    let a_plan_the_registry_refuses = plan_for("ten_acme").replace("ety_record", "ety_absent");
+
+    let (parse, _) = attest(&session, token, an_unreadable_body).await;
+    let (conversion, _) =
+        attest(&session, token, &a_conversion_this_process_does_not_perform).await;
+    let (validate, _) = attest(&session, token, &a_plan_the_registry_refuses).await;
 
     assert_eq!(
         (parse, conversion, validate),
@@ -138,8 +123,6 @@ async fn a_default_to_transform_is_carried_into_the_attestation() {
     );
 }
 
-/// A default whose `type` is not in the vocabulary is refused as unreadable,
-/// rather than silently dropped by a tolerant deserializer.
 #[tokio::test]
 async fn a_default_of_an_unknown_type_is_refused() {
     let fixture = Fixture::new("attest-default-unknown");
@@ -191,13 +174,6 @@ async fn a_default_does_not_overwrite_a_value_the_object_already_holds() {
     );
 }
 
-/// A default's VARIANT is checked against the target's declared type.
-///
-/// `check_transform` compares the declared scalar against
-/// `DefaultValue::scalar_type()`. An untyped target cannot see this — it
-/// carries the legacy String contract, so every non-string default refuses
-/// alike. `counter` is declared `Integer` so the arms stop being
-/// interchangeable.
 #[tokio::test]
 async fn a_default_whose_variant_does_not_match_the_declared_type_is_refused() {
     let fixture = Fixture::new("attest-typed-default-wrong");
@@ -252,8 +228,6 @@ async fn a_default_carrying_a_field_from_another_variant_is_refused() {
     assert!(!body.contains(r#""fixpoint""#), "{body}");
 }
 
-/// The same law on the transform enum, which the F1 fix also widened and
-/// which nothing else pins.
 #[tokio::test]
 async fn a_transform_carrying_a_field_from_another_kind_is_refused() {
     let fixture = Fixture::new("attest-transform-mixed-fields");

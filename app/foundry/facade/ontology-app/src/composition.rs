@@ -1,14 +1,3 @@
-//! Boot: open the durable stores, seed the registries, replay each tenant's
-//! log into its projection. Every step is fail-closed and ordered so that a
-//! refusal happens before anything is served.
-//!
-//! Two invariants this module exists to hold. First, a configured durable
-//! path that cannot be opened is a BOOT REFUSAL — never an in-memory
-//! fallback, which would serve confident answers from state that does not
-//! survive a restart. Second, the action log and the denial trail are two
-//! distinct stores, so a refusal can never land in the log it was refused
-//! from.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -22,26 +11,29 @@ use crate::authz::PolicyEnforcementPoint;
 use crate::config::Config;
 use crate::seed::registry_for;
 
-/// Why the process refused to boot.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BootError {
-    /// The action log could not be opened at the configured path.
-    ActionLogUnopenable { detail: String },
-    /// The denial trail could not be opened at the configured path.
-    DenialLogUnopenable { detail: String },
+    ActionLogUnopenable {
+        detail: String,
+    },
+    DenialLogUnopenable {
+        detail: String,
+    },
     /// Both logs name one path. A shared store would let a refusal land in
     /// the log it was refused from.
     LogPathsAliased,
-    /// The roster is empty, so the process would serve nothing while
-    /// reporting itself healthy.
     NoTenantsConfigured,
-    /// A tenant's registry could not be seeded.
-    SeedRefused { tenant_id: String, detail: String },
-    /// A tenant's log could not be replayed.
-    ReplayFailed { tenant_id: String, detail: String },
-    /// The policy seed did not compile or strict-validate. The process
-    /// never serves a policy set it could not validate.
-    PolicyRejected { detail: String },
+    SeedRefused {
+        tenant_id: String,
+        detail: String,
+    },
+    ReplayFailed {
+        tenant_id: String,
+        detail: String,
+    },
+    PolicyRejected {
+        detail: String,
+    },
 }
 
 impl std::fmt::Display for BootError {
@@ -82,27 +74,14 @@ impl std::fmt::Display for BootError {
     }
 }
 
-/// One tenant's served state.
 pub struct TenantState {
     pub projection: ProjectionState,
-    /// The durable stores this tenant writes through. They live here, not
-    /// in a shared pool, because a submission needs the action log, the
-    /// denial trail and the projection together under one lock.
     /// Held behind the PORT so a test can install a log that fails on demand.
-    /// A real SQLite handle CAN be driven to failure — a second connection
-    /// dropping the table makes the open handle's next read `Err` — but doing
-    /// that from here would put a `rusqlite` dev-dependency in the facade and
-    /// raw SQL against the adapter's schema in its tests. The tests already
-    /// open `SqliteRecordsLog` by path; it is the SQL, not the coupling, that
-    /// would be new.
     pub action_log: Box<dyn RecordsLog + Send>,
     pub denial_log: Box<dyn RecordsLog + Send>,
 }
 
 impl std::fmt::Debug for TenantState {
-    /// The durable handles carry no derivable Debug and nothing worth
-    /// rendering; what an operator wants is where the fold stands, and
-    /// `sync_status` needs a tenant id this type does not carry.
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("TenantState")
@@ -130,19 +109,9 @@ impl TenantState {
 }
 
 impl TenantState {
-    /// This tenant's log entries AS OF NOW, read from the durable log.
-    ///
-    /// History and audit read through here rather than holding a vector,
-    /// because a retained copy is a second source that can disagree with the
-    /// log — which it did: the boot snapshot this replaced could not show an
-    /// entry the process had since accepted.
-    ///
-    /// Costs a full replay per request — O(tenant log), unbounded and growing
-    /// — and neither caller is paged today, so this is the whole log to
-    /// render one object's history. Callers hold the tenant mutex across it,
-    /// so the observation in `metrics` degrades while it runs. `replay`
-    /// already takes a `from_ordinal`, so bounding it later needs no port
-    /// change.
+    /// Costs a full replay — O(tenant log), unbounded — and callers hold the
+    /// tenant mutex across it, so the observation in `metrics` degrades while
+    /// it runs.
     ///
     /// The `Applied` disposition `audit_view` reports is sound only while
     /// this process is the sole writer: an entry appended below our
@@ -152,7 +121,6 @@ impl TenantState {
         self.action_log.replay(tenant_id, 1)
     }
 
-    /// Where this tenant's fold stands against its log.
     pub fn sync_status(&self, tenant_id: &str) -> Result<SyncStatus, RecordsLogError> {
         Ok(self
             .projection
@@ -166,24 +134,17 @@ impl TenantState {
 #[derive(Debug)]
 pub struct AppState {
     pub tenants: BTreeMap<String, Mutex<TenantState>>,
-    /// The enforcement point every authorized surface consults.
     pub pep: PolicyEnforcementPoint,
-    /// Request accounting the SLO indicators name.
     pub metrics: crate::metrics::Metrics,
-    /// Who this process recognizes. Empty means deny-all serving: a
-    /// process with no roster still answers its probes honestly rather
-    /// than refusing to boot or, worse, serving openly.
     pub operators: Vec<OperatorCredential>,
 }
 
 impl AppState {
-    /// How many tenants this process serves.
     pub fn tenant_count(&self) -> usize {
         self.tenants.len()
     }
 }
 
-/// Boot the process from resolved configuration.
 pub fn compose(config: &Config) -> Result<AppState, BootError> {
     if config.tenants.is_empty() {
         return Err(BootError::NoTenantsConfigured);
@@ -196,14 +157,7 @@ pub fn compose(config: &Config) -> Result<AppState, BootError> {
             detail: format!("{error:?}"),
         }
     })?;
-    // The denial trail is opened at boot for the same reason the action log
-    // is: discovering at refusal time that the trail is unwritable would
-    // mean losing the record of a denial.
-    let _denial_log = SqliteRecordsLog::open(&config.denial_log).map_err(|error| {
-        BootError::DenialLogUnopenable {
-            detail: format!("{error:?}"),
-        }
-    })?;
+    refuse_unless_denial_trail_opens(&config.denial_log)?;
 
     let pep = PolicyEnforcementPoint::load(POLICY_VERSION).map_err(|error| {
         BootError::PolicyRejected {
@@ -252,8 +206,15 @@ pub fn compose(config: &Config) -> Result<AppState, BootError> {
     })
 }
 
-/// The bundle version this build serves. It moves when the seed does.
 const POLICY_VERSION: &str = "psv-000001";
+
+fn refuse_unless_denial_trail_opens(path: &Path) -> Result<(), BootError> {
+    SqliteRecordsLog::open(path)
+        .map(drop)
+        .map_err(|error| BootError::DenialLogUnopenable {
+            detail: format!("{error:?}"),
+        })
+}
 
 /// Two configured paths name one store. Canonicalization is best-effort —
 /// the paths need not exist yet — so a literal match is the fallback.

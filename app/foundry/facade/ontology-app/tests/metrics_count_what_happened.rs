@@ -1,17 +1,3 @@
-//! The counters report what the process actually did.
-//!
-//! Asserting that `/metrics` *mentions* a counter proves nothing: the
-//! exposition emits a `# HELP` and `# TYPE` line for every declared metric
-//! whether or not anything ever increments it. That is how a metric declared
-//! and never sampled survived a suite that claimed to check it. These tests
-//! drive the real router and assert exact VALUE lines, so a counter that
-//! never counts fails here.
-//!
-//! Operator procedure: these values are process-lifetime and unlabelled by
-//! tenant. `/metrics` is unauthenticated by design, so it must not become a
-//! tenancy oracle — that is why an objective over them is a scrape-level
-//! statement and not a per-tenant one.
-
 #[path = "facade_support/mod.rs"]
 mod support;
 
@@ -153,8 +139,6 @@ async fn the_unserved_tenant_refusal_counts() {
     )
     .await;
 
-    // The same branch exists on the write path. Fixing the read side alone
-    // would have left an identical uncounted refusal one module over.
     let before = value_of(
         &scrape(&session).await,
         "foundry_action_submit_refused_total",
@@ -172,8 +156,6 @@ async fn the_unserved_tenant_refusal_counts() {
     );
 }
 
-/// Every route that answers must contribute to the numerator, or an
-/// availability ratio silently under-counts the work the process did.
 #[tokio::test]
 async fn each_read_serving_route_counts_exactly_once() {
     let fixture = Fixture::new("metrics-read-routes");

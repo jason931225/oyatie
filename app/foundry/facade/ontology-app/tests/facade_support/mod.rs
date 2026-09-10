@@ -1,8 +1,3 @@
-//! Shared fixture for the facade's HTTP suites: temp-backed durable stores,
-//! a booted process, and the three credentials the write tests distinguish
-//! between — an in-tenant operator, a foreign-tenant operator, and a
-//! recognized caller holding no role at all.
-
 #![allow(dead_code)]
 
 use std::path::PathBuf;
@@ -108,9 +103,6 @@ impl Fixture {
         ROLELESS_TOKEN
     }
 
-    /// The path of the tenant's action log, so a test can reach the durable
-    /// store directly — to append behind the process's back, as a second
-    /// writer would.
     pub fn action_log_path(&self) -> std::path::PathBuf {
         self.action.clone()
     }
@@ -132,7 +124,6 @@ impl Drop for Fixture {
     }
 }
 
-/// POST a body to the write surface, optionally bearing a credential.
 pub async fn post(fixture: &Fixture, token: Option<&str>, body: &str) -> (StatusCode, String) {
     let mut request = Request::builder()
         .method("POST")
@@ -159,7 +150,6 @@ pub async fn post(fixture: &Fixture, token: Option<&str>, body: &str) -> (Status
     (status, String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// GET a path, optionally bearing a credential.
 pub async fn get(fixture: &Fixture, token: Option<&str>, path: &str) -> (StatusCode, String) {
     let mut request = Request::builder().method("GET").uri(path);
     if let Some(token) = token {
@@ -179,8 +169,6 @@ pub async fn get(fixture: &Fixture, token: Option<&str>, path: &str) -> (StatusC
     (status, String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// Land one record through the REAL write path, so a read test reads what a
-/// write actually produced rather than a hand-built projection.
 pub async fn write_a_record(fixture: &Fixture, object_ref: &str, key: &str) {
     let body = format!(
         r#"{{"object_ref":"{object_ref}","action_type":"aty_record_write","idempotency_key":"{key}","occurred_at_epoch_seconds":1700000000,"properties":{{"name":"Ada"}}}}"#
@@ -212,16 +200,12 @@ impl Fixture {
 }
 
 impl Session {
-    /// Drive a process the caller RETAINS a handle to, so a test can act on
-    /// the same state the router serves — holding a tenant lock, say.
     pub fn from_shared(state: std::sync::Arc<AppState>) -> Self {
         Session {
             router: router_from(state),
         }
     }
 
-    /// Drive a process the caller composed, so a test can install a double
-    /// before the router is built.
     pub fn from_state(state: AppState) -> Self {
         Session {
             router: router(state),
@@ -271,7 +255,6 @@ impl Session {
     }
 }
 
-/// The canonical write body: one record, one spent idempotency key.
 pub const WRITE_BODY: &str = r#"{"object_ref":"ent_alpha","action_type":"aty_record_write","idempotency_key":"idem_1","occurred_at_epoch_seconds":1700000000,"properties":{"name":"Ada"}}"#;
 
 /// Scrape the exposition. UNAUTHENTICATED on purpose: were `/metrics` behind
@@ -283,8 +266,6 @@ pub async fn scrape(session: &Session) -> String {
     body
 }
 
-/// One counter's value, or a panic naming the whole exposition. A metric
-/// that stopped being exported must fail loudly here, never read as zero.
 pub fn value_of(body: &str, metric: &str) -> u64 {
     body.lines()
         .find_map(|line| line.strip_prefix(&format!("{metric} ")))

@@ -1,15 +1,3 @@
-//! A storage fault is the SERVICE's failure, not the caller's.
-//!
-//! `WriteError::Log` carries two variants that mean opposite things.
-//! `IdempotencyConflict` is the caller reusing a spent key on different
-//! content: their mistake, 409, and retrying the same bytes will not help.
-//! `Storage` is an adapter-level I/O or corruption fault: the service's
-//! failure, and retrying may well succeed.
-//!
-//! Answering the second with the first tells a caller their write collided
-//! with itself when the disk was the problem — a cause that did not occur,
-//! blame in the wrong place, and advice against the retry that would work.
-
 mod facade_support;
 mod failing_log;
 use facade_support as support;
@@ -60,8 +48,6 @@ async fn a_storage_fault_is_not_reported_as_an_idempotency_conflict() {
     );
 }
 
-/// The other variant keeps its meaning. A divergent reuse of a spent key is
-/// still the caller's conflict, and splitting the arm must not move it.
 #[tokio::test]
 async fn a_divergent_key_reuse_is_still_the_callers_conflict() {
     let fixture = Fixture::new("storage-fault-conflict");
@@ -81,8 +67,6 @@ async fn a_divergent_key_reuse_is_still_the_callers_conflict() {
     );
 }
 
-/// Both halves count against availability. A submission the service failed
-/// is exactly the kind an availability objective must see.
 #[tokio::test]
 async fn a_storage_fault_counts_as_a_refused_submission() {
     let fixture = Fixture::new("storage-fault-counted");

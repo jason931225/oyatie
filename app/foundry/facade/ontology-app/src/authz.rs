@@ -1,13 +1,3 @@
-//! From a PDP verdict to the kernel's `ActionPolicyDecision` — the one
-//! conversion the write path depends on.
-//!
-//! The decision this produces is minted ONLY from a real Allow: its
-//! `decision_id` is the PDP's own, so the log entry the writer appends is
-//! attributable to the authorization that permitted it. Nothing here
-//! constructs a decision on any other path, which is what keeps
-//! "authorized" from becoming a thing this process can assert about
-//! itself.
-
 use std::collections::BTreeMap;
 
 use data_ontology_kernel::{ActionPolicyDecision, AutonomyTier};
@@ -18,13 +8,6 @@ use shared_platform_contracts_kernel::pdp::{
 
 use crate::pdp::{OPS_CONSOLE, PepError, Surface};
 
-/// Who is calling, as established by the credential — never by a header.
-///
-/// `roles` is part of that establishment, not a convenience: if this
-/// process synthesized role membership for whoever asked, the seed's
-/// `principal is Principal in Role::"foundry-operator"` clause would be
-/// vacuous and the permit would cover the world. A caller presenting no
-/// role is denied by absence of any permit that reaches it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Caller {
     pub tenant_id: String,    // data_class: TENANT_SCOPED
@@ -32,8 +15,6 @@ pub struct Caller {
     pub roles: Vec<String>,   // data_class: TENANT_SCOPED
 }
 
-/// The enforcement point: one guarded PDP and the entity shape the seed
-/// expects.
 pub struct PolicyEnforcementPoint {
     guard: PdpRuntimeGuard,
 }
@@ -48,22 +29,18 @@ impl std::fmt::Debug for PolicyEnforcementPoint {
 }
 
 impl PolicyEnforcementPoint {
-    /// Compile, strict-validate and serve the checked-in seed.
     pub fn load(version: &str) -> Result<Self, PepError> {
         Ok(Self {
             guard: crate::pdp::load_guarded(version)?,
         })
     }
 
-    /// The bundle version currently serving — the operator's handle for
-    /// telling which posture produced a refusal.
     pub fn loaded_policy_version(&self) -> PolicyVersion {
         self.guard.loaded_policy_version()
     }
 
-    /// Decide one request, and on Allow mint the kernel decision the write
-    /// path requires. Every error is a refusal: the port's contract states
-    /// that a PEP must treat any PDP error as deny.
+    /// Every error is a refusal: the port's contract states that a PEP must
+    /// treat any PDP error as deny.
     pub fn decide(
         &self,
         caller: &Caller,
@@ -130,10 +107,6 @@ fn request(caller: &Caller, surface: Surface, object_ref: &str) -> Authorization
     }
 }
 
-/// The entity slice the seed's conditions read. The principal's tenant is
-/// the CALLER's tenant — established by the credential — while the
-/// object's tenant is the one it is addressed under, so a cross-tenant
-/// attempt presents two different tenants and the structural forbid fires.
 fn entities(caller: &Caller, object_ref: &str) -> EntitySlice {
     let role_refs: Vec<EntityRef> = caller
         .roles
@@ -169,8 +142,4 @@ fn entities(caller: &Caller, object_ref: &str) -> EntitySlice {
     EntitySlice { entities: records }
 }
 
-/// The tenant every seeded object belongs to in this lane. The read and
-/// write surfaces bind the object's real tenant once the request handlers
-/// land; until then a single owning tenant keeps the cross-tenant refusal
-/// honest rather than vacuous.
 const TENANT_OF_RECORD: &str = "ten_acme";

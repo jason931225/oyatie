@@ -1,15 +1,3 @@
-//! The write surface: an Action reaches the log only through the writer,
-//! and only for a caller the seed's policy actually permits.
-//!
-//! The tenant a request acts on is taken from the CREDENTIAL, never from
-//! the request body or a header. That is the difference between a surface
-//! that authorizes and one that merely asks who you claim to be: a caller
-//! holding tenant A's token cannot address tenant B by saying so.
-//!
-//! Operator procedure: a 403 carries the refusing gate and its cause. A 401
-//! means the credential itself was not recognized — check the operator
-//! roster the process booted with, not the policy seed.
-
 #[path = "facade_support/mod.rs"]
 mod support;
 
@@ -102,7 +90,6 @@ async fn an_undeclared_property_is_refused_by_the_writer_not_the_surface() {
         r#"{"object_ref":"ent_alpha","action_type":"aty_record_write","idempotency_key":"idem_1","occurred_at_epoch_seconds":1700000000,"properties":{"name":"Ada","nonesuch":"x"}}"#,
     )
     .await;
-    // The registry, not this process, decides what an object may carry.
     assert_eq!(status, StatusCode::FORBIDDEN, "body: {body}");
     assert_eq!(
         fixture.log_head(),

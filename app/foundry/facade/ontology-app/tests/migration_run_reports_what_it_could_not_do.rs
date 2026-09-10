@@ -1,13 +1,3 @@
-//! `POST /v1/migrations/run` — what it reports when it cannot finish.
-//!
-//! The states these cover are the ones the reported fields exist for, and the
-//! only ones that tell an honest report from a flattering constant: at a
-//! clean fixpoint `pending`, `refused`, `conflicted`, `unavailable` and
-//! `poisoned` are all zero and `fixpoint` is true, so a constant equal to
-//! that survives every test in the sibling suite. Each body here is asserted
-//! VERBATIM, because a field asserted at the one value it takes in the one
-//! test that reads it is not pinned.
-
 mod facade_support;
 mod failing_log;
 mod migration_support;
@@ -22,10 +12,10 @@ use migration_support::{plan_for, run, state_with_two_revisions, write_owing};
 ///
 /// This is the state the reported fields exist for, and the only one that
 /// tells an honest report from a flattering constant: at a clean fixpoint
-/// `pending`, `refused`, `conflicted` and `poisoned` are all zero and
-/// `fixpoint` is true, so hardcoding any of them survives every other test in
-/// this file. The store is broken AFTER the object lands, so an object is
-/// genuinely owed and genuinely cannot be written.
+/// `pending`, `refused`, `conflicted`, `unavailable` and `poisoned` are all
+/// zero and `fixpoint` is true, so hardcoding any of them survives every
+/// other test in this file. The store is broken AFTER the object lands, so an
+/// object is genuinely owed and genuinely cannot be written.
 ///
 /// It is a 200, not a refusal: the plan was executable and the run did what it
 /// could. The failure is reported in the body, because a migration that

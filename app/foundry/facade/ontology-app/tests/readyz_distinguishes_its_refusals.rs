@@ -1,12 +1,3 @@
-//! `/readyz` says WHICH kind of not-ready, because they are different facts.
-//!
-//! A tenant that is behind and a tenant nobody could read are both not-ready,
-//! and Kubernetes reads only the status code — both are 503. The body is for
-//! the human reading the event, and answering "lagging" for a tenant whose
-//! head could not be read names a state the process never observed. That is
-//! the failure this vertical's lag signal was rebuilt to stop, one surface
-//! along, so the distinction is asserted rather than described.
-
 mod facade_support;
 mod failing_log;
 mod out_of_band;
@@ -15,13 +6,6 @@ use facade_support as support;
 use axum::http::StatusCode;
 use support::{Fixture, Session};
 
-/// A head the process cannot read is not evidence of being caught up.
-///
-/// `sync_status` became fallible in this change, which is a failure mode
-/// the readiness predicate could not previously face at all — the head came from an
-/// in-memory vector and could not fail. An unpinned `Err` branch on a
-/// readiness probe is a process that answers "ready" over a store it cannot
-/// read.
 #[tokio::test]
 async fn an_unreadable_head_is_not_ready() {
     let fixture = Fixture::new("lag-unreadable-readyz");
@@ -42,17 +26,12 @@ async fn an_unreadable_head_is_not_ready() {
         StatusCode::SERVICE_UNAVAILABLE,
         "the probe must refuse, not answer ready over an unreadable log"
     );
-    // WHICH refusal, not merely that it refused. Reporting an unobservable
-    // tenant as "lagging" names a state the process never observed.
     assert_eq!(
         body, "unobserved\n",
         "a tenant nobody could read is not a tenant known to be behind"
     );
 }
 
-/// The other refusal keeps its own name. A projection genuinely behind its
-/// log is "lagging", and an unobservable one is not — collapsing them would
-/// put a state the process never saw in front of an operator.
 #[tokio::test]
 async fn a_lagging_process_says_lagging() {
     let fixture = Fixture::new("readyz-lagging");
@@ -71,11 +50,6 @@ async fn a_lagging_process_says_lagging() {
     );
 }
 
-/// And a BUSY tenant gets its own word.
-///
-/// It was observable; only this pass missed it. Reporting it as "unobserved"
-/// names a state the process never saw, and reporting it as "lagging" names
-/// one it never measured — the two errors this file exists to keep apart.
 #[tokio::test]
 async fn a_contended_tenant_says_contended() {
     let fixture = Fixture::new("readyz-contended");

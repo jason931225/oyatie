@@ -7,13 +7,6 @@
 //! action, so even a permitted role is refused across tenants; and the
 //! fold poisons a cross-tenant envelope, so the projection could not serve
 //! one even if the first two were bypassed.
-//!
-//! Operator procedure: a 403 here is the intended answer, not an outage.
-//! If a cross-tenant read ever returned 404 instead, that would be a
-//! REGRESSION worth escalating — a distinguishable "not found" tells the
-//! caller the object is absent from a tenant they were never entitled to
-//! ask about.
-
 #[path = "facade_support/mod.rs"]
 mod support;
 

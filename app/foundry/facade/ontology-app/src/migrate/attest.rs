@@ -1,14 +1,3 @@
-//! `POST /v1/migrations/attest` — what a plan still owes.
-//!
-//! A READ of the projection dressed as a POST, because a plan does not fit in
-//! a query string. Gated on `Use`, not `Invoke`, and it mutates nothing: the
-//! attestation is pure and recomputable at any time.
-//!
-//! The plan is VALIDATED against the tenant's registry before it is attested,
-//! by the same `MigrationPlan::validate` the runner calls and against the same
-//! `registry_input` the runner admits from, so an attestation can never claim
-//! a fixpoint over a plan the runner would refuse to execute.
-
 use std::sync::Arc;
 
 use axum::Json;
@@ -46,7 +35,6 @@ pub async fn attest(
             "the request is not a migration plan",
         );
     };
-    // The credential's tenant, checked rather than substituted.
     if request.tenant_id != caller.tenant_id {
         state.metrics.read_refused();
         return refuse(
