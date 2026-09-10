@@ -29,9 +29,11 @@ for f in $staged; do
 done
 unset IFS
 
-# One invocation over real paths: rustfmt exits non-zero for a file, but exits 0 for stdin even
-# when it prints a diff, so a stdin pipeline would look strict and gate nothing.
-if (cd "$tmp" && find . -name '*.rs' -exec rustfmt --check --config-path "$top/rustfmt.toml" -- {} +); then
+# Real paths, not stdin: rustfmt exits 0 for stdin even when it prints a diff, so piping the
+# staged bytes in would look strict and gate nothing. The file list still reaches xargs -0 rustfmt.
+extracted=$(cd "$tmp" && find . -name '*.rs' | wc -l)
+[ "$extracted" -gt 0 ] || { echo "pre-commit: extracted no staged Rust; refusing to pass blind" >&2; exit 1; }
+if (cd "$tmp" && find . -name '*.rs' -print0 | xargs -0 rustfmt --check --config-path "$top/rustfmt.toml" --); then
   exit 0
 fi
 echo "" >&2

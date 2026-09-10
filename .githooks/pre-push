@@ -38,8 +38,12 @@ for f in $changed; do
 done
 unset IFS
 
-# rustfmt exits 0 for stdin even when it prints a diff, so this must run over real paths.
-if (cd "$tmp" && find . -name '*.rs' -exec rustfmt --check --config-path "$top/rustfmt.toml" -- {} +); then
+# A range can change only files that no longer exist at HEAD, leaving nothing to check. That is a
+# pass, and it must be decided here: GNU xargs runs its command once on empty input, which would
+# hand rustfmt the push ref list on stdin, and rustfmt exits 0 for stdin even when it prints a diff.
+extracted=$(cd "$tmp" && find . -name '*.rs' | wc -l)
+[ "$extracted" -gt 0 ] || exit 0
+if (cd "$tmp" && find . -name '*.rs' -print0 | xargs -0 rustfmt --check --config-path "$top/rustfmt.toml" --); then
   exit 0
 fi
 echo "" >&2
