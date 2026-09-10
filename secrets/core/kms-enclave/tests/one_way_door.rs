@@ -9,6 +9,7 @@
 use std::fmt::Write as _;
 use std::marker::PhantomData;
 
+use secrets_kms_enclave::mlocked::MlockedKey;
 use secrets_kms_enclave::{
     DekId, DekMaterial, EnclaveRoot, KekId, KekMaterial, KekVersion, KekVersionChain, SealingRootId,
 };
@@ -47,6 +48,7 @@ fn key_material_types_are_not_clone() {
     assert_not_clone!(KekMaterial);
     assert_not_clone!(DekMaterial);
     assert_not_clone!(KekVersionChain);
+    assert_not_clone!(MlockedKey);
     assert!(CloneProbe::<String>(PhantomData).detect());
 }
 
