@@ -14,10 +14,12 @@ fn help_and_ready_succeed() {
     assert_eq!(run(&args(&["ready"])), ExitCode::SUCCESS);
 }
 
-/// Every command in `cli::COMMANDS` reaches its handler.
+/// The commands in `cli::COMMANDS` this test invokes directly. `help` and `ready` are covered by
+/// `help_and_ready_succeed` above and `survey` by `survey_reaches_its_handler` below; the three
+/// together are what reach every command.
 ///
 /// Kept in step with that list by hand, because an integration test cannot see a `pub(crate)`
-/// const; `run_dispatches_exactly_the_listed_commands` is what holds the list itself honest.
+/// const; `dispatch_arm_lines_agree_with_the_command_list` is what holds the list itself honest.
 #[test]
 fn every_command_succeeds_on_a_valid_invocation() {
     use std::time::{SystemTime, UNIX_EPOCH};

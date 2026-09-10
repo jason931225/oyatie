@@ -22,8 +22,8 @@ use seams::{
 /// reachable as `-h` and `--help`; those are argv spellings, not commands of their own.
 ///
 /// Neither the usage text below nor the dispatch is a second copy of this list:
-/// `usage_documents_exactly_the_listed_commands` and `run_dispatches_exactly_the_listed_commands`
-/// hold each of them against it.
+/// `usage_documents_exactly_the_listed_commands` holds the usage text against it, and
+/// `dispatch_arm_lines_agree_with_the_command_list` holds the `match` arm lines.
 pub(crate) const COMMANDS: &[&str] = &[
     "help",
     "ready",
@@ -157,9 +157,14 @@ mod tests {
     /// whatever both were written to say, and an arm added to `run` alone is what nothing else
     /// here can see.
     ///
-    /// An arm whose pattern is not string literals alone yields its own text in place of tokens,
-    /// so a `const`, a guard, or a `_` above `other` fails the comparison instead of passing
-    /// through it unread.
+    /// The unit is a line carrying `=>` between `match cmd {` and the fallback arm. Everything
+    /// left of the `=>` and outside the quotes must be whitespace or `|`, so a `const`, a guard
+    /// or a `_` written on such a line yields that text in place of tokens and the comparison
+    /// names it.
+    ///
+    /// Known escapes, not claimed closed: a pattern wrapped onto a line of its own carries no
+    /// `=>` and is skipped, and a dispatch outside the `match`, before it or after it, never
+    /// enters the window. Both survive `cargo fmt`. Nothing here says the list is complete.
     fn dispatched() -> Vec<&'static str> {
         include_str!("mod.rs")
             .lines()
@@ -192,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn run_dispatches_exactly_the_listed_commands() {
+    fn dispatch_arm_lines_agree_with_the_command_list() {
         let expected: Vec<&str> = COMMANDS
             .iter()
             .flat_map(|cmd| match *cmd {
@@ -203,8 +208,8 @@ mod tests {
         assert_eq!(
             dispatched(),
             expected,
-            "`run` dispatches a command COMMANDS does not carry, or has stopped dispatching one \
-             it does"
+            "a dispatch arm line carries a command COMMANDS does not, or COMMANDS carries one no \
+             arm line does"
         );
     }
 }
