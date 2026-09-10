@@ -125,22 +125,12 @@ fn get_object_api_maps_not_found_and_tenant_drift_explicitly() {
     ));
 }
 
-// ---------------------------------------------------------------------------
-// cso-1 / cso-2 / cso-3: expanded idempotency replay surface coverage
-// These tests pin behavioral contracts from the slice spec that are not yet
-// asserted in the existing suite.
-// ---------------------------------------------------------------------------
 
-/// Replayed response preserves the ORIGINAL request's `request_id`, not the
-/// second caller's.  This is the deterministic-replay contract: the recorded
-/// success is returned verbatim regardless of what `request_id` the replay
-/// caller supplies.
 #[test]
 fn replayed_response_preserves_first_request_id_not_second_callers() {
     let mut catalog = catalog_with_active_bucket();
     let mut ledger = CloudStorageObjectPutIdempotencyLedger::default();
 
-    // First PUT — request_id "req-replay-first".
     let first = put_cloud_storage_object_from_api(
         &mut catalog,
         &mut ledger,
@@ -149,7 +139,6 @@ fn replayed_response_preserves_first_request_id_not_second_callers() {
     .expect("first PUT succeeds");
     assert_eq!(first.metadata.request_id, "req-replay-first");
 
-    // Second PUT — same idempotency key, DIFFERENT request_id.
     let replayed = put_cloud_storage_object_from_api(
         &mut catalog,
         &mut ledger,
@@ -157,7 +146,6 @@ fn replayed_response_preserves_first_request_id_not_second_callers() {
     )
     .expect("replay with same fingerprint succeeds");
 
-    // The replayed response must carry the FIRST request_id, not the second.
     assert_eq!(
         replayed.metadata.request_id, "req-replay-first",
         "replay must return the stored response verbatim (S3/GCS deterministic-replay semantics)"
@@ -166,15 +154,11 @@ fn replayed_response_preserves_first_request_id_not_second_callers() {
     assert_eq!(catalog.objects().count(), 1);
 }
 
-/// Two principals in the same tenant with the same idempotency key string are
-/// recorded as INDEPENDENT ledger entries.  Each entry tracks its own
-/// fingerprint and result; they must not interfere with each other.
 #[test]
 fn composite_key_isolates_principal_scope() {
     let mut catalog = catalog_with_active_bucket();
     let mut ledger = CloudStorageObjectPutIdempotencyLedger::default();
 
-    // Build a request for principal "sp_alpha".
     let alpha_request = CloudStorageObjectPutApiRequest {
         path_bucket_id: BUCKET_ID.to_string(),
         path_object_key: "workspace/alpha.pdf".to_string(),
@@ -188,7 +172,6 @@ fn composite_key_isolates_principal_scope() {
         body: put_body(BUCKET_ID, "workspace/alpha.pdf"),
     };
 
-    // Build a request for principal "sp_beta" — SAME idempotency key string.
     let beta_request = CloudStorageObjectPutApiRequest {
         path_bucket_id: BUCKET_ID.to_string(),
         path_object_key: "workspace/beta.pdf".to_string(),
@@ -207,7 +190,6 @@ fn composite_key_isolates_principal_scope() {
     put_cloud_storage_object_from_api(&mut catalog, &mut ledger, beta_request)
         .expect("sp_beta PUT with same idempotency key string but different principal succeeds");
 
-    // Ledger must hold TWO independent entries.
     assert_eq!(
         ledger.len(),
         2,
@@ -215,7 +197,6 @@ fn composite_key_isolates_principal_scope() {
     );
     assert_eq!(catalog.objects().count(), 2);
 
-    // peek for each principal returns their own entry.
     let alpha_entry = ledger
         .peek(
             "ten_alpha",

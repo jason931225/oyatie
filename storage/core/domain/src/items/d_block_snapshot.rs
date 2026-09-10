@@ -1,8 +1,7 @@
-// Volume snapshots remain block behavior pending the separately promoted block facade.
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SnapshotId {
-    pub value: String, // data_class: INTERNAL_ONLY
+    pub value: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -15,25 +14,25 @@ pub enum SnapshotState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SnapshotCreate {
-    pub id: String,                    // data_class: INTERNAL_ONLY
-    pub tenant_id: String,             // data_class: INTERNAL_ONLY
-    pub source_volume_id: String,      // data_class: INTERNAL_ONLY
-    pub region: String,                // data_class: PUBLIC
-    pub data_class: DataClass,         // data_class: INTERNAL_ONLY
-    pub state: SnapshotState,          // data_class: PUBLIC
-    pub created_at_epoch_seconds: u64, // data_class: INTERNAL_ONLY
+    pub id: String,
+    pub tenant_id: String,
+    pub source_volume_id: String,
+    pub region: String,
+    pub data_class: DataClass,
+    pub state: SnapshotState,
+    pub created_at_epoch_seconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VolumeSnapshot {
-    pub id: Classified<SnapshotId>,    // data_class: INTERNAL_ONLY
-    pub tenant_id: Classified<String>, // data_class: INTERNAL_ONLY
-    pub source_volume_id: Classified<ResourceId>, // data_class: INTERNAL_ONLY
-    pub region: Classified<RegionCode>, // data_class: PUBLIC
-    pub data_class: Classified<PrivacyDataClass>, // data_class: INTERNAL_ONLY
-    pub state: Classified<SnapshotState>, // data_class: PUBLIC
-    pub created_at_epoch_seconds: Classified<u64>, // data_class: INTERNAL_ONLY
-    pub schema_version: Classified<u32>, // data_class: PUBLIC
+    pub id: Classified<SnapshotId>,
+    pub tenant_id: Classified<String>,
+    pub source_volume_id: Classified<ResourceId>,
+    pub region: Classified<RegionCode>,
+    pub data_class: Classified<PrivacyDataClass>,
+    pub state: Classified<SnapshotState>,
+    pub created_at_epoch_seconds: Classified<u64>,
+    pub schema_version: Classified<u32>,
 }
 
 impl SnapshotId {

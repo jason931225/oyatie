@@ -1,5 +1,5 @@
-//! Decrypt-only key-version rotation (AWS KMS version-rotation precedent,
-//! ADR-0536 D-8).
+//! Decrypt-only key-version rotation, on the AWS KMS version-rotation
+//! precedent.
 //!
 //! Rotation creates a NEW key version that encrypts forward; every prior
 //! version is demoted to [`DecryptOnlyKek`], a type with no wrap API, so
@@ -21,12 +21,10 @@ pub struct DecryptOnlyKek {
 }
 
 impl DecryptOnlyKek {
-    /// Version of the retired KEK.
     pub fn version(&self) -> KekVersion {
         self.inner.version()
     }
 
-    /// Unwrap a DEK wrapped by this retired version.
     pub fn unwrap_dek(&self, wrapped: &WrappedDek) -> Result<DekMaterial, EnclaveError> {
         self.inner.unwrap_dek(wrapped)
     }
@@ -50,7 +48,6 @@ pub struct KekVersionChain {
 }
 
 impl KekVersionChain {
-    /// Start a chain at its initial (or recovered) version.
     pub fn new(initial: KekMaterial) -> Self {
         Self {
             current: initial,
@@ -58,17 +55,14 @@ impl KekVersionChain {
         }
     }
 
-    /// Identifier of the KEK this chain manages.
     pub fn kek_id(&self) -> &KekId {
         self.current.kek_id()
     }
 
-    /// The version new wraps are bound to.
     pub fn current_version(&self) -> KekVersion {
         self.current.version()
     }
 
-    /// Retired (decrypt-only) versions, ascending.
     pub fn retired_versions(&self) -> impl Iterator<Item = KekVersion> + '_ {
         self.retired.values().map(DecryptOnlyKek::version)
     }
@@ -92,7 +86,6 @@ impl KekVersionChain {
         Ok(next_version)
     }
 
-    /// Generate a DEK under the CURRENT version only.
     pub fn generate_dek(&self, dek_id: DekId) -> Result<(DekMaterial, WrappedDek), EnclaveError> {
         self.current.generate_dek(dek_id)
     }

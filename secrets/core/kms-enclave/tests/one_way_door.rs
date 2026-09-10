@@ -1,5 +1,5 @@
-//! Type-system one-way door checks (ADR-0536 D-8: key material cannot leave
-//! the crypto boundary).
+//! Type-system one-way door checks: key material cannot leave the crypto
+//! boundary.
 //!
 //! The door is enforced by what the types do NOT implement. `Clone`,
 //! `serde::Serialize`-style egress, and byte accessors are absent by
@@ -47,7 +47,6 @@ fn key_material_types_are_not_clone() {
     assert_not_clone!(KekMaterial);
     assert_not_clone!(DekMaterial);
     assert_not_clone!(KekVersionChain);
-    // Sanity: the probe itself detects Clone types.
     assert!(CloneProbe::<String>(PhantomData).detect());
 }
 
@@ -76,15 +75,11 @@ fn debug_output_never_carries_key_bytes() {
 
 #[test]
 fn wrapped_forms_are_the_only_egress() {
-    // The public API offers exactly one way to externalize a KEK — wrap_kek
-    // — and the result round-trips only through unwrap_kek on the same root.
     let root = EnclaveRoot::generate(SealingRootId::new("cell-1-root").unwrap()).unwrap();
     let kek =
         KekMaterial::generate(KekId::new("kek/ten_alpha").unwrap(), KekVersion::INITIAL).unwrap();
     let token = root.wrap_kek(&kek).unwrap();
 
-    // The token exposes header metadata but its ciphertext is opaque: it
-    // differs from the (unobservable) key and authenticates only intact.
     assert_eq!(token.kek_id().value(), "kek/ten_alpha");
     assert_eq!(token.kek_version(), 1);
     assert!(root.unwrap_kek(&token).is_ok());

@@ -1,9 +1,8 @@
 //! Unagreed object and block backend-provider contract.
 //!
-//! This owner-local draft isolates removable S3/OCI backend semantics from the
-//! storage core. It is not the sold S3 facade and must not be consumed by other
-//! owners. `storage-domain` re-exports these types during the P0 compatibility
-//! window.
+//! This owner-local draft isolates removable S3/OCI backend semantics
+//! from the storage core. It is not the sold S3 facade and must not be
+//! consumed by other owners.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]

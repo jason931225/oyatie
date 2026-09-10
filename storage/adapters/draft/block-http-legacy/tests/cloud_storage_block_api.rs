@@ -1,4 +1,3 @@
-// Compatibility tests intentionally use panic helpers to assert invariants.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use storage_block_http_legacy_draft::{

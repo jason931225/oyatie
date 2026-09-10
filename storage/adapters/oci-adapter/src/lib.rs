@@ -1,7 +1,7 @@
 //! Deprecated package identity for the combined OCI provider compatibility adapter.
 //!
-//! Object and block implementations remain independent modules and emit only
-//! deterministic command and receipt projections.
+//! The implementation emits deterministic command and receipt projections only;
+//! it has no credentialed network execution or durability authority.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![forbid(unsafe_code)]

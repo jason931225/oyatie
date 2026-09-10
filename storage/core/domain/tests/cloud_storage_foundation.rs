@@ -1,4 +1,3 @@
-// ADR-0083 Tier 3: integration tests use `.expect()` / `.expect_err()` to assert invariants.
 #![allow(clippy::expect_used, clippy::panic)]
 
 use storage_domain::{

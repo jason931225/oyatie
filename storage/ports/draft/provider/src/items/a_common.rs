@@ -106,6 +106,6 @@ impl StorageBlockOperation {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct VolumePerformance {
-    pub iops: u64,            // data_class: PUBLIC
-    pub throughput_mbps: u64, // data_class: PUBLIC
+    pub iops: u64,
+    pub throughput_mbps: u64,
 }
